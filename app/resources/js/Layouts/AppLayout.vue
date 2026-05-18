@@ -2,18 +2,21 @@
 import { ref, computed } from 'vue'
 import { usePage, router } from '@inertiajs/vue3'
 import { useTheme } from '@/composables/useTheme'
+import { useAuth } from '@/composables/useAuth'
 
 const page = usePage()
 const user = computed(() => page.props.auth?.user)
 const { theme } = useTheme()
+const { can } = useAuth()
 
 const sidebarOpen = ref(true)
 const mobileMenuOpen = ref(false)
 
-const menuItems = [
-    { label: 'Dashboard', icon: 'pi pi-home', href: '/dashboard' },
-    { label: 'Aparência', icon: 'pi pi-palette', href: '/settings/aparencia' },
-]
+const menuItems = computed(() => [
+    { label: 'Dashboard', icon: 'pi pi-home', href: '/dashboard', show: true },
+    { label: 'Usuários', icon: 'pi pi-users', href: '/usuarios', show: can('usuarios.listar') },
+    { label: 'Aparência', icon: 'pi pi-palette', href: '/settings/aparencia', show: can('aparencia.editar') },
+].filter(item => item.show))
 
 const searchQuery = ref('')
 
@@ -35,8 +38,8 @@ function isActive(href) {
 }
 
 const filteredMenuItems = computed(() => {
-    if (!searchQuery.value) return menuItems
-    return menuItems.filter(item =>
+    if (!searchQuery.value) return menuItems.value
+    return menuItems.value.filter(item =>
         item.label.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
 })
