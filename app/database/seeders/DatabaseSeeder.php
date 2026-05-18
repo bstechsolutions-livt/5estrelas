@@ -9,6 +9,10 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->call([
+            SettingsSeeder::class,
+        ]);
+
         User::firstOrCreate(
             ['email' => 'admin@5estrelas.com.br'],
             [
