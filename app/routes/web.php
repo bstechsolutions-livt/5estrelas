@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\NewPasswordController;
+use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
@@ -12,6 +14,13 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'show'])->name('login');
     Route::post('/login', [LoginController::class, 'store']);
+
+    // Recuperação de senha
+    Route::get('/esqueci-senha', [PasswordResetLinkController::class, 'show'])->name('password.request');
+    Route::post('/esqueci-senha', [PasswordResetLinkController::class, 'store'])->name('password.email');
+
+    Route::get('/redefinir-senha/{token}', [NewPasswordController::class, 'show'])->name('password.reset');
+    Route::post('/redefinir-senha', [NewPasswordController::class, 'store'])->name('password.update');
 });
 
 // Authenticated routes

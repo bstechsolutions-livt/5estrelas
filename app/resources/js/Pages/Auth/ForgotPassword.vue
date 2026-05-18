@@ -1,17 +1,16 @@
 <script setup>
-import { computed } from 'vue'
-import { useForm, Link } from '@inertiajs/vue3'
+import { computed, watch } from 'vue'
+import { useForm, usePage, Link } from '@inertiajs/vue3'
 import InputText from 'primevue/inputtext'
-import Password from 'primevue/password'
 import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
+import Message from 'primevue/message'
 import { useTheme } from '@/composables/useTheme'
 
 const { theme } = useTheme()
+const page = usePage()
 
 const appName = computed(() => theme.value?.app_name || '5 Estrelas')
 const logoUrl = computed(() => theme.value?.logo_url)
-const logoMobileUrl = computed(() => theme.value?.logo_mobile_url || theme.value?.logo_url)
 const loginBgUrl = computed(() => theme.value?.login_bg_url)
 const loginBgMobileUrl = computed(() => theme.value?.login_bg_mobile_url || theme.value?.login_bg_url)
 const primaryColor = computed(() => theme.value?.primary_color || '#3b82f6')
@@ -23,7 +22,6 @@ const initials = computed(() => {
     return appName.value.substring(0, 2).toUpperCase()
 })
 
-// Background responsivo: usa media query CSS via gradient + background-image com url-set
 const bgStyle = computed(() => {
     const desktop = loginBgUrl.value
     const mobile = loginBgMobileUrl.value
@@ -42,15 +40,16 @@ const hasLoginBg = computed(() => !!(loginBgUrl.value || loginBgMobileUrl.value)
 
 const form = useForm({
     email: '',
-    password: '',
-    remember: false,
 })
 
 function submit() {
-    form.post('/login', {
-        onFinish: () => form.reset('password'),
+    form.post('/esqueci-senha', {
+        preserveScroll: true,
+        onSuccess: () => form.reset(),
     })
 }
+
+const successMessage = computed(() => page.props.flash?.success)
 </script>
 
 <template>
@@ -73,11 +72,19 @@ function submit() {
                 />
                 <template v-if="!logoUrl">
                     <h1 class="text-2xl font-bold text-white drop-shadow-lg">{{ appName }}</h1>
-                    <p class="text-gray-200 text-sm mt-1 drop-shadow">Acesse sua conta</p>
                 </template>
             </div>
 
             <form @submit.prevent="submit" class="bg-white rounded-2xl shadow-xl p-8 space-y-5">
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-800 mb-1">Esqueci minha senha</h2>
+                    <p class="text-sm text-gray-500">Informe seu e-mail e enviaremos um link para redefinir sua senha.</p>
+                </div>
+
+                <Message v-if="successMessage" severity="success" :closable="false">
+                    {{ successMessage }}
+                </Message>
+
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">E-mail</label>
                     <InputText
@@ -87,45 +94,24 @@ function submit() {
                         class="w-full"
                         :invalid="!!form.errors.email"
                     />
-                    <small v-if="form.errors.email" class="text-red-500 text-xs mt-1">
+                    <small v-if="form.errors.email" class="text-red-500 text-xs mt-1 block">
                         {{ form.errors.email }}
                     </small>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Senha</label>
-                    <Password
-                        v-model="form.password"
-                        placeholder="••••••••"
-                        :feedback="false"
-                        toggleMask
-                        class="w-full"
-                        inputClass="w-full"
-                        :invalid="!!form.errors.password"
-                    />
-                    <small v-if="form.errors.password" class="text-red-500 text-xs mt-1">
-                        {{ form.errors.password }}
-                    </small>
-                </div>
-
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <Checkbox v-model="form.remember" :binary="true" inputId="remember" />
-                        <label for="remember" class="text-sm text-gray-600 cursor-pointer">
-                            Lembrar-me
-                        </label>
-                    </div>
-                    <Link href="/esqueci-senha" class="text-sm text-blue-600 hover:underline">
-                        Esqueci minha senha
-                    </Link>
-                </div>
-
                 <Button
                     type="submit"
-                    label="Entrar"
+                    label="Enviar link"
+                    icon="pi pi-send"
                     :loading="form.processing"
                     class="w-full"
                 />
+
+                <div class="text-center pt-2">
+                    <Link href="/login" class="text-sm text-gray-600 hover:underline">
+                        ← Voltar ao login
+                    </Link>
+                </div>
             </form>
         </div>
     </div>

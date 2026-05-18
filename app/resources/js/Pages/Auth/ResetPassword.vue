@@ -4,14 +4,17 @@ import { useForm, Link } from '@inertiajs/vue3'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
 import { useTheme } from '@/composables/useTheme'
+
+const props = defineProps({
+    token: String,
+    email: String,
+})
 
 const { theme } = useTheme()
 
 const appName = computed(() => theme.value?.app_name || '5 Estrelas')
 const logoUrl = computed(() => theme.value?.logo_url)
-const logoMobileUrl = computed(() => theme.value?.logo_mobile_url || theme.value?.logo_url)
 const loginBgUrl = computed(() => theme.value?.login_bg_url)
 const loginBgMobileUrl = computed(() => theme.value?.login_bg_mobile_url || theme.value?.login_bg_url)
 const primaryColor = computed(() => theme.value?.primary_color || '#3b82f6')
@@ -23,7 +26,6 @@ const initials = computed(() => {
     return appName.value.substring(0, 2).toUpperCase()
 })
 
-// Background responsivo: usa media query CSS via gradient + background-image com url-set
 const bgStyle = computed(() => {
     const desktop = loginBgUrl.value
     const mobile = loginBgMobileUrl.value
@@ -41,14 +43,15 @@ const bgStyle = computed(() => {
 const hasLoginBg = computed(() => !!(loginBgUrl.value || loginBgMobileUrl.value))
 
 const form = useForm({
-    email: '',
+    token: props.token,
+    email: props.email,
     password: '',
-    remember: false,
+    password_confirmation: '',
 })
 
 function submit() {
-    form.post('/login', {
-        onFinish: () => form.reset('password'),
+    form.post('/redefinir-senha', {
+        onFinish: () => form.reset('password', 'password_confirmation'),
     })
 }
 </script>
@@ -56,7 +59,6 @@ function submit() {
 <template>
     <div :class="['min-h-screen flex items-center justify-center px-4', hasLoginBg ? 'login-bg' : '']" :style="bgStyle">
         <div class="w-full max-w-md">
-            <!-- Logo -->
             <div class="text-center mb-8">
                 <div
                     v-if="!logoUrl"
@@ -73,59 +75,71 @@ function submit() {
                 />
                 <template v-if="!logoUrl">
                     <h1 class="text-2xl font-bold text-white drop-shadow-lg">{{ appName }}</h1>
-                    <p class="text-gray-200 text-sm mt-1 drop-shadow">Acesse sua conta</p>
                 </template>
             </div>
 
             <form @submit.prevent="submit" class="bg-white rounded-2xl shadow-xl p-8 space-y-5">
                 <div>
+                    <h2 class="text-xl font-semibold text-gray-800 mb-1">Redefinir senha</h2>
+                    <p class="text-sm text-gray-500">Defina uma nova senha para acessar sua conta.</p>
+                </div>
+
+                <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">E-mail</label>
                     <InputText
                         v-model="form.email"
                         type="email"
-                        placeholder="seu@email.com"
                         class="w-full"
                         :invalid="!!form.errors.email"
+                        readonly
                     />
-                    <small v-if="form.errors.email" class="text-red-500 text-xs mt-1">
+                    <small v-if="form.errors.email" class="text-red-500 text-xs mt-1 block">
                         {{ form.errors.email }}
                     </small>
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Senha</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Nova senha</label>
                     <Password
                         v-model="form.password"
-                        placeholder="••••••••"
-                        :feedback="false"
+                        :feedback="true"
                         toggleMask
                         class="w-full"
                         inputClass="w-full"
                         :invalid="!!form.errors.password"
+                        promptLabel="Digite a nova senha"
+                        weakLabel="Fraca"
+                        mediumLabel="Média"
+                        strongLabel="Forte"
                     />
-                    <small v-if="form.errors.password" class="text-red-500 text-xs mt-1">
-                        {{ form.errors.password }}
-                    </small>
+                    <small v-if="form.errors.password" class="text-red-500 text-xs mt-1 block">{{ form.errors.password }}</small>
+                    <small v-else class="text-gray-500 text-xs mt-1 block">Mínimo 8 caracteres</small>
                 </div>
 
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <Checkbox v-model="form.remember" :binary="true" inputId="remember" />
-                        <label for="remember" class="text-sm text-gray-600 cursor-pointer">
-                            Lembrar-me
-                        </label>
-                    </div>
-                    <Link href="/esqueci-senha" class="text-sm text-blue-600 hover:underline">
-                        Esqueci minha senha
-                    </Link>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Confirmar senha</label>
+                    <Password
+                        v-model="form.password_confirmation"
+                        :feedback="false"
+                        toggleMask
+                        class="w-full"
+                        inputClass="w-full"
+                    />
                 </div>
 
                 <Button
                     type="submit"
-                    label="Entrar"
+                    label="Redefinir e entrar"
+                    icon="pi pi-check"
                     :loading="form.processing"
                     class="w-full"
                 />
+
+                <div class="text-center pt-2">
+                    <Link href="/login" class="text-sm text-gray-600 hover:underline">
+                        ← Voltar ao login
+                    </Link>
+                </div>
             </form>
         </div>
     </div>
