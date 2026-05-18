@@ -1,0 +1,36 @@
+# Laravel app folder
+app/node_modules
+app/public/build
+app/public/hot
+app/public/storage
+app/storage/*.key
+app/storage/pail
+app/storage/app/private
+app/storage/app/public
+app/storage/framework/cache
+app/storage/framework/sessions
+app/storage/framework/testing
+app/storage/framework/views
+app/storage/logs
+app/vendor
+app/.env
+app/.env.backup
+app/.env.production
+app/.phpunit.cache
+app/.phpunit.result.cache
+app/auth.json
+app/_ide_helper.php
+app/Homestead.json
+app/Homestead.yaml
+app/database/database.sqlite
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.nova/
+.zed/
+.cursor/
+.codex
+*.log

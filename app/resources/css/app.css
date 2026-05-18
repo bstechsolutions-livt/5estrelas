@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@import "primeicons/primeicons.css";
+
+:root {
+    --p-primary-color: #3b82f6;
+    --p-primary-color-hover: #2563eb;
+    --sidebar-bg: #1e1e2d;
+    --sidebar-text: #a1a5b7;
+    --sidebar-text-active: #ffffff;
+    --sidebar-width: 260px;
+    --sidebar-collapsed-width: 70px;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
