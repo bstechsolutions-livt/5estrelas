@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
@@ -18,6 +19,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Perfil (qualquer autenticado)
+    Route::get('/perfil', [ProfileController::class, 'show'])->name('profile.show');
+    Route::post('/perfil', [ProfileController::class, 'updateProfile'])->name('profile.update');
+    Route::put('/perfil/senha', [ProfileController::class, 'updatePassword'])->name('profile.password');
+    Route::delete('/perfil/avatar', [ProfileController::class, 'removeAvatar'])->name('profile.avatar.remove');
 
     // Usuários
     Route::middleware('permission:usuarios.listar')->group(function () {

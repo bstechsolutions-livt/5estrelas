@@ -209,17 +209,23 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" :style="{ backgroundColor: primaryColor, color: 'var(--app-primary-text)' }">
-                            <span class="text-sm font-semibold">
+                    <button
+                        type="button"
+                        class="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                        @click="navigate('/perfil')"
+                        title="Ver perfil"
+                    >
+                        <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden" :style="{ backgroundColor: user?.avatar_url ? 'transparent' : primaryColor, color: 'var(--app-primary-text)' }">
+                            <img v-if="user?.avatar_url" :src="user.avatar_url" alt="Avatar" class="w-full h-full object-cover" />
+                            <span v-else class="text-sm font-semibold">
                                 {{ user?.name?.charAt(0)?.toUpperCase() }}
                             </span>
                         </div>
-                        <div class="hidden sm:block">
+                        <div class="hidden sm:block text-left">
                             <p class="text-sm font-medium leading-tight" :style="{ color: 'var(--app-secondary-text)' }">{{ user?.name }}</p>
                             <p class="text-xs leading-tight" :style="{ color: 'var(--app-secondary-text-muted)' }">Ver perfil</p>
                         </div>
-                    </div>
+                    </button>
 
                     <div class="flex items-center gap-1 pl-3 border-l" :style="{ borderColor: 'rgba(255,255,255,0.08)' }">
                         <button class="p-2 rounded-lg relative transition-colors sidebar-icon-btn">
