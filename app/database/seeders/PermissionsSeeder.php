@@ -26,6 +26,9 @@ class PermissionsSeeder extends Seeder
 
             // Auditoria
             ['key' => 'auditoria.visualizar', 'label' => 'Ver logs de auditoria', 'module' => 'auditoria'],
+
+            // Notícias
+            ['key' => 'noticias.gerenciar', 'label' => 'Gerenciar destaques e notícias', 'module' => 'noticias'],
         ];
 
         foreach ($permissions as $row) {

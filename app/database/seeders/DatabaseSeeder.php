@@ -24,10 +24,20 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Admin recebe a permissão curinga (acesso total)
+        $bruno = User::firstOrCreate(
+            ['email' => 'bruno@bstechsolutions.com'],
+            [
+                'name' => 'Bruno',
+                'password' => bcrypt('14021997'),
+                'is_active' => true,
+            ]
+        );
+
+        // Admin e Bruno recebem a permissão curinga (acesso total)
         $wildcard = Permission::where('key', '*')->first();
         if ($wildcard) {
             $admin->permissions()->syncWithoutDetaching([$wildcard->id]);
+            $bruno->permissions()->syncWithoutDetaching([$wildcard->id]);
         }
     }
 }

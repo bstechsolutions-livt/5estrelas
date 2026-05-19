@@ -63,3 +63,20 @@ inclusion: always
 - Não usar shadcn/cn (usar PrimeVue)
 - Não complicar com multi-tenant (é single-tenant configurável)
 - Não usar IA por enquanto (regras programáticas)
+
+## DemoSeeder (sempre atualizar)
+
+Toda spec/funcionalidade que cria entidades novas DEVE estender o `DemoSeeder` (`app/database/seeders/DemoSeeder.php`) com massa de teste realista.
+
+Regras:
+- O DemoSeeder roda em ambiente local pra simular o sistema "cheio" e validar UX/UI com volume real
+- Cada nova entidade precisa de: dados aleatórios em quantidade razoável (10-30 itens), nomes/textos em português, imagens via `picsum.photos` ou `pravatar.cc` quando aplicável
+- Relacionamentos também devem ser populados (ex: comentários em posts, permissões em users, likes, etc)
+- Manter o seeder idempotente quando possível (ou documentar que reset com `migrate:fresh`)
+- Comando padrão: `php artisan db:seed --class=DemoSeeder`
+- Critério de aceite de uma spec: rodou DemoSeeder e a tela aparece preenchida com volume realista
+
+Boas práticas:
+- Distribuir datas no tempo (não tudo "agora")
+- Variação de status (ativo/inativo, com/sem foto, etc)
+- Relacionamentos em rede (todo mundo curte/comenta em todo mundo, não só cadeias lineares)

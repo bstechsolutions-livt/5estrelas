@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ \App\Models\Setting::get('app_name', config('app.name', 'Sistema')) }}</title>
     @if($favicon = \App\Models\Setting::get('favicon_path'))
         <link rel="icon" href="{{ \Illuminate\Support\Facades\Storage::url($favicon) }}">

@@ -15,6 +15,7 @@ const mobileMenuOpen = ref(false)
 const menuItems = computed(() => [
     { label: 'Dashboard', icon: 'pi pi-home', href: '/dashboard', show: true },
     { label: 'Usuários', icon: 'pi pi-users', href: '/usuarios', show: can('usuarios.listar') },
+    { label: 'Notícias', icon: 'pi pi-megaphone', href: '/noticias', show: can('noticias.gerenciar') },
     { label: 'Aparência', icon: 'pi pi-palette', href: '/settings/aparencia', show: can('aparencia.editar') },
     { label: 'Auditoria', icon: 'pi pi-history', href: '/auditoria', show: can('auditoria.visualizar') },
 ].filter(item => item.show))

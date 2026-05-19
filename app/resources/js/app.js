@@ -5,6 +5,7 @@ import Aura from '@primevue/themes/aura'
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
 
+import './bootstrap'
 import '../css/app.css'
 
 createInertiaApp({
