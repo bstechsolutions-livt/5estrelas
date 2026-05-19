@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -38,6 +39,18 @@ class SettingsController extends Controller
             'login_bg_mobile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:30720'],
         ]);
 
+        // Captura valores anteriores (para auditoria)
+        $previous = [
+            'app_name' => Setting::get('app_name'),
+            'primary_color' => Setting::get('primary_color'),
+            'secondary_color' => Setting::get('secondary_color'),
+            'logo_path' => Setting::get('logo_path'),
+            'logo_mobile_path' => Setting::get('logo_mobile_path'),
+            'favicon_path' => Setting::get('favicon_path'),
+            'login_bg_path' => Setting::get('login_bg_path'),
+            'login_bg_mobile_path' => Setting::get('login_bg_mobile_path'),
+        ];
+
         Setting::set('app_name', $request->app_name);
         Setting::set('primary_color', $request->primary_color, 'color');
         Setting::set('secondary_color', $request->secondary_color, 'color');
@@ -55,6 +68,37 @@ class SettingsController extends Controller
                 $path = $this->storeBranding($request->file($field), $field);
                 Setting::set($settingKey, $path, 'image');
             }
+        }
+
+        // Calcula diff (apenas campos que mudaram)
+        $current = [
+            'app_name' => $request->app_name,
+            'primary_color' => $request->primary_color,
+            'secondary_color' => $request->secondary_color,
+            'logo_path' => Setting::get('logo_path'),
+            'logo_mobile_path' => Setting::get('logo_mobile_path'),
+            'favicon_path' => Setting::get('favicon_path'),
+            'login_bg_path' => Setting::get('login_bg_path'),
+            'login_bg_mobile_path' => Setting::get('login_bg_mobile_path'),
+        ];
+
+        $oldDiff = [];
+        $newDiff = [];
+        foreach ($current as $k => $v) {
+            if ($previous[$k] !== $v) {
+                $oldDiff[$k] = $previous[$k];
+                $newDiff[$k] = $v;
+            }
+        }
+
+        if (!empty($newDiff)) {
+            AuditLogger::log(
+                event: 'aparencia.updated',
+                module: 'aparencia',
+                description: 'Aparência do sistema atualizada',
+                oldValues: $oldDiff,
+                newValues: $newDiff,
+            );
         }
 
         return back()->with('success', 'Aparência atualizada com sucesso.');

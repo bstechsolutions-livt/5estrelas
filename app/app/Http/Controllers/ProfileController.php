@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use App\Services\AuditLogger;
 use Inertia\Inertia;
 
 class ProfileController extends Controller
@@ -40,8 +41,20 @@ class ProfileController extends Controller
             'avatar.mimes' => 'A foto deve ser JPG, PNG ou WebP.',
         ]);
 
-        $user->name = $data['name'];
-        $user->email = $data['email'];
+        $oldValues = [];
+        $newValues = [];
+
+        if ($user->name !== $data['name']) {
+            $oldValues['name'] = $user->name;
+            $newValues['name'] = $data['name'];
+            $user->name = $data['name'];
+        }
+
+        if ($user->email !== $data['email']) {
+            $oldValues['email'] = $user->email;
+            $newValues['email'] = $data['email'];
+            $user->email = $data['email'];
+        }
 
         if ($request->hasFile('avatar')) {
             // Remove avatar antigo se existir
@@ -53,10 +66,25 @@ class ProfileController extends Controller
             $ext = $file->getClientOriginalExtension();
             $filename = "avatars/{$user->id}_" . time() . ".{$ext}";
             Storage::disk('public')->putFileAs('', $file, $filename);
+            $oldValues['avatar_path'] = $user->avatar_path;
+            $newValues['avatar_path'] = $filename;
             $user->avatar_path = $filename;
         }
 
-        $user->save();
+        // Save sem disparar trait Auditable do User para não duplicar
+        // (a trait registra updated; aqui registramos perfil.updated com diff curado)
+        $user->saveQuietly();
+
+        if (!empty($newValues)) {
+            AuditLogger::log(
+                event: 'perfil.updated',
+                module: 'perfil',
+                description: 'Atualizou os próprios dados',
+                auditable: $user,
+                oldValues: $oldValues,
+                newValues: $newValues,
+            );
+        }
 
         return back()->with('success', 'Perfil atualizado com sucesso.');
     }
@@ -70,7 +98,14 @@ class ProfileController extends Controller
 
         $user = $request->user();
         $user->password = Hash::make($request->password);
-        $user->save();
+        $user->saveQuietly();
+
+        AuditLogger::log(
+            event: 'perfil.password_changed',
+            module: 'perfil',
+            description: 'Trocou a própria senha',
+            auditable: $user,
+        );
 
         return back()->with('success', 'Senha atualizada com sucesso.');
     }
@@ -78,13 +113,23 @@ class ProfileController extends Controller
     public function removeAvatar(Request $request)
     {
         $user = $request->user();
+        $oldPath = $user->avatar_path;
 
         if ($user->avatar_path && Storage::disk('public')->exists($user->avatar_path)) {
             Storage::disk('public')->delete($user->avatar_path);
         }
 
         $user->avatar_path = null;
-        $user->save();
+        $user->saveQuietly();
+
+        AuditLogger::log(
+            event: 'perfil.avatar_removed',
+            module: 'perfil',
+            description: 'Removeu a própria foto de perfil',
+            auditable: $user,
+            oldValues: ['avatar_path' => $oldPath],
+            newValues: ['avatar_path' => null],
+        );
 
         return back()->with('success', 'Foto removida.');
     }

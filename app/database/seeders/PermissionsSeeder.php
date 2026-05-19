@@ -23,6 +23,9 @@ class PermissionsSeeder extends Seeder
             // Aparência
             ['key' => 'aparencia.visualizar', 'label' => 'Ver aparência', 'module' => 'aparencia'],
             ['key' => 'aparencia.editar', 'label' => 'Editar aparência', 'module' => 'aparencia'],
+
+            // Auditoria
+            ['key' => 'auditoria.visualizar', 'label' => 'Ver logs de auditoria', 'module' => 'auditoria'],
         ];
 
         foreach ($permissions as $row) {

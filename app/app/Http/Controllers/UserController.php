@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -103,8 +104,18 @@ class UserController extends Controller
             return back()->with('error', 'Você não pode desativar a si mesmo.');
         }
 
+        $previous = $user->is_active;
         $user->is_active = !$user->is_active;
         $user->save();
+
+        AuditLogger::log(
+            event: 'usuarios.toggle_active',
+            module: 'usuarios',
+            description: ($user->is_active ? 'Ativou' : 'Inativou') . " usuário {$user->name}",
+            auditable: $user,
+            oldValues: ['is_active' => $previous],
+            newValues: ['is_active' => $user->is_active],
+        );
 
         return back()->with('success', $user->is_active ? 'Usuário ativado.' : 'Usuário inativado.');
     }

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
@@ -60,6 +61,11 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:aparencia.editar')->group(function () {
         Route::get('/settings/aparencia', [SettingsController::class, 'appearance'])->name('settings.appearance');
         Route::post('/settings/aparencia', [SettingsController::class, 'updateAppearance'])->name('settings.appearance.update');
+    });
+
+    // Auditoria
+    Route::middleware('permission:auditoria.visualizar')->group(function () {
+        Route::get('/auditoria', [AuditLogController::class, 'index'])->name('audit.index');
     });
 });
 

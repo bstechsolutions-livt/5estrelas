@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Permission;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -45,6 +46,9 @@ class UserPermissionController extends Controller
             'permission_ids.*' => ['integer', 'exists:permissions,id'],
         ]);
 
+        // Captura keys antes do sync (para auditoria)
+        $oldKeys = $user->permissions()->pluck('key')->toArray();
+
         // Proteção: não permitir remover o curinga do último admin
         $wildcard = Permission::where('key', '*')->first();
         if ($wildcard && $user->permissions->contains('id', $wildcard->id)) {
@@ -60,6 +64,21 @@ class UserPermissionController extends Controller
 
         $user->permissions()->sync($data['permission_ids'] ?? []);
         $user->flushPermissionCache();
+
+        $newKeys = Permission::whereIn('id', $data['permission_ids'] ?? [])->pluck('key')->toArray();
+        sort($oldKeys);
+        sort($newKeys);
+
+        if ($oldKeys !== $newKeys) {
+            AuditLogger::log(
+                event: 'usuarios.permissions_updated',
+                module: 'usuarios',
+                description: "Permissões de {$user->name} atualizadas",
+                auditable: $user,
+                oldValues: ['keys' => $oldKeys],
+                newValues: ['keys' => $newKeys],
+            );
+        }
 
         return back()->with('success', 'Permissões atualizadas.');
     }

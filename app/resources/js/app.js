@@ -8,7 +8,7 @@ import ConfirmationService from 'primevue/confirmationservice'
 import '../css/app.css'
 
 createInertiaApp({
-    title: (title) => title ? `${title} - 5 Estrelas` : '5 Estrelas',
+    title: (title) => title || '',
     resolve: (name) => {
         const pages = import.meta.glob('./Pages/**/*.vue', { eager: true })
         return pages[`./Pages/${name}.vue`]

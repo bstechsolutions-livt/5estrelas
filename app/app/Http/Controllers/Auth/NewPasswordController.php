@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\AuditLogger;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -44,6 +45,12 @@ class NewPasswordController extends Controller
         );
 
         if ($status === Password::PASSWORD_RESET) {
+            AuditLogger::log(
+                event: 'auth.password.reset_completed',
+                module: 'auth',
+                description: 'Senha redefinida via link de recuperação',
+            );
+
             return redirect('/dashboard')->with('success', 'Senha redefinida com sucesso.');
         }
 

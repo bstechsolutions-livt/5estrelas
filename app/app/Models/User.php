@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Notifications\ResetPasswordNotification;
+use App\Traits\Auditable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -15,9 +16,24 @@ use Illuminate\Notifications\Notifiable;
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, Auditable;
 
     protected ?array $cachedPermissions = null;
+
+    protected string $auditableModule = 'usuarios';
+    protected string $auditableEventPrefix = 'users';
+    protected array $auditableEvents = ['created', 'updated', 'deleted'];
+    protected array $auditableExcept = ['avatar_path']; // muda muito, vamos logar via Profile
+
+    public function auditDescription(string $action): ?string
+    {
+        return match ($action) {
+            'created' => "Usuário {$this->name} criado",
+            'updated' => "Usuário {$this->name} atualizado",
+            'deleted' => "Usuário {$this->name} excluído",
+            default => null,
+        };
+    }
 
     protected function casts(): array
     {
