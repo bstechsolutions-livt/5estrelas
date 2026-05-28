@@ -38,6 +38,14 @@ Lê **sempre** antes de tomar decisões que envolvam servidor, deploy, infra ou 
 - Senha: `5Estrelas@2026`
 - Host: Outlook (Microsoft 365)
 - Uso: e-mail de avisos do sistema, notificações, comunicações automáticas
+- Também usado como conta Shorebird (code push)
+
+### Shorebird (code push)
+
+- Conta: `modernizacao.avisos@grupo5estrelas.com.br` (login via Microsoft)
+- App ID: `bb9ea030-36c7-4eb8-a520-a57792b90b18`
+- Plano: free
+- CLI: `shorebird` (instalado em `~/.shorebird/bin/shorebird`)
 
 ## Regras de operação
 
