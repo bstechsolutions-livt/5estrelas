@@ -39,13 +39,32 @@ Lê **sempre** antes de tomar decisões que envolvam servidor, deploy, infra ou 
 - Host: Outlook (Microsoft 365)
 - Uso: e-mail de avisos do sistema, notificações, comunicações automáticas
 - Também usado como conta Shorebird (code push)
+- **Conta Google criada com esse mesmo e-mail** (não é Gmail, é conta Google vinculada ao Outlook)
+  - Usada no: Firebase Console, Google Play Console (futuro)
+  - Login: `modernizacao.avisos@grupo5estrelas.com.br` / mesma senha `5Estrelas@2026`
 
 ### Shorebird (code push)
 
 - Conta: `modernizacao.avisos@grupo5estrelas.com.br` (login via Microsoft)
 - App ID: `bb9ea030-36c7-4eb8-a520-a57792b90b18`
+
+### Firebase (push notifications)
+
+- Conta Google: `modernizacao.avisos@grupo5estrelas.com.br`
+- Projeto: `estrelas-b7eab`
+- App Android: `br.com.grupo5estrelas.intranet`
+- `google-services.json`: `mobile/android/app/google-services.json`
+- Package name (Android + iOS): `br.com.grupo5estrelas.intranet`
+- Console: https://console.firebase.google.com/project/estrelas-b7eab
 - Plano: free
 - CLI: `shorebird` (instalado em `~/.shorebird/bin/shorebird`)
+- **IMPORTANTE**: Bruno usa múltiplas contas Shorebird. Antes de qualquer comando `shorebird`, SEMPRE verificar com `shorebird account whoami` e trocar se necessário:
+  ```bash
+  shorebird account whoami
+  # Se não for modernizacao.avisos@grupo5estrelas.com.br:
+  shorebird logout
+  shorebird login  # abre browser, logar com conta Microsoft da 5 Estrelas
+  ```
 
 ## Regras de operação
 
