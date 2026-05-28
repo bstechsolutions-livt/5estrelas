@@ -45,6 +45,10 @@ class AuditLogController extends Controller
 
         $logs = $query->paginate($perPage, ['*'], 'page', $page)->withQueryString();
 
+        if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
+            return response()->json($logs);
+        }
+
         // Listas para filtros (distinct)
         $modules = AuditLog::query()->select('module')->distinct()->orderBy('module')->pluck('module');
         $events = AuditLog::query()->select('event')->distinct()->orderBy('event')->pluck('event');

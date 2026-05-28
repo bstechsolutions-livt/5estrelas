@@ -27,6 +27,11 @@ class UserController extends Controller
 
         $users = $query->paginate($perPage, ['*'], 'page', $page)->withQueryString();
 
+        // Endpoint JSON para infinite scroll mobile
+        if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
+            return response()->json($users);
+        }
+
         return Inertia::render('Users/Index', [
             'users' => $users,
             'filters' => ['search' => $search, 'per_page' => $perPage],
@@ -46,7 +51,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string', new \App\Rules\StrongPassword()],
             'is_active' => ['boolean'],
         ]);
 
@@ -81,7 +86,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => ['nullable', 'string', new \App\Rules\StrongPassword()],
             'is_active' => ['boolean'],
         ]);
 
@@ -118,6 +123,29 @@ class UserController extends Controller
         );
 
         return back()->with('success', $user->is_active ? 'Usuário ativado.' : 'Usuário inativado.');
+    }
+
+    public function unlock(int $id, Request $request)
+    {
+        $user = User::findOrFail($id);
+
+        if (!$user->locked_until && !$user->failed_login_attempts) {
+            return back()->with('success', 'Usuário não está bloqueado.');
+        }
+
+        $user->failed_login_attempts = 0;
+        $user->last_failed_login_at = null;
+        $user->locked_until = null;
+        $user->saveQuietly();
+
+        AuditLogger::log(
+            event: 'usuarios.unlock',
+            module: 'usuarios',
+            description: "Desbloqueou usuário {$user->name}",
+            auditable: $user,
+        );
+
+        return back()->with('success', 'Usuário desbloqueado.');
     }
 
     public function destroy(int $id, Request $request)

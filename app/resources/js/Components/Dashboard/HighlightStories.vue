@@ -6,6 +6,7 @@ import axios from 'axios'
 
 const props = defineProps({
     highlights: { type: Array, default: () => [] },
+    embedded: { type: Boolean, default: false },
 })
 
 const page = usePage()
@@ -287,14 +288,14 @@ if (typeof window !== 'undefined') {
 </script>
 
 <template>
-    <div v-if="highlights.length" class="bg-white rounded-xl border border-gray-200 p-5">
-        <div class="flex items-center justify-between mb-4">
+    <div v-if="highlights.length" :class="embedded ? '' : 'bg-white rounded-xl border border-gray-200 p-5'">
+        <div v-if="!embedded" class="flex items-center justify-between mb-4">
             <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">
                 Destaques
             </h2>
         </div>
 
-        <div class="flex gap-4 overflow-x-auto pb-2 scroll-stories">
+        <div :class="['flex gap-4 overflow-x-auto scroll-stories', embedded ? 'px-4 pb-1' : 'pb-2']">
             <button
                 v-for="(h, idx) in highlights"
                 :key="h.id"

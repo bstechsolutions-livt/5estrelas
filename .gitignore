@@ -34,3 +34,4 @@ Thumbs.db
 .cursor/
 .codex
 *.log
+infra/vpn/auth.txt

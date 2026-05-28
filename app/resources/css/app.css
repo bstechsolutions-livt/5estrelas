@@ -32,3 +32,24 @@ body {
     background: var(--app-primary-active) !important;
     border-color: var(--app-primary-active) !important;
 }
+
+/* Ajustes mobile globais: páginas usando AppLayoutAuto (sem max-width próprio) */
+@media (max-width: 1023px) {
+    /* main do AppLayoutMobile recebe padding lateral padrão de 16px */
+    .mobile-main {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    /* max-width containers viram fluid */
+    .mobile-main .max-w-7xl,
+    .mobile-main .max-w-6xl,
+    .mobile-main .max-w-5xl,
+    .mobile-main .max-w-4xl,
+    .mobile-main .max-w-3xl,
+    .mobile-main .max-w-2xl {
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+}

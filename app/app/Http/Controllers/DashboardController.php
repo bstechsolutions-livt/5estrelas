@@ -65,8 +65,9 @@ class DashboardController extends Controller
         // Catálogo de menus disponíveis para o usuário
         $menuOptions = MenuCatalog::availableTo($user);
 
-        // Atalhos do usuário (resolvendo via catálogo)
+        // Atalhos do usuário (resolvendo via catálogo) - slot dashboard
         $shortcutKeys = UserShortcut::where('user_id', $user->id)
+            ->where('slot', 'dashboard')
             ->orderBy('position')
             ->pluck('menu_key')
             ->toArray();

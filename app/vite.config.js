@@ -25,4 +25,11 @@ export default defineConfig({
             '@': path.resolve(__dirname, 'resources/js'),
         },
     },
+    server: {
+        host: '0.0.0.0',
+        cors: true,
+        hmr: {
+            host: process.env.APP_HOST || 'localhost',
+        },
+    },
 })

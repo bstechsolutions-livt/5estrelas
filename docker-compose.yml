@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: 5estrelas_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: estrelas
+      POSTGRES_USER: estrelas
+      POSTGRES_PASSWORD: estrelas
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis está disponível nativamente na porta 6379 (instalação local).
+  # Se precisar via Docker, descomente este bloco e mude REDIS_PORT no .env.
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: 5estrelas_redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6380:6379"
+  #   volumes:
+  #     - redis_data:/data
+
+volumes:
+  postgres_data:
+  # redis_data:

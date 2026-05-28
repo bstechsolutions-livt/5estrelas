@@ -1,58 +1,154 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 5 Estrelas — Plataforma de Gestão
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistema de gestão completa para o cliente **5 Estrelas**, desenvolvido em parceria entre **BS Tech Solutions** e **Easy Tech**.
 
-## About Laravel
+Cobre: gestão financeira, compras, suprimentos, contratos, operação de campo (fiscalização), ponto com geolocalização, escala de brigadistas, auditoria e dashboards gerenciais.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Camada | Tecnologia |
+|--------|-----------|
+| Backend | Laravel 13 (PHP 8.3+) |
+| Frontend Web | Vue 3 + Inertia.js + PrimeVue 4 |
+| Estilização | Tailwind CSS 4 + PrimeVue CSS variables (white-label) |
+| Auth | Laravel session (Sanctum pro mobile no futuro) |
+| Database | PostgreSQL 16 |
+| Cache/Queue | Redis (em produção) |
+| Realtime | Laravel Reverb (WebSockets) |
+| Storage | Local (dev) / S3-compatível Backblaze B2 (futuro) |
+| App Mobile | Flutter com WebView |
+| CI/CD | GitHub Actions |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Estrutura do repositório
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```
+5estrelas/
+├── app/                    # Backend Laravel + Frontend Vue (Inertia)
+│   ├── app/
+│   ├── routes/
+│   ├── resources/js/       # Vue + PrimeVue + Tailwind
+│   └── database/
+├── mobile/                 # App Flutter (WebView wrapper)
+├── docs/                   # Documentação do projeto
+├── .kiro/steering/         # Regras e guias do projeto
+├── docker-compose.yml      # Postgres local
+└── README.md
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+## Setup local
 
-## Contributing
+### Pré-requisitos
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- PHP 8.3+ com extensões: `pgsql`, `pdo_pgsql`, `mbstring`, `xml`, `zip`
+- Composer 2+
+- Node 20+ / npm
+- Docker + Docker Compose (pra subir Postgres)
+- `pg_dump` / `psql` (`apt install postgresql-client`)
+- Flutter 3.11+ (só pra trabalhar no app mobile)
 
-## Code of Conduct
+No Ubuntu/Debian:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+sudo apt install -y php8.3 php8.3-pgsql php8.3-mbstring php8.3-xml php8.3-zip composer postgresql-client
+```
 
-## Security Vulnerabilities
+### 1. Clonar e instalar
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+git clone git@github.com:bstechsolutions-livt/5estrelas.git
+cd 5estrelas
 
-## License
+# Postgres local
+docker compose up -d
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Backend
+cd app
+cp .env.example .env
+composer install
+php artisan key:generate
+
+# Frontend
+npm install
+```
+
+### 2. Migrar e popular dados
+
+```bash
+# Cria tabelas + admins (Bruno + Admin)
+php artisan migrate:fresh --seed
+
+# Popula massa de teste (20 users, posts, comentários, etc)
+php artisan db:seed --class=DemoSeeder
+```
+
+### 3. Subir os serviços
+
+São 3 processos. Abra 3 terminais:
+
+```bash
+# Terminal 1 — Servidor web (porta 8090)
+php artisan serve --host=0.0.0.0 --port=8090
+
+# Terminal 2 — Reverb (WebSocket pra notificações em tempo real)
+php artisan reverb:start --host=0.0.0.0 --port=8080
+
+# Terminal 3 — Build do frontend (modo watch)
+npm run dev
+```
+
+Acesse `http://localhost:8090`.
+
+### 4. Login
+
+| Usuário | E-mail | Senha | ID |
+|---------|--------|-------|-----|
+| Admin | `admin@5estrelas.com.br` | `password` | 1 |
+| Bruno | `bruno@bstechsolutions.com` | `123456789` | 2 |
+
+(login aceita e-mail OU ID numérico)
+
+## Comandos úteis
+
+```bash
+# Disparar uma notificação manual (testar push em tempo real)
+php artisan notify:send --email=bruno@bstechsolutions.com --title="Teste" --type=info
+
+# Backup do banco (gera ZIP em storage/app/backups/)
+php artisan backup:run --only-db
+
+# Limpar backups antigos (retenção 7 dias)
+php artisan backup:clean
+
+# Resetar tudo (CUIDADO: apaga dados)
+php artisan migrate:fresh --seed
+php artisan db:seed --class=DemoSeeder
+```
+
+## App Mobile (Flutter)
+
+```bash
+cd mobile
+flutter pub get
+flutter run --dart-define=BACKEND_URL=http://<seu-ip>:8090 -d <device-id>
+```
+
+Para conectar do celular ao servidor local, recomendamos **Tailscale** (rede VPN). O IP da máquina dev fica acessível pelo celular via Tailscale.
+
+## Documentação
+
+- [`.kiro/steering/projeto.md`](.kiro/steering/projeto.md) — Visão geral do projeto, escopo, cronograma
+- [`.kiro/steering/regras.md`](.kiro/steering/regras.md) — Regras de trabalho, convenções
+- [`.kiro/steering/stack.md`](.kiro/steering/stack.md) — Decisões técnicas e por quê
+- [`.kiro/steering/auditoria.md`](.kiro/steering/auditoria.md) — Padrão de auditoria
+- [`.kiro/steering/mobile-ux.md`](.kiro/steering/mobile-ux.md) — Padrões UX mobile
+- [`.kiro/steering/mobile-build.md`](.kiro/steering/mobile-build.md) — Build, push e Shorebird
+- [`docs/`](docs/) — PDFs do contrato e infra
+
+## Repositório
+
+- GitHub: https://github.com/bstechsolutions-livt/5estrelas
+- Branch principal: `main`
+
+## Status
+
+Estado atual do projeto rastreado em [`.kiro/steering/projeto.md`](.kiro/steering/projeto.md).

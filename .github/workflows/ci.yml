@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (Laravel)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: estrelas_test
+          POSTGRES_USER: estrelas
+          POSTGRES_PASSWORD: estrelas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pgsql, pdo_pgsql, mbstring, xml, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: app/vendor
+          key: composer-${{ hashFiles('app/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install Composer deps
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Copy .env
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Configure DB for tests
+        run: |
+          echo "DB_CONNECTION=pgsql" >> .env
+          echo "DB_HOST=127.0.0.1" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_DATABASE=estrelas_test" >> .env
+          echo "DB_USERNAME=estrelas" >> .env
+          echo "DB_PASSWORD=estrelas" >> .env
+
+      - name: Run migrations
+        run: php artisan migrate --force
+
+      - name: Run Pint (code style)
+        run: ./vendor/bin/pint --test
+        continue-on-error: true
+
+      - name: Run tests
+        run: php artisan test
+        continue-on-error: true
+
+  frontend:
+    name: Frontend (Vue + Vite)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build assets
+        run: npm run build

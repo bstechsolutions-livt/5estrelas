@@ -93,7 +93,7 @@ class ProfileController extends Controller
     {
         $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'string', 'min:8', 'confirmed', 'different:current_password'],
+            'password' => ['required', 'string', 'confirmed', 'different:current_password', new \App\Rules\StrongPassword()],
         ]);
 
         $user = $request->user();

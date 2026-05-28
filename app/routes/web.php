@@ -4,7 +4,10 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\BackupController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DeviceTokenController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\PostInteractionController;
 use App\Http\Controllers\ProfileController;
@@ -61,6 +64,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/usuarios/{id}/editar', [UserController::class, 'edit'])->name('users.edit');
         Route::put('/usuarios/{id}', [UserController::class, 'update'])->name('users.update');
         Route::post('/usuarios/{id}/toggle-active', [UserController::class, 'toggleActive'])->name('users.toggle');
+        Route::post('/usuarios/{id}/unlock', [UserController::class, 'unlock'])->name('users.unlock');
     });
     Route::middleware('permission:usuarios.excluir')->group(function () {
         Route::delete('/usuarios/{id}', [UserController::class, 'destroy'])->name('users.destroy');
@@ -91,8 +95,41 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:auditoria.visualizar')->group(function () {
         Route::get('/auditoria', [AuditLogController::class, 'index'])->name('audit.index');
     });
+
+    // Backups
+    Route::middleware('permission:backups.gerenciar')->group(function () {
+        Route::get('/backups', [BackupController::class, 'index'])->name('backups.index');
+        Route::post('/backups/run', [BackupController::class, 'run'])->name('backups.run');
+        Route::get('/backups/{filename}/download', [BackupController::class, 'download'])
+            ->where('filename', '.*\.zip')
+            ->name('backups.download');
+        Route::delete('/backups/{filename}', [BackupController::class, 'destroy'])
+            ->where('filename', '.*\.zip')
+            ->name('backups.destroy');
+    });
+
+    // Notificações (do usuário autenticado, sem permissão extra)
+    Route::prefix('notificacoes')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::get('/contador', [NotificationController::class, 'unreadCount'])->name('notifications.count');
+        Route::post('/{id}/lida', [NotificationController::class, 'markRead'])->name('notifications.read');
+        Route::post('/marcar-todas', [NotificationController::class, 'markAllRead'])->name('notifications.read_all');
+        Route::delete('/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+    });
+
+    // Device tokens (push mobile)
+    Route::prefix('device-tokens')->group(function () {
+        Route::post('/', [DeviceTokenController::class, 'register'])->name('device_tokens.register');
+        Route::delete('/', [DeviceTokenController::class, 'unregister'])->name('device_tokens.unregister');
+    });
+
+    // Busca global
+    Route::get('/search', \App\Http\Controllers\SearchController::class)->name('search');
 });
 
 Route::get('/', function () {
     return redirect('/dashboard');
 });
+
+// Health check público (pra monitoramento externo / load balancer)
+Route::get('/health', \App\Http\Controllers\HealthController::class)->name('health');

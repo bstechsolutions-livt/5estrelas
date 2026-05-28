@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { usePage, router } from '@inertiajs/vue3'
 import { useTheme } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
+import NotificationBell from '@/Components/NotificationBell.vue'
+import GlobalSearch from '@/Components/GlobalSearch.vue'
 
 const page = usePage()
 const user = computed(() => page.props.auth?.user)
@@ -18,6 +20,7 @@ const menuItems = computed(() => [
     { label: 'Notícias', icon: 'pi pi-megaphone', href: '/noticias', show: can('noticias.gerenciar') },
     { label: 'Aparência', icon: 'pi pi-palette', href: '/settings/aparencia', show: can('aparencia.editar') },
     { label: 'Auditoria', icon: 'pi pi-history', href: '/auditoria', show: can('auditoria.visualizar') },
+    { label: 'Backups', icon: 'pi pi-database', href: '/backups', show: can('backups.gerenciar') },
 ].filter(item => item.show))
 
 const searchQuery = ref('')
@@ -211,6 +214,8 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
                 </div>
 
                 <div class="flex items-center gap-3">
+                    <GlobalSearch />
+
                     <button
                         type="button"
                         class="flex items-center gap-3 hover:opacity-80 transition-opacity"
@@ -230,9 +235,7 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
                     </button>
 
                     <div class="flex items-center gap-1 pl-3 border-l" :style="{ borderColor: 'rgba(255,255,255,0.08)' }">
-                        <button class="p-2 rounded-lg relative transition-colors sidebar-icon-btn">
-                            <i class="pi pi-bell text-lg"></i>
-                        </button>
+                        <NotificationBell />
                         <button
                             @click="logout"
                             class="p-2 rounded-lg transition-colors sidebar-icon-btn"

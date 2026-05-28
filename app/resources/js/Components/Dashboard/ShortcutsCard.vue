@@ -25,7 +25,7 @@ function toggle(key) {
     else selectedKeys.value.splice(idx, 1)
 }
 
-const form = useForm({ menu_keys: [] })
+const form = useForm({ slot: 'dashboard', menu_keys: [] })
 
 function save() {
     form.menu_keys = selectedKeys.value

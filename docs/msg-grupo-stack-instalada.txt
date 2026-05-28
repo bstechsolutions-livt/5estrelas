@@ -1,0 +1,33 @@
+Pessoal, boa tarde!
+
+Atualizando sobre o ambiente da Plataforma 5 Estrelas:
+
+VPN: conectando normalmente.
+SSH: acesso funcionando após o ajuste de vocês (obrigado!).
+
+Já realizamos a instalação de toda a stack necessária na VM G5E-SVM080:
+
+- PHP 8.3
+- Composer 2
+- PostgreSQL 16 (banco criado e configurado)
+- Redis 7
+- Node 20
+- Nginx
+- Supervisor
+- Certbot (para SSL)
+
+Todos os serviços estão ativos e habilitados no boot.
+
+Diretórios organizados:
+- /var/www/5estrelas — código da aplicação
+- /mnt/dados/storage — uploads e arquivos
+- /mnt/dados/backups — backups do banco
+
+Para darmos continuidade ao deploy da aplicação, precisamos de uma definição:
+
+Qual domínio ou subdomínio será utilizado para acessar a plataforma?
+(ex: plataforma.grupo5estrelas.com.br, app.grupo5estrelas.com.br, etc.)
+
+Com essa informação configuramos o Nginx, geramos o certificado SSL e fazemos o primeiro deploy.
+
+Fico no aguardo!

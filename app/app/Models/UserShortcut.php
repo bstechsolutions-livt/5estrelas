@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserShortcut extends Model
 {
-    protected $fillable = ['user_id', 'menu_key', 'position'];
+    protected $fillable = ['user_id', 'menu_key', 'position', 'slot'];
 
     public function user(): BelongsTo
     {

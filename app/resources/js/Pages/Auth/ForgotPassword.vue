@@ -1,12 +1,14 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useForm, usePage, Link } from '@inertiajs/vue3'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { useTheme } from '@/composables/useTheme'
+import { useDevice } from '@/composables/useDevice'
 
 const { theme } = useTheme()
+const { isMobile } = useDevice()
 const page = usePage()
 
 const appName = computed(() => theme.value?.app_name || '5 Estrelas')
@@ -38,9 +40,7 @@ const bgStyle = computed(() => {
 
 const hasLoginBg = computed(() => !!(loginBgUrl.value || loginBgMobileUrl.value))
 
-const form = useForm({
-    email: '',
-})
+const form = useForm({ email: '' })
 
 function submit() {
     form.post('/esqueci-senha', {
@@ -53,9 +53,63 @@ const successMessage = computed(() => page.props.flash?.success)
 </script>
 
 <template>
-    <div :class="['min-h-screen flex items-center justify-center px-4', hasLoginBg ? 'login-bg' : '']" :style="bgStyle">
+    <!-- Mobile: tela cheia -->
+    <div v-if="isMobile" :class="['min-h-screen flex flex-col px-5 pb-8', hasLoginBg ? 'login-bg' : '']" :style="bgStyle">
+        <div class="flex-1 flex flex-col justify-center pt-12">
+            <div class="text-center mb-8">
+                <div
+                    v-if="!logoUrl"
+                    class="inline-flex items-center justify-center w-20 h-20 rounded-3xl mb-4 shadow-lg"
+                    :style="{ backgroundColor: primaryColor, color: 'var(--app-primary-text, #ffffff)' }"
+                >
+                    <span class="font-bold text-3xl">{{ initials }}</span>
+                </div>
+                <img v-else :src="logoUrl" :alt="appName" class="inline-block h-20 mb-4 object-contain drop-shadow-lg" />
+            </div>
+
+            <div class="space-y-3">
+                <h1 class="text-xl font-semibold text-white drop-shadow">Esqueci minha senha</h1>
+                <p class="text-sm text-white/80 mb-3">Informe seu e-mail e enviaremos um link para redefinir.</p>
+
+                <Message v-if="successMessage" severity="success" :closable="false">
+                    {{ successMessage }}
+                </Message>
+
+                <form @submit.prevent="submit" class="space-y-3">
+                    <div>
+                        <InputText
+                            v-model="form.email"
+                            type="email"
+                            placeholder="E-mail"
+                            class="w-full mobile-input"
+                            :invalid="!!form.errors.email"
+                        />
+                        <small v-if="form.errors.email" class="text-red-300 text-xs mt-1 block px-2">
+                            {{ form.errors.email }}
+                        </small>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="space-y-3">
+            <Button
+                type="button"
+                label="Enviar link"
+                icon="pi pi-send"
+                :loading="form.processing"
+                class="w-full mobile-submit"
+                @click="submit"
+            />
+            <Link href="/login" class="block text-center text-sm text-white/80 hover:text-white">
+                ← Voltar ao login
+            </Link>
+        </div>
+    </div>
+
+    <!-- Desktop: card branco -->
+    <div v-else :class="['min-h-screen flex items-center justify-center px-4', hasLoginBg ? 'login-bg' : '']" :style="bgStyle">
         <div class="w-full max-w-md">
-            <!-- Logo -->
             <div class="text-center mb-8">
                 <div
                     v-if="!logoUrl"
@@ -64,15 +118,7 @@ const successMessage = computed(() => page.props.flash?.success)
                 >
                     <span class="font-bold text-2xl">{{ initials }}</span>
                 </div>
-                <img
-                    v-else
-                    :src="logoUrl"
-                    :alt="appName"
-                    class="inline-block h-24 mb-4 object-contain"
-                />
-                <template v-if="!logoUrl">
-                    <h1 class="text-2xl font-bold text-white drop-shadow-lg">{{ appName }}</h1>
-                </template>
+                <img v-else :src="logoUrl" :alt="appName" class="inline-block h-24 mb-4 object-contain" />
             </div>
 
             <form @submit.prevent="submit" class="bg-white rounded-2xl shadow-xl p-8 space-y-5">
@@ -87,25 +133,11 @@ const successMessage = computed(() => page.props.flash?.success)
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">E-mail</label>
-                    <InputText
-                        v-model="form.email"
-                        type="email"
-                        placeholder="seu@email.com"
-                        class="w-full"
-                        :invalid="!!form.errors.email"
-                    />
-                    <small v-if="form.errors.email" class="text-red-500 text-xs mt-1 block">
-                        {{ form.errors.email }}
-                    </small>
+                    <InputText v-model="form.email" type="email" placeholder="seu@email.com" class="w-full" :invalid="!!form.errors.email" />
+                    <small v-if="form.errors.email" class="text-red-500 text-xs mt-1 block">{{ form.errors.email }}</small>
                 </div>
 
-                <Button
-                    type="submit"
-                    label="Enviar link"
-                    icon="pi pi-send"
-                    :loading="form.processing"
-                    class="w-full"
-                />
+                <Button type="submit" label="Enviar link" icon="pi pi-send" :loading="form.processing" class="w-full" />
 
                 <div class="text-center pt-2">
                     <Link href="/login" class="text-sm text-gray-600 hover:underline">
@@ -128,5 +160,19 @@ const successMessage = computed(() => page.props.flash?.success)
     .login-bg {
         background-image: var(--login-bg-desktop);
     }
+}
+
+:deep(.mobile-input) {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    border: 0 !important;
+    height: 52px !important;
+    font-size: 16px !important;
+    border-radius: 12px !important;
+}
+
+.mobile-submit {
+    height: 54px !important;
+    font-size: 16px !important;
+    border-radius: 12px !important;
 }
 </style>

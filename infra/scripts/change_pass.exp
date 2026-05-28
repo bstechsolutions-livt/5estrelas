@@ -1,0 +1,60 @@
+#!/usr/bin/expect -f
+set timeout 30
+
+spawn ssh -o StrictHostKeyChecking=no -o PubkeyAuthentication=no easytech@192.168.254.80
+
+expect {
+    -re "assword:" {
+        send "Et@2026#\r"
+    }
+    timeout {
+        puts "TIMEOUT esperando prompt de senha"
+        exit 1
+    }
+}
+
+# Agora pode vir: prompt normal ($), pedido de troca, ou permission denied
+expect {
+    -re "urrent.*assword|OLD password|\\(current\\)" {
+        # Servidor pede troca de senha
+        send "Et@2026#\r"
+        expect -re "ew.*assword|New password"
+        send "UE2emkL1uANFetmQl3W1EAgc\r"
+        expect -re "ew.*assword|Retype|type.*again"
+        send "UE2emkL1uANFetmQl3W1EAgc\r"
+        expect {
+            -re "success|updated|\\$|#" {
+                puts "\nSENHA_TROCADA_OK"
+            }
+            -re "unchanged|error|fail" {
+                puts "\nERRO_AO_TROCAR"
+                exit 1
+            }
+            eof {
+                puts "\nSESSAO_ENCERRADA_APOS_TROCA"
+            }
+        }
+    }
+    -re "\\$|#" {
+        # Login normal, troca via chpasswd
+        send "echo 'easytech:UE2emkL1uANFetmQl3W1EAgc' | sudo chpasswd\r"
+        expect -re "\\$|#"
+        puts "\nSENHA_TROCADA_OK"
+        send "exit\r"
+    }
+    -re "Permission denied|ermission denied" {
+        puts "\nERRO: Senha rejeitada pelo servidor"
+        exit 1
+    }
+    -re "assword:" {
+        # Pediu senha de novo = primeira falhou
+        puts "\nERRO: Senha incorreta (pediu novamente)"
+        exit 1
+    }
+    timeout {
+        puts "\nTIMEOUT apos enviar senha"
+        exit 1
+    }
+}
+
+expect eof

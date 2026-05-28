@@ -27,11 +27,14 @@ class PostController extends Controller
             ->paginate($perPage, ['*'], 'page', $page)
             ->withQueryString();
 
-        // Append image_url para cada item
         $posts->getCollection()->transform(function (Post $p) {
             $p->setAppends(['image_url']);
             return $p;
         });
+
+        if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
+            return response()->json($posts);
+        }
 
         return Inertia::render('Posts/Index', [
             'posts' => $posts,

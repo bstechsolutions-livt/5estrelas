@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Descritivo Técnico de Infraestrutura · Plataforma 5 Estrelas (v5)</title>
+<style>
+@page { margin: 18mm 18mm; size: A4; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary: #0A2A66;
+  --primary-dark: #011733;
+  --accent: #C5A572;
+  --green: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --gray-700: #334155;
+  --gray-600: #475569;
+  --gray-500: #64748b;
+  --gray-400: #94a3b8;
+  --gray-200: #e2e8f0;
+  --gray-100: #f1f5f9;
+  --gray-50: #f8fafc;
+}
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.55;
+  color: var(--gray-700);
+}
+.cover {
+  page-break-after: always;
+  padding: 40px 20px 30px;
+  text-align: center;
+  border-bottom: 4px solid var(--primary);
+}
+.cover .brand { font-size: 11pt; font-weight: 800; color: var(--primary); letter-spacing: 1.5px; margin-bottom: 30px; }
+.cover .partners { font-size: 10pt; color: var(--gray-500); margin-bottom: 30px; }
+.cover h1 { font-size: 22pt; color: var(--primary-dark); font-weight: 800; margin-bottom: 8px; line-height: 1.2; }
+.cover .sub { font-size: 13pt; color: var(--gray-500); margin-bottom: 24px; }
+.cover .desc { font-size: 10.5pt; color: var(--gray-600); max-width: 540px; margin: 0 auto 30px; line-height: 1.6; }
+.cover .meta { display: inline-block; text-align: left; margin-top: 20px; padding: 16px 24px; background: var(--gray-50); border-left: 4px solid var(--accent); border-radius: 4px; }
+.cover .meta div { margin: 4px 0; font-size: 11pt; }
+.cover .meta strong { color: var(--primary-dark); display: inline-block; min-width: 100px; }
+
+h2 { font-size: 15pt; color: var(--primary); margin: 24px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--accent); }
+h3 { font-size: 12pt; color: var(--primary-dark); margin: 18px 0 8px; }
+h4 { font-size: 10.5pt; font-weight: 700; color: var(--primary); margin: 12px 0 6px; }
+
+.section { padding: 0 4px; margin-bottom: 16px; }
+
+.intro { background: var(--gray-50); border-left: 4px solid var(--primary); padding: 14px 18px; border-radius: 6px; font-size: 10.5pt; line-height: 1.65; color: var(--gray-700); margin-bottom: 14px; }
+.intro strong { color: var(--primary); }
+
+.box { border-radius: 6px; padding: 12px 16px; margin: 10px 0; font-size: 10pt; }
+.box-blue { background: #f0f4ff; border-left: 4px solid var(--primary); }
+.box-gold { background: #fdf6e8; border-left: 4px solid var(--accent); }
+.box-warn { background: #fef3c7; border-left: 4px solid var(--warning); }
+
+table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 9.5pt; }
+th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--gray-200); vertical-align: top; }
+th { background: #f5f7fa; color: var(--primary); font-weight: 700; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.4px; }
+
+.req-table th:first-child { width: 28%; }
+.port-table th:first-child { width: 22%; }
+.port-table th:nth-child(2) { width: 14%; }
+
+ul, ol { padding-left: 20px; margin: 8px 0; }
+li { margin: 4px 0; font-size: 10pt; }
+
+.checklist { list-style: none; padding-left: 0; }
+.checklist li { padding-left: 26px; position: relative; margin: 6px 0; }
+.checklist li::before { content: '✓'; position: absolute; left: 4px; color: var(--green); font-weight: 800; }
+
+.footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid var(--gray-200); font-size: 8.5pt; color: var(--gray-400); text-align: center; }
+
+.muted { color: var(--gray-500); }
+.mono { font-family: 'Courier New', monospace; font-size: 9.5pt; }
+.right { text-align: right; }
+
+.page-break { page-break-before: always; }
+
+.spec-card {
+  background: linear-gradient(135deg, var(--primary) 0%, #0E3A8A 100%);
+  color: white;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin: 12px 0;
+}
+.spec-card h3 { color: white; margin-top: 0; border: none; }
+.spec-card .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 14px; }
+.spec-card .item .label { font-size: 9pt; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.6px; }
+.spec-card .item .val { font-size: 18pt; font-weight: 800; margin: 4px 0; }
+.spec-card .item .desc { font-size: 9pt; opacity: 0.85; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="brand">BSTECH SOLUTIONS</div>
+  <div class="partners">em parceria com Easy Tech</div>
+  <h1>Descritivo Técnico de Infraestrutura</h1>
+  <div class="sub">Plataforma 5 Estrelas · Versão 5</div>
+  <div class="desc">
+    Especificações de servidor físico próprio, requisitos de rede e segurança para hospedar a Plataforma 5 Estrelas: aplicação web, app mobile, banco de dados, integrações com Senior ERP/HCM, fotos e evidências de campo, dashboards e logs operacionais.
+  </div>
+  <div class="meta">
+    <div><strong>Cliente:</strong> Plataforma 5 Estrelas</div>
+    <div><strong>Modelo:</strong> Servidor físico próprio (on-premise)</div>
+    <div><strong>Versão:</strong> v5 · 22/05/2026</div>
+  </div>
+</div>
+
+<h2>1. Visão geral</h2>
+<div class="intro">
+  <p>A Plataforma 5 Estrelas será hospedada em <strong>servidor físico próprio do cliente</strong>, com possibilidade de expansão conforme o crescimento operacional. Este documento descreve os requisitos mínimos para iniciar a operação, a arquitetura sugerida, os requisitos de rede, portas que precisam estar liberadas, e o checklist de segurança.</p>
+  <p style="margin-top: 8px;">A configuração mínima foi dimensionada para suportar com folga: aplicação web autenticada, banco de dados, integrações com Senior ERP/HCM, app mobile dos fiscais, fotos e evidências de campo, ponto/geolocalização, dashboards de Diretoria e logs/auditoria.</p>
+</div>
+
+<h2>2. Configuração mínima do servidor</h2>
+
+<div class="spec-card">
+  <h3>Requisitos mínimos para iniciar</h3>
+  <div class="grid">
+    <div class="item">
+      <div class="label">Processador</div>
+      <div class="val">4 cores</div>
+      <div class="desc">Mínimo 4 núcleos físicos. Preferência por arquitetura recente (geração ≥ 8ª).</div>
+    </div>
+    <div class="item">
+      <div class="label">Memória RAM</div>
+      <div class="val">6 GB</div>
+      <div class="desc">Mínimo. Recomendado 8&nbsp;GB para folga operacional.</div>
+    </div>
+    <div class="item">
+      <div class="label">Armazenamento HDD</div>
+      <div class="val">1 TB</div>
+      <div class="desc">Mínimo. Para fotos, evidências, anexos e histórico operacional.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <table class="req-table">
+    <thead>
+      <tr><th>Componente</th><th>Especificação mínima</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Processador</strong></td><td>4 cores · 64 bits · arquitetura recente (Intel Core i5/i7 8ª geração ou superior · AMD Ryzen 5/7 · Xeon equivalente)</td></tr>
+      <tr><td><strong>Memória RAM</strong></td><td>Mínimo 6 GB · Recomendado 8 GB com possibilidade de expansão para 16 GB</td></tr>
+      <tr><td><strong>SSD (sistema e banco)</strong></td><td>Pode ser modesto — 240 GB já é suficiente. Hospeda sistema operacional, aplicação, banco de dados e cache. Mais relevante a velocidade do que o tamanho.</td></tr>
+      <tr><td><strong>HDD (fotos e evidências)</strong></td><td>Mínimo 1 TB. Recomendado iniciar com 1 TB e prever expansão. Armazena fotos dos fiscais, evidências de campo, anexos, documentos operacionais e backups locais.</td></tr>
+      <tr><td><strong>Sistema operacional</strong></td><td>Linux Server (preferência: Ubuntu Server 22.04 LTS ou 24.04 LTS · alternativa: Debian 12)</td></tr>
+      <tr><td><strong>Placa de rede</strong></td><td>Gigabit Ethernet (1 Gbps) com porta RJ-45</td></tr>
+      <tr><td><strong>Energia</strong></td><td>Nobreak (UPS) próprio para o servidor, modem/roteador e equipamento de rede. Tempo de autonomia recomendado: ≥ 30 min.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="box box-gold">
+  <strong>Estratégia de armazenamento (SSD + HDD)</strong>
+  <ul>
+    <li><strong>SSD pequeno e rápido:</strong> sistema operacional, aplicação web, banco de dados PostgreSQL/MySQL, cache. Garante resposta rápida nas operações.</li>
+    <li><strong>HDD grande:</strong> diretório dedicado a fotos, evidências, uploads de fiscais, exportações e backups locais. O sistema é configurado para gravar arquivos volumosos diretamente nele.</li>
+  </ul>
+</div>
+
+<h2>3. Expansão conforme o crescimento</h2>
+
+<div class="section">
+  <p class="muted" style="margin-bottom: 8px;">A configuração inicial atende ao início da operação. Conforme aumentar o número de usuários simultâneos, fotos, dashboards e integrações, considere os seguintes upgrades sequenciais:</p>
+  <table>
+    <thead>
+      <tr><th>Etapa</th><th>Quando expandir</th><th>Upgrade sugerido</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Inicial</strong></td>
+        <td>Início da operação</td>
+        <td>4 cores · 6 GB RAM · 1 TB HDD · SSD modesto</td>
+      </tr>
+      <tr>
+        <td><strong>Crescimento moderado</strong></td>
+        <td>Mais de 50 usuários ativos · &gt; 500 GB de fotos</td>
+        <td>RAM para 16 GB · acrescentar HDD secundário (2 TB)</td>
+      </tr>
+      <tr>
+        <td><strong>Operação consolidada</strong></td>
+        <td>Mais de 200 usuários ativos · dashboards complexos · &gt; 1 TB de fotos</td>
+        <td>8 cores · 32 GB RAM · HDDs em RAID 1 ou RAID 5 · SSD NVMe para banco de dados</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="page-break"></div>
+
+<h2>4. Rede, IP externo e portas</h2>
+
+<div class="section">
+  <h3>Acesso externo</h3>
+  <p>O servidor precisa estar acessível pela internet para que aplicação web, app mobile dos fiscais e integrações com Senior ERP/HCM funcionem.</p>
+
+  <table class="req-table">
+    <thead>
+      <tr><th>Item</th><th>Requisito</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>IP externo fixo</strong></td><td>Necessário. Pode ser fornecido pelo provedor de internet empresarial (link dedicado) ou via configuração de DNS dinâmico, desde que estável e com tempo de resposta baixo.</td></tr>
+      <tr><td><strong>Link de internet</strong></td><td>Fibra empresarial. Mínimo 100 Mbps de download e <strong>50 Mbps de upload</strong> (upload é crítico — fiscais enviam fotos de campo).</td></tr>
+      <tr><td><strong>Domínio</strong></td><td>Subdomínio dedicado para o sistema (ex: <span class="mono">5estrelas.empresa.com.br</span> ou similar). Ajustamos no DNS para apontar ao IP externo do servidor.</td></tr>
+      <tr><td><strong>SSL/HTTPS</strong></td><td>Certificado SSL (Let's Encrypt gratuito ou comprado pelo cliente). Configurado pela BS Tech durante a implantação.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h3>Portas que precisam estar liberadas no firewall do cliente</h3>
+
+  <table class="port-table">
+    <thead>
+      <tr><th>Serviço</th><th>Porta</th><th>Direção</th><th>Observação</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>HTTPS</strong></td>
+        <td><span class="mono">443/TCP</span></td>
+        <td>Entrada</td>
+        <td>Acesso ao sistema web. <strong>Obrigatória.</strong></td>
+      </tr>
+      <tr>
+        <td><strong>HTTP (redirect)</strong></td>
+        <td><span class="mono">80/TCP</span></td>
+        <td>Entrada</td>
+        <td>Redireciona automaticamente para HTTPS. Necessária para emissão e renovação automática do certificado SSL Let's Encrypt.</td>
+      </tr>
+      <tr>
+        <td><strong>SSH</strong></td>
+        <td><span class="mono">22/TCP</span></td>
+        <td>Entrada</td>
+        <td>Acesso administrativo da BS Tech para deploys e manutenção. Pode ser restrito por IP de origem.</td>
+      </tr>
+      <tr>
+        <td><strong>API Senior</strong></td>
+        <td>conforme provedor</td>
+        <td>Saída</td>
+        <td>Servidor precisa conseguir acessar a API REST do Senior ERP/HCM. Liberar saída para o IP/host que a Senior fornecer.</td>
+      </tr>
+      <tr>
+        <td><strong>Chatbot/WhatsApp</strong></td>
+        <td>conforme provedor</td>
+        <td>Saída</td>
+        <td>Saída para a API do canal de chatbot (definida na implantação).</td>
+      </tr>
+      <tr>
+        <td><strong>SMTP</strong></td>
+        <td><span class="mono">465 ou 587/TCP</span></td>
+        <td>Saída</td>
+        <td>Envio de e-mails de notificação aos gestores e usuários.</td>
+      </tr>
+      <tr>
+        <td><strong>NTP</strong></td>
+        <td><span class="mono">123/UDP</span></td>
+        <td>Saída</td>
+        <td>Sincronização de relógio do servidor (importante para geolocalização e logs).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="muted" style="font-size: 9.5pt; margin-top: 8px;">Recomendamos manter o firewall com política <strong>"deny by default"</strong> e abrir explicitamente apenas as portas acima. Acesso administrativo (SSH) pode ter restrição por IP de origem para reforçar a segurança.</p>
+</div>
+
+<div class="page-break"></div>
+
+<h2>5. Arquitetura sugerida no servidor</h2>
+
+<div class="section">
+  <table>
+    <thead>
+      <tr><th>Camada</th><th>Tecnologia</th><th>Onde fica</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Web server / Reverse proxy</td><td>Nginx</td><td>SSD</td></tr>
+      <tr><td>Aplicação backend</td><td>Laravel · PHP 8.4 · PHP-FPM</td><td>SSD</td></tr>
+      <tr><td>Banco de dados</td><td>PostgreSQL 14+ (preferencial) ou MySQL 8</td><td>SSD</td></tr>
+      <tr><td>Cache e filas</td><td>Redis</td><td>SSD</td></tr>
+      <tr><td>Queue worker</td><td>Supervisor + Laravel Horizon</td><td>SSD</td></tr>
+      <tr><td>Fotos e evidências</td><td>Diretório dedicado · gravação direta</td><td><strong>HDD</strong></td></tr>
+      <tr><td>Backups locais</td><td>Cron diário (banco + arquivos)</td><td><strong>HDD</strong></td></tr>
+      <tr><td>App mobile dos fiscais</td><td>Acesso via API REST (HTTPS)</td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <div class="box box-blue" style="margin-top: 12px;">
+    <strong>O que fica em cada disco</strong>
+    <ul>
+      <li><strong>SSD:</strong> sistema, aplicação, banco de dados, cache, logs ativos. Velocidade alta, tamanho menor.</li>
+      <li><strong>HDD (1 TB+):</strong> fotos dos fiscais, evidências fotográficas das passagens de turno, anexos de auditoria, exportações grandes, backups locais. Volume alto, velocidade não é crítica.</li>
+    </ul>
+  </div>
+</div>
+
+<h2>6. Backup</h2>
+
+<div class="section">
+  <table>
+    <thead>
+      <tr><th>O que</th><th>Frequência</th><th>Onde</th><th>Retenção</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Banco de dados (dump)</td><td>Diário (madrugada)</td><td>HDD local + cópia externa</td><td>30 dias</td></tr>
+      <tr><td>Fotos e evidências</td><td>Incremental diário</td><td>HDD local + cópia externa</td><td>permanente</td></tr>
+      <tr><td>Configuração e .env</td><td>Manual a cada mudança</td><td>HDD local · repositório seguro</td><td>permanente</td></tr>
+    </tbody>
+  </table>
+
+  <div class="box box-warn" style="margin-top: 12px;">
+    <strong>Cópia externa do backup</strong>
+    <p>Backups locais protegem contra falhas de banco/aplicação, mas <strong>não</strong> protegem contra incêndio, roubo ou falha total do servidor. É altamente recomendado uma cópia externa periódica — pode ser:</p>
+    <ul>
+      <li>HD externo trocado mensalmente e guardado fora do prédio</li>
+      <li>Storage em nuvem (Backblaze B2, AWS S3, Google Cloud Storage) — custo proporcional ao volume</li>
+      <li>Servidor secundário em outra localização</li>
+    </ul>
+    <p>A escolha pode ser feita junto com a BS Tech após a definição do volume real de fotos durante os primeiros meses de operação.</p>
+  </div>
+</div>
+
+<h2>7. Checklist mínimo para iniciar</h2>
+
+<div class="section">
+  <ul class="checklist">
+    <li>Servidor físico com 4 cores, 6 GB RAM, SSD para sistema e HDD ≥ 1 TB para fotos</li>
+    <li>Linux Server instalado (Ubuntu Server LTS preferencial)</li>
+    <li>Link de fibra empresarial com IP externo fixo</li>
+    <li>Subdomínio definido e apontado para o IP externo</li>
+    <li>Firewall com portas <span class="mono">443</span>, <span class="mono">80</span> e <span class="mono">22</span> abertas (entrada) e saídas para Senior, chatbot, SMTP e NTP liberadas</li>
+    <li>Nobreak para servidor, modem/roteador e equipamento de rede</li>
+    <li>Acesso administrativo (SSH) liberado para a BS Tech durante a implantação</li>
+    <li>Plano de backup local definido em conjunto com a BS Tech</li>
+    <li>Cópia externa do backup definida (HD externo · nuvem · servidor secundário)</li>
+  </ul>
+</div>
+
+<h2>8. O que a BS Tech faz na implantação</h2>
+
+<div class="section">
+  <ul>
+    <li>Configuração do Linux Server (atualizações, hardening básico, firewall)</li>
+    <li>Instalação de Nginx, PHP, banco de dados, Redis, Supervisor</li>
+    <li>Deploy da aplicação 5 Estrelas e configuração do <span class="mono">.env</span></li>
+    <li>Emissão e renovação automática de SSL (Let's Encrypt)</li>
+    <li>Configuração de cron jobs (backup, jobs agendados, integrações)</li>
+    <li>Documentação técnica de deploy e operação entregue ao cliente</li>
+    <li>Acompanhamento técnico durante o ciclo de validação por módulo</li>
+  </ul>
+</div>
+
+<div class="footer">
+  BSTech Solutions · em parceria com Easy Tech<br>
+  Documento técnico orientativo. Versão 5 · Emitido em 22/05/2026 · Sujeito a ajustes mediante validação técnica em campo.
+</div>
+
+</body>
+</html>

@@ -18,6 +18,13 @@ class SettingsSeeder extends Seeder
             ['key' => 'favicon_path', 'value' => null, 'type' => 'image'],
             ['key' => 'login_bg_path', 'value' => null, 'type' => 'image'],
             ['key' => 'login_bg_mobile_path', 'value' => null, 'type' => 'image'],
+
+            // Segurança
+            ['key' => 'security.password_min_length', 'value' => '8', 'type' => 'integer'],
+            ['key' => 'security.password_require_letter', 'value' => '1', 'type' => 'boolean'],
+            ['key' => 'security.password_require_number', 'value' => '1', 'type' => 'boolean'],
+            ['key' => 'security.max_login_attempts', 'value' => '5', 'type' => 'integer'],
+            ['key' => 'security.lockout_minutes', 'value' => '15', 'type' => 'integer'],
         ];
 
         foreach ($defaults as $row) {
