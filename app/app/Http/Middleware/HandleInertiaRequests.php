@@ -34,6 +34,7 @@ class HandleInertiaRequests extends Middleware
             'shortcuts' => fn () => $request->user() ? $this->resolveShortcuts($request->user(), 'dashboard') : [],
             'mobileNavShortcuts' => fn () => $request->user() ? $this->resolveShortcuts($request->user(), 'mobile_nav') : [],
             'menuOptions' => fn () => $request->user() ? MenuCatalog::availableTo($request->user()) : [],
+            'menuGrouped' => fn () => $request->user() ? MenuCatalog::groupedFor($request->user()) : [],
             'theme' => [
                 'app_name' => Setting::get('app_name', '5 Estrelas'),
                 'primary_color' => Setting::get('primary_color', '#3b82f6'),

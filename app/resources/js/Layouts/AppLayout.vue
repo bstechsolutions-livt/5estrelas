@@ -14,8 +14,24 @@ const { can } = useAuth()
 const sidebarOpen = ref(true)
 const mobileMenuOpen = ref(false)
 
-// Usa menuOptions do backend (fonte única de verdade, mesmo que o drawer mobile)
+// Usa menuGrouped do backend (agrupado com submenus)
+const menuGrouped = computed(() => page.props.menuGrouped || [])
+// Flat list pra busca
 const menuItems = computed(() => page.props.menuOptions || [])
+
+const openGroups = ref({})
+
+function toggleGroup(label) {
+    openGroups.value[label] = !openGroups.value[label]
+}
+
+function isGroupOpen(label) {
+    // Aberto se marcado OU se algum item do grupo está ativo
+    if (openGroups.value[label]) return true
+    const group = menuGrouped.value.find(g => g.type === 'group' && g.label === label)
+    if (!group) return false
+    return group.items.some(i => isActive(i.href))
+}
 
 const searchQuery = ref('')
 
@@ -104,19 +120,47 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
 
                 <!-- Menu -->
                 <nav class="flex-1 py-2 px-3 space-y-1 overflow-y-auto">
-                    <button
-                        v-for="item in filteredMenuItems"
-                        :key="item.href"
-                        @click="navigate(item.href)"
-                        :class="[
-                            'sidebar-menu-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm',
-                            isActive(item.href) ? 'sidebar-menu-active border-l-2' : ''
-                        ]"
-                        :style="isActive(item.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
-                    >
-                        <i :class="[item.icon, 'text-base']"></i>
-                        <span>{{ item.label }}</span>
-                    </button>
+                    <template v-for="entry in menuGrouped" :key="entry.key || entry.label">
+                        <!-- Item raiz (sem grupo) -->
+                        <button
+                            v-if="entry.type === 'item'"
+                            @click="navigate(entry.href)"
+                            :class="[
+                                'sidebar-menu-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm',
+                                isActive(entry.href) ? 'sidebar-menu-active border-l-2' : ''
+                            ]"
+                            :style="isActive(entry.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
+                        >
+                            <i :class="[entry.icon, 'text-base']"></i>
+                            <span>{{ entry.label }}</span>
+                        </button>
+
+                        <!-- Grupo com submenus -->
+                        <div v-else-if="entry.type === 'group'">
+                            <button
+                                @click="toggleGroup(entry.label)"
+                                class="sidebar-menu-item w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-xs uppercase tracking-wider font-semibold mt-3 mb-1"
+                            >
+                                <span>{{ entry.label }}</span>
+                                <i :class="['pi text-[10px]', isGroupOpen(entry.label) ? 'pi-chevron-down' : 'pi-chevron-right']"></i>
+                            </button>
+                            <div v-show="isGroupOpen(entry.label)" class="space-y-0.5 ml-1">
+                                <button
+                                    v-for="item in entry.items"
+                                    :key="item.href"
+                                    @click="navigate(item.href)"
+                                    :class="[
+                                        'sidebar-menu-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm',
+                                        isActive(item.href) ? 'sidebar-menu-active border-l-2' : ''
+                                    ]"
+                                    :style="isActive(item.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
+                                >
+                                    <i :class="[item.icon, 'text-base']"></i>
+                                    <span>{{ item.label }}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </template>
                 </nav>
             </aside>
         </div>
@@ -162,19 +206,44 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
                     </div>
 
                     <nav class="flex-1 py-2 px-3 space-y-1 overflow-y-auto">
-                        <button
-                            v-for="item in filteredMenuItems"
-                            :key="item.href"
-                            @click="navigate(item.href)"
-                            :class="[
-                                'sidebar-menu-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm',
-                                isActive(item.href) ? 'sidebar-menu-active border-l-2' : ''
-                            ]"
-                            :style="isActive(item.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
-                        >
-                            <i :class="[item.icon, 'text-base']"></i>
-                            <span>{{ item.label }}</span>
-                        </button>
+                        <template v-for="entry in menuGrouped" :key="entry.key || entry.label">
+                            <button
+                                v-if="entry.type === 'item'"
+                                @click="navigate(entry.href)"
+                                :class="[
+                                    'sidebar-menu-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm',
+                                    isActive(entry.href) ? 'sidebar-menu-active border-l-2' : ''
+                                ]"
+                                :style="isActive(entry.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
+                            >
+                                <i :class="[entry.icon, 'text-base']"></i>
+                                <span>{{ entry.label }}</span>
+                            </button>
+                            <div v-else-if="entry.type === 'group'">
+                                <button
+                                    @click="toggleGroup(entry.label)"
+                                    class="sidebar-menu-item w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-xs uppercase tracking-wider font-semibold mt-3 mb-1"
+                                >
+                                    <span>{{ entry.label }}</span>
+                                    <i :class="['pi text-[10px]', isGroupOpen(entry.label) ? 'pi-chevron-down' : 'pi-chevron-right']"></i>
+                                </button>
+                                <div v-show="isGroupOpen(entry.label)" class="space-y-0.5 ml-1">
+                                    <button
+                                        v-for="item in entry.items"
+                                        :key="item.href"
+                                        @click="navigate(item.href)"
+                                        :class="[
+                                            'sidebar-menu-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm',
+                                            isActive(item.href) ? 'sidebar-menu-active border-l-2' : ''
+                                        ]"
+                                        :style="isActive(item.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
+                                    >
+                                        <i :class="[item.icon, 'text-base']"></i>
+                                        <span>{{ item.label }}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
                     </nav>
                 </aside>
             </Transition>
