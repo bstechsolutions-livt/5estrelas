@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BackupController;
+use App\Http\Controllers\BranchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DeviceTokenController;
@@ -117,6 +118,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/departamentos/{id}/editar', [DepartmentController::class, 'edit'])->name('departments.edit');
         Route::put('/departamentos/{id}', [DepartmentController::class, 'update'])->name('departments.update');
         Route::delete('/departamentos/{id}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
+    });
+
+    // Filiais
+    Route::middleware('permission:filiais.gerenciar')->group(function () {
+        Route::get('/filiais', [BranchController::class, 'index'])->name('branches.index');
+        Route::get('/filiais/criar', [BranchController::class, 'create'])->name('branches.create');
+        Route::post('/filiais', [BranchController::class, 'store'])->name('branches.store');
+        Route::get('/filiais/{id}/editar', [BranchController::class, 'edit'])->name('branches.edit');
+        Route::put('/filiais/{id}', [BranchController::class, 'update'])->name('branches.update');
+        Route::delete('/filiais/{id}', [BranchController::class, 'destroy'])->name('branches.destroy');
     });
 
     // Notificações (do usuário autenticado, sem permissão extra)

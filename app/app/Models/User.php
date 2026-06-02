@@ -54,6 +54,11 @@ class User extends Authenticatable
         return $this->belongsTo(Department::class);
     }
 
+    public function branches(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Branch::class, 'branch_user');
+    }
+
     public function permissionKeys(): array
     {
         if ($this->cachedPermissions === null) {

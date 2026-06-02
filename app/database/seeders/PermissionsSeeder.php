@@ -33,6 +33,9 @@ class PermissionsSeeder extends Seeder
             // Departamentos
             ['key' => 'departamentos.gerenciar', 'label' => 'Gerenciar departamentos', 'module' => 'departamentos'],
 
+            // Filiais
+            ['key' => 'filiais.gerenciar', 'label' => 'Gerenciar filiais', 'module' => 'filiais'],
+
             // Backups
             ['key' => 'backups.gerenciar', 'label' => 'Gerenciar backups', 'module' => 'backups'],
         ];
