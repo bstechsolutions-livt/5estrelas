@@ -14,14 +14,8 @@ const { can } = useAuth()
 const sidebarOpen = ref(true)
 const mobileMenuOpen = ref(false)
 
-const menuItems = computed(() => [
-    { label: 'Dashboard', icon: 'pi pi-home', href: '/dashboard', show: true },
-    { label: 'Usuários', icon: 'pi pi-users', href: '/usuarios', show: can('usuarios.listar') },
-    { label: 'Notícias', icon: 'pi pi-megaphone', href: '/noticias', show: can('noticias.gerenciar') },
-    { label: 'Aparência', icon: 'pi pi-palette', href: '/settings/aparencia', show: can('aparencia.editar') },
-    { label: 'Auditoria', icon: 'pi pi-history', href: '/auditoria', show: can('auditoria.visualizar') },
-    { label: 'Backups', icon: 'pi pi-database', href: '/backups', show: can('backups.gerenciar') },
-].filter(item => item.show))
+// Usa menuOptions do backend (fonte única de verdade, mesmo que o drawer mobile)
+const menuItems = computed(() => page.props.menuOptions || [])
 
 const searchQuery = ref('')
 

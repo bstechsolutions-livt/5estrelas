@@ -141,6 +141,11 @@ watch(() => page.props.flash?.error, (msg) => {
                         </template>
                     </Column>
                     <Column field="email" header="E-mail" />
+                    <Column header="Departamento">
+                        <template #body="{ data }">
+                            <span class="text-sm text-gray-600">{{ data.department?.name || '—' }}</span>
+                        </template>
+                    </Column>
                     <Column field="is_active" header="Status">
                         <template #body="{ data }">
                             <Tag :value="data.is_active ? 'Ativo' : 'Inativo'" :severity="data.is_active ? 'success' : 'secondary'" />

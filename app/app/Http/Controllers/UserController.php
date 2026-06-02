@@ -18,6 +18,7 @@ class UserController extends Controller
         $page = (int) $request->input('page', 1);
 
         $query = User::query()
+            ->with('department:id,name')
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")

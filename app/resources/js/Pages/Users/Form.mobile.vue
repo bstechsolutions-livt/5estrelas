@@ -6,10 +6,12 @@ import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
 import ToggleSwitch from 'primevue/toggleswitch'
+import Select from 'primevue/select'
 
 const props = defineProps({
     mode: { type: String, required: true },
     user: Object,
+    departments: { type: Array, default: () => [] },
 })
 
 const isEdit = computed(() => props.mode === 'edit')
@@ -19,7 +21,13 @@ const form = useForm({
     email: props.user?.email || '',
     password: '',
     is_active: props.user?.is_active ?? true,
+    department_id: props.user?.department_id || null,
 })
+
+const departmentOptions = computed(() => [
+    { label: 'Sem departamento', value: null },
+    ...props.departments.map(d => ({ label: d.name, value: d.id })),
+])
 
 function submit() {
     if (isEdit.value) {
@@ -64,6 +72,10 @@ function cancel() {
                         :pt="{ pcInputText: { root: { style: 'height: 44px; width: 100%' } } }"
                     />
                     <small v-if="form.errors.password" class="text-red-500 text-xs mt-1 block">{{ form.errors.password }}</small>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Departamento</label>
+                    <Select v-model="form.department_id" :options="departmentOptions" option-label="label" option-value="value" placeholder="Selecione..." class="w-full" />
                 </div>
                 <div class="flex items-center gap-3 pt-1">
                     <ToggleSwitch v-model="form.is_active" inputId="active" />
