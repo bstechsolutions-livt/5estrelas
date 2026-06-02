@@ -35,13 +35,18 @@ Lê **sempre** antes de tomar decisões que envolvam servidor, deploy, infra ou 
 ### E-mail do cliente (avisos/notificações)
 
 - E-mail: `modernizacao.avisos@grupo5estrelas.com.br`
-- Senha: `5Estrelas@2026`
+- Senha Outlook: `5Estrelas@2026`
 - Host: Outlook (Microsoft 365)
 - Uso: e-mail de avisos do sistema, notificações, comunicações automáticas
 - Também usado como conta Shorebird (code push)
 - **Conta Google criada com esse mesmo e-mail** (não é Gmail, é conta Google vinculada ao Outlook)
   - Usada no: Firebase Console, Google Play Console (futuro)
   - Login: `modernizacao.avisos@grupo5estrelas.com.br` / mesma senha `5Estrelas@2026`
+- **Conta Apple (Apple ID)**
+  - Login: `modernizacao.avisos@grupo5estrelas.com.br`
+  - Senha: `G5e@Plataforma2026` (Apple não aceita "5Estrelas" na senha)
+  - Nome: grupo 5estrelas
+  - Usada no: App Store Connect, Apple Developer Program
 
 ### Shorebird (code push)
 
@@ -70,6 +75,7 @@ Lê **sempre** antes de tomar decisões que envolvam servidor, deploy, infra ou 
 
 - **Domínio de produção**: `intranet.grupo5estrelas.com.br`
 - **Acesso temporário**: via VPN no IP interno `192.168.254.80` (até liberarem portas 80/443 externas)
+- **Acesso externo**: `https://intranet.grupo5estrelas.com.br` (SSL Let's Encrypt, ativo desde 28/05/2026, renova automaticamente)
 - **Antes de qualquer ação contra a VM, confirmar com Bruno**. Servidor de produção = high-risk.
 - Mudanças destrutivas (drop, rm -rf, restart de serviço, fechamento de porta) precisam aprovação explícita.
 - Sempre testar localmente antes; rodar em produção apenas o que já passou em dev.

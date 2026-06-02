@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DeviceTokenController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PostController;
@@ -106,6 +107,16 @@ Route::middleware('auth')->group(function () {
         Route::delete('/backups/{filename}', [BackupController::class, 'destroy'])
             ->where('filename', '.*\.zip')
             ->name('backups.destroy');
+    });
+
+    // Departamentos
+    Route::middleware('permission:departamentos.gerenciar')->group(function () {
+        Route::get('/departamentos', [DepartmentController::class, 'index'])->name('departments.index');
+        Route::get('/departamentos/criar', [DepartmentController::class, 'create'])->name('departments.create');
+        Route::post('/departamentos', [DepartmentController::class, 'store'])->name('departments.store');
+        Route::get('/departamentos/{id}/editar', [DepartmentController::class, 'edit'])->name('departments.edit');
+        Route::put('/departamentos/{id}', [DepartmentController::class, 'update'])->name('departments.update');
+        Route::delete('/departamentos/{id}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
     });
 
     // Notificações (do usuário autenticado, sem permissão extra)

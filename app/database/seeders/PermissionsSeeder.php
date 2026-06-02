@@ -30,6 +30,9 @@ class PermissionsSeeder extends Seeder
             // Notícias
             ['key' => 'noticias.gerenciar', 'label' => 'Gerenciar destaques e notícias', 'module' => 'noticias'],
 
+            // Departamentos
+            ['key' => 'departamentos.gerenciar', 'label' => 'Gerenciar departamentos', 'module' => 'departamentos'],
+
             // Backups
             ['key' => 'backups.gerenciar', 'label' => 'Gerenciar backups', 'module' => 'backups'],
         ];

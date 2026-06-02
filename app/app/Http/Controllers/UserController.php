@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Department;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
@@ -43,6 +44,7 @@ class UserController extends Controller
         return Inertia::render('Users/Form', [
             'mode' => 'create',
             'user' => null,
+            'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -53,6 +55,7 @@ class UserController extends Controller
             'email' => ['required', 'email', 'unique:users,email'],
             'password' => ['required', 'string', new \App\Rules\StrongPassword()],
             'is_active' => ['boolean'],
+            'department_id' => ['nullable', 'exists:departments,id'],
         ]);
 
         User::create([
@@ -60,6 +63,7 @@ class UserController extends Controller
             'email' => $data['email'],
             'password' => bcrypt($data['password']),
             'is_active' => $data['is_active'] ?? true,
+            'department_id' => $data['department_id'] ?? null,
         ]);
 
         return redirect('/usuarios')->with('success', 'Usuário criado com sucesso.');
@@ -75,7 +79,9 @@ class UserController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'is_active' => (bool) $user->is_active,
+                'department_id' => $user->department_id,
             ],
+            'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -88,6 +94,7 @@ class UserController extends Controller
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['nullable', 'string', new \App\Rules\StrongPassword()],
             'is_active' => ['boolean'],
+            'department_id' => ['nullable', 'exists:departments,id'],
         ]);
 
         $user->name = $data['name'];
@@ -96,6 +103,7 @@ class UserController extends Controller
             $user->password = bcrypt($data['password']);
         }
         $user->is_active = $data['is_active'] ?? $user->is_active;
+        $user->department_id = $data['department_id'] ?? $user->department_id;
         $user->save();
 
         return redirect('/usuarios')->with('success', 'Usuário atualizado com sucesso.');
