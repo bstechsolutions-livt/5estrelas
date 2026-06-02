@@ -95,6 +95,47 @@ class SearchController extends Controller
             ];
         }
 
+        // Departamentos
+        if ($user->hasPermission('departamentos.gerenciar')) {
+            $depts = \App\Models\Department::query()
+                ->where('name', 'ilike', "%{$q}%")
+                ->limit(5)
+                ->get(['id', 'name'])
+                ->map(fn ($d) => [
+                    'id' => $d->id,
+                    'title' => $d->name,
+                    'subtitle' => 'Departamento',
+                    'icon' => 'pi pi-building',
+                    'href' => "/departamentos/{$d->id}/editar",
+                ]);
+
+            if ($depts->isNotEmpty()) {
+                $groups[] = ['label' => 'Departamentos', 'items' => $depts];
+            }
+        }
+
+        // Filiais
+        if ($user->hasPermission('filiais.gerenciar')) {
+            $branches = \App\Models\Branch::query()
+                ->where(function ($qq) use ($q) {
+                    $qq->where('name', 'ilike', "%{$q}%")
+                        ->orWhere('cnpj', 'like', "%{$q}%");
+                })
+                ->limit(5)
+                ->get(['id', 'name', 'cnpj'])
+                ->map(fn ($b) => [
+                    'id' => $b->id,
+                    'title' => $b->name,
+                    'subtitle' => $b->cnpj ? "CNPJ: {$b->cnpj}" : 'Filial',
+                    'icon' => 'pi pi-map-marker',
+                    'href' => "/filiais/{$b->id}/editar",
+                ]);
+
+            if ($branches->isNotEmpty()) {
+                $groups[] = ['label' => 'Filiais', 'items' => $branches];
+            }
+        }
+
         return response()->json(['groups' => $groups, 'query' => $q]);
     }
 }

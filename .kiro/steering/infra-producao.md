@@ -100,6 +100,7 @@ Lê **sempre** antes de tomar decisões que envolvam servidor, deploy, infra ou 
 - **Nunca expor senhas em mensagens de grupo/chat**. Senhas ficam só nos docs internos (repo privado).
 - **Toda decisão de infra/deploy/arquitetura fica documentada** em steering ou docs.
 - **Toda credencial nova que chegar, anotar imediatamente** no steering + docs.
+- **Busca global (Ctrl+K)**: toda nova entidade/cadastro criado DEVE ser adicionado no `SearchController.php` pra aparecer nos resultados de busca.
 
 ## Documento de referência
 
