@@ -205,7 +205,7 @@ function formatSize(bytes) {
                     </div>
 
                     <!-- Info lateral -->
-                    <div class="bg-white rounded-xl border border-gray-100 p-4 text-sm">
+                    <div v-if="payable.preparer || payable.approver || payable.approved_at" class="bg-white rounded-xl border border-gray-100 p-4 text-sm">
                         <div v-if="payable.preparer" class="mb-2">
                             <p class="text-xs text-gray-500">Preparado por</p>
                             <p class="text-gray-800">{{ payable.preparer.name }}</p>
