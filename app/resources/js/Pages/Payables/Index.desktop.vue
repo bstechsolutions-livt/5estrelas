@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import DataTable from 'primevue/datatable'
@@ -55,7 +55,20 @@ function onPage(event) {
     }, { preserveState: true, replace: true })
 }
 
-function goShow(id) { router.visit(`/financeiro/contas-pagar/${id}`) }
+// Restaura scroll ao voltar do detalhe
+onMounted(() => {
+    const saved = sessionStorage.getItem('payables_scroll')
+    if (saved) {
+        setTimeout(() => window.scrollTo(0, parseInt(saved)), 50)
+        sessionStorage.removeItem('payables_scroll')
+    }
+})
+
+function goShow(id) {
+    // Salva scroll position antes de sair
+    sessionStorage.setItem('payables_scroll', window.scrollY.toString())
+    router.visit(`/financeiro/contas-pagar/${id}`)
+}
 
 function formatMoney(val) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
