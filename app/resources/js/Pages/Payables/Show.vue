@@ -88,6 +88,9 @@ function formatSize(bytes) {
             <!-- Header -->
             <div class="flex items-start justify-between mb-6">
                 <div>
+                    <button @click="router.visit('/financeiro/contas-pagar')" class="text-sm text-blue-600 hover:underline mb-2 flex items-center gap-1">
+                        <i class="pi pi-arrow-left text-xs"></i> Voltar para lista
+                    </button>
                     <div class="flex items-center gap-3">
                         <h1 :class="isMobile ? 'text-lg font-bold text-gray-800' : 'text-2xl font-bold text-gray-800'">
                             {{ payable.supplier_name }}
