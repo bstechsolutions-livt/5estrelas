@@ -108,9 +108,9 @@ function formatSize(bytes) {
                 <p class="text-xl font-bold text-gray-800">{{ formatMoney(payable.amount) }}</p>
             </div>
 
-            <div :class="isMobile ? 'space-y-4' : 'grid grid-cols-3 gap-6'">
+            <div :class="isMobile ? 'space-y-4' : (canPrepare || canApprove) ? 'grid grid-cols-3 gap-6' : ''">
                 <!-- Coluna principal -->
-                <div :class="isMobile ? '' : 'col-span-2 space-y-4'">
+                <div :class="isMobile ? '' : (canPrepare || canApprove) ? 'col-span-2 space-y-4' : 'space-y-4'">
                     <!-- Info -->
                     <div class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Informações</h3>
@@ -178,7 +178,7 @@ function formatSize(bytes) {
                 </div>
 
                 <!-- Sidebar de ações -->
-                <div class="space-y-4">
+                <div v-if="canPrepare || canApprove" class="space-y-4">
                     <!-- Ações do preparador -->
                     <div v-if="canPrepare" class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Ações</h3>
