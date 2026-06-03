@@ -25,6 +25,9 @@ class MenuCatalog
             // Conteúdo
             ['key' => 'noticias', 'label' => 'Notícias', 'icon' => 'pi pi-megaphone', 'href' => '/noticias', 'permission' => 'noticias.gerenciar', 'group' => 'Conteúdo'],
 
+            // Financeiro
+            ['key' => 'contas_pagar', 'label' => 'Contas a Pagar', 'icon' => 'pi pi-wallet', 'href' => '/financeiro/contas-pagar', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
+
             // Configurações
             ['key' => 'aparencia', 'label' => 'Aparência', 'icon' => 'pi pi-palette', 'href' => '/settings/aparencia', 'permission' => 'aparencia.editar', 'group' => 'Configurações'],
             ['key' => 'backups', 'label' => 'Backups', 'icon' => 'pi pi-database', 'href' => '/backups', 'permission' => 'backups.gerenciar', 'group' => 'Configurações'],

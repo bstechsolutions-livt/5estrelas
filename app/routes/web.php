@@ -7,6 +7,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PayableController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DeviceTokenController;
 use App\Http\Controllers\NotificationController;
@@ -128,6 +129,18 @@ Route::middleware('auth')->group(function () {
         Route::get('/filiais/{id}/editar', [BranchController::class, 'edit'])->name('branches.edit');
         Route::put('/filiais/{id}', [BranchController::class, 'update'])->name('branches.update');
         Route::delete('/filiais/{id}', [BranchController::class, 'destroy'])->name('branches.destroy');
+    });
+
+    // Financeiro - Contas a Pagar
+    Route::prefix('financeiro/contas-pagar')->middleware('permission:financeiro.contas_pagar.visualizar')->group(function () {
+        Route::get('/', [PayableController::class, 'index'])->name('payables.index');
+        Route::get('/{id}', [PayableController::class, 'show'])->name('payables.show');
+        Route::post('/{id}/comentarios', [PayableController::class, 'addComment'])->name('payables.comment');
+        Route::post('/{id}/documentos', [PayableController::class, 'addDocument'])->name('payables.document');
+        Route::delete('/{payableId}/documentos/{docId}', [PayableController::class, 'removeDocument'])->name('payables.document.remove');
+        Route::post('/{id}/enviar-aprovacao', [PayableController::class, 'sendForApproval'])->name('payables.send_approval');
+        Route::post('/{id}/aprovar', [PayableController::class, 'approve'])->name('payables.approve');
+        Route::post('/{id}/reprovar', [PayableController::class, 'reject'])->name('payables.reject');
     });
 
     // Notificações (do usuário autenticado, sem permissão extra)

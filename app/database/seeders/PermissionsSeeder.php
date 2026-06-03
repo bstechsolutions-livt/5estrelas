@@ -36,6 +36,11 @@ class PermissionsSeeder extends Seeder
             // Filiais
             ['key' => 'filiais.gerenciar', 'label' => 'Gerenciar filiais', 'module' => 'filiais'],
 
+            // Financeiro - Contas a Pagar
+            ['key' => 'financeiro.contas_pagar.visualizar', 'label' => 'Ver contas a pagar', 'module' => 'financeiro'],
+            ['key' => 'financeiro.contas_pagar.preparar', 'label' => 'Preparar contas a pagar', 'module' => 'financeiro'],
+            ['key' => 'financeiro.contas_pagar.aprovar', 'label' => 'Aprovar contas a pagar', 'module' => 'financeiro'],
+
             // Backups
             ['key' => 'backups.gerenciar', 'label' => 'Gerenciar backups', 'module' => 'backups'],
         ];
