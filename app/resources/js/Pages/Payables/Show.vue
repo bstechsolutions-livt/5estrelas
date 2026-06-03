@@ -75,6 +75,10 @@ function formatDateTime(d) {
 const canPrepare = ['pendente', 'em_preparacao', 'reprovado'].includes(props.payable.status)
 const canApprove = props.payable.status === 'aguardando_aprovacao'
 
+function goBack() {
+    window.history.back()
+}
+
 function formatSize(bytes) {
     if (bytes < 1024) return bytes + ' B'
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
@@ -88,7 +92,7 @@ function formatSize(bytes) {
             <!-- Header -->
             <div class="flex items-start justify-between mb-6">
                 <div>
-                    <button @click="window.history.back()" class="text-sm text-blue-600 hover:underline mb-2 flex items-center gap-1 cursor-pointer">
+                    <button @click="goBack" class="text-sm text-blue-600 hover:underline mb-2 flex items-center gap-1 cursor-pointer">
                         <i class="pi pi-arrow-left text-xs"></i> Voltar para lista
                     </button>
                     <div class="flex items-center gap-3">
