@@ -59,14 +59,18 @@ function onPage(event) {
 onMounted(() => {
     const saved = sessionStorage.getItem('payables_scroll')
     if (saved) {
-        setTimeout(() => window.scrollTo(0, parseInt(saved)), 50)
+        setTimeout(() => {
+            const main = document.querySelector('main.overflow-y-auto')
+            if (main) main.scrollTo(0, parseInt(saved))
+        }, 100)
         sessionStorage.removeItem('payables_scroll')
     }
 })
 
 function goShow(id) {
-    // Salva scroll position antes de sair
-    sessionStorage.setItem('payables_scroll', window.scrollY.toString())
+    // Salva scroll position do main container antes de sair
+    const main = document.querySelector('main.overflow-y-auto')
+    if (main) sessionStorage.setItem('payables_scroll', main.scrollTop.toString())
     router.visit(`/financeiro/contas-pagar/${id}`)
 }
 
