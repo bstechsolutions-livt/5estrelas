@@ -104,8 +104,8 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             <!-- Filtros -->
             <div class="flex flex-wrap gap-3 mb-4">
                 <InputText v-model="search" placeholder="Buscar fornecedor, título..." class="w-64" />
-                <Select v-model="status" :options="statusList" option-label="label" option-value="value" class="w-48" />
-                <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" class="w-52" />
+                <Select v-model="status" :options="statusList" option-label="label" option-value="value" placeholder="Status" class="w-48" />
+                <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" placeholder="Filial" class="w-52" />
             </div>
 
             <!-- Tabela -->
