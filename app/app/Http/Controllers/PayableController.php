@@ -40,7 +40,7 @@ class PayableController extends Controller
             $query->where('branch_id', $request->branch_id);
         }
 
-        $payables = $query->paginate(20)->withQueryString();
+        $payables = $query->paginate($request->input('per_page', 20))->withQueryString();
 
         if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
             return response()->json($payables);

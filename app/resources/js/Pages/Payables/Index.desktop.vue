@@ -45,6 +45,16 @@ watch(search, () => { clearTimeout(timer); timer = setTimeout(applyFilters, 300)
 watch(status, applyFilters)
 watch(branchId, applyFilters)
 
+function onPage(event) {
+    router.get('/financeiro/contas-pagar', {
+        search: search.value || undefined,
+        status: status.value || undefined,
+        branch_id: branchId.value || undefined,
+        page: event.page + 1,
+        per_page: event.rows,
+    }, { preserveState: true, replace: true })
+}
+
 function goShow(id) { router.visit(`/financeiro/contas-pagar/${id}`) }
 
 function formatMoney(val) {
@@ -110,7 +120,13 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
 
             <!-- Tabela -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                <DataTable :value="payables.data" striped-rows @row-click="(e) => goShow(e.data.id)" class="cursor-pointer">
+                <DataTable :value="payables.data" striped-rows @row-click="(e) => goShow(e.data.id)" class="cursor-pointer"
+                    :lazy="true" :paginator="true" :rows="payables.per_page" :total-records="payables.total"
+                    :first="(payables.current_page - 1) * payables.per_page"
+                    @page="onPage"
+                    paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+                    :rows-per-page-options="[20, 50, 100]"
+                >
                     <Column field="title_number" header="Nº" style="width: 90px; white-space: nowrap" />
                     <Column field="supplier_name" header="Fornecedor" style="min-width: 200px" />
                     <Column field="amount" header="Valor" style="width: 140px; white-space: nowrap">
