@@ -111,24 +111,24 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             <!-- Tabela -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100">
                 <DataTable :value="payables.data" striped-rows @row-click="(e) => goShow(e.data.id)" class="cursor-pointer">
-                    <Column field="title_number" header="Nº" style="width: 80px" />
-                    <Column field="supplier_name" header="Fornecedor" />
-                    <Column field="amount" header="Valor" style="width: 140px">
+                    <Column field="title_number" header="Nº" style="width: 90px; white-space: nowrap" />
+                    <Column field="supplier_name" header="Fornecedor" style="min-width: 200px" />
+                    <Column field="amount" header="Valor" style="width: 140px; white-space: nowrap">
                         <template #body="{ data }">
                             <span class="font-semibold">{{ formatMoney(data.amount) }}</span>
                         </template>
                     </Column>
-                    <Column field="due_date" header="Vencimento" style="width: 120px">
+                    <Column field="due_date" header="Vencimento" style="width: 110px; white-space: nowrap">
                         <template #body="{ data }">
                             {{ formatDate(data.due_date) }}
                         </template>
                     </Column>
-                    <Column header="Filial" style="width: 150px">
+                    <Column header="Filial" style="width: 180px">
                         <template #body="{ data }">
-                            <span class="text-xs text-gray-600">{{ data.branch?.name || '—' }}</span>
+                            <span class="text-xs text-gray-600 truncate block max-w-[160px]" :title="data.branch?.name">{{ data.branch?.name || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="status" header="Status" style="width: 160px">
+                    <Column field="status" header="Status" style="width: 150px; white-space: nowrap">
                         <template #body="{ data }">
                             <Tag :value="statusOptions[data.status]" :severity="statusSeverity[data.status]" />
                         </template>
