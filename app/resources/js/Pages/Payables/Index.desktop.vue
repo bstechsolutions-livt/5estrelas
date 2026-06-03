@@ -19,13 +19,17 @@ const props = defineProps({
 })
 
 const search = ref(props.filters?.search || '')
-const status = ref(props.filters?.status || null)
+const status = ref(props.filters?.status || 'pendente')
 const branchId = ref(props.filters?.branch_id || null)
 
-const statusList = computed(() => [
-    { label: 'Todos os status', value: null },
-    ...Object.entries(props.statusOptions).map(([k, v]) => ({ label: v, value: k })),
-])
+const statusList = [
+    { label: 'Pendentes', value: 'pendente', color: 'amber' },
+    { label: 'Em Preparação', value: 'em_preparacao', color: 'blue' },
+    { label: 'Aguardando Aprovação', value: 'aguardando_aprovacao', color: 'orange' },
+    { label: 'Aprovados', value: 'aprovado', color: 'green' },
+    { label: 'Reprovados', value: 'reprovado', color: 'red' },
+    { label: 'Pagos', value: 'pago', color: 'emerald' },
+]
 
 const branchList = computed(() => [
     { label: 'Todas as filiais', value: null },
@@ -109,29 +113,27 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                 <p class="text-sm text-gray-500 mt-1">Gerencie títulos, anexe documentos e envie para aprovação.</p>
             </div>
 
-            <!-- Cards resumo -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                <div class="bg-white rounded-xl border border-gray-100 p-4">
-                    <p class="text-xs text-gray-500 uppercase tracking-wide">Pendentes</p>
-                    <p class="text-xl font-bold text-amber-600 mt-1">{{ formatMoney(totalPendente) }}</p>
-                    <p class="text-xs text-gray-400 mt-0.5">{{ countPendente }} título(s)</p>
-                </div>
-                <div class="bg-white rounded-xl border border-gray-100 p-4">
-                    <p class="text-xs text-gray-500 uppercase tracking-wide">Aguardando Aprovação</p>
-                    <p class="text-xl font-bold text-blue-600 mt-1">{{ formatMoney(totalAguardando) }}</p>
-                    <p class="text-xs text-gray-400 mt-0.5">{{ countAguardando }} título(s)</p>
-                </div>
-                <div class="bg-white rounded-xl border border-gray-100 p-4">
-                    <p class="text-xs text-gray-500 uppercase tracking-wide">Aprovados</p>
-                    <p class="text-xl font-bold text-green-600 mt-1">{{ formatMoney(totalAprovado) }}</p>
-                    <p class="text-xs text-gray-400 mt-0.5">{{ countAprovado }} título(s)</p>
-                </div>
+            <!-- Tabs de status -->
+            <div class="flex flex-wrap gap-2 mb-5">
+                <button
+                    v-for="s in statusList"
+                    :key="s.value"
+                    @click="status = s.value"
+                    :class="[
+                        'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                        status === s.value
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                    ]"
+                >
+                    {{ s.label }}
+                    <span v-if="totals?.[s.value]" class="ml-1.5 text-xs opacity-75">({{ totals[s.value]?.count || 0 }})</span>
+                </button>
             </div>
 
             <!-- Filtros -->
             <div class="flex flex-wrap gap-3 mb-4">
                 <InputText v-model="search" placeholder="Buscar fornecedor, título..." class="w-64" />
-                <Select v-model="status" :options="statusList" option-label="label" option-value="value" placeholder="Status" class="w-48" />
                 <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" placeholder="Filial" class="w-52" />
             </div>
 
