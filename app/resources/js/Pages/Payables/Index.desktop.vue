@@ -5,6 +5,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
+import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
@@ -21,8 +22,8 @@ const props = defineProps({
 const search = ref(props.filters?.search || '')
 const status = ref(props.filters?.status || 'pendente')
 const branchId = ref(props.filters?.branch_id || null)
-const amountMin = ref(props.filters?.amount_min || '')
-const amountMax = ref(props.filters?.amount_max || '')
+const amountMin = ref(props.filters?.amount_min ? Number(props.filters.amount_min) : null)
+const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_max) : null)
 const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
 
@@ -56,6 +57,31 @@ function applyFilters() {
 watch(search, () => { clearTimeout(timer); timer = setTimeout(applyFilters, 300) })
 watch(status, applyFilters)
 watch(branchId, applyFilters)
+
+const hasActiveFilters = computed(() => {
+    return !!(search.value || branchId.value || amountMin.value || amountMax.value || dueFrom.value || dueTo.value)
+})
+
+const activeFilterCount = computed(() => {
+    let c = 0
+    if (search.value) c++
+    if (branchId.value) c++
+    if (amountMin.value) c++
+    if (amountMax.value) c++
+    if (dueFrom.value) c++
+    if (dueTo.value) c++
+    return c
+})
+
+function clearFilters() {
+    search.value = ''
+    branchId.value = null
+    amountMin.value = null
+    amountMax.value = null
+    dueFrom.value = ''
+    dueTo.value = ''
+    applyFilters()
+}
 
 function onPage(event) {
     router.get('/financeiro/contas-pagar', {
@@ -144,13 +170,17 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             </div>
 
             <!-- Filtros -->
-            <div class="flex flex-wrap gap-3 mb-4">
+            <div class="flex flex-wrap gap-3 mb-2">
                 <InputText v-model="search" placeholder="Buscar fornecedor, título..." class="w-64" />
                 <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" placeholder="Filial" class="w-52" />
-                <InputText v-model="amountMin" placeholder="Valor mín" class="w-28" @change="applyFilters" />
-                <InputText v-model="amountMax" placeholder="Valor máx" class="w-28" @change="applyFilters" />
-                <InputText v-model="dueFrom" type="date" placeholder="Venc. de" class="w-36" @change="applyFilters" />
-                <InputText v-model="dueTo" type="date" placeholder="Venc. até" class="w-36" @change="applyFilters" />
+                <InputNumber v-model="amountMin" placeholder="Valor mín" mode="currency" currency="BRL" locale="pt-BR" class="w-40" @blur="applyFilters" />
+                <InputNumber v-model="amountMax" placeholder="Valor máx" mode="currency" currency="BRL" locale="pt-BR" class="w-40" @blur="applyFilters" />
+                <InputText v-model="dueFrom" type="date" class="w-36" @change="applyFilters" />
+                <InputText v-model="dueTo" type="date" class="w-36" @change="applyFilters" />
+            </div>
+            <div v-if="hasActiveFilters" class="flex items-center gap-2 mb-4">
+                <span class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">{{ activeFilterCount }} filtro(s) aplicado(s)</span>
+                <button @click="clearFilters" class="text-xs text-red-600 hover:underline cursor-pointer">Limpar filtros</button>
             </div>
 
             <!-- Tabela -->
