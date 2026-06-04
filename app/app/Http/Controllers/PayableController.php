@@ -39,6 +39,12 @@ class PayableController extends Controller
         if ($request->filled('branch_id')) {
             $query->where('branch_id', $request->branch_id);
         }
+        if ($request->filled('amount_min')) {
+            $query->where('amount', '>=', (float) $request->amount_min);
+        }
+        if ($request->filled('amount_max')) {
+            $query->where('amount', '<=', (float) $request->amount_max);
+        }
 
         $payables = $query->paginate($request->input('per_page', 20))->withQueryString();
 
@@ -56,7 +62,7 @@ class PayableController extends Controller
         return Inertia::render('Payables/Index', [
             'payables' => $payables,
             'totals' => $totals,
-            'filters' => $request->only(['status', 'search', 'due_from', 'due_to', 'branch_id']),
+            'filters' => $request->only(['status', 'search', 'due_from', 'due_to', 'branch_id', 'amount_min', 'amount_max']),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statusOptions' => Payable::STATUS_LABELS,
         ]);

@@ -21,6 +21,10 @@ const props = defineProps({
 const search = ref(props.filters?.search || '')
 const status = ref(props.filters?.status || 'pendente')
 const branchId = ref(props.filters?.branch_id || null)
+const amountMin = ref(props.filters?.amount_min || '')
+const amountMax = ref(props.filters?.amount_max || '')
+const dueFrom = ref(props.filters?.due_from || '')
+const dueTo = ref(props.filters?.due_to || '')
 
 const statusList = [
     { label: 'Pendentes', value: 'pendente', color: 'amber' },
@@ -42,6 +46,10 @@ function applyFilters() {
         search: search.value || undefined,
         status: status.value || undefined,
         branch_id: branchId.value || undefined,
+        amount_min: amountMin.value || undefined,
+        amount_max: amountMax.value || undefined,
+        due_from: dueFrom.value || undefined,
+        due_to: dueTo.value || undefined,
     }, { preserveState: true, replace: true })
 }
 
@@ -54,6 +62,10 @@ function onPage(event) {
         search: search.value || undefined,
         status: status.value || undefined,
         branch_id: branchId.value || undefined,
+        amount_min: amountMin.value || undefined,
+        amount_max: amountMax.value || undefined,
+        due_from: dueFrom.value || undefined,
+        due_to: dueTo.value || undefined,
         page: event.page + 1,
         per_page: event.rows,
     }, { preserveState: true, replace: true })
@@ -135,6 +147,10 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             <div class="flex flex-wrap gap-3 mb-4">
                 <InputText v-model="search" placeholder="Buscar fornecedor, título..." class="w-64" />
                 <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" placeholder="Filial" class="w-52" />
+                <InputText v-model="amountMin" placeholder="Valor mín" class="w-28" @change="applyFilters" />
+                <InputText v-model="amountMax" placeholder="Valor máx" class="w-28" @change="applyFilters" />
+                <InputText v-model="dueFrom" type="date" placeholder="Venc. de" class="w-36" @change="applyFilters" />
+                <InputText v-model="dueTo" type="date" placeholder="Venc. até" class="w-36" @change="applyFilters" />
             </div>
 
             <!-- Tabela -->
