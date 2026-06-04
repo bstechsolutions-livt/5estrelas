@@ -170,33 +170,27 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             </div>
 
             <!-- Filtros -->
-            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 space-y-3">
-                <div class="flex flex-wrap gap-3">
-                    <InputText v-model="search" placeholder="Buscar fornecedor, título..." class="flex-1 min-w-[200px]" />
-                    <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" placeholder="Filial" class="w-52" />
+            <div class="grid grid-cols-6 gap-3 mb-4">
+                <div class="col-span-2">
+                    <InputText v-model="search" placeholder="Buscar fornecedor, título..." class="w-full" />
                 </div>
-                <div class="flex flex-wrap gap-3 items-end">
-                    <div>
-                        <label class="block text-[11px] text-gray-500 mb-1">Valor mínimo</label>
-                        <InputNumber v-model="amountMin" mode="currency" currency="BRL" locale="pt-BR" class="w-40" @blur="applyFilters" />
-                    </div>
-                    <div>
-                        <label class="block text-[11px] text-gray-500 mb-1">Valor máximo</label>
-                        <InputNumber v-model="amountMax" mode="currency" currency="BRL" locale="pt-BR" class="w-40" @blur="applyFilters" />
-                    </div>
-                    <div>
-                        <label class="block text-[11px] text-gray-500 mb-1">Vencimento de</label>
-                        <InputText v-model="dueFrom" type="date" class="w-36" @change="applyFilters" />
-                    </div>
-                    <div>
-                        <label class="block text-[11px] text-gray-500 mb-1">Vencimento até</label>
-                        <InputText v-model="dueTo" type="date" class="w-36" @change="applyFilters" />
-                    </div>
+                <div>
+                    <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" placeholder="Filial" class="w-full" />
                 </div>
-                <div v-if="hasActiveFilters" class="flex items-center gap-2 pt-1">
-                    <span class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">{{ activeFilterCount }} filtro(s) aplicado(s)</span>
-                    <button @click="clearFilters" class="text-xs text-red-600 hover:underline cursor-pointer">Limpar filtros</button>
+                <div>
+                    <InputNumber v-model="amountMin" placeholder="Valor mín" mode="currency" currency="BRL" locale="pt-BR" class="w-full" @blur="applyFilters" />
                 </div>
+                <div>
+                    <InputNumber v-model="amountMax" placeholder="Valor máx" mode="currency" currency="BRL" locale="pt-BR" class="w-full" @blur="applyFilters" />
+                </div>
+                <div class="flex gap-2">
+                    <InputText v-model="dueFrom" type="date" class="flex-1" @change="applyFilters" title="Vencimento de" />
+                    <InputText v-model="dueTo" type="date" class="flex-1" @change="applyFilters" title="Vencimento até" />
+                </div>
+            </div>
+            <div v-if="hasActiveFilters" class="flex items-center gap-2 mb-4 -mt-2">
+                <span class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">{{ activeFilterCount }} filtro(s)</span>
+                <button @click="clearFilters" class="text-xs text-red-600 hover:underline cursor-pointer">Limpar</button>
             </div>
 
             <!-- Tabela -->
