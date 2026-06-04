@@ -191,11 +191,11 @@ const currentTotal = computed(() => {
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-gray-600 mb-1">Valor mínimo</label>
-                        <InputNumber v-model="amountMin" mode="currency" currency="BRL" locale="pt-BR" class="w-full" />
+                        <InputText v-model="amountMin" type="number" placeholder="0" class="w-full" />
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 mb-1">Valor máximo</label>
-                        <InputNumber v-model="amountMax" mode="currency" currency="BRL" locale="pt-BR" class="w-full" />
+                        <InputText v-model="amountMax" type="number" placeholder="0" class="w-full" />
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
