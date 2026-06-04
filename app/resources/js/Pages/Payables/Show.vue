@@ -143,7 +143,7 @@ function formatSize(bytes) {
                         </div>
                         <div v-else class="text-sm text-gray-400 mb-3">Nenhum documento anexado.</div>
                         <div v-if="canPrepare">
-                            <FileUpload mode="basic" :auto="true" choose-label="Anexar documento" accept="*/*"
+                            <FileUpload mode="basic" :auto="true" choose-label="Anexar documento"
                                 :max-file-size="10485760" @select="uploadDoc" class="w-full" />
                         </div>
                     </div>
