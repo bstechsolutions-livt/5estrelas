@@ -19,11 +19,13 @@ const props = defineProps({
     statusOptions: Object,
 })
 
+const STORAGE_KEY = 'payables_filters'
+
 const search = ref(props.filters?.search || '')
 const status = ref(props.filters?.status || 'pendente')
 const branchId = ref(props.filters?.branch_id || null)
-const amountMin = ref(props.filters?.amount_min || '')
-const amountMax = ref(props.filters?.amount_max || '')
+const amountMin = ref(props.filters?.amount_min ? Number(props.filters.amount_min) : null)
+const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_max) : null)
 const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
 
@@ -42,8 +44,8 @@ const branchList = computed(() => [
 ])
 
 let timer = null
-function applyFilters() {
-    router.get('/financeiro/contas-pagar', {
+function currentFilters() {
+    return {
         search: search.value || undefined,
         status: status.value || undefined,
         branch_id: branchId.value || undefined,
@@ -51,7 +53,16 @@ function applyFilters() {
         amount_max: amountMax.value || undefined,
         due_from: dueFrom.value || undefined,
         due_to: dueTo.value || undefined,
-    }, { preserveState: true, replace: true })
+    }
+}
+
+function saveFilters() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentFilters()))
+}
+
+function applyFilters() {
+    saveFilters()
+    router.get('/financeiro/contas-pagar', currentFilters(), { preserveState: true, replace: true })
 }
 
 watch(search, () => { clearTimeout(timer); timer = setTimeout(applyFilters, 300) })
