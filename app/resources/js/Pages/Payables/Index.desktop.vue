@@ -5,7 +5,6 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
-import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
@@ -22,8 +21,8 @@ const props = defineProps({
 const search = ref(props.filters?.search || '')
 const status = ref(props.filters?.status || 'pendente')
 const branchId = ref(props.filters?.branch_id || null)
-const amountMin = ref(props.filters?.amount_min ? Number(props.filters.amount_min) : null)
-const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_max) : null)
+const amountMin = ref(props.filters?.amount_min || '')
+const amountMax = ref(props.filters?.amount_max || '')
 const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
 
@@ -76,8 +75,8 @@ const activeFilterCount = computed(() => {
 function clearFilters() {
     search.value = ''
     branchId.value = null
-    amountMin.value = null
-    amountMax.value = null
+    amountMin.value = ''
+    amountMax.value = ''
     dueFrom.value = ''
     dueTo.value = ''
     applyFilters()
@@ -170,27 +169,14 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             </div>
 
             <!-- Filtros -->
-            <div class="grid grid-cols-6 gap-3 mb-4">
-                <div class="col-span-2">
-                    <InputText v-model="search" placeholder="Buscar fornecedor, título..." class="w-full" />
-                </div>
-                <div>
-                    <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" placeholder="Filial" class="w-full" />
-                </div>
-                <div>
-                    <InputNumber v-model="amountMin" placeholder="Valor mín" mode="currency" currency="BRL" locale="pt-BR" class="w-full" @blur="applyFilters" />
-                </div>
-                <div>
-                    <InputNumber v-model="amountMax" placeholder="Valor máx" mode="currency" currency="BRL" locale="pt-BR" class="w-full" @blur="applyFilters" />
-                </div>
-                <div class="flex gap-2">
-                    <InputText v-model="dueFrom" type="date" class="flex-1" @change="applyFilters" title="Vencimento de" />
-                    <InputText v-model="dueTo" type="date" class="flex-1" @change="applyFilters" title="Vencimento até" />
-                </div>
-            </div>
-            <div v-if="hasActiveFilters" class="flex items-center gap-2 mb-4 -mt-2">
-                <span class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">{{ activeFilterCount }} filtro(s)</span>
-                <button @click="clearFilters" class="text-xs text-red-600 hover:underline cursor-pointer">Limpar</button>
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+                <InputText v-model="search" placeholder="Buscar fornecedor, título..." class="w-56" />
+                <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" placeholder="Filial" class="w-44" />
+                <InputText v-model="amountMin" placeholder="Valor mín" class="w-28" @change="applyFilters" />
+                <InputText v-model="amountMax" placeholder="Valor máx" class="w-28" @change="applyFilters" />
+                <InputText v-model="dueFrom" type="date" class="w-34" @change="applyFilters" />
+                <InputText v-model="dueTo" type="date" class="w-34" @change="applyFilters" />
+                <button v-if="hasActiveFilters" @click="clearFilters" class="text-xs text-red-600 hover:underline cursor-pointer ml-1">Limpar</button>
             </div>
 
             <!-- Tabela -->
