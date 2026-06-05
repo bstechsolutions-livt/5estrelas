@@ -229,6 +229,28 @@ class SearchController extends Controller
             if ($alvaras->isNotEmpty()) {
                 $groups[] = ['label' => 'Alvarás', 'items' => $alvaras];
             }
+
+            // Equipamentos
+            $equipamentos = \App\Models\v2\BsGestaoEquipamento::query()
+                ->with('tipoEquipamento:id,nome')
+                ->where(function ($qq) use ($q) {
+                    $qq->where('numero_identificacao', 'ilike', "%{$q}%")
+                        ->orWhere('localizacao', 'ilike', "%{$q}%")
+                        ->orWhere('carga', 'ilike', "%{$q}%");
+                })
+                ->limit(5)
+                ->get()
+                ->map(fn ($e) => [
+                    'id' => $e->id,
+                    'title' => $e->numero_identificacao ?: ('Equipamento #' . $e->id),
+                    'subtitle' => trim(($e->tipoEquipamento->nome ?? 'Equipamento') . ($e->localizacao ? ' · ' . $e->localizacao : '')),
+                    'icon' => 'pi pi-box',
+                    'href' => "/pagina/gestao-contratos/equipamentos/{$e->id}",
+                ]);
+
+            if ($equipamentos->isNotEmpty()) {
+                $groups[] = ['label' => 'Equipamentos', 'items' => $equipamentos];
+            }
         }
 
         return response()->json(['groups' => $groups, 'query' => $q]);
