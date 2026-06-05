@@ -251,6 +251,23 @@ class SearchController extends Controller
             if ($equipamentos->isNotEmpty()) {
                 $groups[] = ['label' => 'Equipamentos', 'items' => $equipamentos];
             }
+
+            // Tipos de Equipamento (têm tela de cadastro própria)
+            $tiposEquip = \App\Models\v2\BsGestaoTipoEquipamento::query()
+                ->where('nome', 'ilike', "%{$q}%")
+                ->limit(5)
+                ->get(['id', 'nome'])
+                ->map(fn ($t) => [
+                    'id' => $t->id,
+                    'title' => $t->nome,
+                    'subtitle' => 'Tipo de equipamento',
+                    'icon' => 'pi pi-tags',
+                    'href' => '/pagina/gestao-contratos/equipamentos/tipos',
+                ]);
+
+            if ($tiposEquip->isNotEmpty()) {
+                $groups[] = ['label' => 'Tipos de Equipamento', 'items' => $tiposEquip];
+            }
         }
 
         return response()->json(['groups' => $groups, 'query' => $q]);
