@@ -89,14 +89,14 @@ function getIconCorDiasVencimento(dias) {
       </span>
     </div>
 
-    <!-- Loading -->
+    <!-- Loading (apenas na primeira carga; inline, não cobre sidebar/header) -->
     <div
-      v-if="GestaoJs.dashboard.value.loading"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm"
+      v-if="GestaoJs.dashboard.value.loading && !GestaoJs.dashboard.value.loaded"
+      class="flex items-center justify-center py-24"
     >
-      <div class="flex flex-col items-center gap-4">
-        <i class="pi pi-spin pi-spinner text-5xl text-purple-600"></i>
-        <span class="text-lg font-medium text-gray-600 dark:text-gray-300">
+      <div class="flex flex-col items-center gap-3">
+        <i class="pi pi-spin pi-spinner text-4xl" :style="{ color: 'var(--app-primary)' }"></i>
+        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
           Carregando...
         </span>
       </div>

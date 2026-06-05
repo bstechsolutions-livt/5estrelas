@@ -19,6 +19,7 @@ export const activeTab = ref("dashboard")
 
 export const dashboard = ref({
   loading: false,
+  loaded: false,
   contratos: {
     total_locacao: 0,
     total_servico: 0,
@@ -57,6 +58,7 @@ export async function getDashboard() {
         resp.data.dados.proximos_alvaras_vencer
       dashboard.value.proximos_equipamentos_vencer =
         resp.data.dados.proximos_equipamentos_vencer || []
+      dashboard.value.loaded = true
     }
   } catch (error) {
     toast.error("Erro ao carregar dashboard")
