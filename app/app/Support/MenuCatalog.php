@@ -15,7 +15,9 @@ class MenuCatalog
     {
         return [
             // Raiz (sem grupo)
-            ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'pi pi-home', 'href' => '/dashboard', 'permission' => null],
+
+            // Plano de Voo
+            ['key' => 'dashboard', 'label' => 'Painel de Entrada', 'icon' => 'pi pi-home', 'href' => '/dashboard', 'permission' => null, 'group' => 'Plano de Voo'],
 
             // Conteúdo
             ['key' => 'noticias', 'label' => 'Notícias', 'icon' => 'pi pi-megaphone', 'href' => '/noticias', 'permission' => 'noticias.gerenciar', 'group' => 'Conteúdo'],

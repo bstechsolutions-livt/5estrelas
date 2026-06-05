@@ -146,8 +146,12 @@ function isImage(doc) {
                                 </a>
                                 <div class="flex items-center gap-1 flex-shrink-0">
                                     <a :href="doc.url" target="_blank" rel="noopener"
-                                        class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer" title="Visualizar / baixar">
+                                        class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer" title="Visualizar">
                                         <i class="pi pi-eye"></i>
+                                    </a>
+                                    <a :href="doc.url" :download="doc.name"
+                                        class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer" title="Baixar">
+                                        <i class="pi pi-download"></i>
                                     </a>
                                     <button v-if="canPrepare" @click="removeDoc(doc.id)" class="text-red-400 hover:text-red-600 p-1.5 cursor-pointer" title="Remover">
                                         <i class="pi pi-trash"></i>
