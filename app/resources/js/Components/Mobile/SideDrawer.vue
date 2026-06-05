@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import { useTheme } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
@@ -26,15 +26,22 @@ const initials = computed(() => {
 })
 
 const items = computed(() => {
-    // Usa o menuOptions vindo do backend (MenuCatalog.availableTo)
-    // garante que toda nova entrada do menu apareça automaticamente
-    const fromCatalog = (page.props.menuOptions || []).map(opt => ({
-        label: opt.label,
-        icon: opt.icon,
-        href: opt.href,
-    }))
-    return fromCatalog
+    // Usa o menuGrouped vindo do backend (com grupos/submenus)
+    return page.props.menuGrouped || []
 })
+
+const openGroups = ref({})
+
+function toggleGroup(label) {
+    openGroups.value[label] = !openGroups.value[label]
+}
+
+function isGroupOpen(label) {
+    if (openGroups.value[label]) return true
+    const group = (page.props.menuGrouped || []).find(g => g.type === 'group' && g.label === label)
+    if (!group) return false
+    return group.items.some(i => isActive(i.href))
+}
 
 function isActive(href) {
     return page.url === href || page.url.startsWith(href + '/')
@@ -106,21 +113,52 @@ watch(() => props.modelValue, (val) => {
 
                 <!-- Menu -->
                 <nav class="flex-1 py-3 px-2 space-y-1 overflow-y-auto">
-                    <button
-                        v-for="item in items"
-                        :key="item.href"
-                        @click="navigate(item.href)"
-                        :class="[
-                            'w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors text-sm',
-                            isActive(item.href) ? 'text-white border-l-2' : ''
-                        ]"
-                        :style="isActive(item.href)
-                            ? { backgroundColor: primaryColor + '26', borderColor: primaryColor, color: '#fff' }
-                            : { color: 'var(--app-secondary-text-muted, rgba(255,255,255,0.7))' }"
-                    >
-                        <i :class="[item.icon, 'text-base']"></i>
-                        <span>{{ item.label }}</span>
-                    </button>
+                    <template v-for="entry in items" :key="entry.key || entry.label">
+                        <!-- Item raiz -->
+                        <button
+                            v-if="entry.type === 'item'"
+                            @click="navigate(entry.href)"
+                            :class="[
+                                'w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors text-sm',
+                                isActive(entry.href) ? 'text-white border-l-2' : ''
+                            ]"
+                            :style="isActive(entry.href)
+                                ? { backgroundColor: primaryColor + '26', borderColor: primaryColor, color: '#fff' }
+                                : { color: 'var(--app-secondary-text-muted, rgba(255,255,255,0.7))' }"
+                        >
+                            <i :class="[entry.icon, 'text-base']"></i>
+                            <span>{{ entry.label }}</span>
+                        </button>
+
+                        <!-- Grupo com submenus -->
+                        <div v-else-if="entry.type === 'group'">
+                            <button
+                                @click="toggleGroup(entry.label)"
+                                class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs uppercase tracking-wider font-semibold mt-3 mb-1"
+                                style="color: var(--app-secondary-text-muted, rgba(255,255,255,0.5));"
+                            >
+                                <span>{{ entry.label }}</span>
+                                <i :class="['pi text-[10px]', isGroupOpen(entry.label) ? 'pi-chevron-down' : 'pi-chevron-right']"></i>
+                            </button>
+                            <div v-show="isGroupOpen(entry.label)" class="space-y-0.5">
+                                <button
+                                    v-for="item in entry.items"
+                                    :key="item.href"
+                                    @click="navigate(item.href)"
+                                    :class="[
+                                        'w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors text-sm',
+                                        isActive(item.href) ? 'text-white border-l-2' : ''
+                                    ]"
+                                    :style="isActive(item.href)
+                                        ? { backgroundColor: primaryColor + '26', borderColor: primaryColor, color: '#fff' }
+                                        : { color: 'var(--app-secondary-text-muted, rgba(255,255,255,0.7))' }"
+                                >
+                                    <i :class="[item.icon, 'text-base']"></i>
+                                    <span>{{ item.label }}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </template>
                 </nav>
 
                 <!-- Footer -->
