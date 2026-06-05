@@ -65,9 +65,8 @@ function applyFilters() {
     router.get('/financeiro/contas-pagar', currentFilters(), { preserveState: true, replace: true })
 }
 
-watch(search, () => { clearTimeout(timer); timer = setTimeout(applyFilters, 300) })
+// Só o status (tab) aplica automático. Demais filtros aplicam via botão "Filtrar".
 watch(status, applyFilters)
-watch(branchId, applyFilters)
 
 const hasActiveFilters = computed(() => {
     return !!(search.value || branchId.value || amountMin.value || amountMax.value || dueFrom.value || dueTo.value)
@@ -181,14 +180,43 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             </div>
 
             <!-- Filtros -->
-            <div class="flex flex-wrap items-center gap-2 mb-4">
-                <InputText v-model="search" placeholder="Buscar fornecedor, título..." class="w-56" />
-                <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" placeholder="Filial" class="w-44" />
-                <InputText v-model="amountMin" placeholder="Valor mín" class="w-28" @change="applyFilters" />
-                <InputText v-model="amountMax" placeholder="Valor máx" class="w-28" @change="applyFilters" />
-                <InputText v-model="dueFrom" type="date" class="w-34" @change="applyFilters" />
-                <InputText v-model="dueTo" type="date" class="w-34" @change="applyFilters" />
-                <button v-if="hasActiveFilters" @click="clearFilters" class="text-xs text-red-600 hover:underline cursor-pointer ml-1">Limpar</button>
+            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div class="lg:col-span-2">
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
+                        <InputText v-model="search" placeholder="Fornecedor ou título" class="w-full" @keyup.enter="applyFilters" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Filial</label>
+                        <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" placeholder="Todas" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Valor mínimo</label>
+                        <InputNumber v-model="amountMin" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Valor máximo</label>
+                        <InputNumber v-model="amountMax" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Vencimento de</label>
+                        <InputText v-model="dueFrom" type="date" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Vencimento até</label>
+                        <InputText v-model="dueTo" type="date" class="w-full" />
+                    </div>
+                </div>
+                <div class="flex items-center justify-between mt-4">
+                    <span v-if="hasActiveFilters" class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        {{ activeFilterCount }} filtro(s) ativo(s)
+                    </span>
+                    <span v-else></span>
+                    <div class="flex gap-2">
+                        <Button label="Limpar" severity="secondary" outlined size="small" @click="clearFilters" :disabled="!hasActiveFilters" />
+                        <Button label="Filtrar" icon="pi pi-search" size="small" @click="applyFilters" />
+                    </div>
+                </div>
             </div>
 
             <!-- Tabela -->
