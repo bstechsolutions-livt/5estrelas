@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
@@ -47,8 +47,8 @@ function formatDate(d) {
     return new Date(d).toLocaleDateString('pt-BR')
 }
 
-const isDraft = props.bordero.status === 'rascunho'
-const canApprove = props.bordero.status === 'aguardando_aprovacao'
+const isDraft = computed(() => props.bordero.status === 'rascunho')
+const canApprove = computed(() => props.bordero.status === 'aguardando_aprovacao')
 const statusSeverity = { pendente: 'warn', em_preparacao: 'info', aguardando_aprovacao: 'warn', aprovado: 'success', reprovado: 'danger', pago: 'success' }
 </script>
 
