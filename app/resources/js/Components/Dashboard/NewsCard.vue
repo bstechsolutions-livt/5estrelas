@@ -139,9 +139,9 @@ function userInitial(u) {
                     <img v-if="currentUser?.avatar_url" :src="currentUser.avatar_url" class="w-full h-full object-cover" />
                     <span v-else class="text-white text-xs font-semibold">{{ userInitial(currentUser) }}</span>
                 </div>
-                <div class="flex-1 flex gap-2">
-                    <input v-model="newComment" @keydown.enter.prevent="submitComment" placeholder="Escreva um comentário..." class="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-gray-400" />
-                    <button @click="submitComment" :disabled="!newComment.trim() || submittingComment" class="px-3 rounded-lg text-white text-sm disabled:opacity-50" :style="{ backgroundColor: 'var(--app-primary, #3b82f6)' }">
+                <div class="flex-1 flex gap-2 min-w-0">
+                    <input v-model="newComment" @keydown.enter.prevent="submitComment" placeholder="Escreva um comentário..." class="flex-1 min-w-0 text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-gray-400" />
+                    <button @click="submitComment" :disabled="!newComment.trim() || submittingComment" class="px-3 py-2 rounded-lg text-white text-sm disabled:opacity-50 flex-shrink-0 whitespace-nowrap" :style="{ backgroundColor: 'var(--app-primary, #3b82f6)' }">
                         Enviar
                     </button>
                 </div>
