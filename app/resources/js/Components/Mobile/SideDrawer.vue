@@ -44,7 +44,8 @@ function isGroupOpen(label) {
 }
 
 function isActive(href) {
-    return page.url === href || page.url.startsWith(href + '/')
+    const path = page.url.split('?')[0]
+    return path === href || path.startsWith(href + '/')
 }
 
 function close() {

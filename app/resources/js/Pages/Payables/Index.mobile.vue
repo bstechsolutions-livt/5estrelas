@@ -177,6 +177,9 @@ const currentTotal = computed(() => {
                     <span class="text-xs text-gray-400">Venc: {{ formatDate(p.due_date) }}</span>
                 </div>
                 <p v-if="p.title_number" class="text-[11px] text-gray-400 mt-1">{{ p.title_number }} · {{ p.branch?.name || '' }}</p>
+                <span v-if="p.bordero" class="inline-block mt-1 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                    {{ p.bordero.number }}
+                </span>
             </button>
         </div>
         <div v-else class="text-center py-12 text-gray-400 text-sm">Nenhum título encontrado.</div>

@@ -49,7 +49,9 @@ function navigate(href) {
 }
 
 function isActive(href) {
-    return page.url === href || page.url.startsWith(href + '/')
+    // Ignora query string ao comparar (ex: /financeiro/contas-pagar?status=x)
+    const path = page.url.split('?')[0]
+    return path === href || path.startsWith(href + '/')
 }
 
 const filteredMenuItems = computed(() => {

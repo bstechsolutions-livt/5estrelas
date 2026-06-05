@@ -296,6 +296,15 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span class="text-xs text-gray-600 truncate block max-w-[160px]" :title="data.branch?.name" @click="goShow(data.id)">{{ data.branch?.name || '—' }}</span>
                         </template>
                     </Column>
+                    <Column header="Borderô" style="width: 110px">
+                        <template #body="{ data }">
+                            <button v-if="data.bordero" @click.stop="router.visit(`/financeiro/borderos/${data.bordero.id}`)"
+                                class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded hover:bg-blue-100 cursor-pointer">
+                                {{ data.bordero.number }}
+                            </button>
+                            <span v-else class="text-xs text-gray-300" @click="goShow(data.id)">—</span>
+                        </template>
+                    </Column>
                     <Column field="status" header="Status" style="width: 150px; white-space: nowrap">
                         <template #body="{ data }">
                             <Tag :value="statusOptions[data.status]" :severity="statusSeverity[data.status]" />

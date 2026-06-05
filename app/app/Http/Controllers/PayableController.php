@@ -16,7 +16,7 @@ class PayableController extends Controller
     public function index(Request $request)
     {
         $query = Payable::query()
-            ->with(['branch:id,name', 'preparer:id,name'])
+            ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number'])
             ->orderByDesc('due_date');
 
         if ($request->filled('status')) {
