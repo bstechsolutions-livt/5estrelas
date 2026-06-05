@@ -65,8 +65,12 @@ function applyFilters() {
     router.get('/financeiro/contas-pagar', currentFilters(), { preserveState: true, replace: true })
 }
 
-// Só o status (tab) aplica automático. Demais filtros aplicam via botão "Filtrar".
-watch(status, applyFilters)
+// Tab de status: aplica na hora (sem opção "ver todos")
+function selectStatus(s) {
+    if (status.value === s) return
+    status.value = s
+    applyFilters()
+}
 
 const hasActiveFilters = computed(() => {
     return !!(search.value || branchId.value || amountMin.value || amountMax.value || dueFrom.value || dueTo.value)
@@ -107,8 +111,31 @@ function onPage(event) {
     }, { preserveState: true, replace: true })
 }
 
-// Restaura scroll ao voltar do detalhe
+// Restaura scroll ao voltar do detalhe + filtros do cache em visita "limpa"
 onMounted(() => {
+    // Sem query string na URL = chegou pelo menu. Restaura último filtro usado.
+    if (!window.location.search) {
+        const cached = localStorage.getItem(STORAGE_KEY)
+        if (cached) {
+            try {
+                const f = JSON.parse(cached)
+                status.value = f.status || 'pendente'
+                search.value = f.search || ''
+                branchId.value = f.branch_id || null
+                amountMin.value = f.amount_min ? Number(f.amount_min) : null
+                amountMax.value = f.amount_max ? Number(f.amount_max) : null
+                dueFrom.value = f.due_from || ''
+                dueTo.value = f.due_to || ''
+                const serverStatus = props.filters?.status || 'pendente'
+                const differs = status.value !== serverStatus || f.search || f.branch_id || f.amount_min || f.amount_max || f.due_from || f.due_to
+                if (differs) {
+                    applyFilters()
+                    return
+                }
+            } catch (e) { /* cache inválido, ignora */ }
+        }
+    }
+
     const saved = sessionStorage.getItem('payables_scroll')
     if (saved) {
         setTimeout(() => {
@@ -194,7 +221,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                 <button
                     v-for="s in statusList"
                     :key="s.value"
-                    @click="status = s.value"
+                    @click="selectStatus(s.value)"
                     :class="[
                         'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                         status === s.value

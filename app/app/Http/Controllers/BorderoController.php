@@ -18,9 +18,10 @@ class BorderoController extends Controller
             ->with('creator:id,name')
             ->orderByDesc('created_at');
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
+        // Sempre filtra por um status (default: aguardando_aprovacao). Não existe "ver todos".
+        $status = $request->input('status') ?: 'aguardando_aprovacao';
+        $query->where('status', $status);
+
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
@@ -40,7 +41,10 @@ class BorderoController extends Controller
         return Inertia::render('Borderos/Index', [
             'borderos' => $borderos,
             'totals' => $totals,
-            'filters' => $request->only(['status', 'search']),
+            'filters' => array_merge(
+                $request->only(['search']),
+                ['status' => $status],
+            ),
             'statusOptions' => Bordero::STATUS_LABELS,
         ]);
     }

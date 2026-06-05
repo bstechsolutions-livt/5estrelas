@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import BottomSheet from '@/Components/Mobile/BottomSheet.vue'
@@ -63,12 +63,43 @@ function applyFilters() {
 }
 
 let timer = null
+let restoring = false
 watch(search, () => {
+    if (restoring) return
     clearTimeout(timer)
     timer = setTimeout(applyFilters, 300)
 })
 
-watch(status, applyFilters)
+// Tab de status: aplica na hora (sem opção "ver todos")
+function selectStatus(s) {
+    if (status.value === s) return
+    status.value = s
+    applyFilters()
+}
+
+// Restaura último filtro usado em visita "limpa" (sem query string)
+onMounted(() => {
+    if (!window.location.search) {
+        const cached = localStorage.getItem(STORAGE_KEY)
+        if (cached) {
+            try {
+                const f = JSON.parse(cached)
+                restoring = true
+                status.value = f.status || 'pendente'
+                search.value = f.search || ''
+                branchId.value = f.branch_id || null
+                amountMin.value = f.amount_min ? Number(f.amount_min) : null
+                amountMax.value = f.amount_max ? Number(f.amount_max) : null
+                dueFrom.value = f.due_from || ''
+                dueTo.value = f.due_to || ''
+                const serverStatus = props.filters?.status || 'pendente'
+                const differs = status.value !== serverStatus || f.search || f.branch_id || f.amount_min || f.amount_max || f.due_from || f.due_to
+                setTimeout(() => { restoring = false }, 400)
+                if (differs) applyFilters()
+            } catch (e) { restoring = false }
+        }
+    }
+})
 
 function applyAndClose() {
     applyFilters()
@@ -126,7 +157,7 @@ const currentTotal = computed(() => {
                 <button
                     v-for="s in statusList"
                     :key="s.value"
-                    @click="status = s.value"
+                    @click="selectStatus(s.value)"
                     :class="[
                         'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors',
                         status === s.value

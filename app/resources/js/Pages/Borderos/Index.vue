@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
@@ -15,8 +15,9 @@ const props = defineProps({
     statusOptions: Object,
 })
 
+const STORAGE_KEY = 'borderos_status'
 const { isMobile } = useDevice()
-const status = ref(props.filters?.status || null)
+const status = ref(props.filters?.status || 'aguardando_aprovacao')
 
 const statusList = [
     { label: 'Rascunho', value: 'rascunho' },
@@ -27,9 +28,22 @@ const statusList = [
 ]
 
 function filterStatus(s) {
-    status.value = status.value === s ? null : s
-    router.get('/financeiro/borderos', { status: status.value || undefined }, { preserveState: true, replace: true })
+    if (status.value === s) return
+    status.value = s
+    localStorage.setItem(STORAGE_KEY, s)
+    router.get('/financeiro/borderos', { status: s }, { preserveState: true, replace: true })
 }
+
+onMounted(() => {
+    // Visita "limpa" (sem query): restaura último status usado
+    if (!window.location.search) {
+        const cached = localStorage.getItem(STORAGE_KEY)
+        if (cached && cached !== (props.filters?.status || 'aguardando_aprovacao')) {
+            status.value = cached
+            router.get('/financeiro/borderos', { status: cached }, { preserveState: true, replace: true })
+        }
+    }
+})
 
 function goShow(id) { router.visit(`/financeiro/borderos/${id}`) }
 

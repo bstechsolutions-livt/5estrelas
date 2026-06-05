@@ -19,9 +19,9 @@ class PayableController extends Controller
             ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number'])
             ->orderByDesc('due_date');
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
+        // Sempre filtra por um status (default: pendente). Não existe "ver todos".
+        $status = $request->input('status') ?: 'pendente';
+        $query->where('status', $status);
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
@@ -62,7 +62,10 @@ class PayableController extends Controller
         return Inertia::render('Payables/Index', [
             'payables' => $payables,
             'totals' => $totals,
-            'filters' => $request->only(['status', 'search', 'due_from', 'due_to', 'branch_id', 'amount_min', 'amount_max']),
+            'filters' => array_merge(
+                $request->only(['search', 'due_from', 'due_to', 'branch_id', 'amount_min', 'amount_max']),
+                ['status' => $status],
+            ),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statusOptions' => Payable::STATUS_LABELS,
         ]);
