@@ -178,6 +178,59 @@ class SearchController extends Controller
             }
         }
 
+        // Gestão de Contratos
+        if ($user->hasPermission('contratos.visualizar')) {
+            $contratos = \App\Models\v2\BsGestaoContrato::query()
+                ->where(function ($qq) use ($q) {
+                    $qq->where('numero_contrato', 'ilike', "%{$q}%")
+                        ->orWhere('nome_locador', 'ilike', "%{$q}%")
+                        ->orWhere('razao_social_loja', 'ilike', "%{$q}%")
+                        ->orWhere('tipo_servico', 'ilike', "%{$q}%");
+                })
+                ->limit(5)
+                ->get(['id', 'tipo', 'numero_contrato', 'nome_locador', 'razao_social_loja', 'tipo_servico', 'valor_mensal'])
+                ->map(function ($c) {
+                    $titulo = $c->numero_contrato ?: ($c->tipo === 'LOCACAO' ? ($c->razao_social_loja ?: 'Contrato de locação') : ($c->tipo_servico ?: 'Contrato de serviço'));
+                    $sub = $c->tipo === 'LOCACAO' ? 'Locação' : 'Serviço';
+                    if ($c->nome_locador) {
+                        $sub .= ' · ' . $c->nome_locador;
+                    }
+                    $rota = $c->tipo === 'LOCACAO' ? 'locacao' : 'servicos';
+                    return [
+                        'id' => $c->id,
+                        'title' => $titulo,
+                        'subtitle' => $sub,
+                        'icon' => $c->tipo === 'LOCACAO' ? 'pi pi-building' : 'pi pi-briefcase',
+                        'href' => "/pagina/gestao-contratos/{$rota}/{$c->id}",
+                    ];
+                });
+
+            if ($contratos->isNotEmpty()) {
+                $groups[] = ['label' => 'Contratos', 'items' => $contratos];
+            }
+
+            // Alvarás
+            $alvaras = \App\Models\v2\BsGestaoAlvara::query()
+                ->where(function ($qq) use ($q) {
+                    $qq->where('numero_documento', 'ilike', "%{$q}%")
+                        ->orWhere('descricao', 'ilike', "%{$q}%")
+                        ->orWhere('orgao_emissor', 'ilike', "%{$q}%");
+                })
+                ->limit(5)
+                ->get(['id', 'numero_documento', 'descricao', 'orgao_emissor'])
+                ->map(fn ($a) => [
+                    'id' => $a->id,
+                    'title' => $a->numero_documento ?: 'Alvará',
+                    'subtitle' => $a->orgao_emissor ?: ($a->descricao ?: 'Alvará/Licença'),
+                    'icon' => 'pi pi-id-card',
+                    'href' => "/pagina/gestao-contratos/alvaras/{$a->id}",
+                ]);
+
+            if ($alvaras->isNotEmpty()) {
+                $groups[] = ['label' => 'Alvarás', 'items' => $alvaras];
+            }
+        }
+
         return response()->json(['groups' => $groups, 'query' => $q]);
     }
 }
