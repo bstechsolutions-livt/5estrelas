@@ -206,39 +206,84 @@ function getIconCorDiasVencimento(dias) {
           </p>
         </div>
 
-        <!-- Vencendo em 30 dias -->
+        <!-- Equipamentos -->
         <div
-          class="bg-white dark:bg-slate-800 border-l-4 border-l-orange-500 rounded-xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all duration-300 group"
+          class="bg-white dark:bg-slate-800 border-l-4 border-l-amber-500 rounded-xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group"
+          @click="irPara('/pagina/gestao-contratos/equipamentos')"
         >
           <div class="flex items-center justify-between mb-2">
             <p class="text-gray-500 dark:text-gray-400 text-sm font-medium">
-              Vencendo em 30 dias
+              Equipamentos
             </p>
             <span
-              class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex-shrink-0"
+              class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex-shrink-0 group-hover:scale-110 transition-transform"
             >
-              <i class="pi pi-clock text-orange-600 dark:text-orange-400"></i>
+              <i class="pi pi-box text-amber-600 dark:text-amber-400"></i>
             </span>
           </div>
           <div
-            class="flex w-full justify-start text-orange-600 dark:text-orange-400 text-2xl font-bold"
+            class="flex w-full justify-start text-gray-950 dark:text-white text-2xl font-bold"
           >
-            <span>
-              {{
-                GestaoJs.dashboard.value.contratos.vencendo_30_dias +
-                GestaoJs.dashboard.value.alvaras.vencendo_30_dias
-              }}
-            </span>
+            <span>{{ GestaoJs.dashboard.value.equipamentos.total }}</span>
           </div>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {{ GestaoJs.dashboard.value.contratos.vencendo_30_dias }} contratos
-            | {{ GestaoJs.dashboard.value.alvaras.vencendo_30_dias }} alvarás
+          <p
+            v-if="GestaoJs.dashboard.value.equipamentos.vencidos > 0"
+            class="text-sm text-red-600 dark:text-red-400 mt-1 font-medium flex items-center gap-1"
+          >
+            <i class="pi pi-exclamation-circle text-xs"></i>
+            {{ GestaoJs.dashboard.value.equipamentos.vencidos }} vencido(s)
+          </p>
+          <p
+            v-else
+            class="text-sm text-green-600 dark:text-green-400 mt-1 font-medium flex items-center gap-1"
+          >
+            <i class="pi pi-check-circle text-xs"></i>
+            Todos em dia
           </p>
         </div>
       </div>
 
+      <!-- Faixa de indicadores -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center gap-3">
+          <span class="inline-flex items-center justify-center w-11 h-11 rounded-lg" :style="{ backgroundColor: 'color-mix(in srgb, var(--app-primary) 15%, white)' }">
+            <i class="pi pi-dollar text-lg" :style="{ color: 'var(--app-primary)' }"></i>
+          </span>
+          <div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Comprometido / mês</p>
+            <p class="text-lg font-bold text-gray-900 dark:text-white">
+              {{ GestaoJs.formatarMoeda((GestaoJs.dashboard.value.contratos.valor_total_locacao || 0) + (GestaoJs.dashboard.value.contratos.valor_total_servico || 0)) }}
+            </p>
+          </div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center gap-3">
+          <span class="inline-flex items-center justify-center w-11 h-11 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+            <i class="pi pi-clock text-orange-600 dark:text-orange-400 text-lg"></i>
+          </span>
+          <div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Vencendo em 30 dias</p>
+            <p class="text-lg font-bold text-gray-900 dark:text-white">
+              {{ GestaoJs.dashboard.value.contratos.vencendo_30_dias + GestaoJs.dashboard.value.alvaras.vencendo_30_dias + GestaoJs.dashboard.value.equipamentos.vencendo_30_dias }}
+              <span class="text-xs font-normal text-gray-400">itens</span>
+            </p>
+          </div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center gap-3">
+          <span class="inline-flex items-center justify-center w-11 h-11 rounded-lg bg-red-100 dark:bg-red-900/30">
+            <i class="pi pi-exclamation-triangle text-red-600 dark:text-red-400 text-lg"></i>
+          </span>
+          <div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Vencidos</p>
+            <p class="text-lg font-bold text-gray-900 dark:text-white">
+              {{ (GestaoJs.dashboard.value.contratos.vencidos || 0) + GestaoJs.dashboard.value.alvaras.vencidos + GestaoJs.dashboard.value.equipamentos.vencidos }}
+              <span class="text-xs font-normal text-gray-400">itens</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
       <!-- Próximos Vencimentos -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Contratos -->
         <div
           class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md border border-gray-100 dark:border-slate-700"
@@ -420,6 +465,69 @@ function getIconCorDiasVencimento(dias) {
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
                   {{ GestaoJs.formatarData(alvara.data_validade) }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Equipamentos -->
+        <div
+          class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md border border-gray-100 dark:border-slate-700"
+        >
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                <i class="pi pi-box text-amber-600 dark:text-amber-400"></i>
+              </span>
+              Equipamentos a Vencer
+            </h3>
+            <button
+              @click="irPara('/pagina/gestao-contratos/equipamentos')"
+              class="text-sm font-medium transition-colors"
+              :style="{ color: 'var(--app-primary)' }"
+            >
+              Ver todos →
+            </button>
+          </div>
+
+          <div
+            v-if="GestaoJs.dashboard.value.proximos_equipamentos_vencer.length === 0"
+            class="text-center py-8 text-gray-500 dark:text-gray-400"
+          >
+            <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <i class="pi pi-check-circle text-3xl text-green-500 dark:text-green-400"></i>
+            </div>
+            <p class="font-medium">Nenhum equipamento próximo do vencimento</p>
+          </div>
+
+          <div v-else class="space-y-3 max-h-80 overflow-y-auto">
+            <div
+              v-for="equip in GestaoJs.dashboard.value.proximos_equipamentos_vencer"
+              :key="equip.id"
+              class="flex items-center gap-3 p-3 rounded-xl transition-all duration-200 hover:shadow-sm"
+              :class="getBgCorDiasVencimento(equip.dias_para_vencimento)"
+            >
+              <div
+                class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                :class="getIconBgCorDiasVencimento(equip.dias_para_vencimento)"
+              >
+                <i class="pi pi-box" :class="getIconCorDiasVencimento(equip.dias_para_vencimento)"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  {{ equip.numero_identificacao || (equip.tipo_equipamento?.nome) || ("Equip. #" + equip.id) }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {{ equip.filial ? equip.filial.codigo + " - " + equip.filial.razaosocial : (equip.localizacao || "Sem filial") }}
+                </p>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <p class="text-sm font-bold" :class="getCorDiasVencimento(equip.dias_para_vencimento)">
+                  {{ equip.dias_para_vencimento }} dias
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ GestaoJs.formatarData(equip.data_validade) }}
                 </p>
               </div>
             </div>

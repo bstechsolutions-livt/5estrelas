@@ -8,6 +8,7 @@ use App\Models\v2\BsGestaoAlvara;
 use App\Models\v2\BsGestaoContrato;
 use App\Models\v2\BsGestaoContratoAnexo;
 use App\Models\v2\BsGestaoContratoReajuste;
+use App\Models\v2\BsGestaoEquipamento;
 use App\Models\v2\BsGestaoTipoAlvara;
 use App\Models\v2\BsGestaoTipoIndice;
 use Carbon\Carbon;
@@ -39,6 +40,15 @@ class GestaoContratosController extends Controller
       $alvarasVencendo30 = BsGestaoAlvara::vencendoEm(30)->count();
       $alvarasVencidos = BsGestaoAlvara::vencidos()->count();
 
+      // Contratos vencidos
+      $contratosVencidos = BsGestaoContrato::ativos()->vencidos()->count();
+
+      // Equipamentos
+      $equipTotal = BsGestaoEquipamento::count();
+      $equipVencendo30 = BsGestaoEquipamento::vencendo(30)->count();
+      $equipVencidos = BsGestaoEquipamento::vencidos()->count();
+      $equipManutencao = BsGestaoEquipamento::emManutencao()->count();
+
       // Próximos vencimentos
       $proximosVencimentos = BsGestaoContrato::with(['filial', 'tipoIndice'])
         ->ativos()
@@ -53,6 +63,12 @@ class GestaoContratosController extends Controller
         ->limit(10)
         ->get();
 
+      $proximosEquipamentosVencer = BsGestaoEquipamento::with(['filial', 'tipoEquipamento'])
+        ->vencendo(60)
+        ->orderBy('data_validade')
+        ->limit(10)
+        ->get();
+
       return response()->json([
         'sucesso' => true,
         'dados' => [
@@ -61,6 +77,7 @@ class GestaoContratosController extends Controller
             'total_servico' => $totalContratosServico,
             'vencendo_30_dias' => $contratosVencendo30,
             'vencendo_90_dias' => $contratosVencendo90,
+            'vencidos' => $contratosVencidos,
             'valor_total_locacao' => $valorTotalLocacao,
             'valor_total_servico' => $valorTotalServico,
           ],
@@ -69,8 +86,15 @@ class GestaoContratosController extends Controller
             'vencendo_30_dias' => $alvarasVencendo30,
             'vencidos' => $alvarasVencidos,
           ],
+          'equipamentos' => [
+            'total' => $equipTotal,
+            'vencendo_30_dias' => $equipVencendo30,
+            'vencidos' => $equipVencidos,
+            'em_manutencao' => $equipManutencao,
+          ],
           'proximos_vencimentos' => $proximosVencimentos,
           'proximos_alvaras_vencer' => $proximosAlvarasVencer,
+          'proximos_equipamentos_vencer' => $proximosEquipamentosVencer,
         ],
       ]);
     } catch (\Throwable $th) {

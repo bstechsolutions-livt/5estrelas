@@ -32,8 +32,15 @@ export const dashboard = ref({
     vencendo_30_dias: 0,
     vencidos: 0
   },
+  equipamentos: {
+    total: 0,
+    vencendo_30_dias: 0,
+    vencidos: 0,
+    em_manutencao: 0
+  },
   proximos_vencimentos: [],
-  proximos_alvaras_vencer: []
+  proximos_alvaras_vencer: [],
+  proximos_equipamentos_vencer: []
 })
 
 export async function getDashboard() {
@@ -43,10 +50,13 @@ export async function getDashboard() {
     if (resp.data.sucesso) {
       dashboard.value.contratos = resp.data.dados.contratos
       dashboard.value.alvaras = resp.data.dados.alvaras
+      dashboard.value.equipamentos = resp.data.dados.equipamentos || dashboard.value.equipamentos
       dashboard.value.proximos_vencimentos =
         resp.data.dados.proximos_vencimentos
       dashboard.value.proximos_alvaras_vencer =
         resp.data.dados.proximos_alvaras_vencer
+      dashboard.value.proximos_equipamentos_vencer =
+        resp.data.dados.proximos_equipamentos_vencer || []
     }
   } catch (error) {
     toast.error("Erro ao carregar dashboard")

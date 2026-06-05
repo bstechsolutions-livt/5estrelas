@@ -10,6 +10,25 @@
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * White-label do módulo de Contratos (portado da Biglar, cuja cor de marca era roxo).
+ * A paleta `purple` do Tailwind passa a refletir a cor primária do tema (--app-primary).
+ * Verificado: `purple` só é usado no módulo de contratos. Tons claros derivados via color-mix.
+ * Resultado: todas as telas de contrato seguem a identidade visual da 5 Estrelas, sem editar tela por tela.
+ */
+:root {
+    --color-purple-50: color-mix(in srgb, var(--app-primary) 8%, white);
+    --color-purple-100: color-mix(in srgb, var(--app-primary) 15%, white);
+    --color-purple-200: color-mix(in srgb, var(--app-primary) 28%, white);
+    --color-purple-300: color-mix(in srgb, var(--app-primary) 45%, white);
+    --color-purple-400: color-mix(in srgb, var(--app-primary) 70%, white);
+    --color-purple-500: var(--app-primary);
+    --color-purple-600: var(--app-primary);
+    --color-purple-700: color-mix(in srgb, var(--app-primary) 82%, black);
+    --color-purple-800: color-mix(in srgb, var(--app-primary) 68%, black);
+    --color-purple-900: color-mix(in srgb, var(--app-primary) 55%, black);
+}
+
 :root {
     --p-primary-color: #3b82f6;
     --p-primary-color-hover: #2563eb;
