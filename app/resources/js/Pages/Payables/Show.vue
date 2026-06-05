@@ -162,7 +162,9 @@ function isImage(doc) {
                         <div v-else class="text-sm text-gray-400 mb-3">Nenhum documento anexado.</div>
                         <div v-if="canPrepare">
                             <FileUpload mode="basic" :auto="true" choose-label="Anexar documento"
-                                :max-file-size="10485760" @select="uploadDoc" class="w-full" />
+                                :max-file-size="10485760" @select="uploadDoc" class="w-full"
+                                invalid-file-size-message="O arquivo é muito grande. O tamanho máximo permitido é {1}." />
+                            <p class="text-[11px] text-gray-400 mt-1.5 text-center">Tamanho máximo por arquivo: 10 MB.</p>
                         </div>
                     </div>
 
