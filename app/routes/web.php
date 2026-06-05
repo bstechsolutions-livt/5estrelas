@@ -19,6 +19,8 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Http\Controllers\UserShortcutController;
+use App\Http\Controllers\v2\GestaoContratosController;
+use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 
 // Guest routes
@@ -172,6 +174,55 @@ Route::middleware('auth')->group(function () {
 
     // Busca global
     Route::get('/search', \App\Http\Controllers\SearchController::class)->name('search');
+
+    // ═══════════════════════════════════════════════════════════════
+    //   GESTÃO DE CONTRATOS (portado da intranet Biglar)
+    // ═══════════════════════════════════════════════════════════════
+
+    // Páginas (Inertia) — caminhos batem com a navegação interna das telas (/pagina/...)
+    Route::prefix('pagina/gestao-contratos')->middleware('permission:contratos.visualizar')->name('gestao-contratos.')->group(function () {
+        Route::get('/', fn () => Inertia::render('v2/gestao-contratos/index'))->name('dashboard');
+        Route::get('/locacao', fn () => Inertia::render('v2/gestao-contratos/locacao/index'))->name('locacao');
+        Route::get('/locacao/novo', fn () => Inertia::render('v2/gestao-contratos/locacao/form'))->name('locacao.novo');
+        Route::get('/locacao/{id}', fn ($id) => Inertia::render('v2/gestao-contratos/locacao/form', ['id' => $id]))->name('locacao.editar');
+        Route::get('/servicos', fn () => Inertia::render('v2/gestao-contratos/servicos/index'))->name('servicos');
+        Route::get('/servicos/novo', fn () => Inertia::render('v2/gestao-contratos/servicos/form'))->name('servicos.novo');
+        Route::get('/servicos/{id}', fn ($id) => Inertia::render('v2/gestao-contratos/servicos/form', ['id' => $id]))->name('servicos.editar');
+        Route::get('/alvaras', fn () => Inertia::render('v2/gestao-contratos/alvaras/index'))->name('alvaras');
+        Route::get('/alvaras/novo', fn () => Inertia::render('v2/gestao-contratos/alvaras/form'))->name('alvaras.novo');
+        Route::get('/alvaras/{id}', fn ($id) => Inertia::render('v2/gestao-contratos/alvaras/form', ['id' => $id]))->name('alvaras.editar');
+        Route::get('/relatorios', fn () => Inertia::render('v2/gestao-contratos/relatorios/index'))->name('relatorios');
+    });
+
+    // API (axios) — espelha os endpoints do GestaoContratosController
+    Route::prefix('v2/gestao-contratos')->controller(GestaoContratosController::class)->middleware('permission:contratos.visualizar')->name('gestao-contratos.api.')->group(function () {
+        Route::get('/dashboard', 'getDashboard')->name('dashboard');
+        Route::get('/tipos-indice', 'getTiposIndice')->name('tipos-indice');
+        Route::get('/tipos-alvara', 'getTiposAlvara')->name('tipos-alvara');
+        Route::get('/filiais', 'getFiliais')->name('filiais');
+
+        // Contratos
+        Route::get('/contratos', 'getContratos')->name('contratos.index');
+        Route::get('/contratos/exportar', 'exportarContratos')->name('contratos.exportar');
+        Route::get('/contratos/{id}', 'getContrato')->name('contratos.show');
+        Route::post('/contratos', 'storeContrato')->name('contratos.store');
+        Route::put('/contratos/{id}', 'updateContrato')->name('contratos.update');
+        Route::delete('/contratos/{id}', 'deleteContrato')->name('contratos.destroy');
+        Route::post('/contratos/{contratoId}/reajustes', 'storeReajuste')->name('contratos.reajustes.store');
+        Route::post('/contratos/{contratoId}/anexos', 'uploadAnexo')->name('contratos.anexos.store');
+        Route::delete('/anexos/{id}', 'deleteAnexo')->name('anexos.destroy');
+
+        // Alvarás
+        Route::get('/alvaras', 'getAlvaras')->name('alvaras.index');
+        Route::get('/alvaras/exportar', 'exportarAlvaras')->name('alvaras.exportar');
+        Route::get('/alvaras/{id}', 'getAlvara')->name('alvaras.show');
+        Route::post('/alvaras', 'storeAlvara')->name('alvaras.store');
+        Route::put('/alvaras/{id}', 'updateAlvara')->name('alvaras.update');
+        Route::delete('/alvaras/{id}', 'deleteAlvara')->name('alvaras.destroy');
+        Route::post('/alvaras/{id}/anexo', 'uploadAnexoAlvara')->name('alvaras.anexo.store');
+        Route::delete('/alvaras/{id}/anexo', 'deleteAnexoAlvara')->name('alvaras.anexo.destroy');
+        Route::get('/alvaras/{id}/anexo/download', 'downloadAnexoAlvara')->name('alvaras.anexo.download');
+    });
 });
 
 Route::get('/', function () {

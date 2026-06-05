@@ -43,6 +43,10 @@ class PermissionsSeeder extends Seeder
 
             // Backups
             ['key' => 'backups.gerenciar', 'label' => 'Gerenciar backups', 'module' => 'backups'],
+
+            // Gestão de Contratos (portado da Biglar)
+            ['key' => 'contratos.visualizar', 'label' => 'Ver gestão de contratos', 'module' => 'contratos'],
+            ['key' => 'contratos.gerenciar', 'label' => 'Gerenciar contratos (criar/editar/excluir)', 'module' => 'contratos'],
         ];
 
         foreach ($permissions as $row) {

@@ -26,6 +26,12 @@ class MenuCatalog
             ['key' => 'contas_pagar', 'label' => 'Contas a Pagar', 'icon' => 'pi pi-wallet', 'href' => '/financeiro/contas-pagar', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
             ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
 
+            // Contratos (portado da Biglar)
+            ['key' => 'contratos_dashboard', 'label' => 'Painel', 'icon' => 'pi pi-chart-pie', 'href' => '/pagina/gestao-contratos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+            ['key' => 'contratos_locacao', 'label' => 'Locação', 'icon' => 'pi pi-building', 'href' => '/pagina/gestao-contratos/locacao', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+            ['key' => 'contratos_servicos', 'label' => 'Serviços', 'icon' => 'pi pi-briefcase', 'href' => '/pagina/gestao-contratos/servicos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+            ['key' => 'contratos_alvaras', 'label' => 'Alvarás', 'icon' => 'pi pi-id-card', 'href' => '/pagina/gestao-contratos/alvaras', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+
             // Cadastros
             ['key' => 'usuarios', 'label' => 'Usuários', 'icon' => 'pi pi-users', 'href' => '/usuarios', 'permission' => 'usuarios.listar', 'group' => 'Cadastros'],
             ['key' => 'departamentos', 'label' => 'Departamentos', 'icon' => 'pi pi-building', 'href' => '/departamentos', 'permission' => 'departamentos.gerenciar', 'group' => 'Cadastros'],

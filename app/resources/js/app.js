@@ -4,6 +4,8 @@ import PrimeVue from 'primevue/config'
 import Aura from '@primevue/themes/aura'
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
+import Toast from 'vue-toastification'
+import 'vue-toastification/dist/index.css'
 
 import './bootstrap'
 import '../css/app.css'
@@ -29,6 +31,7 @@ createInertiaApp({
         })
         app.use(ToastService)
         app.use(ConfirmationService)
+        app.use(Toast, { position: 'top-right', timeout: 4000 })
 
         app.mount(el)
     },
