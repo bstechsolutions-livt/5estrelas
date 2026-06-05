@@ -20,6 +20,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Http\Controllers\UserShortcutController;
 use App\Http\Controllers\v2\GestaoContratosController;
+use App\Http\Controllers\v2\GestaoContratosRenovacaoController;
+use App\Http\Controllers\v2\GestaoEquipamentosController;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 
@@ -192,6 +194,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/alvaras/novo', fn () => Inertia::render('v2/gestao-contratos/alvaras/form'))->name('alvaras.novo');
         Route::get('/alvaras/{id}', fn ($id) => Inertia::render('v2/gestao-contratos/alvaras/form', ['id' => $id]))->name('alvaras.editar');
         Route::get('/relatorios', fn () => Inertia::render('v2/gestao-contratos/relatorios/index'))->name('relatorios');
+        // Renovação
+        Route::get('/renovacao', fn () => Inertia::render('v2/gestao-contratos/renovacao/index'))->name('renovacao');
+        Route::get('/renovacao/{id}', fn ($id) => Inertia::render('v2/gestao-contratos/renovacao/form', ['contratoId' => $id]))->name('renovacao.form');
+        // Equipamentos
+        Route::get('/equipamentos/dashboard', fn () => Inertia::render('v2/gestao-contratos/equipamentos/dashboard'))->name('equipamentos.dashboard');
+        Route::get('/equipamentos', fn () => Inertia::render('v2/gestao-contratos/equipamentos/index'))->name('equipamentos');
+        Route::get('/equipamentos/novo', fn () => Inertia::render('v2/gestao-contratos/equipamentos/form'))->name('equipamentos.novo');
+        Route::get('/equipamentos/tipos', fn () => Inertia::render('v2/gestao-contratos/equipamentos/tipos/index'))->name('equipamentos.tipos');
+        Route::get('/equipamentos/{id}', fn ($id) => Inertia::render('v2/gestao-contratos/equipamentos/form', ['id' => $id]))->name('equipamentos.editar');
     });
 
     // API (axios) — espelha os endpoints do GestaoContratosController
@@ -222,6 +233,41 @@ Route::middleware('auth')->group(function () {
         Route::post('/alvaras/{id}/anexo', 'uploadAnexoAlvara')->name('alvaras.anexo.store');
         Route::delete('/alvaras/{id}/anexo', 'deleteAnexoAlvara')->name('alvaras.anexo.destroy');
         Route::get('/alvaras/{id}/anexo/download', 'downloadAnexoAlvara')->name('alvaras.anexo.download');
+    });
+
+    // API Renovações
+    Route::prefix('v2/gestao-contratos/renovacoes')->controller(GestaoContratosRenovacaoController::class)->middleware('permission:contratos.visualizar')->name('gestao-contratos.api.renovacoes.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/para-renovar', 'contratosParaRenovar')->name('para-renovar');
+        Route::get('/contrato/{contratoId}', 'prepararRenovacao')->name('preparar');
+        Route::post('/contrato/{contratoId}', 'renovar')->name('renovar');
+    });
+
+    // API Equipamentos
+    Route::prefix('v2/gestao-contratos')->controller(GestaoEquipamentosController::class)->middleware('permission:contratos.visualizar')->name('gestao-contratos.api.equip.')->group(function () {
+        Route::get('/equipamentos/dashboard', 'getDashboard')->name('dashboard');
+        Route::get('/equipamentos/exportar', 'exportarEquipamentos')->name('exportar');
+        Route::get('/equipamentos', 'getEquipamentos')->name('index');
+        Route::get('/equipamentos/{id}', 'getEquipamento')->name('show');
+        Route::post('/equipamentos', 'storeEquipamento')->name('store');
+        Route::put('/equipamentos/{id}', 'updateEquipamento')->name('update');
+        Route::delete('/equipamentos/{id}', 'deleteEquipamento')->name('destroy');
+        // Tipos de equipamento
+        Route::get('/tipos-equipamento', 'getTiposEquipamento')->name('tipos.index');
+        Route::post('/tipos-equipamento', 'storeTipoEquipamento')->name('tipos.store');
+        Route::put('/tipos-equipamento/{id}', 'updateTipoEquipamento')->name('tipos.update');
+        Route::delete('/tipos-equipamento/{id}', 'deleteTipoEquipamento')->name('tipos.destroy');
+        // Ocorrências
+        Route::get('/equipamentos/{id}/ocorrencias', 'getOcorrencias')->name('ocorrencias.index');
+        Route::post('/equipamentos/{id}/ocorrencias', 'storeOcorrencia')->name('ocorrencias.store');
+        // Tratativas
+        Route::get('/equipamentos/{id}/tratativas', 'getTratativas')->name('tratativas.index');
+        Route::post('/equipamentos/{id}/tratativas', 'storeTratativa')->name('tratativas.store');
+        // Fotos
+        Route::post('/equipamentos/{id}/fotos', 'uploadFoto')->name('fotos.store');
+        Route::post('/ocorrencias/{id}/fotos', 'uploadFotoOcorrencia')->name('ocorrencias.fotos.store');
+        Route::delete('/equipamento-fotos/{id}', 'deleteFoto')->name('fotos.destroy');
+        Route::get('/equipamento-fotos/{id}/download', 'downloadFoto')->name('fotos.download');
     });
 });
 

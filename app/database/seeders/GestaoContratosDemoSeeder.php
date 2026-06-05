@@ -121,6 +121,61 @@ class GestaoContratosDemoSeeder extends Seeder
         }
 
         $this->command->info('✅ Contratos: ' . BsGestaoContrato::count() . ' | Alvarás: ' . BsGestaoAlvara::count());
+
+        $this->seedEquipamentos($branches);
+        $this->seedRenovacoes();
+    }
+
+    private function seedEquipamentos(array $branches): void
+    {
+        $tipos = [
+            'Extintor de Incêndio', 'Mangueira de Incêndio', 'Cilindro de Gás',
+            'Equipamento de Proteção', 'Detector de Fumaça', 'Iluminação de Emergência',
+        ];
+        $tipoIds = [];
+        foreach ($tipos as $t) {
+            $tipoIds[] = \App\Models\v2\BsGestaoTipoEquipamento::firstOrCreate(['nome' => $t], ['ativo' => true])->id;
+        }
+
+        $statuses = ['VIGENTE', 'VIGENTE', 'VIGENTE', 'EM_MANUTENCAO'];
+        for ($i = 0; $i < 20; $i++) {
+            \App\Models\v2\BsGestaoEquipamento::create([
+                'filial_id' => $branches[array_rand($branches)],
+                'tipo_equipamento_id' => $tipoIds[array_rand($tipoIds)],
+                'numero_identificacao' => 'EQ-' . str_pad($i + 1, 4, '0', STR_PAD_LEFT),
+                'carga' => random_int(0, 1) ? random_int(4, 12) . ' kg' : null,
+                'peso_kg' => random_int(2, 50) + random_int(0, 99) / 100,
+                'qtd_projeto' => random_int(1, 5),
+                'localizacao' => 'Setor ' . chr(random_int(65, 70)),
+                'data_validade' => now()->addDays(random_int(-30, 365))->toDateString(),
+                'status' => $statuses[array_rand($statuses)],
+                'created_by' => 2,
+            ]);
+        }
+
+        $this->command->info('✅ Equipamentos: ' . \App\Models\v2\BsGestaoEquipamento::count() . ' (tipos: ' . count($tipoIds) . ')');
+    }
+
+    private function seedRenovacoes(): void
+    {
+        // Renovações de alguns contratos de locação recorrentes (simula histórico)
+        $contratos = BsGestaoContrato::where('tipo', 'LOCACAO')->limit(5)->get();
+        foreach ($contratos as $c) {
+            \App\Models\v2\GestaoContratoRenovacao::create([
+                'contrato_id' => $c->id,
+                'data_renovacao' => now()->subMonths(random_int(1, 10))->toDateString(),
+                'nova_data_inicio' => $c->data_inicio,
+                'nova_data_fim' => $c->data_fim,
+                'valor_anterior' => $c->valor_mensal * 0.93,
+                'valor_novo' => $c->valor_mensal,
+                'percentual_variacao' => 7.5,
+                'percentual_divergencia_limite' => 10,
+                'dentro_divergencia' => true,
+                'status' => 'APROVADA',
+                'created_by' => 2,
+            ]);
+        }
+        $this->command->info('✅ Renovações: ' . \App\Models\v2\GestaoContratoRenovacao::count());
     }
 
     private function fakeCnpj(): string
