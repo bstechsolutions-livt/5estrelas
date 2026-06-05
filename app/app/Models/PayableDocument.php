@@ -10,6 +10,8 @@ class PayableDocument extends Model
 {
     protected $fillable = ['payable_id', 'uploaded_by', 'name', 'path', 'mime_type', 'size'];
 
+    protected $appends = ['url'];
+
     public function payable(): BelongsTo
     {
         return $this->belongsTo(Payable::class);

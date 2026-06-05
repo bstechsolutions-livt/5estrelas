@@ -87,6 +87,10 @@ function formatSize(bytes) {
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
     return (bytes / 1048576).toFixed(1) + ' MB'
 }
+
+function isImage(doc) {
+    return doc.mime_type?.startsWith('image/')
+}
 </script>
 
 <template>
@@ -132,16 +136,23 @@ function formatSize(bytes) {
                         <div v-if="payable.documents?.length" class="space-y-2 mb-3">
                             <div v-for="doc in payable.documents" :key="doc.id"
                                 class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                                <div class="flex items-center gap-2 min-w-0">
-                                    <i class="pi pi-file text-gray-400"></i>
+                                <a :href="doc.url" target="_blank" rel="noopener"
+                                    class="flex items-center gap-2 min-w-0 flex-1 group">
+                                    <i :class="['pi', isImage(doc) ? 'pi-image' : doc.mime_type === 'application/pdf' ? 'pi-file-pdf' : 'pi-file', 'text-gray-400']"></i>
                                     <div class="min-w-0">
-                                        <p class="text-sm text-gray-800 truncate">{{ doc.name }}</p>
+                                        <p class="text-sm text-gray-800 truncate group-hover:text-blue-600 group-hover:underline">{{ doc.name }}</p>
                                         <p class="text-[11px] text-gray-400">{{ formatSize(doc.size) }} · {{ doc.uploader?.name }}</p>
                                     </div>
+                                </a>
+                                <div class="flex items-center gap-1 flex-shrink-0">
+                                    <a :href="doc.url" target="_blank" rel="noopener"
+                                        class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer" title="Visualizar / baixar">
+                                        <i class="pi pi-eye"></i>
+                                    </a>
+                                    <button v-if="canPrepare" @click="removeDoc(doc.id)" class="text-red-400 hover:text-red-600 p-1.5 cursor-pointer" title="Remover">
+                                        <i class="pi pi-trash"></i>
+                                    </button>
                                 </div>
-                                <button v-if="canPrepare" @click="removeDoc(doc.id)" class="text-red-400 hover:text-red-600 text-xs p-1">
-                                    <i class="pi pi-trash"></i>
-                                </button>
                             </div>
                         </div>
                         <div v-else class="text-sm text-gray-400 mb-3">Nenhum documento anexado.</div>
