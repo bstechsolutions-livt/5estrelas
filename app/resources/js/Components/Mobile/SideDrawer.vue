@@ -43,9 +43,23 @@ function isGroupOpen(label) {
     return group.items.some(i => isActive(i.href))
 }
 
-function isActive(href) {
+const activeHref = computed(() => {
     const path = page.url.split('?')[0]
-    return path === href || path.startsWith(href + '/')
+    let best = null
+    for (const entry of (page.props.menuGrouped || [])) {
+        const list = entry.type === 'group' ? (entry.items || []) : [entry]
+        for (const it of list) {
+            if (!it.href) continue
+            if (path === it.href || path.startsWith(it.href + '/')) {
+                if (!best || it.href.length > best.length) best = it.href
+            }
+        }
+    }
+    return best
+})
+
+function isActive(href) {
+    return activeHref.value === href
 }
 
 function close() {

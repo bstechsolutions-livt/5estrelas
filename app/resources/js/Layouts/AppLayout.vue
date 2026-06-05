@@ -48,10 +48,25 @@ function navigate(href) {
     mobileMenuOpen.value = false
 }
 
-function isActive(href) {
-    // Ignora query string ao comparar (ex: /financeiro/contas-pagar?status=x)
+// Item ativo = match mais específico (href mais longo que casa com a URL atual).
+// Evita que um item "pai" (ex: /pagina/gestao-contratos) fique ativo nas subpáginas.
+const activeHref = computed(() => {
     const path = page.url.split('?')[0]
-    return path === href || path.startsWith(href + '/')
+    let best = null
+    for (const entry of menuGrouped.value) {
+        const items = entry.type === 'group' ? (entry.items || []) : [entry]
+        for (const it of items) {
+            if (!it.href) continue
+            if (path === it.href || path.startsWith(it.href + '/')) {
+                if (!best || it.href.length > best.length) best = it.href
+            }
+        }
+    }
+    return best
+})
+
+function isActive(href) {
+    return activeHref.value === href
 }
 
 const filteredMenuItems = computed(() => {
