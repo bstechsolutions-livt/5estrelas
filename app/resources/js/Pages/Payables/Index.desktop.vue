@@ -181,8 +181,8 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
 
             <!-- Filtros -->
             <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4">
-                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <div class="lg:col-span-2">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
                         <InputText v-model="search" placeholder="Fornecedor ou título" class="w-full" @keyup.enter="applyFilters" />
                     </div>
@@ -192,11 +192,11 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Valor mínimo</label>
-                        <InputNumber v-model="amountMin" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" />
+                        <InputNumber v-model="amountMin" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" :input-class="'w-full'" />
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Valor máximo</label>
-                        <InputNumber v-model="amountMax" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" />
+                        <InputNumber v-model="amountMax" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" :input-class="'w-full'" />
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Vencimento de</label>
@@ -207,11 +207,11 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                         <InputText v-model="dueTo" type="date" class="w-full" />
                     </div>
                 </div>
-                <div class="flex items-center justify-between mt-4">
+                <div class="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
                     <span v-if="hasActiveFilters" class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
                         {{ activeFilterCount }} filtro(s) ativo(s)
                     </span>
-                    <span v-else></span>
+                    <span v-else class="text-xs text-gray-400">Nenhum filtro aplicado</span>
                     <div class="flex gap-2">
                         <Button label="Limpar" severity="secondary" outlined size="small" @click="clearFilters" :disabled="!hasActiveFilters" />
                         <Button label="Filtrar" icon="pi pi-search" size="small" @click="applyFilters" />
