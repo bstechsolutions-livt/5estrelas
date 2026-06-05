@@ -1,6 +1,15 @@
 @import "tailwindcss";
 @import "primeicons/primeicons.css";
 
+/*
+ * Desliga o modo escuro globalmente.
+ * As telas portadas da Biglar usam muitas classes `dark:`. No Tailwind 4 o `dark:`
+ * ativa pela preferência do SO (prefers-color-scheme). Aqui redefinimos o variant
+ * para só valer dentro de um elemento com a classe `.dark` — que nunca é adicionada.
+ * Resultado: o sistema é sempre claro, independente do SO do usuário.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
     --p-primary-color: #3b82f6;
     --p-primary-color-hover: #2563eb;
