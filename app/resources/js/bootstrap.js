@@ -30,3 +30,36 @@ window.Echo = new Echo({
         },
     },
 })
+
+// ─────────────────────────────────────────────────────────────────
+// Interceptador global de links internos → navegação SPA (Inertia)
+// Telas portadas (ex: gestão de contratos) usam <a href="/pagina/..."> nos
+// breadcrumbs. Link HTML puro recarrega a página inteira. Aqui interceptamos
+// cliques em links internos e roteamos pelo Inertia, sem precisar editar cada
+// tela. Arquivos (/storage), externos, target=_blank, download e cliques com
+// modificadores (ctrl/cmd/abrir em nova aba) continuam com comportamento padrão.
+// ─────────────────────────────────────────────────────────────────
+import { router } from '@inertiajs/vue3'
+
+document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0) return
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+
+    const a = e.target.closest('a')
+    if (!a) return
+
+    const href = a.getAttribute('href')
+    if (!href) return
+
+    // Ignora: nova aba, download, âncoras, mailto/tel, externos
+    if (a.target && a.target !== '' && a.target !== '_self') return
+    if (a.hasAttribute('download')) return
+    if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return
+
+    // Só links internos relativos (mesma origem), exceto arquivos em /storage
+    if (!href.startsWith('/') || href.startsWith('//')) return
+    if (href.startsWith('/storage')) return
+
+    e.preventDefault()
+    router.visit(href)
+})
