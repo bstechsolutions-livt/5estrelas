@@ -74,6 +74,8 @@ watch(search, () => {
 function selectStatus(s) {
     if (status.value === s) return
     status.value = s
+    selected.value = []
+    selectionMode.value = false
     applyFilters()
 }
 
@@ -131,6 +133,45 @@ const activeFilterCount = computed(() => {
 function goShow(id) {
     sessionStorage.setItem('payables_scroll_mobile', document.querySelector('.mobile-main')?.scrollTop?.toString() || '0')
     router.visit(`/financeiro/contas-pagar/${id}`)
+}
+
+// Seleção pra criar borderô (mobile)
+const selectableStatuses = ['pendente', 'em_preparacao', 'reprovado']
+const canSelect = computed(() => selectableStatuses.includes(status.value))
+const selectionMode = ref(false)
+const selected = ref([])
+const createSheetOpen = ref(false)
+const borderoDescription = ref('')
+
+function toggleSelectionMode() {
+    selectionMode.value = !selectionMode.value
+    if (!selectionMode.value) selected.value = []
+}
+function onCardTap(p) {
+    if (selectionMode.value && canSelect.value) {
+        const i = selected.value.indexOf(p.id)
+        if (i >= 0) selected.value.splice(i, 1)
+        else selected.value.push(p.id)
+    } else {
+        goShow(p.id)
+    }
+}
+function isSelected(id) {
+    return selected.value.includes(id)
+}
+function createBordero() {
+    if (selected.value.length === 0) return
+    router.post('/financeiro/borderos', {
+        payable_ids: selected.value,
+        description: borderoDescription.value || undefined,
+    }, {
+        onSuccess: () => {
+            selected.value = []
+            selectionMode.value = false
+            createSheetOpen.value = false
+            borderoDescription.value = ''
+        },
+    })
 }
 
 function formatMoney(val) {
@@ -193,14 +234,25 @@ const currentTotal = computed(() => {
                     {{ activeFilterCount }}
                 </span>
             </button>
+            <button v-if="canSelect" @click="toggleSelectionMode"
+                :class="['w-11 h-11 rounded-lg border flex items-center justify-center',
+                    selectionMode ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-300 text-gray-600']">
+                <i class="pi pi-check-square"></i>
+            </button>
         </div>
 
+        <p v-if="selectionMode" class="px-4 pb-1 text-xs text-blue-600">Toque nos títulos para agrupar em um borderô.</p>
+
         <!-- Lista -->
-        <div v-if="payables.data.length" class="px-4 space-y-2 pb-20">
-            <button v-for="p in payables.data" :key="p.id" @click="goShow(p.id)"
-                class="w-full bg-white rounded-xl border border-gray-200 p-3 text-left active:bg-gray-50">
+        <div v-if="payables.data.length" class="px-4 space-y-2" :class="selectionMode && selected.length ? 'pb-28' : 'pb-20'">
+            <button v-for="p in payables.data" :key="p.id" @click="onCardTap(p)"
+                :class="['w-full bg-white rounded-xl border p-3 text-left active:bg-gray-50 transition-colors',
+                    selectionMode && isSelected(p.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200']">
                 <div class="flex items-start justify-between gap-2 mb-1">
-                    <p class="text-sm font-medium text-gray-800 truncate flex-1">{{ p.supplier_name }}</p>
+                    <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <i v-if="selectionMode" :class="['pi', isSelected(p.id) ? 'pi-check-circle text-blue-600' : 'pi-circle text-gray-300']"></i>
+                        <p class="text-sm font-medium text-gray-800 truncate flex-1">{{ p.supplier_name }}</p>
+                    </div>
                     <Tag :value="statusOptions[p.status]" :severity="statusSeverity[p.status]" class="text-[10px]" />
                 </div>
                 <div class="flex items-center justify-between">
@@ -214,6 +266,31 @@ const currentTotal = computed(() => {
             </button>
         </div>
         <div v-else class="text-center py-12 text-gray-400 text-sm">Nenhum título encontrado.</div>
+
+        <!-- Barra de ação fixa quando há seleção -->
+        <div v-if="selectionMode && selected.length" class="fixed bottom-16 left-0 right-0 px-4 z-30">
+            <div class="bg-blue-600 text-white rounded-xl shadow-lg p-3 flex items-center justify-between">
+                <span class="text-sm font-medium">{{ selected.length }} selecionado(s)</span>
+                <button @click="createSheetOpen = true" class="bg-white text-blue-600 font-semibold text-sm px-4 py-2 rounded-lg flex items-center gap-1">
+                    <i class="pi pi-list-check text-xs"></i> Criar Borderô
+                </button>
+            </div>
+        </div>
+
+        <!-- Bottom sheet: confirmar criação de borderô -->
+        <BottomSheet v-model="createSheetOpen" title="Novo borderô">
+            <p class="text-sm text-gray-600 mb-3">Agrupando {{ selected.length }} título(s) em um borderô.</p>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Descrição (opcional)</label>
+            <InputText v-model="borderoDescription" placeholder="Ex: Pagamentos fornecedores 06/2026" class="w-full" style="height: 44px" />
+            <div class="flex gap-2 mt-4">
+                <button @click="createSheetOpen = false" class="flex-1 py-3 rounded-lg border border-gray-300 text-gray-700 font-medium">
+                    Cancelar
+                </button>
+                <button @click="createBordero" class="flex-1 py-3 rounded-lg text-white font-medium" :style="{ backgroundColor: 'var(--app-primary, #3b82f6)' }">
+                    Criar Borderô
+                </button>
+            </div>
+        </BottomSheet>
 
         <!-- Bottom sheet filtros avançados -->
         <BottomSheet v-model="filtersOpen" title="Filtros">

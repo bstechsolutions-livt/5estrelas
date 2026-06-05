@@ -156,6 +156,26 @@ class SearchController extends Controller
             if ($payables->isNotEmpty()) {
                 $groups[] = ['label' => 'Contas a Pagar', 'items' => $payables];
             }
+
+            // Borderôs
+            $borderos = \App\Models\Bordero::query()
+                ->where(function ($qq) use ($q) {
+                    $qq->where('number', 'ilike', "%{$q}%")
+                        ->orWhere('description', 'ilike', "%{$q}%");
+                })
+                ->limit(5)
+                ->get(['id', 'number', 'description', 'total_amount', 'items_count'])
+                ->map(fn ($b) => [
+                    'id' => $b->id,
+                    'title' => $b->number,
+                    'subtitle' => ($b->items_count ?? 0) . ' títulos · R$ ' . number_format($b->total_amount, 2, ',', '.'),
+                    'icon' => 'pi pi-list-check',
+                    'href' => "/financeiro/borderos/{$b->id}",
+                ]);
+
+            if ($borderos->isNotEmpty()) {
+                $groups[] = ['label' => 'Borderôs', 'items' => $borderos];
+            }
         }
 
         return response()->json(['groups' => $groups, 'query' => $q]);

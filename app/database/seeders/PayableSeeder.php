@@ -3,7 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\Branch;
+use App\Models\Bordero;
 use App\Models\Payable;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class PayableSeeder extends Seeder
@@ -51,5 +53,70 @@ class PayableSeeder extends Seeder
         }
 
         $this->command->info('✅ 35 títulos fake criados para contas a pagar.');
+
+        $this->seedBorderos();
+    }
+
+    /**
+     * Agrupa alguns títulos selecionáveis em borderôs fake, com status variados.
+     */
+    private function seedBorderos(): void
+    {
+        $creator = User::where('email', 'bruno@bstechsolutions.com')->first()
+            ?? User::where('email', 'admin@5estrelas.com.br')->first()
+            ?? User::first();
+
+        if (!$creator) {
+            $this->command->warn('  ! Nenhum usuário encontrado para criar borderôs.');
+            return;
+        }
+
+        // Distribuição de status dos borderôs a criar
+        $borderoStatuses = ['rascunho', 'aguardando_aprovacao', 'aguardando_aprovacao', 'aprovado', 'reprovado'];
+        $count = 0;
+
+        foreach ($borderoStatuses as $status) {
+            // Pega títulos livres (sem borderô) em status agrupável
+            $payables = Payable::whereNull('bordero_id')
+                ->whereIn('status', ['pendente', 'em_preparacao', 'reprovado'])
+                ->inRandomOrder()
+                ->limit(random_int(2, 4))
+                ->get();
+
+            if ($payables->count() < 2) {
+                break; // acabaram os títulos livres
+            }
+
+            $bordero = Bordero::create([
+                'number' => Bordero::generateNumber(),
+                'description' => 'Borderô de pagamentos - lote ' . ($count + 1),
+                'status' => $status,
+                'created_by' => $creator->id,
+                'sent_for_approval_at' => $status !== 'rascunho' ? now()->subDays(random_int(1, 10)) : null,
+                'approved_by' => in_array($status, ['aprovado', 'reprovado']) ? $creator->id : null,
+                'approved_at' => $status === 'aprovado' ? now()->subDays(random_int(0, 5)) : null,
+                'rejection_reason' => $status === 'reprovado' ? 'Divergência nos valores apresentados.' : null,
+            ]);
+
+            // Vincula títulos e alinha o status deles ao do borderô
+            $payableStatus = match ($status) {
+                'rascunho' => 'em_preparacao',
+                'aguardando_aprovacao' => 'aguardando_aprovacao',
+                'aprovado' => 'aprovado',
+                'reprovado' => 'reprovado',
+                default => 'em_preparacao',
+            };
+
+            Payable::whereIn('id', $payables->pluck('id'))->update([
+                'bordero_id' => $bordero->id,
+                'prepared_by' => $creator->id,
+                'status' => $payableStatus,
+            ]);
+
+            $bordero->recalculate();
+            $count++;
+        }
+
+        $this->command->info("✅ {$count} borderôs fake criados.");
     }
 }
