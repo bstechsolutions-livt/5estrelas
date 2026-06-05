@@ -143,16 +143,6 @@ class BsGestaoContrato extends Model
         return $this->hasMany(BsGestaoContratoAnexo::class, 'contrato_id');
     }
 
-    public function medicoes()
-    {
-        return $this->hasMany(GestaoContratoMedicao::class, 'contrato_id')->orderBy('competencia', 'desc');
-    }
-
-    public function renovacoes()
-    {
-        return $this->hasMany(GestaoContratoRenovacao::class, 'contrato_id')->orderBy('data_renovacao', 'desc');
-    }
-
     // Accessors
     public function getDocumentoLocadorAttribute($value)
     {

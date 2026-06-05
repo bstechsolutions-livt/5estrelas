@@ -123,7 +123,6 @@ class GestaoContratosDemoSeeder extends Seeder
         $this->command->info('✅ Contratos: ' . BsGestaoContrato::count() . ' | Alvarás: ' . BsGestaoAlvara::count());
 
         $this->seedEquipamentos($branches);
-        $this->seedRenovacoes();
     }
 
     private function seedEquipamentos(array $branches): void
@@ -154,28 +153,6 @@ class GestaoContratosDemoSeeder extends Seeder
         }
 
         $this->command->info('✅ Equipamentos: ' . \App\Models\v2\BsGestaoEquipamento::count() . ' (tipos: ' . count($tipoIds) . ')');
-    }
-
-    private function seedRenovacoes(): void
-    {
-        // Renovações de alguns contratos de locação recorrentes (simula histórico)
-        $contratos = BsGestaoContrato::where('tipo', 'LOCACAO')->limit(5)->get();
-        foreach ($contratos as $c) {
-            \App\Models\v2\GestaoContratoRenovacao::create([
-                'contrato_id' => $c->id,
-                'data_renovacao' => now()->subMonths(random_int(1, 10))->toDateString(),
-                'nova_data_inicio' => $c->data_inicio,
-                'nova_data_fim' => $c->data_fim,
-                'valor_anterior' => $c->valor_mensal * 0.93,
-                'valor_novo' => $c->valor_mensal,
-                'percentual_variacao' => 7.5,
-                'percentual_divergencia_limite' => 10,
-                'dentro_divergencia' => true,
-                'status' => 'APROVADA',
-                'created_by' => 2,
-            ]);
-        }
-        $this->command->info('✅ Renovações: ' . \App\Models\v2\GestaoContratoRenovacao::count());
     }
 
     private function fakeCnpj(): string

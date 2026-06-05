@@ -20,7 +20,6 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Http\Controllers\UserShortcutController;
 use App\Http\Controllers\v2\GestaoContratosController;
-use App\Http\Controllers\v2\GestaoContratosRenovacaoController;
 use App\Http\Controllers\v2\GestaoEquipamentosController;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
@@ -193,10 +192,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/alvaras', fn () => Inertia::render('v2/gestao-contratos/alvaras/index'))->name('alvaras');
         Route::get('/alvaras/novo', fn () => Inertia::render('v2/gestao-contratos/alvaras/form'))->name('alvaras.novo');
         Route::get('/alvaras/{id}', fn ($id) => Inertia::render('v2/gestao-contratos/alvaras/form', ['id' => $id]))->name('alvaras.editar');
-        Route::get('/relatorios', fn () => Inertia::render('v2/gestao-contratos/relatorios/index'))->name('relatorios');
-        // Renovação
-        Route::get('/renovacao', fn () => Inertia::render('v2/gestao-contratos/renovacao/index'))->name('renovacao');
-        Route::get('/renovacao/{id}', fn ($id) => Inertia::render('v2/gestao-contratos/renovacao/form', ['contratoId' => $id]))->name('renovacao.form');
         // Equipamentos
         Route::get('/equipamentos/dashboard', fn () => Inertia::render('v2/gestao-contratos/equipamentos/dashboard'))->name('equipamentos.dashboard');
         Route::get('/equipamentos', fn () => Inertia::render('v2/gestao-contratos/equipamentos/index'))->name('equipamentos');
@@ -233,14 +228,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/alvaras/{id}/anexo', 'uploadAnexoAlvara')->name('alvaras.anexo.store');
         Route::delete('/alvaras/{id}/anexo', 'deleteAnexoAlvara')->name('alvaras.anexo.destroy');
         Route::get('/alvaras/{id}/anexo/download', 'downloadAnexoAlvara')->name('alvaras.anexo.download');
-    });
-
-    // API Renovações
-    Route::prefix('v2/gestao-contratos/renovacoes')->controller(GestaoContratosRenovacaoController::class)->middleware('permission:contratos.visualizar')->name('gestao-contratos.api.renovacoes.')->group(function () {
-        Route::get('/', 'index')->name('index');
-        Route::get('/para-renovar', 'contratosParaRenovar')->name('para-renovar');
-        Route::get('/contrato/{contratoId}', 'prepararRenovacao')->name('preparar');
-        Route::post('/contrato/{contratoId}', 'renovar')->name('renovar');
     });
 
     // API Equipamentos
