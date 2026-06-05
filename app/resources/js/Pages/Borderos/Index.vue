@@ -1,0 +1,103 @@
+<script setup>
+import { ref, computed } from 'vue'
+import { router } from '@inertiajs/vue3'
+import AppLayout from '@/Layouts/AppLayout.vue'
+import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import Tag from 'primevue/tag'
+import { useDevice } from '@/composables/useDevice'
+
+const props = defineProps({
+    borderos: Object,
+    totals: Object,
+    filters: Object,
+    statusOptions: Object,
+})
+
+const { isMobile } = useDevice()
+const status = ref(props.filters?.status || null)
+
+const statusList = [
+    { label: 'Rascunho', value: 'rascunho' },
+    { label: 'Aguardando Aprovação', value: 'aguardando_aprovacao' },
+    { label: 'Aprovados', value: 'aprovado' },
+    { label: 'Reprovados', value: 'reprovado' },
+    { label: 'Pagos', value: 'pago' },
+]
+
+function filterStatus(s) {
+    status.value = status.value === s ? null : s
+    router.get('/financeiro/borderos', { status: status.value || undefined }, { preserveState: true, replace: true })
+}
+
+function goShow(id) { router.visit(`/financeiro/borderos/${id}`) }
+
+function formatMoney(val) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+}
+function formatDate(d) {
+    if (!d) return '—'
+    return new Date(d).toLocaleDateString('pt-BR')
+}
+
+const statusSeverity = { rascunho: 'secondary', aguardando_aprovacao: 'warn', aprovado: 'success', reprovado: 'danger', pago: 'success' }
+</script>
+
+<template>
+    <component :is="isMobile ? AppLayoutMobile : AppLayout" :title="isMobile ? 'Borderôs' : undefined">
+        <div :class="isMobile ? 'px-4 py-3' : 'max-w-6xl mx-auto'">
+            <div v-if="!isMobile" class="mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Borderôs</h1>
+                <p class="text-sm text-gray-500 mt-1">Agrupamentos de títulos para pagamento.</p>
+            </div>
+
+            <!-- Tabs status -->
+            <div class="flex flex-wrap gap-2 mb-5 overflow-x-auto">
+                <button v-for="s in statusList" :key="s.value" @click="filterStatus(s.value)"
+                    :class="['px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors',
+                        status === s.value ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50']">
+                    {{ s.label }}
+                    <span v-if="totals?.[s.value]" class="ml-1 text-xs opacity-75">({{ totals[s.value]?.count || 0 }})</span>
+                </button>
+            </div>
+
+            <!-- Mobile: cards -->
+            <div v-if="isMobile">
+                <div v-if="borderos.data.length" class="space-y-2 pb-20">
+                    <button v-for="b in borderos.data" :key="b.id" @click="goShow(b.id)"
+                        class="w-full bg-white rounded-xl border border-gray-200 p-3 text-left active:bg-gray-50">
+                        <div class="flex items-start justify-between mb-1">
+                            <p class="text-sm font-semibold text-gray-800">{{ b.number }}</p>
+                            <Tag :value="statusOptions[b.status]" :severity="statusSeverity[b.status]" class="text-[10px]" />
+                        </div>
+                        <p class="text-sm font-bold text-gray-700">{{ formatMoney(b.total_amount) }}</p>
+                        <p class="text-xs text-gray-400 mt-0.5">{{ b.items_count }} títulos · {{ formatDate(b.created_at) }}</p>
+                    </button>
+                </div>
+                <div v-else class="text-center py-12 text-gray-400 text-sm">Nenhum borderô.</div>
+            </div>
+
+            <!-- Desktop: tabela -->
+            <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100">
+                <DataTable :value="borderos.data" striped-rows @row-click="(e) => goShow(e.data.id)" class="cursor-pointer">
+                    <Column field="number" header="Número" style="width: 120px" />
+                    <Column field="description" header="Descrição">
+                        <template #body="{ data }">{{ data.description || '—' }}</template>
+                    </Column>
+                    <Column field="items_count" header="Títulos" style="width: 90px" />
+                    <Column field="total_amount" header="Total" style="width: 150px">
+                        <template #body="{ data }"><span class="font-semibold">{{ formatMoney(data.total_amount) }}</span></template>
+                    </Column>
+                    <Column header="Criado por" style="width: 160px">
+                        <template #body="{ data }"><span class="text-xs text-gray-600">{{ data.creator?.name || '—' }}</span></template>
+                    </Column>
+                    <Column field="status" header="Status" style="width: 160px">
+                        <template #body="{ data }"><Tag :value="statusOptions[data.status]" :severity="statusSeverity[data.status]" /></template>
+                    </Column>
+                    <template #empty><div class="text-center py-8 text-gray-500">Nenhum borderô criado.</div></template>
+                </DataTable>
+            </div>
+        </div>
+    </component>
+</template>

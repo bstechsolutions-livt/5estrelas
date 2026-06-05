@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BackupController;
+use App\Http\Controllers\BorderoController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PayableController;
@@ -141,6 +142,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/enviar-aprovacao', [PayableController::class, 'sendForApproval'])->name('payables.send_approval');
         Route::post('/{id}/aprovar', [PayableController::class, 'approve'])->name('payables.approve');
         Route::post('/{id}/reprovar', [PayableController::class, 'reject'])->name('payables.reject');
+    });
+
+    // Financeiro - Borderôs
+    Route::prefix('financeiro/borderos')->middleware('permission:financeiro.contas_pagar.visualizar')->group(function () {
+        Route::get('/', [BorderoController::class, 'index'])->name('borderos.index');
+        Route::post('/', [BorderoController::class, 'store'])->name('borderos.store');
+        Route::get('/{id}', [BorderoController::class, 'show'])->name('borderos.show');
+        Route::delete('/{borderoId}/titulos/{payableId}', [BorderoController::class, 'removePayable'])->name('borderos.remove_payable');
+        Route::post('/{id}/enviar-aprovacao', [BorderoController::class, 'sendForApproval'])->name('borderos.send_approval');
+        Route::post('/{id}/aprovar', [BorderoController::class, 'approve'])->name('borderos.approve');
+        Route::post('/{id}/reprovar', [BorderoController::class, 'reject'])->name('borderos.reject');
     });
 
     // Notificações (do usuário autenticado, sem permissão extra)

@@ -126,6 +126,34 @@ function goShow(id) {
     router.visit(`/financeiro/contas-pagar/${id}`)
 }
 
+// Seleção para borderô
+const selected = ref([])
+
+// Só pode selecionar títulos que estão livres pra agrupar
+const selectableStatuses = ['pendente', 'em_preparacao', 'reprovado']
+const canSelect = computed(() => selectableStatuses.includes(status.value))
+
+function toggleSelect(id) {
+    const i = selected.value.indexOf(id)
+    if (i >= 0) selected.value.splice(i, 1)
+    else selected.value.push(id)
+}
+
+function isSelected(id) {
+    return selected.value.includes(id)
+}
+
+const createBorderoForm = ref({ description: '' })
+function createBordero() {
+    if (selected.value.length === 0) return
+    router.post('/financeiro/borderos', {
+        payable_ids: selected.value,
+        description: createBorderoForm.value.description || undefined,
+    }, {
+        onSuccess: () => { selected.value = [] },
+    })
+}
+
 function formatMoney(val) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
 }
@@ -219,30 +247,53 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                 </div>
             </div>
 
+            <!-- Barra de seleção pra borderô -->
+            <div v-if="canSelect && selected.length > 0" class="bg-blue-600 text-white rounded-xl p-3 mb-4 flex items-center justify-between">
+                <span class="text-sm font-medium">{{ selected.length }} título(s) selecionado(s)</span>
+                <div class="flex items-center gap-2">
+                    <InputText v-model="createBorderoForm.description" placeholder="Descrição do borderô (opcional)" class="w-72" />
+                    <Button label="Criar Borderô" icon="pi pi-list-check" severity="contrast" size="small" @click="createBordero" />
+                    <Button icon="pi pi-times" severity="contrast" text size="small" @click="selected = []" />
+                </div>
+            </div>
+
             <!-- Tabela -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                <DataTable :value="payables.data" striped-rows @row-click="(e) => goShow(e.data.id)" class="cursor-pointer"
+                <DataTable :value="payables.data" striped-rows class="cursor-pointer"
                     :lazy="true" :paginator="true" :rows="payables.per_page" :total-records="payables.total"
                     :first="(payables.current_page - 1) * payables.per_page"
                     @page="onPage"
                     paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
                     :rows-per-page-options="[20, 50, 100]"
                 >
-                    <Column field="title_number" header="Nº" style="width: 90px; white-space: nowrap" />
-                    <Column field="supplier_name" header="Fornecedor" style="min-width: 200px" />
+                    <Column v-if="canSelect" header="" style="width: 48px">
+                        <template #body="{ data }">
+                            <input type="checkbox" :checked="isSelected(data.id)" @click.stop="toggleSelect(data.id)" class="w-4 h-4 cursor-pointer" />
+                        </template>
+                    </Column>
+                    <Column field="title_number" header="Nº" style="width: 90px; white-space: nowrap">
+                        <template #body="{ data }">
+                            <span @click="goShow(data.id)">{{ data.title_number }}</span>
+                        </template>
+                    </Column>
+                    <Column field="supplier_name" header="Fornecedor" style="min-width: 200px">
+                        <template #body="{ data }">
+                            <span @click="goShow(data.id)">{{ data.supplier_name }}</span>
+                        </template>
+                    </Column>
                     <Column field="amount" header="Valor" style="width: 140px; white-space: nowrap">
                         <template #body="{ data }">
-                            <span class="font-semibold">{{ formatMoney(data.amount) }}</span>
+                            <span class="font-semibold" @click="goShow(data.id)">{{ formatMoney(data.amount) }}</span>
                         </template>
                     </Column>
                     <Column field="due_date" header="Vencimento" style="width: 110px; white-space: nowrap">
                         <template #body="{ data }">
-                            {{ formatDate(data.due_date) }}
+                            <span @click="goShow(data.id)">{{ formatDate(data.due_date) }}</span>
                         </template>
                     </Column>
                     <Column header="Filial" style="width: 180px">
                         <template #body="{ data }">
-                            <span class="text-xs text-gray-600 truncate block max-w-[160px]" :title="data.branch?.name">{{ data.branch?.name || '—' }}</span>
+                            <span class="text-xs text-gray-600 truncate block max-w-[160px]" :title="data.branch?.name" @click="goShow(data.id)">{{ data.branch?.name || '—' }}</span>
                         </template>
                     </Column>
                     <Column field="status" header="Status" style="width: 150px; white-space: nowrap">

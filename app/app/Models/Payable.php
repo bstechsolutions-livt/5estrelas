@@ -74,6 +74,11 @@ class Payable extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    public function bordero(): BelongsTo
+    {
+        return $this->belongsTo(Bordero::class);
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(PayableDocument::class);
