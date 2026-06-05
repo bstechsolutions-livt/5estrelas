@@ -97,22 +97,23 @@ const statusSeverity = { pendente: 'warn', em_preparacao: 'info', aguardando_apr
                     <h3 class="text-sm font-semibold text-gray-700">Títulos neste borderô</h3>
                 </div>
                 <div class="divide-y divide-gray-50">
-                    <div v-for="p in bordero.payables" :key="p.id" class="flex items-center justify-between p-3 hover:bg-gray-50">
+                    <div v-for="p in bordero.payables" :key="p.id"
+                        @click="router.visit(`/financeiro/contas-pagar/${p.id}`)"
+                        class="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer">
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
                                 <span class="text-xs font-mono text-gray-400">{{ p.title_number }}</span>
                                 <p class="text-sm font-medium text-gray-800 truncate">{{ p.supplier_name }}</p>
+                                <i v-if="p.documents_count" class="pi pi-paperclip text-gray-300 text-xs" :title="`${p.documents_count} documento(s)`"></i>
                             </div>
                             <p class="text-xs text-gray-500">Venc: {{ formatDate(p.due_date) }} · {{ p.branch?.name || '' }}</p>
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="text-sm font-semibold text-gray-700">{{ formatMoney(p.amount) }}</span>
-                            <button v-if="isDraft" @click="removePayable(p.id)" class="text-red-400 hover:text-red-600 p-1">
+                            <button v-if="isDraft" @click.stop="removePayable(p.id)" class="text-red-400 hover:text-red-600 p-1" title="Remover do borderô">
                                 <i class="pi pi-times"></i>
                             </button>
-                            <button v-else @click="router.visit(`/financeiro/contas-pagar/${p.id}`)" class="text-gray-400 hover:text-gray-600 p-1">
-                                <i class="pi pi-external-link text-xs"></i>
-                            </button>
+                            <i v-else class="pi pi-chevron-right text-gray-300 text-xs"></i>
                         </div>
                     </div>
                 </div>

@@ -50,7 +50,7 @@ class BorderoController extends Controller
         $bordero = Bordero::with([
             'creator:id,name',
             'approver:id,name',
-            'payables' => fn ($q) => $q->with('branch:id,name')->orderBy('due_date'),
+            'payables' => fn ($q) => $q->with('branch:id,name')->withCount('documents')->orderBy('due_date'),
         ])->findOrFail($id);
 
         return Inertia::render('Borderos/Show', [

@@ -73,7 +73,10 @@ function formatDateTime(d) {
 }
 
 const canPrepare = ['pendente', 'em_preparacao', 'reprovado'].includes(props.payable.status)
-const canApprove = props.payable.status === 'aguardando_aprovacao'
+// Se está num borderô, não pode enviar individual — o borderô controla o envio
+const inBordero = !!props.payable.bordero_id
+const canSendIndividual = canPrepare && !inBordero
+const canApprove = props.payable.status === 'aguardando_aprovacao' && !inBordero
 
 function goBack() {
     window.history.back()
@@ -108,9 +111,9 @@ function formatSize(bytes) {
                 <p class="text-xl font-bold text-gray-800">{{ formatMoney(payable.amount) }}</p>
             </div>
 
-            <div :class="isMobile ? 'space-y-4' : (canPrepare || canApprove) ? 'grid grid-cols-3 gap-6' : ''">
+            <div :class="isMobile ? 'space-y-4' : (canSendIndividual || canApprove || inBordero) ? 'grid grid-cols-3 gap-6' : ''">
                 <!-- Coluna principal -->
-                <div :class="isMobile ? '' : (canPrepare || canApprove) ? 'col-span-2 space-y-4' : 'space-y-4'">
+                <div :class="isMobile ? '' : (canSendIndividual || canApprove || inBordero) ? 'col-span-2 space-y-4' : 'space-y-4'">
                     <!-- Info -->
                     <div class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Informações</h3>
@@ -178,9 +181,18 @@ function formatSize(bytes) {
                 </div>
 
                 <!-- Sidebar de ações -->
-                <div v-if="canPrepare || canApprove" class="space-y-4">
-                    <!-- Ações do preparador -->
-                    <div v-if="canPrepare" class="bg-white rounded-xl border border-gray-100 p-4">
+                <div v-if="canSendIndividual || canApprove || inBordero" class="space-y-4">
+                    <!-- Aviso: está em borderô -->
+                    <div v-if="inBordero" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <h3 class="text-sm font-semibold text-amber-700 mb-1 flex items-center gap-2">
+                            <i class="pi pi-list-check"></i> Em um borderô
+                        </h3>
+                        <p class="text-xs text-amber-600 mb-2">Este título faz parte de um borderô. O envio e aprovação são feitos pelo borderô.</p>
+                        <Button label="Ver borderô" icon="pi pi-arrow-right" size="small" outlined class="w-full" @click="router.visit(`/financeiro/borderos/${payable.bordero_id}`)" />
+                    </div>
+
+                    <!-- Ações do preparador (só se NÃO está em borderô) -->
+                    <div v-if="canSendIndividual" class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Ações</h3>
                         <Button label="Enviar para Aprovação" icon="pi pi-send" class="w-full" @click="sendForApproval" />
                     </div>
