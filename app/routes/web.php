@@ -189,6 +189,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/servicos', fn () => Inertia::render('v2/gestao-contratos/servicos/index'))->name('servicos');
         Route::get('/servicos/novo', fn () => Inertia::render('v2/gestao-contratos/servicos/form'))->name('servicos.novo');
         Route::get('/servicos/{id}', fn ($id) => Inertia::render('v2/gestao-contratos/servicos/form', ['id' => $id]))->name('servicos.editar');
+        // Serviços Prestados (5E presta ao cliente)
+        Route::get('/servicos-prestados', fn () => Inertia::render('v2/gestao-contratos/servicos-prestados/index'))->name('servicos-prestados');
+        Route::get('/servicos-prestados/novo', fn () => Inertia::render('v2/gestao-contratos/servicos-prestados/form'))->name('servicos-prestados.novo');
+        Route::get('/servicos-prestados/{id}', fn ($id) => Inertia::render('v2/gestao-contratos/servicos-prestados/form', ['id' => $id]))->name('servicos-prestados.editar');
         Route::get('/alvaras', fn () => Inertia::render('v2/gestao-contratos/alvaras/index'))->name('alvaras');
         Route::get('/alvaras/novo', fn () => Inertia::render('v2/gestao-contratos/alvaras/form'))->name('alvaras.novo');
         Route::get('/alvaras/{id}', fn ($id) => Inertia::render('v2/gestao-contratos/alvaras/form', ['id' => $id]))->name('alvaras.editar');

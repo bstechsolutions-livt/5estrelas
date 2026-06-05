@@ -29,7 +29,8 @@ class MenuCatalog
             // Contratos (portado da Biglar)
             ['key' => 'contratos_dashboard', 'label' => 'Painel', 'icon' => 'pi pi-chart-pie', 'href' => '/pagina/gestao-contratos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
             ['key' => 'contratos_locacao', 'label' => 'Locação', 'icon' => 'pi pi-building', 'href' => '/pagina/gestao-contratos/locacao', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
-            ['key' => 'contratos_servicos', 'label' => 'Serviços', 'icon' => 'pi pi-briefcase', 'href' => '/pagina/gestao-contratos/servicos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+            ['key' => 'contratos_servicos', 'label' => 'Serviços Contratados', 'icon' => 'pi pi-briefcase', 'href' => '/pagina/gestao-contratos/servicos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+            ['key' => 'contratos_servicos_prestados', 'label' => 'Serviços Prestados', 'icon' => 'pi pi-send', 'href' => '/pagina/gestao-contratos/servicos-prestados', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
             ['key' => 'contratos_alvaras', 'label' => 'Alvarás', 'icon' => 'pi pi-id-card', 'href' => '/pagina/gestao-contratos/alvaras', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
             ['key' => 'contratos_equipamentos', 'label' => 'Equipamentos', 'icon' => 'pi pi-box', 'href' => '/pagina/gestao-contratos/equipamentos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
             ['key' => 'contratos_equip_tipos', 'label' => 'Tipos de Equip.', 'icon' => 'pi pi-tags', 'href' => '/pagina/gestao-contratos/equipamentos/tipos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],

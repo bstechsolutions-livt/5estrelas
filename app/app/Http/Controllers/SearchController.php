@@ -191,11 +191,19 @@ class SearchController extends Controller
                 ->get(['id', 'tipo', 'numero_contrato', 'nome_locador', 'razao_social_loja', 'tipo_servico', 'valor_mensal'])
                 ->map(function ($c) {
                     $titulo = $c->numero_contrato ?: ($c->tipo === 'LOCACAO' ? ($c->razao_social_loja ?: 'Contrato de locação') : ($c->tipo_servico ?: 'Contrato de serviço'));
-                    $sub = $c->tipo === 'LOCACAO' ? 'Locação' : 'Serviço';
+                    $sub = match ($c->tipo) {
+                        'LOCACAO' => 'Locação',
+                        'SERVICO_PRESTADO' => 'Serviço prestado',
+                        default => 'Serviço contratado',
+                    };
                     if ($c->nome_locador) {
                         $sub .= ' · ' . $c->nome_locador;
                     }
-                    $rota = $c->tipo === 'LOCACAO' ? 'locacao' : 'servicos';
+                    $rota = match ($c->tipo) {
+                        'LOCACAO' => 'locacao',
+                        'SERVICO_PRESTADO' => 'servicos-prestados',
+                        default => 'servicos',
+                    };
                     return [
                         'id' => $c->id,
                         'title' => $titulo,
