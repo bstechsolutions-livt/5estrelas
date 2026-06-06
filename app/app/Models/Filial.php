@@ -5,34 +5,19 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Adaptador: o módulo de contratos portado da Biglar referencia "Filial".
- * No 5 Estrelas a entidade equivalente é "Branch" (tabela `branches`).
- * Este model mapeia branches expondo os atributos que o código da Biglar espera
- * (codigo, razaosocial, fantasia, cgc), para evitar reescrever as telas/controllers.
+ * Adaptador: o código portado da Biglar (contratos + solicitacoes) referencia
+ * "Filial". No 5 Estrelas a entidade equivalente é "Branch" (tabela `branches`).
+ *
+ * Para que queries que fazem SELECT de colunas específicas e ORDER BY nos nomes
+ * legados (codigo, razaosocial, fantasia, cgc) funcionem, este model aponta para
+ * a view `vw_filiais`, que expõe as colunas reais de branches MAIS esses aliases
+ * como colunas de verdade. Read-only (a view não é gravável; branches é a fonte).
  */
 class Filial extends Model
 {
-    protected $table = 'branches';
+    protected $table = 'vw_filiais';
 
-    protected $appends = ['codigo', 'razaosocial', 'fantasia', 'cgc'];
+    public $timestamps = false;
 
-    public function getCodigoAttribute()
-    {
-        return $this->code ?? (string) $this->id;
-    }
-
-    public function getRazaosocialAttribute()
-    {
-        return $this->name;
-    }
-
-    public function getFantasiaAttribute()
-    {
-        return $this->name;
-    }
-
-    public function getCgcAttribute()
-    {
-        return $this->cnpj;
-    }
+    protected $guarded = [];
 }

@@ -278,6 +278,47 @@ class SearchController extends Controller
             }
         }
 
+        // Solicitações
+        if ($user->hasPermission('solicitacoes.visualizar')) {
+            $solicitacoes = \App\Models\Solicitacao::query()
+                ->where(function ($qq) use ($q) {
+                    $qq->where('titulo', 'ilike', "%{$q}%")
+                        ->orWhere('descricao', 'ilike', "%{$q}%");
+                })
+                ->orderByDesc('id')
+                ->limit(5)
+                ->get(['id', 'titulo', 'status', 'assunto_id'])
+                ->map(fn ($s) => [
+                    'id' => $s->id,
+                    'title' => $s->titulo ?: ('Solicitação #' . $s->id),
+                    'subtitle' => 'Solicitação · ' . ucfirst((string) $s->status),
+                    'icon' => 'pi pi-inbox',
+                    'href' => '/solicitacoes/lista?solicitacao=' . $s->id,
+                ]);
+
+            if ($solicitacoes->isNotEmpty()) {
+                $groups[] = ['label' => 'Solicitações', 'items' => $solicitacoes];
+            }
+
+            // Assuntos de solicitação (têm tela de configuração própria)
+            $assuntos = \App\Models\SolicitacaoAssunto::query()
+                ->where('assunto', 'ilike', "%{$q}%")
+                ->where('ativo', 'S')
+                ->limit(5)
+                ->get(['id', 'assunto'])
+                ->map(fn ($a) => [
+                    'id' => $a->id,
+                    'title' => $a->assunto,
+                    'subtitle' => 'Assunto de solicitação',
+                    'icon' => 'pi pi-tag',
+                    'href' => '/solicitacoes/configuracoes',
+                ]);
+
+            if ($assuntos->isNotEmpty()) {
+                $groups[] = ['label' => 'Assuntos de Solicitação', 'items' => $assuntos];
+            }
+        }
+
         return response()->json(['groups' => $groups, 'query' => $q]);
     }
 }

@@ -3517,34 +3517,34 @@ class SolicitacoesController extends Controller
 
         foreach ($canais as $canal) {
 
-            $existeParam = DB::table('INTRANET_PARAMETROS')
-                ->where('MENU', 'SOLICITACOES')
-                ->where('SUBMENU', 'CONFIGURAR')
-                ->where('PARAMETRO', 'NOTIFICACAO')
-                ->where('CONDICAO1', $canal->canal)
-                ->where('CONDICAO2', 'GERAL')
+            $existeParam = DB::table('intranet_parametros')
+                ->where('menu', 'SOLICITACOES')
+                ->where('submenu', 'CONFIGURAR')
+                ->where('parametro', 'NOTIFICACAO')
+                ->where('condicao1', $canal->canal)
+                ->where('condicao2', 'GERAL')
                 ->exists();
 
             if (! $existeParam) {
 
-                DB::table('INTRANET_PARAMETROS')->insert([
-                    'MENU' => 'SOLICITACOES',
-                    'SUBMENU' => 'CONFIGURAR',
-                    'PARAMETRO' => 'NOTIFICACAO',
-                    'CONDICAO1' => $canal->canal,
-                    'CONDICAO2' => 'GERAL',
-                    'VALOR' => '0',
+                DB::table('intranet_parametros')->insert([
+                    'menu' => 'SOLICITACOES',
+                    'submenu' => 'CONFIGURAR',
+                    'parametro' => 'NOTIFICACAO',
+                    'condicao1' => $canal->canal,
+                    'condicao2' => 'GERAL',
+                    'valor' => '0',
                 ]);
 
                 $canal->notificacao = 0;
             } else {
 
-                $canal->notificacao = DB::table('INTRANET_PARAMETROS')
-                    ->where('MENU', 'SOLICITACOES')
-                    ->where('SUBMENU', 'CONFIGURAR')
-                    ->where('PARAMETRO', 'NOTIFICACAO')
-                    ->where('CONDICAO1', $canal->canal)
-                    ->where('CONDICAO2', 'GERAL')
+                $canal->notificacao = DB::table('intranet_parametros')
+                    ->where('menu', 'SOLICITACOES')
+                    ->where('submenu', 'CONFIGURAR')
+                    ->where('parametro', 'NOTIFICACAO')
+                    ->where('condicao1', $canal->canal)
+                    ->where('condicao2', 'GERAL')
                     ->value('valor');
             }
         }
@@ -3560,14 +3560,14 @@ class SolicitacoesController extends Controller
 
             foreach ($canais as $canal) {
 
-                DB::table('INTRANET_PARAMETROS')
-                    ->where('MENU', 'SOLICITACOES')
-                    ->where('SUBMENU', 'CONFIGURAR')
-                    ->where('PARAMETRO', 'NOTIFICACAO')
-                    ->where('CONDICAO1', $canal['canal'])
-                    ->where('CONDICAO2', 'GERAL')
+                DB::table('intranet_parametros')
+                    ->where('menu', 'SOLICITACOES')
+                    ->where('submenu', 'CONFIGURAR')
+                    ->where('parametro', 'NOTIFICACAO')
+                    ->where('condicao1', $canal['canal'])
+                    ->where('condicao2', 'GERAL')
                     ->update([
-                        'VALOR' => $canal['notificacao'],
+                        'valor' => $canal['notificacao'],
                     ]);
             }
 
@@ -3580,23 +3580,23 @@ class SolicitacoesController extends Controller
     public function criaNotificacao($titulo, $mensagem, $usuarioEnvio, $origem, $link = null)
     {
         try {
-            $canaisNotif = DB::table('INTRANET_PARAMETROS')
+            $canaisNotif = DB::table('intranet_parametros')
                 ->select('condicao1')
-                ->where('MENU', 'SOLICITACOES')
-                ->where('SUBMENU', 'CONFIGURAR')
-                ->where('PARAMETRO', 'NOTIFICACAO')
-                ->whereIn('CONDICAO1', ['in-app', 'email', 'flutter'])
-                ->where('CONDICAO2', 'GERAL')
-                ->where('VALOR', '1')
+                ->where('menu', 'SOLICITACOES')
+                ->where('submenu', 'CONFIGURAR')
+                ->where('parametro', 'NOTIFICACAO')
+                ->whereIn('condicao1', ['in-app', 'email', 'flutter'])
+                ->where('condicao2', 'GERAL')
+                ->where('valor', '1')
                 ->pluck('condicao1');
 
             $canaisUser = DB::table('intranet_parametros')
-                ->where('MENU', 'SOLICITACOES')
-                ->where('SUBMENU', 'CONFIGURAR')
-                ->where('PARAMETRO', 'NOTIFICACAO')
-                ->whereIn('CONDICAO2', $usuarioEnvio)
-                ->whereIn('CONDICAO1', $canaisNotif)
-                ->where('VALOR', '1')
+                ->where('menu', 'SOLICITACOES')
+                ->where('submenu', 'CONFIGURAR')
+                ->where('parametro', 'NOTIFICACAO')
+                ->whereIn('condicao2', $usuarioEnvio)
+                ->whereIn('condicao1', $canaisNotif)
+                ->where('valor', '1')
                 ->select('condicao1')
                 ->pluck('condicao1');
 
