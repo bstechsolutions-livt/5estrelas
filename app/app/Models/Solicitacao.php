@@ -69,8 +69,7 @@ class Solicitacao extends Model
 
     public function filial()
     {
-        return $this->belongsTo(Filial::class, 'filial_id', 'codigo')
-            ->select(['codigo', 'fantasia', 'cidade', 'uf']);
+        return $this->belongsTo(Filial::class, 'filial_id');
     }
 
     public function assunto()
