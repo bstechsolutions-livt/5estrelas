@@ -16,19 +16,9 @@ use Illuminate\Support\Facades\Storage;
  */
 class Funcionario extends Model
 {
-    protected $table = 'users';
+    protected $table = 'INTRANET_USUARIO';
 
-    protected $appends = ['matricula', 'nome', 'avatar_url'];
-
-    public function getMatriculaAttribute()
-    {
-        return (string) $this->id;
-    }
-
-    public function getNomeAttribute()
-    {
-        return $this->name;
-    }
+    protected $appends = ['avatar_url'];
 
     public function getAvatarUrlAttribute()
     {

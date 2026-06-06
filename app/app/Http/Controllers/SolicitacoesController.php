@@ -1358,11 +1358,7 @@ class SolicitacoesController extends Controller
             $solicitacoes->where('id', $request->input('id'));
 
             // Verificar se usuário pode ver esta solicitação específica
-            $permiteVerTodos = DB::table('INTRANET_PERMISSAO AS P')
-                ->join('INTRANET_USUARIO_PERMISSAO AS IPP', 'IPP.PERMISSAO_ID', '=', 'P.IDPERMISSAO')
-                ->where('IPP.MATRICULA', auth()->id())
-                ->where('descricao', 'solicitacoes.lista.ver-todos-depto')
-                ->exists();
+            $permiteVerTodos = auth()->user()?->hasPermission('solicitacoes.lista.ver-todos-depto') ?? false;
 
             if (! $permiteVerTodos) {
                 // Buscar departamentos que o usuário tem acesso
@@ -3272,7 +3268,7 @@ class SolicitacoesController extends Controller
             ->whereHas('agendamentos', function ($query) {
                 $query->where('mat_responsavel', auth()->id());
             })
-            ->orderBy('INTRANET_SOLICITACAO.id', 'asc')
+            ->orderBy('intranet_solicitacao.id', 'asc')
             ->get();
 
         $usuarioLogado = [
@@ -3280,18 +3276,9 @@ class SolicitacoesController extends Controller
             'nome' => (auth()->user()?->name),
         ];
 
-        $permiteVerTodos = DB::table('INTRANET_PERMISSAO AS P')
-            ->join('INTRANET_PERFIL_PERMISSAO AS IPP', 'IPP.IDPERMISSAO', '=', 'P.IDPERMISSAO')
-            ->join('INTRANET_USUARIO_PERFIL AS IUP', 'IUP.IDPERFIL', '=', 'IPP.IDPERFIL')
-            ->where('IUP.MATRICULA', auth()->id())
-            ->where('descricao', 'solicitacoes.agendamento.ver-todos')
-            ->exists();
+        $permiteVerTodos = auth()->user()?->hasPermission('solicitacoes.agendamento.ver-todos') ?? false;
 
-        $permiteVerTodosUser = DB::table('INTRANET_PERMISSAO AS P')
-            ->join('INTRANET_USUARIO_PERMISSAO AS IPP', 'IPP.permissao_id', '=', 'P.IDPERMISSAO')
-            ->where('IPP.MATRICULA', auth()->id())
-            ->where('descricao', 'solicitacoes.agendamento.ver-todos')
-            ->exists();
+        $permiteVerTodosUser = false;
 
         if ($permiteVerTodos || $permiteVerTodosUser) {
             $deptoUser = (auth()->user()?->department_id);
@@ -3488,7 +3475,7 @@ class SolicitacoesController extends Controller
             if ($permiteVerTodos || $permiteVerTodosUser) {
 
                 // Adaptado (5E): filtra responsáveis pelo departamento via tabela `users`
-                $agendamentosQuery->join('users as p', 'p.id', '=', 'INTRANET_SOLICITACAO_AGEND.mat_responsavel')
+                $agendamentosQuery->join('users as p', 'p.id', '=', 'intranet_solicitacao_agend.mat_responsavel')
                     ->where('p.department_id', (auth()->user()?->department_id));
             }
         }
@@ -3697,7 +3684,7 @@ class SolicitacoesController extends Controller
 
         $solicitacoes = Solicitacao::with(['agendamentos', 'assunto'])
             ->whereIn('id', $idSolicitacoes)
-            ->orderBy('INTRANET_SOLICITACAO.id', 'asc')
+            ->orderBy('intranet_solicitacao.id', 'asc')
             ->get();
 
         $solicitacoes->usuarioLogado = auth()->id();
