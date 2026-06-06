@@ -188,7 +188,7 @@ class SolicitacoesController extends Controller
                     }
                 }
 
-                $selects = SolicitacaoSelecao::where('ASSUNTO_ID', $assunto->id)->orderBy('ordem')->get();
+                $selects = SolicitacaoSelecao::where('assunto_id', $assunto->id)->orderBy('ordem')->get();
                 foreach ($selects as $select) {
                     $itens = SolicitacaoSelecaoItem::where('selecao_id', $select->id)->orderBy('valor')->get(['id', 'valor']);
                     $select->valores = $itens->map(function ($item) {
@@ -303,7 +303,7 @@ class SolicitacoesController extends Controller
             foreach ($camposArray as &$campo) {
                 if ($camposAtivos->has($campo['descricao'])) {
 
-                    $campoSelecionado = SolicitacaoCampos::where('ASSUNTO_ID', $assunto->id)->where('DESCRICAO', $campo['descricao'])->first();
+                    $campoSelecionado = SolicitacaoCampos::where('assunto_id', $assunto->id)->where('descricao', $campo['descricao'])->first();
 
                     $campo['ativo'] = true;
                     $campo['obrigatorio'] = $campoSelecionado->obrigatorio == 1;
@@ -315,10 +315,10 @@ class SolicitacoesController extends Controller
                 }
             }
 
-            $selects = SolicitacaoSelecao::where('ASSUNTO_ID', $assunto->id)->orderBy('ordem')->get()->toArray();
+            $selects = SolicitacaoSelecao::where('assunto_id', $assunto->id)->orderBy('ordem')->get()->toArray();
 
             foreach ($selects as &$select) {
-                $select['valores'] = SolicitacaoSelecaoItem::where('SELECAO_ID', $select['id'])->pluck('valor');
+                $select['valores'] = SolicitacaoSelecaoItem::where('selecao_id', $select['id'])->pluck('valor');
                 $select['ativo'] = true;
                 $select['obrigatorio'] = $select['obrigatorio'] == 'S' ? true : false;
             }
@@ -1942,13 +1942,13 @@ class SolicitacoesController extends Controller
 
         $solicitacao->diasAberto = Carbon::parse($solicitacao->created_at)->diffInDays(Carbon::now());
 
-        $solicitacao->dadosAcesso = SolicitacaoCAcessos::where('SOLICITACAO_ID', $solicitacao->id)
+        $solicitacao->dadosAcesso = SolicitacaoCAcessos::where('solicitacao_id', $solicitacao->id)
             ->distinct()
-            ->select(['TIPO'])
+            ->select(['tipo'])
             ->get();
 
         foreach ($solicitacao->dadosAcesso as $dadosAcesso) {
-            $dadosAcesso->dados = SolicitacaoCAcessos::where('SOLICITACAO_ID', $solicitacao->id)
+            $dadosAcesso->dados = SolicitacaoCAcessos::where('solicitacao_id', $solicitacao->id)
                 ->where('tipo', $dadosAcesso->tipo)
                 ->get();
 
@@ -1993,7 +1993,7 @@ class SolicitacoesController extends Controller
             'nome' => UtilController::nomeFuncionario($solicitacao->usuario_origem),
         ];
 
-        $solicitacao->vendas = SolicitacaoCVendas::where('SOLICITACAO_ID', $solicitacao->id)
+        $solicitacao->vendas = SolicitacaoCVendas::where('solicitacao_id', $solicitacao->id)
             ->get();
 
         foreach ($solicitacao->vendas as $venda) {
@@ -2008,9 +2008,9 @@ class SolicitacoesController extends Controller
             ];
         }
 
-        $solicitacao->equipamentos = SolicitacaoCEquip::where('SOLICITACAO_ID', $solicitacao->id)->get();
+        $solicitacao->equipamentos = SolicitacaoCEquip::where('solicitacao_id', $solicitacao->id)->get();
 
-        $solicitacao->usuariosDestino = SolicitacaoCDest::where('SOLICITACAO_ID', $solicitacao->id)->get();
+        $solicitacao->usuariosDestino = SolicitacaoCDest::where('solicitacao_id', $solicitacao->id)->get();
 
         foreach ($solicitacao->usuariosDestino as $usuario) {
             $usuario->matricula = $usuario->matricula;
@@ -4216,7 +4216,7 @@ class SolicitacoesController extends Controller
     {
 
         try {
-            return response()->json(Solicitacao::where('USUARIO_SOLICITANTE', auth()->id())->where('STATUS', 'resolvida')->exists(), 200);
+            return response()->json(Solicitacao::where('usuario_solicitante', auth()->id())->where('status', 'resolvida')->exists(), 200);
         } catch (\Throwable $th) {
             return response()->json(false, 200);
         }
@@ -5838,7 +5838,7 @@ class SolicitacoesController extends Controller
                 }
 
                 // Buscar usuários destino
-                $usuariosDestino = SolicitacaoCDest::where('SOLICITACAO_ID', $sol->id)->get();
+                $usuariosDestino = SolicitacaoCDest::where('solicitacao_id', $sol->id)->get();
                 $usuariosDestinoNomes = $usuariosDestino->map(function ($usuario) {
                     return UtilController::nomeFuncionario($usuario->matricula);
                 })->filter()->values()->toArray();
@@ -5980,7 +5980,7 @@ class SolicitacoesController extends Controller
                 }
 
                 // Buscar usuários destino
-                $usuariosDestino = SolicitacaoCDest::where('SOLICITACAO_ID', $sol->id)->get();
+                $usuariosDestino = SolicitacaoCDest::where('solicitacao_id', $sol->id)->get();
                 $usuariosDestinoNomes = $usuariosDestino->map(function ($usuario) {
                     return UtilController::nomeFuncionario($usuario->matricula);
                 })->filter()->values()->toArray();
@@ -6140,7 +6140,7 @@ class SolicitacoesController extends Controller
                     $diasAtraso = $atraso > 0 ? $atraso : null;
                 }
 
-                $usuariosDestino = SolicitacaoCDest::where('SOLICITACAO_ID', $sol->id)->get();
+                $usuariosDestino = SolicitacaoCDest::where('solicitacao_id', $sol->id)->get();
                 $usuariosDestinoNomes = $usuariosDestino->map(function ($usuario) {
                     return UtilController::nomeFuncionario($usuario->matricula);
                 })->filter()->values()->toArray();
