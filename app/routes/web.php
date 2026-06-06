@@ -21,6 +21,7 @@ use App\Http\Controllers\UserPermissionController;
 use App\Http\Controllers\UserShortcutController;
 use App\Http\Controllers\v2\GestaoContratosController;
 use App\Http\Controllers\v2\GestaoEquipamentosController;
+use App\Http\Controllers\SolicitacoesController;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 
@@ -259,6 +260,132 @@ Route::middleware('auth')->group(function () {
         Route::post('/ocorrencias/{id}/fotos', 'uploadFotoOcorrencia')->name('ocorrencias.fotos.store');
         Route::delete('/equipamento-fotos/{id}', 'deleteFoto')->name('fotos.destroy');
         Route::get('/equipamento-fotos/{id}/download', 'downloadFoto')->name('fotos.download');
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    //   SOLICITAÇÕES (portado da intranet Biglar) — caminhos = /solicitacoes/*
+    // ═══════════════════════════════════════════════════════════════
+    Route::prefix('solicitacoes')->middleware('permission:solicitacoes.visualizar')->group(function () {
+        Route::get('possui-resolvidas', [SolicitacoesController::class, 'possuiResolvidas']);
+
+        // Configuração (admin)
+        Route::prefix('configuracoes')->middleware('permission:solicitacoes.configurar')->group(function () {
+            Route::get('', [SolicitacoesController::class, 'indexConfiguracoes']);
+            Route::get('departamentos', [SolicitacoesController::class, 'getDepartamentos']);
+            Route::get('buscar-equipamentos', [SolicitacoesController::class, 'getEquipamentos']);
+            Route::get('canais-notif', [SolicitacoesController::class, 'getCanaisNotif']);
+            Route::get('verificar-respostas-campo/{selecao_id}', [SolicitacoesController::class, 'verificarRespostasCampo']);
+            Route::post('departamentos', [SolicitacoesController::class, 'storeDepartamentos']);
+            Route::post('assuntos', [SolicitacoesController::class, 'getAssuntos']);
+            Route::post('salvar-assuntos', [SolicitacoesController::class, 'salvarAssuntos']);
+            Route::post('salvar-modelos', [SolicitacoesController::class, 'salvarModelos']);
+            Route::post('salvar-notif', [SolicitacoesController::class, 'saveNotificacoes']);
+            Route::post('salvar-equipamento', [SolicitacoesController::class, 'addEquipamento']);
+            Route::post('remover-equipamento', [SolicitacoesController::class, 'deleteEquipamento']);
+            Route::post('preparar-importacao', [SolicitacoesController::class, 'prepararImportacao']);
+            Route::post('importar', [SolicitacoesController::class, 'importar']);
+            Route::get('liberacoes/{assunto_id}', [SolicitacoesController::class, 'getLiberacoes']);
+            Route::post('salvar-liberacoes', [SolicitacoesController::class, 'salvarLiberacoes']);
+            Route::get('dados-liberacao', [SolicitacoesController::class, 'getDadosLiberacao']);
+            Route::get('responsaveis/{assunto_id}', [SolicitacoesController::class, 'getResponsaveis']);
+            Route::post('salvar-responsaveis', [SolicitacoesController::class, 'salvarResponsaveis']);
+            Route::post('duplicar-assunto', [SolicitacoesController::class, 'duplicarAssunto']);
+            Route::post('toggle-ativo-assunto', [SolicitacoesController::class, 'toggleAtivoAssunto']);
+            Route::post('exportar-relatorio', [SolicitacoesController::class, 'exportarRelatorio']);
+            Route::get('responsaveis-adicionais/{departamento}', [SolicitacoesController::class, 'getResponsaveisAdicionais']);
+            Route::post('adicionar-responsavel-adicional', [SolicitacoesController::class, 'adicionarResponsavelAdicional']);
+            Route::delete('remover-responsavel-adicional', [SolicitacoesController::class, 'removerResponsavelAdicional']);
+            Route::get('dados/departamentos-compras', [SolicitacoesController::class, 'getDepartamentosCompras']);
+            Route::get('dados/departamentos-funcionario', [SolicitacoesController::class, 'getDepartamentosFuncionario']);
+            Route::get('dados/filiais-winthor', [SolicitacoesController::class, 'getFiliaisWinthor']);
+            Route::get('dados/funcoes', [SolicitacoesController::class, 'getFuncoesWinthor']);
+            Route::get('dados/regionais', [SolicitacoesController::class, 'getRegionais']);
+            Route::get('etapas/{assunto_id}', [SolicitacoesController::class, 'getEtapas']);
+            Route::post('salvar-etapas', [SolicitacoesController::class, 'salvarEtapas']);
+            Route::post('clonar-etapas', [SolicitacoesController::class, 'clonarEtapas']);
+            Route::get('fluxo/{assunto_id}', [SolicitacoesController::class, 'getFluxo']);
+            Route::post('salvar-fluxo', [SolicitacoesController::class, 'salvarFluxo']);
+            Route::get('campos-predefinidos-fluxo', [SolicitacoesController::class, 'getCamposPredefinidos']);
+            Route::get('filiais-lideranca', [SolicitacoesController::class, 'getFiliaisLideranca']);
+            Route::post('filiais-lideranca', [SolicitacoesController::class, 'storeFiliaisLideranca']);
+        });
+
+        Route::prefix('nova')->group(function () {
+            Route::get('', [SolicitacoesController::class, 'indexNova']);
+            Route::post('criar', [SolicitacoesController::class, 'criarSolicitacao']);
+        });
+
+        Route::prefix('dashboard')->group(function () {
+            Route::get('', [SolicitacoesController::class, 'indexDashboard']);
+            Route::post('dados', [SolicitacoesController::class, 'getDadosDashboard']);
+        });
+
+        Route::prefix('relatorios')->group(function () {
+            Route::get('', [SolicitacoesController::class, 'indexRelatorios']);
+            Route::post('buscar', [SolicitacoesController::class, 'buscarRelatorio']);
+            Route::post('exportar', [SolicitacoesController::class, 'exportarRelatorioFiltros']);
+            Route::post('exportar-fluxo', [SolicitacoesController::class, 'exportarRelatorioFluxo']);
+        });
+
+        Route::get('minhas', [SolicitacoesController::class, 'indexMinhas']);
+
+        Route::prefix('lista')->group(function () {
+            Route::get('solicitacao/{id}', [SolicitacoesController::class, 'getSolicitacao']);
+            Route::get('', [SolicitacoesController::class, 'indexLista']);
+            Route::get('buscar-departamentos', [SolicitacoesController::class, 'getDeptoAtivo']);
+            Route::post('buscar-solicitacoes', [SolicitacoesController::class, 'getSolicitacoes']);
+            Route::post('mudar-prioridade', [SolicitacoesController::class, 'mudarPrioridade']);
+            Route::post('mudar-responsavel', [SolicitacoesController::class, 'mudarResponsavel']);
+            Route::post('comentar', [SolicitacoesController::class, 'comentar']);
+            Route::delete('comentario/{id}', [SolicitacoesController::class, 'excluirComentario']);
+            Route::post('iniciar-atendimento', [SolicitacoesController::class, 'iniciarAtendimento']);
+            Route::post('pausar-atendimento', [SolicitacoesController::class, 'pausarAtendimento']);
+            Route::post('retorno-solicitante', [SolicitacoesController::class, 'RetornoSolicitante']);
+            Route::post('resolver-atendimento', [SolicitacoesController::class, 'resolverAtendimento']);
+            Route::post('finalizar-atendimento', [SolicitacoesController::class, 'finalizarAtendimento']);
+            Route::post('recusar-atendimento', [SolicitacoesController::class, 'recusarAtendimento']);
+            Route::post('cancelar-atendimento', [SolicitacoesController::class, 'cancelarAtendimento']);
+            Route::post('alterar-departamento', [SolicitacoesController::class, 'alterarDepto']);
+            Route::post('alterar-solicitante', [SolicitacoesController::class, 'alterarSolicitante']);
+            Route::post('atualizar-previsao-entrega', [SolicitacoesController::class, 'atualizarPrevisaoEntrega']);
+            Route::post('enviar-arquivo-dossie', [SolicitacoesController::class, 'enviarArquivoParaDossie']);
+            Route::post('alterar-etapa', [SolicitacoesController::class, 'alterarEtapa']);
+            Route::get('fluxo-solicitacao/{solicitacao_id}', [SolicitacoesController::class, 'getFluxoSolicitacao']);
+            Route::post('avancar-fluxo', [SolicitacoesController::class, 'avancarFluxo']);
+            Route::post('voltar-fluxo', [SolicitacoesController::class, 'voltarFluxo']);
+            Route::post('decidir-fluxo', [SolicitacoesController::class, 'decidirFluxo']);
+            Route::post('devolver-ao-fluxo', [SolicitacoesController::class, 'devolverAoFluxo']);
+            Route::post('salvar-campos-fluxo', [SolicitacoesController::class, 'salvarCamposFluxo']);
+        });
+
+        Route::prefix('agendamento')->group(function () {
+            Route::get('/', [SolicitacoesController::class, 'indexAgendamento']);
+            Route::get('agendamentos/{id}', [SolicitacoesController::class, 'getAgendamentosByUser']);
+            Route::get('buscar-agendamento/{id}', [SolicitacoesController::class, 'getAgendamentos']);
+            Route::get('end-filial/{id}', [SolicitacoesController::class, 'getEnderecoFilial']);
+            Route::get('buscar-anexos/{id}', [SolicitacoesController::class, 'getAnexos']);
+            Route::get('buscar-solicitacoes/{id}', [SolicitacoesController::class, 'getSolAgendamentos']);
+            Route::post('dados', [SolicitacoesController::class, 'getDados']);
+            Route::post('buscar-por-data', [SolicitacoesController::class, 'buscaAgendamentoPorData']);
+            Route::post('criar-agendamento', [SolicitacoesController::class, 'criarAgendamento']);
+            Route::post('atualizar-agendamento', [SolicitacoesController::class, 'atualizarAgendamento']);
+            Route::post('cancelar-agendamento', [SolicitacoesController::class, 'cancelarAgendamento']);
+            Route::post('iniciar-agendamento', [SolicitacoesController::class, 'iniciarAgendamento']);
+            Route::post('finalizar-agendamento', [SolicitacoesController::class, 'finalizarAgendamento']);
+            Route::post('salvar-anexos', [SolicitacoesController::class, 'salvarAnexos']);
+            Route::post('deletar-anexo', [SolicitacoesController::class, 'deletarAnexo']);
+            Route::post('criar-lembrete', [SolicitacoesController::class, 'criarLembrete']);
+            Route::post('editar-lembrete', [SolicitacoesController::class, 'editarLembrete']);
+            Route::post('cancelar-lembrete', [SolicitacoesController::class, 'cancelarLembrete']);
+        });
+
+        Route::prefix('aprovacoes')->group(function () {
+            Route::get('usuario', [SolicitacoesController::class, 'buscarAprovacoesUsuario']);
+            Route::get('{solicitacao_id}', [SolicitacoesController::class, 'listarAprovacoes']);
+            Route::post('/', [SolicitacoesController::class, 'criarAprovacao']);
+            Route::post('{id}/responder', [SolicitacoesController::class, 'responderAprovacao']);
+            Route::post('{id}', [SolicitacoesController::class, 'editarAprovacao']);
+        });
     });
 });
 

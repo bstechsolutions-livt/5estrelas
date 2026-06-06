@@ -47,6 +47,12 @@ class PermissionsSeeder extends Seeder
             // Gestão de Contratos (portado da Biglar)
             ['key' => 'contratos.visualizar', 'label' => 'Ver gestão de contratos', 'module' => 'contratos'],
             ['key' => 'contratos.gerenciar', 'label' => 'Gerenciar contratos (criar/editar/excluir)', 'module' => 'contratos'],
+
+            // Solicitações (portado da Biglar)
+            ['key' => 'solicitacoes.visualizar', 'label' => 'Ver solicitações', 'module' => 'solicitacoes'],
+            ['key' => 'solicitacoes.criar', 'label' => 'Abrir solicitações', 'module' => 'solicitacoes'],
+            ['key' => 'solicitacoes.configurar', 'label' => 'Configurar solicitações (assuntos/fluxos)', 'module' => 'solicitacoes'],
+            ['key' => 'solicitacoes.aprovar', 'label' => 'Aprovar solicitações', 'module' => 'solicitacoes'],
         ];
 
         foreach ($permissions as $row) {
