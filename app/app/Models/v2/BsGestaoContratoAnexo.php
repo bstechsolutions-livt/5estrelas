@@ -3,6 +3,7 @@
 namespace App\Models\v2;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class BsGestaoContratoAnexo extends Model
 {
@@ -18,6 +19,17 @@ class BsGestaoContratoAnexo extends Model
         'descricao',
         'created_by',
     ];
+
+    protected $appends = ['url'];
+
+    /**
+     * URL pública do anexo (via symlink storage:link).
+     * O `caminho` guarda o path relativo no disco public (ex.: gestao/contratos/53/arquivo.pdf).
+     */
+    public function getUrlAttribute(): ?string
+    {
+        return $this->caminho ? Storage::url($this->caminho) : null;
+    }
 
     public function contrato()
     {

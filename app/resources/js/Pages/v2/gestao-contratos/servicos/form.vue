@@ -594,7 +594,7 @@ const tiposAnexo = [
             </div>
             <div class="flex gap-2">
               <a
-                :href="anexo.caminho"
+                :href="anexo.url" :download="anexo.nome_arquivo"
                 target="_blank"
                 class="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg"
               >

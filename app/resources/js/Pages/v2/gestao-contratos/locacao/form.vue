@@ -813,7 +813,7 @@ async function salvarReajuste() {
               <div><p class="font-medium">{{ anexo.nome_arquivo }}</p><p class="text-sm text-gray-500">{{ anexo.tipo }} • {{ anexo.descricao || "Sem descrição" }}</p></div>
             </div>
             <div class="flex gap-2">
-              <a :href="anexo.caminho" target="_blank" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><i class="pi pi-download"></i></a>
+              <a :href="anexo.url" :download="anexo.nome_arquivo" target="_blank" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><i class="pi pi-download"></i></a>
               <button @click="excluirAnexo(anexo.id)" class="p-2 text-red-600 hover:bg-red-50 rounded-lg"><i class="pi pi-trash"></i></button>
             </div>
           </div>

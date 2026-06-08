@@ -147,7 +147,7 @@ async function salvar() {
       await axios.post("/v2/gestao-contratos/contratos", dados)
       GestaoJs.showToast("Contrato cadastrado com sucesso!", "success")
     }
-    router.visit("/pagina/gestao-contratos/servicos-prestados-prestados")
+    router.visit("/pagina/gestao-contratos/servicos-prestados")
   } catch (error) {
     console.error("Erro ao salvar contrato:", error)
     GestaoJs.showToast(
@@ -160,7 +160,7 @@ async function salvar() {
 }
 
 function voltar() {
-  router.visit("/pagina/gestao-contratos/servicos-prestados-prestados")
+  router.visit("/pagina/gestao-contratos/servicos-prestados")
 }
 
 // Funções de Anexo
@@ -243,7 +243,7 @@ const tiposAnexo = [
           </a>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
           <a
-            href="/pagina/gestao-contratos/servicos-prestados-prestados"
+            href="/pagina/gestao-contratos/servicos-prestados"
             class="hover:text-green-600 dark:hover:text-green-400"
           >
             Serviços Prestados
@@ -594,7 +594,7 @@ const tiposAnexo = [
             </div>
             <div class="flex gap-2">
               <a
-                :href="anexo.caminho"
+                :href="anexo.url" :download="anexo.nome_arquivo"
                 target="_blank"
                 class="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg"
               >
