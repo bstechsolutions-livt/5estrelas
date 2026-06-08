@@ -14,7 +14,7 @@ import Detalhes from "./partials/Detalhes.vue"
 import BsAgenda from "@/Components/Componentes/Agenda/BsAgenda.vue"
 import Agendamento from "../Agendamento.vue"
 import Filial2 from "@/Components/New/Filial2.vue"
-import Solicitacao from "@/Pages/Solicitacoes/Solicitação.vue"
+import Solicitacao from "@/Pages/Solicitacoes/Ticket.vue"
 
 const page = usePage()
 
@@ -191,7 +191,7 @@ async function abrirAgendamentoDaUrl() {
       const { data } = await axios.get(
         "/solicitacoes/agendamento/agendamentos/" + mat
       )
-      // data = array de solicitações, cada uma com .agendamentos[]
+      // data = array de tickets, cada uma com .agendamentos[]
       for (const sol of data) {
         const ag = (sol.agendamentos || []).find(
           (a) => String(a.id) === String(id)
@@ -254,7 +254,7 @@ async function getAgendamentosByUser(mat_usuario) {
 }
 
 function abrirDetalhes(ag) {
-  // Se for lembrete, abre a solicitação no dialog
+  // Se for lembrete, abre a ticket no dialog
   if (ag.tipo === "lembrete" && ag.solicitacao_id) {
     solicitacaoLembreteId.value = ag.solicitacao_id
     dialogSolicitacao.value = true
@@ -385,7 +385,7 @@ async function filtrarStatus() {
           <i class="pi pi-home text-gray-400 dark:text-gray-500"></i>
           <span>Home</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
-          <span>Solicitações</span>
+          <span>Tickets</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
           <span
             class="text-gray-950 dark:text-white font-bold truncate max-w-[120px] sm:max-w-none"
@@ -739,7 +739,7 @@ async function filtrarStatus() {
             <div>
               <h2 class="text-xl font-bold text-white">Novo Agendamento</h2>
               <p class="text-sm text-white/70">
-                Crie um agendamento sem vínculo a solicitações
+                Crie um agendamento sem vínculo a tickets
               </p>
             </div>
           </div>
@@ -763,7 +763,7 @@ async function filtrarStatus() {
       </div>
     </Dialog>
 
-    <!-- Dialog Solicitação do Lembrete -->
+    <!-- Dialog Ticket do Lembrete -->
     <Dialog
       v-model:visible="dialogSolicitacao"
       modal

@@ -27,13 +27,13 @@ class MenuCatalog
             ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
 
             // Solicitações (portado da Biglar)
-            ['key' => 'sol_nova', 'label' => 'Nova Solicitação', 'icon' => 'pi pi-plus-circle', 'href' => '/solicitacoes/nova', 'permission' => 'solicitacoes.visualizar', 'group' => 'Solicitações'],
-            ['key' => 'sol_lista', 'label' => 'Acompanhar', 'icon' => 'pi pi-list', 'href' => '/solicitacoes/lista', 'permission' => 'solicitacoes.visualizar', 'group' => 'Solicitações'],
-            ['key' => 'sol_minhas', 'label' => 'Minhas Solicitações', 'icon' => 'pi pi-user', 'href' => '/solicitacoes/minhas', 'permission' => 'solicitacoes.visualizar', 'group' => 'Solicitações'],
-            ['key' => 'sol_dashboard', 'label' => 'Painel', 'icon' => 'pi pi-chart-pie', 'href' => '/solicitacoes/dashboard', 'permission' => 'solicitacoes.visualizar', 'group' => 'Solicitações'],
-            ['key' => 'sol_agenda', 'label' => 'Agenda', 'icon' => 'pi pi-calendar', 'href' => '/solicitacoes/agendamento', 'permission' => 'solicitacoes.visualizar', 'group' => 'Solicitações'],
-            ['key' => 'sol_relatorios', 'label' => 'Relatórios', 'icon' => 'pi pi-chart-bar', 'href' => '/solicitacoes/relatorios', 'permission' => 'solicitacoes.visualizar', 'group' => 'Solicitações'],
-            ['key' => 'sol_config', 'label' => 'Configurações', 'icon' => 'pi pi-cog', 'href' => '/solicitacoes/configuracoes', 'permission' => 'solicitacoes.configurar', 'group' => 'Solicitações'],
+            ['key' => 'sol_nova', 'label' => 'Novo Ticket', 'icon' => 'pi pi-plus-circle', 'href' => '/solicitacoes/nova', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
+            ['key' => 'sol_lista', 'label' => 'Acompanhar', 'icon' => 'pi pi-list', 'href' => '/solicitacoes/lista', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
+            ['key' => 'sol_minhas', 'label' => 'Meus Tickets', 'icon' => 'pi pi-user', 'href' => '/solicitacoes/minhas', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
+            ['key' => 'sol_dashboard', 'label' => 'Painel', 'icon' => 'pi pi-chart-pie', 'href' => '/solicitacoes/dashboard', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
+            ['key' => 'sol_agenda', 'label' => 'Agenda', 'icon' => 'pi pi-calendar', 'href' => '/solicitacoes/agendamento', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
+            ['key' => 'sol_relatorios', 'label' => 'Relatórios', 'icon' => 'pi pi-chart-bar', 'href' => '/solicitacoes/relatorios', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
+            ['key' => 'sol_config', 'label' => 'Configurações', 'icon' => 'pi pi-cog', 'href' => '/solicitacoes/configuracoes', 'permission' => 'solicitacoes.configurar', 'group' => 'Tickets'],
 
             // Contratos (portado da Biglar)
             ['key' => 'contratos_dashboard', 'label' => 'Painel', 'icon' => 'pi pi-chart-pie', 'href' => '/pagina/gestao-contratos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],

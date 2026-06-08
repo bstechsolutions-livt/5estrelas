@@ -76,7 +76,7 @@ export function useSolicitacoesEcho() {
           if (!estaNoFiltro) {
             // Notificar via toast que há nova solicitação fora do filtro
             const id = data.solicitacao.id || ""
-            toastInfo(`Nova solicitação #${id} recebida (fora do filtro atual)`)
+            toastInfo(`Novo ticket #${id} recebido (fora do filtro atual)`)
           }
         }
 

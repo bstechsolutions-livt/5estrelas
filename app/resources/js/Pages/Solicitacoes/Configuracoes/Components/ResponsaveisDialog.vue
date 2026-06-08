@@ -20,12 +20,12 @@
         <ul class="list-disc list-inside space-y-1 text-indigo-700">
           <li>
             <strong>Sem responsáveis configurados:</strong>
-            Qualquer usuário do departamento pode ver e atender solicitações
+            Qualquer usuário do departamento pode ver e atender tickets
             deste assunto
           </li>
           <li>
             <strong>Com responsáveis configurados:</strong>
-            Apenas os usuários listados podem ver e atender as solicitações
+            Apenas os usuários listados podem ver e atender as tickets
             deste assunto
           </li>
         </ul>

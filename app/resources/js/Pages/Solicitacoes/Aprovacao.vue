@@ -106,7 +106,7 @@
               Solicitar Aprovação
             </h3>
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              Selecione um aprovador para esta solicitação
+              Selecione um aprovador para esta ticket
             </p>
           </div>
         </div>
@@ -521,7 +521,7 @@
                   severity="danger"
                   outlined
                   rounded
-                  v-tooltip.top="'Cancelar solicitação'"
+                  v-tooltip.top="'Cancelar ticket'"
                   class="!w-9 !h-9"
                 />
 
@@ -661,8 +661,8 @@
           >
             {{
               respostaAprovacao.acao === "aprovada"
-                ? "Você está aprovando esta solicitação"
-                : "Você está rejeitando esta solicitação"
+                ? "Você está aprovando esta ticket"
+                : "Você está rejeitando esta ticket"
             }}
           </p>
         </div>
@@ -899,8 +899,8 @@ const podeEnviarAprovacao = computed(() => {
 
 const tituloDialogResposta = computed(() => {
   return respostaAprovacao.acao === "aprovada"
-    ? "Aprovar Solicitação"
-    : "Rejeitar Solicitação"
+    ? "Aprovar Ticket"
+    : "Rejeitar Ticket"
 })
 
 const labelBotaoResposta = computed(() => {
@@ -1093,7 +1093,7 @@ async function salvarEdicao() {
 async function cancelarAprovacao(aprovacao) {
   const resultado = await swalConfirm(
     "Cancelar Aprovação",
-    "Tem certeza que deseja cancelar esta solicitação de aprovação?"
+    "Tem certeza que deseja cancelar esta ticket de aprovação?"
   )
 
   if (!resultado.isConfirmed) return

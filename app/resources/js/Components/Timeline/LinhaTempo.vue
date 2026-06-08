@@ -41,7 +41,7 @@ const labelInicioTexto = computed(
 )
 const idInicioTexto = computed(() => {
   if (props.idInicio) return props.idInicio
-  if (props.solicitacao?.id) return `Solicitação #${props.solicitacao.id}`
+  if (props.solicitacao?.id) return `Ticket #${props.solicitacao.id}`
   return ""
 })
 
@@ -185,7 +185,7 @@ function getStatus(mov) {
     case "FINALIZADA":
       return "Finalizada"
     case "CANCELADA":
-      return "Solicitação Cancelada"
+      return "Ticket Cancelado"
     case "NEGADA":
       return "Negada"
     case "RETORNO_SOLICITANTE":

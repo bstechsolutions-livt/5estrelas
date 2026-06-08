@@ -18,7 +18,7 @@ import Image from "primevue/image"
 import Skeleton from "primevue/skeleton"
 import TabView from "primevue/tabview"
 import TabPanel from "primevue/tabpanel"
-import Solicitação from "../../Solicitação.vue"
+import Ticket from "../../Ticket.vue"
 import BsFile2 from "@/Components/Componentes/BsFile2.vue"
 import Agendamento from "../../Agendamento.vue"
 import ViewFiles from "@/Components/Componentes/ViewFiles.vue"
@@ -942,12 +942,12 @@ function fecharDialogImagem() {
           </div>
         </TabPanel>
 
-        <!-- Tab Solicitações -->
+        <!-- Tab Tickets -->
         <TabPanel>
           <template #header>
             <div class="flex items-center gap-1 sm:gap-2 px-0.5 sm:px-1">
               <i class="pi pi-list text-violet-500 text-sm"></i>
-              <span class="text-xs sm:text-sm">Solicitações</span>
+              <span class="text-xs sm:text-sm">Tickets</span>
               <span
                 v-if="solicitacoes?.length"
                 class="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-violet-500 text-white text-[10px] sm:text-xs flex items-center justify-center"
@@ -1010,7 +1010,7 @@ function fecharDialogImagem() {
                 <i class="pi pi-inbox text-2xl text-gray-400"></i>
               </div>
               <p class="text-gray-500 dark:text-gray-400">
-                Nenhuma solicitação vinculada
+                Nenhuma ticket vinculada
               </p>
             </div>
           </div>
@@ -1244,7 +1244,7 @@ function fecharDialogImagem() {
     </div>
   </Dialog>
 
-  <!-- Dialog Solicitação -->
+  <!-- Dialog Ticket -->
   <Dialog
     v-model:visible="dialogSolicitacao"
     modal
@@ -1263,7 +1263,7 @@ function fecharDialogImagem() {
     }"
   >
     <div class="w-screen h-screen overflow-hidden">
-      <Solicitação
+      <Ticket
         :solicitacao_id="solicitacaoSelecionada"
         :permissoes
         :auth="props.auth"

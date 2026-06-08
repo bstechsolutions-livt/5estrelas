@@ -119,7 +119,7 @@ const respostasSelectsFluxo = ref([]) // Respostas dos campos do assunto ao avan
 const decisaoPendenteId = ref(null)
 const decisaoPendenteObs = ref(null)
 
-// ✅ Reverb - Canal ativo para a solicitação
+// ✅ Reverb - Canal ativo para a ticket
 const { escutarSolicitacao, sairDoCanal } = useSolicitacoesEcho()
 let canalSolicitacao = null
 
@@ -360,29 +360,29 @@ onUnmounted(() => {
   }
 })
 
-// ✅ Iniciar listener do Reverb para a solicitação específica
+// ✅ Iniciar listener do Reverb para a ticket específica
 function iniciarReverbListener() {
   if (!props.solicitacao_id) return
 
   console.log(
-    "[Solicitação] Iniciando listener Reverb para solicitação:",
+    "[Ticket] Iniciando listener Reverb para ticket:",
     props.solicitacao_id
   )
 
   canalSolicitacao = escutarSolicitacao(props.solicitacao_id, {
     onAtualizada: (data) => {
-      // Atualização recebida - recarregar solicitação silenciosamente
-      console.log("[Solicitação] Atualização recebida via Reverb:", data)
+      // Atualização recebida - recarregar ticket silenciosamente
+      console.log("[Ticket] Atualização recebida via Reverb:", data)
       buscarSolicitacaoSilenciosa()
     },
     onComentario: (data) => {
       // Novo comentário recebido
-      console.log("[Solicitação] Novo comentário via Reverb:", data)
+      console.log("[Ticket] Novo comentário via Reverb:", data)
       buscarSolicitacaoSilenciosa()
     },
     onComentarioExcluido: (data) => {
       // Comentário excluído em tempo real
-      console.log("[Solicitação] Comentário excluído via Reverb:", data)
+      console.log("[Ticket] Comentário excluído via Reverb:", data)
       buscarSolicitacaoSilenciosa()
     }
   })
@@ -673,11 +673,11 @@ async function buscarSolicitacaoSilenciosa() {
     // Atualizar fluxo/workflow
     carregarFluxo()
   } catch (err) {
-    console.error("[Solicitação] Erro ao atualizar via Reverb:", err)
+    console.error("[Ticket] Erro ao atualizar via Reverb:", err)
   }
 }
 
-// Watcher para verificar se o status da solicitação mudou para "retorno solicitante"
+// Watcher para verificar se o status da ticket mudou para "retorno solicitante"
 watch(
   () => solicitacao.value && solicitacao.value.status,
   (novoStatus) => {
@@ -1146,7 +1146,7 @@ async function decidirFluxo(decisaoId) {
       const result = await swalInput(
         "Cancelar Fluxo",
         "Informe o motivo do cancelamento",
-        "Ex: Solicitação duplicada, não procede...",
+        "Ex: Ticket duplicado, não procede...",
         "Confirmar",
         "Voltar",
         { inputType: "textarea", required: false }
@@ -1155,8 +1155,8 @@ async function decidirFluxo(decisaoId) {
       observacao = result.value || null
     } else if (decisao?.acao === "abrir_solicitacao") {
       const result = await swalConfirm(
-        "Abrir Solicitação Vinculada",
-        "Será criada uma nova solicitação vinculada a esta. Deseja continuar?"
+        "Abrir Ticket Vinculada",
+        "Será criada uma nova ticket vinculada a esta. Deseja continuar?"
       )
       if (!result.isConfirmed) return
     } else if (decisao?.acao === "atribuir_avancar") {
@@ -1336,7 +1336,7 @@ async function devolverAoFluxo() {
 async function mudarResponsavel() {
   const response = await swalConfirm(
     "Deseja realmente mudar o responsavel pelo chamado ?",
-    "Os agendamentos atrelados a essa solicitação também terão seus responsáveis alterados."
+    "Os agendamentos atrelados a essa ticket também terão seus responsáveis alterados."
   )
 
   if (response.isConfirmed) {
@@ -1498,7 +1498,7 @@ async function comentar(tipo) {
       buscarSolicitacao()
     })
     .catch((err) => {
-      toastError("Erro ao comentar na solicitação!")
+      toastError("Erro ao comentar na ticket!")
 
       // Excluir arquivos se der algum erro, pra não ficar lixo no sistema
       for (let arquivo of arquivosComentario.value) {
@@ -1561,7 +1561,7 @@ async function iniciarAtendimento() {
   if (temProblemasAprovacao.value) {
     const continuar = await swalConfirm(
       "Atenção!",
-      `Existem aprovações pendentes ou rejeitadas nesta solicitação.\nDeseja iniciar o atendimento mesmo assim?`,
+      `Existem aprovações pendentes ou rejeitadas nesta ticket.\nDeseja iniciar o atendimento mesmo assim?`,
       "Sim, iniciar",
       "Cancelar"
     )
@@ -1603,7 +1603,7 @@ async function pausarAtendimento() {
 async function resolverAtendimento() {
   // Verificar se há aprovações pendentes ou rejeitadas
   if (temProblemasAprovacao.value) {
-    const mensagemAlerta = `Esta solicitação possui ${mensagemAlerteAprovacao.value}.\n\nDeseja resolver mesmo assim?`
+    const mensagemAlerta = `Esta ticket possui ${mensagemAlerteAprovacao.value}.\n\nDeseja resolver mesmo assim?`
 
     const resp = await swalConfirm(
       "Atenção: Aprovações Pendentes",
@@ -1614,7 +1614,7 @@ async function resolverAtendimento() {
       return
     }
   } else {
-    const resp = await swalConfirm("Deseja resolver essa solicitação ?")
+    const resp = await swalConfirm("Deseja resolver essa ticket ?")
 
     if (!resp.isConfirmed) {
       return
@@ -1634,7 +1634,7 @@ async function resolverAtendimento() {
       comentario.value = ""
     })
     .catch((err) => {
-      toastError("Erro ao resolver solicitação!")
+      toastError("Erro ao resolver ticket!")
     })
 }
 
@@ -1662,7 +1662,7 @@ async function finalizar() {
       buscarSolicitacao()
     })
     .catch((err) => {
-      toastError("Erro ao finalizar solicitação!")
+      toastError("Erro ao finalizar ticket!")
     })
 }
 
@@ -1685,14 +1685,14 @@ async function recusarAtendimento() {
       comentario.value = ""
     })
     .catch((err) => {
-      toastError("Erro ao recusar solicitação!")
+      toastError("Erro ao recusar ticket!")
     })
 }
 
 async function showDialogCancelar() {
   const resposta = await swalConfirm(
     "Você tem certeza?",
-    "Os agendamentos atrelados a essa solicitação também serão cancelados."
+    "Os agendamentos atrelados a essa ticket também serão cancelados."
   )
   if (!resposta.isConfirmed) {
     return
@@ -1717,7 +1717,7 @@ async function cancelarAtendimento() {
       comentario.value = ""
     })
     .catch((err) => {
-      toastError("Erro ao cancelar solicitação!")
+      toastError("Erro ao cancelar ticket!")
     })
 }
 
@@ -1881,7 +1881,7 @@ function getEstilosEtapa(movimentacao) {
   }
 }
 
-// Computed: converte movimentações de Solicitações para formato eventosExternos do componente LinhaTempo
+// Computed: converte movimentações de Tickets para formato eventosExternos do componente LinhaTempo
 // Backend retorna movimentações em id DESC (mais recente primeiro).
 // LinhaTempo faz .reverse() internamente, então enviamos em ASC para que o resultado final seja DESC (mais recente no topo).
 const eventosTimeline = computed(() => {
@@ -1940,7 +1940,7 @@ function getIconeMovimentacao(tipo, movimentacao = null) {
   if (
     tipoLower.includes("criada") ||
     tipoLower.includes("criado") ||
-    tipoLower.includes("solicitação criada")
+    tipoLower.includes("ticket criada")
   ) {
     return {
       icon: "fas fa-plus",
@@ -2239,7 +2239,7 @@ async function criarBranch() {
       : descricaoSol || tituloSol || "solicitacao"
 
   const resultado = await swalConfirm(
-    `Criar branch para a solicitação #${props.solicitacao_id}?`,
+    `Criar branch para a ticket #${props.solicitacao_id}?`,
     `Branch baseada em producao com o nome: ${props.solicitacao_id}-${titulo.toLowerCase().substring(0, 40)}...`
   )
   if (!resultado.isConfirmed) return
@@ -2761,7 +2761,7 @@ const assuntosFiltrados = computed(() => {
 async function RetornarSolicitacao() {
   const resposta = await swalConfirm(
     "Você tem certeza?",
-    "A solicitação será retornada ao Solicitante."
+    "A ticket será retornada ao Solicitante."
   )
   if (!resposta.isConfirmed) {
     return
@@ -2780,7 +2780,7 @@ async function RetornarSolicitacao() {
       dialogRetorno.value = false
     })
     .catch((err) => {
-      toastError("Erro ao retornar solicitação!")
+      toastError("Erro ao retornar ticket!")
     })
 }
 
@@ -2881,7 +2881,7 @@ async function confirmarEnvioDossie() {
     const params = {
       funcionario: funcionarioSelecionadoDossie.value,
       documento: {
-        descricao: `Arquivo da solicitação #${props.solicitacao_id}`,
+        descricao: `Arquivo da ticket #${props.solicitacao_id}`,
         arquivos: [
           {
             file: { id: arquivoParaDossie.value }
@@ -3059,7 +3059,7 @@ async function novoAgendamento() {
         class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900"
       >
         <div class="flex items-center gap-4">
-          <!-- ID da Solicitação -->
+          <!-- ID do Ticket -->
           <div class="flex items-center gap-2">
             <div
               class="flex items-center justify-center w-8 h-8 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20"
@@ -3761,7 +3761,7 @@ async function novoAgendamento() {
                     <h3
                       class="text-lg font-bold text-emerald-800 dark:text-emerald-200"
                     >
-                      Sua solicitação foi resolvida
+                      Sua ticket foi resolvida
                     </h3>
                     <p class="text-sm text-emerald-600 dark:text-emerald-400">
                       Confirme a resolução ou recuse para retornar ao atendente
@@ -3781,7 +3781,7 @@ async function novoAgendamento() {
                     @click="showDialogRecusar()"
                     severity="danger"
                     class="!h-11 flex-1 sm:flex-none !rounded-xl"
-                    title="Voltar solicitação ao atendente"
+                    title="Voltar ticket ao atendente"
                     label="Recusar"
                     icon="pi pi-times"
                     outlined
@@ -3864,7 +3864,7 @@ async function novoAgendamento() {
                       <i class="pi pi-user text-white text-[10px]"></i>
                     </div>
                     <h3 class="text-xs font-bold text-gray-800 dark:text-white">
-                      Responsável pela Solicitação
+                      Responsável pelo Ticket
                     </h3>
                   </div>
                 </div>
@@ -3984,7 +3984,7 @@ async function novoAgendamento() {
                           v-if="previsaoFormatada"
                           class="flex items-center gap-1.5"
                           v-tooltip.top="
-                            'Data prevista para entrega desta solicitação'
+                            'Data prevista para entrega desta ticket'
                           "
                         >
                           <div
@@ -4637,7 +4637,7 @@ async function novoAgendamento() {
                     </div>
                   </div>
 
-                  <!-- Solicitações vinculadas -->
+                  <!-- Tickets vinculados -->
                   <div
                     v-if="
                       fluxoDados.solicitacao_pai ||
@@ -4651,7 +4651,7 @@ async function novoAgendamento() {
                       <span
                         class="text-[11px] font-semibold text-violet-600 dark:text-violet-400"
                       >
-                        Solicitações Vinculadas
+                        Tickets Vinculadas
                       </span>
                     </div>
                     <!-- Pai -->
@@ -5742,7 +5742,7 @@ async function novoAgendamento() {
                       <h3
                         class="text-sm font-bold text-gray-800 dark:text-white"
                       >
-                        Detalhes da Solicitação
+                        Detalhes do Ticket
                       </h3>
                     </div>
 
@@ -6357,7 +6357,7 @@ async function novoAgendamento() {
                   severity="danger"
                   outlined
                   class="w-full ipad:w-auto !h-9 mt-2"
-                  label="Cancelar Solicitação"
+                  label="Cancelar Ticket"
                   @click="showDialogCancelar()"
                 ></Button>
               </div>
@@ -6660,9 +6660,9 @@ async function novoAgendamento() {
                     <i class="fas fa-check-circle text-2xl"></i>
                   </div>
                   <div>
-                    <p class="font-bold text-lg">Solicitação Resolvida!</p>
+                    <p class="font-bold text-lg">Ticket Resolvida!</p>
                     <p class="text-emerald-100 text-sm">
-                      Sua solicitação foi atendida com sucesso
+                      Sua ticket foi atendida com sucesso
                     </p>
                   </div>
                 </div>
@@ -7276,7 +7276,7 @@ async function novoAgendamento() {
                 Nenhum agendamento
               </h4>
               <p class="text-gray-400 text-center max-w-xs">
-                Ainda não existem agendamentos para essa solicitação.
+                Ainda não existem agendamentos para essa ticket.
               </p>
             </div>
           </div>
@@ -7325,7 +7325,7 @@ async function novoAgendamento() {
             <LinhaTempo
               :eventosExternos="eventosTimeline"
               labelInicio="Início da Jornada"
-              :idInicio="`Solicitação #${solicitacao.id}`"
+              :idInicio="`Ticket #${solicitacao.id}`"
             />
           </div>
           <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -7670,7 +7670,7 @@ async function novoAgendamento() {
             <div>
               <h3 class="text-lg font-bold text-white">Mudar Prioridade</h3>
               <p class="text-white/80 text-xs">
-                Defina a prioridade desta solicitação
+                Defina a prioridade desta ticket
               </p>
             </div>
           </div>
@@ -7775,7 +7775,7 @@ async function novoAgendamento() {
             <div>
               <h3 class="text-lg font-bold text-white">Trocar Solicitante</h3>
               <p class="text-white/80 text-xs">
-                Alterar o solicitante desta solicitação
+                Alterar o solicitante desta ticket
               </p>
             </div>
           </div>
@@ -7987,7 +7987,7 @@ async function novoAgendamento() {
               <p class="text-white/80 text-xs">
                 {{
                   trocaAssunto
-                    ? "Altere o assunto da solicitação"
+                    ? "Altere o assunto da ticket"
                     : "Altere o departamento responsável"
                 }}
               </p>
@@ -8380,7 +8380,7 @@ async function novoAgendamento() {
             <div>
               <h3 class="text-lg font-bold text-white">Atribuir Responsável</h3>
               <p class="text-white/80 text-xs">
-                Defina quem irá atender esta solicitação
+                Defina quem irá atender esta ticket
               </p>
             </div>
           </div>
@@ -8813,7 +8813,7 @@ async function novoAgendamento() {
               <i class="pi pi-times-circle text-white text-lg"></i>
             </div>
             <div>
-              <h3 class="text-lg font-bold text-white">Recusar Solicitação</h3>
+              <h3 class="text-lg font-bold text-white">Recusar Ticket</h3>
               <p class="text-white/80 text-xs">Informe o motivo da recusa</p>
             </div>
           </div>
@@ -8896,7 +8896,7 @@ async function novoAgendamento() {
               <i class="pi pi-ban text-white text-lg"></i>
             </div>
             <div>
-              <h3 class="text-lg font-bold text-white">Cancelar Solicitação</h3>
+              <h3 class="text-lg font-bold text-white">Cancelar Ticket</h3>
               <p class="text-white/80 text-xs">
                 Esta ação não pode ser desfeita
               </p>
@@ -8922,7 +8922,7 @@ async function novoAgendamento() {
           <div class="flex items-start gap-2">
             <i class="pi pi-exclamation-triangle text-amber-500 mt-0.5"></i>
             <p class="text-xs text-amber-700 dark:text-amber-400">
-              Após cancelada, a solicitação não poderá ser reaberta.
+              Após cancelada, a ticket não poderá ser reaberta.
             </p>
           </div>
         </div>
@@ -9203,7 +9203,7 @@ async function novoAgendamento() {
               {{
                 lembreteEdicao
                   ? "Altere os dados do lembrete"
-                  : "Agende uma data para atender esta solicitação"
+                  : "Agende uma data para atender esta ticket"
               }}
             </p>
           </div>
@@ -9274,7 +9274,7 @@ async function novoAgendamento() {
                 Retorno ao Solicitante
               </h3>
               <p class="text-white/80 text-xs">
-                Devolver solicitação para esclarecimentos
+                Devolver ticket para esclarecimentos
               </p>
             </div>
           </div>
@@ -9363,7 +9363,7 @@ async function novoAgendamento() {
           />
         </div>
         <span class="text-lg font-semibold text-center text-orange-700">
-          Esta solicitação foi retornada para você
+          Esta ticket foi retornada para você
         </span>
         <span class="text-sm text-center text-gray-600">
           Para que o atendimento continue, informe os dados solicitados através
@@ -9534,7 +9534,7 @@ async function novoAgendamento() {
   <Dialog
     v-model:visible="dialogResolver"
     modal
-    header="Resolver Solicitação"
+    header="Resolver Ticket"
     :style="{ width: '500px' }"
     position="top"
   >
@@ -9544,7 +9544,7 @@ async function novoAgendamento() {
         <div class="flex items-start space-x-3">
           <i class="pi pi-info-circle text-blue-500 text-xl mt-1"></i>
           <div class="flex flex-col space-y-2 text-sm text-gray-700">
-            <p class="font-semibold">Como deseja concluir esta solicitação?</p>
+            <p class="font-semibold">Como deseja concluir esta ticket?</p>
           </div>
         </div>
       </div>
@@ -9560,7 +9560,7 @@ async function novoAgendamento() {
           <div class="flex-1">
             <h3 class="font-semibold text-gray-900 mb-2">Finalizar Direto</h3>
             <p class="text-sm text-gray-600 mb-3">
-              A solicitação será
+              A ticket será
               <span class="font-semibold">concluída imediatamente</span>
               sem passar pela aprovação do solicitante. Use esta opção quando a
               resolução for óbvia ou já acordada previamente.
@@ -9589,7 +9589,7 @@ async function novoAgendamento() {
               Enviar para Aprovação
             </h3>
             <p class="text-sm text-gray-600 mb-3">
-              A solicitação será marcada como
+              A ticket será marcada como
               <span class="font-semibold">resolvida</span>
               e enviada ao solicitante para confirmação. O solicitante poderá
               aceitar ou recusar a resolução.

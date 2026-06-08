@@ -1,7 +1,7 @@
 <script setup>
 import Loader from "@/Components/Loader.vue"
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayout.vue"
-import Solicitacao from "@/Pages/Solicitacoes/Solicitação.vue"
+import Solicitacao from "@/Pages/Solicitacoes/Ticket.vue"
 import CardAprovacao from "./Components/CardAprovacao.vue"
 import {
   formatarData,
@@ -71,7 +71,7 @@ const props = defineProps([
 
 const loading = ref(false)
 const loadingInicial = ref(true) // Loading enquanto carrega configurações
-const solicitações = ref(null)
+const tickets = ref(null)
 const contagemCards = ref(null) // Contagem fixa para os cards (não muda com filtro por card)
 const filtrandoPorCard = ref(false) // Flag para saber se o filtro veio de um clique no card
 const totalRegistros = ref(0) // Total para paginação
@@ -360,7 +360,7 @@ const optionsAssunto = computed(() => {
       }
     )
 
-    // Adicionar opção "TRANSFERIDO" para solicitações sem assunto
+    // Adicionar opção "TRANSFERIDO" para tickets sem assunto
     return [...assuntosFiltrados, { id: null, assunto: "TRANSFERIDO" }]
   }
   return []
@@ -422,10 +422,10 @@ onMounted(async () => {
     dialogSolicitacao.value = true
   }
 
-  // ✅ Buscar solicitações e aprovações em PARALELO
+  // ✅ Buscar tickets e aprovações em PARALELO
   await Promise.all([getSolicitacoes(), buscarAprovacoesPendentes()])
 
-  // Aguardar as solicitações para garantir que temos as colunas do servidor
+  // Aguardar as tickets para garantir que temos as colunas do servidor
   // A mesclagem será feita na função getSolicitacoes()
   isResolver.value = page.url == "/solicitacoes/lista?resolvidas=true"
   // se vier da notificação de tem resolvidas para finalizar
@@ -447,7 +447,7 @@ onMounted(async () => {
   loadingInicial.value = false
 })
 
-// ✅ Verifica se a solicitação recebida via Reverb corresponde aos filtros ativos
+// ✅ Verifica se a ticket recebida via Reverb corresponde aos filtros ativos
 function solicitacaoCorrespondeAosFiltros(solicitacao) {
   if (!solicitacao) return false
 
@@ -480,7 +480,7 @@ function solicitacaoCorrespondeAosFiltros(solicitacao) {
     const responsaveisMatriculas = filtro.value.responsavel.map(
       (r) => r.matricula || r
     )
-    // Se não tiver responsável na solicitação e filtro exige responsável específico
+    // Se não tiver responsável na ticket e filtro exige responsável específico
     if (
       !solicitacao.usuario_responsavel &&
       !responsaveisMatriculas.includes("nao_atribuido")
@@ -510,16 +510,16 @@ function iniciarReverbListener() {
   canalDepartamento = escutarDepartamento(departamento, {
     filtroAtual: (solicitacao) => solicitacaoCorrespondeAosFiltros(solicitacao),
     onCriada: (data) => {
-      // Verificar se a solicitação corresponde aos filtros ativos
+      // Verificar se a ticket corresponde aos filtros ativos
       if (solicitacaoCorrespondeAosFiltros(data.solicitacao)) {
-        // Nova solicitação criada e corresponde aos filtros - mostrar toast
-        toastSuccess(`Nova solicitação #${data.solicitacao?.id} criada!`)
+        // Nova ticket criada e corresponde aos filtros - mostrar toast
+        toastSuccess(`Nova ticket #${data.solicitacao?.id} criada!`)
       }
       // Recarregar lista para obter dados completos
       getSolicitacoesSilenciosa()
     },
     onAtualizada: (data) => {
-      // Solicitação atualizada - recarregar lista para obter dados completos (foto, nome, etc)
+      // Ticket atualizado - recarregar lista para obter dados completos (foto, nome, etc)
       getSolicitacoesSilenciosa()
 
       // ✅ Se é atualização de aprovação, recarregar aprovações também
@@ -542,7 +542,7 @@ function iniciarReverbListener() {
         buscarAprovacoesPendentes()
       }
 
-      // Atualizar lista de solicitações
+      // Atualizar lista de tickets
       getSolicitacoesSilenciosa()
     })
   }
@@ -566,18 +566,18 @@ function onPageChange(event) {
 }
 
 const solicitacoesFiltered = computed(() => {
-  if (!Array.isArray(solicitações.value)) {
+  if (!Array.isArray(tickets.value)) {
     return []
   }
 
-  var existeMarcado = solicitações.value.some((s) => s.checked)
+  var existeMarcado = tickets.value.some((s) => s.checked)
 
   if (!existeMarcado) {
-    return solicitações.value.filter((i) => !i.ocultarSolicitacao)
+    return tickets.value.filter((i) => !i.ocultarSolicitacao)
   }
 
-  var solicitacaoBase = solicitações.value.filter((s) => s.checked)[0]
-  return solicitações.value.filter((sol) => {
+  var solicitacaoBase = tickets.value.filter((s) => s.checked)[0]
+  return tickets.value.filter((sol) => {
     if (sol.filial.codigo != solicitacaoBase.filial.codigo) {
       return false
     } else if (
@@ -654,9 +654,9 @@ async function buscarSolicitacoesInterno() {
     if (response.data.paginacao?.porPagina) {
       filtro.value.porPagina = response.data.paginacao.porPagina
     }
-    solicitações.value = response.data["solicitacoes"].data
-    solicitações.value.paginacao = response.data["paginacao"]
-    solicitações.value.contagem = response.data["contagem"]
+    tickets.value = response.data["solicitacoes"].data
+    tickets.value.paginacao = response.data["paginacao"]
+    tickets.value.contagem = response.data["contagem"]
     // Atualizar contagem dos cards apenas quando NÃO for filtro por clique no card
     if (!filtrandoPorCard.value) {
       contagemCards.value = response.data["contagem"]
@@ -677,7 +677,7 @@ async function buscarSolicitacoesInterno() {
       colunasCarregadas.value = true
     }
 
-    solicitações.value.forEach((item) => {
+    tickets.value.forEach((item) => {
       if (
         item.status == "cancelada" ||
         item.status == "finalizada" ||
@@ -696,7 +696,7 @@ async function buscarSolicitacoesInterno() {
       }
     })
 
-    solicitações.value.totalAbertos = solicitações.value.filter(
+    tickets.value.totalAbertos = tickets.value.filter(
       (i) =>
         i.status != "finalizada" &&
         i.status != "cancelada" &&
@@ -706,7 +706,7 @@ async function buscarSolicitacoesInterno() {
     console.error(error)
     swalErro()
   } finally {
-    if (solicitações.value?.contagem?.resolvida == 0) {
+    if (tickets.value?.contagem?.resolvida == 0) {
       isResolver.value = false
     }
   }
@@ -789,7 +789,7 @@ function getStatusSeverity(status) {
   return severities[status] || "secondary"
 }
 
-// Verificar se a solicitação está atrasada (previsão de entrega vencida)
+// Verificar se a ticket está atrasada (previsão de entrega vencida)
 function estaAtrasada(solicitacao) {
   if (!solicitacao.previsao_entrega) return false
 
@@ -884,9 +884,9 @@ async function buscarFuncionario() {
 }
 
 const habilitaMultAgendamento = computed(() => {
-  if (solicitações.value) {
+  if (tickets.value) {
     var habilitar = false
-    solicitações.value.map((item) => {
+    tickets.value.map((item) => {
       if (item.checked) {
         habilitar = true
       }
@@ -908,14 +908,14 @@ function adicionarFunc(func) {
 }
 
 async function criarAgendamento() {
-  solicitacoesAgend.value = solicitações.value.filter((item) => {
+  solicitacoesAgend.value = tickets.value.filter((item) => {
     return item.checked == true
   })
   dialogAgendamento.value = true
 }
 
 async function atualizaAgendamentos() {
-  // Limpar cache de solicitações marcadas
+  // Limpar cache de tickets marcadas
   cacheMarcadas.value = []
   getSolicitacoes()
   dialogAgendamento.value = false
@@ -984,7 +984,7 @@ function deParaColunas(coluna) {
     status: "Situação",
     usuario_origem: "Usuario Origem",
     previsao_entrega: "Previsão de Entrega",
-    solicitacao_pai_id: "Solicitação Pai",
+    solicitacao_pai_id: "Ticket Pai",
     usuarios_destino: "Usuários Destino"
   }
 
@@ -1097,7 +1097,7 @@ function calcularDiasRestantes(dataPrevisao, status = null) {
   }
 }
 
-// Função para verificar se uma solicitação está atrasada
+// Função para verificar se uma ticket está atrasada
 function solicitacaoAtrasada(solicitacao) {
   if (!solicitacao.previsao_entrega) return false
 
@@ -1283,11 +1283,11 @@ async function buscarAprovacoesPendentes() {
   }
 }
 
-// Aprovar rapidamente uma solicitação
+// Aprovar rapidamente uma ticket
 async function aprovarRapido(aprovacao) {
   const confirmacao = await swalConfirm(
     "Confirmar Aprovação",
-    `Deseja aprovar a solicitação #${aprovacao.solicitacao_id}?`,
+    `Deseja aprovar a ticket #${aprovacao.solicitacao_id}?`,
     "Sim, aprovar",
     "Cancelar"
   )
@@ -1301,19 +1301,19 @@ async function aprovarRapido(aprovacao) {
       resposta: "Aprovado via ação rápida"
     })
 
-    toastSuccess("Solicitação aprovada com sucesso!")
+    toastSuccess("Ticket aprovado com sucesso!")
     await buscarAprovacoesPendentes() // Recarregar lista
   } catch (error) {
     console.error("Erro ao aprovar:", error)
-    swalErro("Erro ao aprovar solicitação")
+    swalErro("Erro ao aprovar ticket")
   } finally {
     loadingAprovacoes.value = false
   }
 }
 
-// Rejeitar rapidamente uma solicitação
+// Rejeitar rapidamente uma ticket
 async function rejeitarRapido(aprovacao) {
-  // Abre diretamente a solicitação na aba de aprovações e já abre o dialog de rejeição
+  // Abre diretamente a ticket na aba de aprovações e já abre o dialog de rejeição
   solicitacaoSelecionada.value = {
     id: aprovacao.solicitacao_id,
     abaInicial: "aprovacoes",
@@ -1322,7 +1322,7 @@ async function rejeitarRapido(aprovacao) {
   dialogSolicitacao.value = true
 }
 
-// Abrir solicitação para ver detalhes
+// Abrir ticket para ver detalhes
 function abrirSolicitacaoAprovacao(aprovacao, abaInicial = "aprovacoes") {
   solicitacaoSelecionada.value = { id: aprovacao.solicitacao_id, abaInicial }
   dialogSolicitacao.value = true
@@ -1338,7 +1338,7 @@ const mostrarAbaAprovacoes = computed(() => {
   return temAprovacoesPendentes.value
 })
 
-// Função para atualizar dados após mudanças em solicitações
+// Função para atualizar dados após mudanças em tickets
 async function atualizarDados() {
   getSolicitacoes()
   await buscarAprovacoesPendentes()
@@ -1408,7 +1408,7 @@ async function exportarTabela() {
 </script>
 
 <template>
-  <Head title="Atendimento - Solicitações" />
+  <Head title="Atendimento - Tickets" />
 
   <AuthenticatedLayout>
     <!-- Loading Inicial -->
@@ -1433,7 +1433,7 @@ async function exportarTabela() {
         <!-- Texto -->
         <div class="text-center">
           <p class="text-xl font-semibold text-gray-700 dark:text-gray-200">
-            Carregando Solicitações
+            Carregando Tickets
           </p>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Aguarde um momento...
@@ -1453,7 +1453,7 @@ async function exportarTabela() {
           <i class="pi pi-home"></i>
           <span>Home</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
-          <span>Solicitações</span>
+          <span>Tickets</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
           <span
             class="text-gray-950 dark:text-white font-bold truncate max-w-[120px] sm:max-w-none"
@@ -1473,13 +1473,13 @@ async function exportarTabela() {
           <div
             class="w-1 h-8 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full"
           ></div>
-          Atendimento de Solicitações
+          Atendimento de Tickets
         </h2>
       </div>
       <span
         class="block text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-bold pl-4 pr-2 sm:pr-0 break-words whitespace-normal"
       >
-        Gerencie as solicitações do seu departamento e acompanhe o status de
+        Gerencie as tickets do seu departamento e acompanhe o status de
         cada uma.
       </span>
     </div>
@@ -1517,7 +1517,7 @@ async function exportarTabela() {
               pendente{{ totalAprovacoesPendentes > 1 ? "s" : "" }}
             </h4>
             <p class="text-sm text-amber-600 dark:text-amber-400">
-              Solicitações aguardando sua aprovação ou rejeição
+              Tickets aguardando sua aprovação ou rejeição
             </p>
           </div>
         </div>
@@ -1547,11 +1547,11 @@ async function exportarTabela() {
             <span
               @click="
                 swalObservacao(
-                  'Departamento responsável por tratar a solicitação.'
+                  'Departamento responsável por tratar a ticket.'
                 )
               "
               v-tooltip.top="
-                'Departamento responsável por tratar a solicitação.'
+                'Departamento responsável por tratar a ticket.'
               "
               class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
             >
@@ -1580,11 +1580,11 @@ async function exportarTabela() {
             <span
               @click="
                 swalObservacao(
-                  'Assunto no qual a solicitação foi vinculada/atribuída.'
+                  'Assunto no qual a ticket foi vinculada/atribuída.'
                 )
               "
               v-tooltip.top="
-                'Assunto no qual a solicitação foi vinculada/atribuída.'
+                'Assunto no qual a ticket foi vinculada/atribuída.'
               "
               class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
             >
@@ -1654,11 +1654,11 @@ async function exportarTabela() {
               <span
                 @click="
                   swalObservacao(
-                    'ID é um número único que identifica sua solicitação no sistema.'
+                    'ID é um número único que identifica sua ticket no sistema.'
                   )
                 "
                 v-tooltip.top="
-                  'ID é um número único que identifica sua solicitação no sistema.'
+                  'ID é um número único que identifica sua ticket no sistema.'
                 "
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
@@ -1684,11 +1684,11 @@ async function exportarTabela() {
               <span
                 @click="
                   swalObservacao(
-                    'Filtre as solicitações por prioridade (urgente, alta, média ou baixa).'
+                    'Filtre as tickets por prioridade (urgente, alta, média ou baixa).'
                   )
                 "
                 v-tooltip.top="
-                  'Filtre as solicitações por prioridade (urgente, alta, média ou baixa).'
+                  'Filtre as tickets por prioridade (urgente, alta, média ou baixa).'
                 "
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
@@ -1725,11 +1725,11 @@ async function exportarTabela() {
               <span
                 @click="
                   swalObservacao(
-                    'Filtre as solicitações pelo status atual (pendente, em atendimento, finalizada, etc).'
+                    'Filtre as tickets pelo status atual (pendente, em atendimento, finalizada, etc).'
                   )
                 "
                 v-tooltip.top="
-                  'Filtre as solicitações pelo status atual (pendente, em atendimento, finalizada, etc).'
+                  'Filtre as tickets pelo status atual (pendente, em atendimento, finalizada, etc).'
                 "
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
@@ -1761,10 +1761,10 @@ async function exportarTabela() {
               <span
                 @click="
                   swalObservacao(
-                    'Filtre as solicitações pela filial de origem.'
+                    'Filtre as tickets pela filial de origem.'
                   )
                 "
-                v-tooltip.top="'Filtre as solicitações pela filial de origem.'"
+                v-tooltip.top="'Filtre as tickets pela filial de origem.'"
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
                 i
@@ -1796,11 +1796,11 @@ async function exportarTabela() {
               <span
                 @click="
                   swalObservacao(
-                    'Filtre as solicitações pelo estado (UF) da filial.'
+                    'Filtre as tickets pelo estado (UF) da filial.'
                   )
                 "
                 v-tooltip.top="
-                  'Filtre as solicitações pelo estado (UF) da filial.'
+                  'Filtre as tickets pelo estado (UF) da filial.'
                 "
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
@@ -1834,10 +1834,10 @@ async function exportarTabela() {
               <span
                 @click="
                   swalObservacao(
-                    'Filtre as solicitações pela cidade da filial.'
+                    'Filtre as tickets pela cidade da filial.'
                   )
                 "
-                v-tooltip.top="'Filtre as solicitações pela cidade da filial.'"
+                v-tooltip.top="'Filtre as tickets pela cidade da filial.'"
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
                 i
@@ -1873,9 +1873,9 @@ async function exportarTabela() {
               Solicitante
               <span
                 @click="
-                  swalObservacao('Filtre as solicitações por quem as criou.')
+                  swalObservacao('Filtre as tickets por quem as criou.')
                 "
-                v-tooltip.top="'Filtre as solicitações por quem as criou.'"
+                v-tooltip.top="'Filtre as tickets por quem as criou.'"
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
                 i
@@ -1900,8 +1900,8 @@ async function exportarTabela() {
             >
               Responsável
               <span
-                @click="swalObservacao('Responsável atual pela solicitação.')"
-                v-tooltip.top="'Responsável atual pela solicitação.'"
+                @click="swalObservacao('Responsável atual pela ticket.')"
+                v-tooltip.top="'Responsável atual pela ticket.'"
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
                 i
@@ -1933,11 +1933,11 @@ async function exportarTabela() {
               <span
                 @click="
                   swalObservacao(
-                    'Buscar solicitações criadas a partir desta data.'
+                    'Buscar tickets criadas a partir desta data.'
                   )
                 "
                 v-tooltip.top="
-                  'Buscar solicitações criadas a partir desta data.'
+                  'Buscar tickets criadas a partir desta data.'
                 "
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
@@ -1967,9 +1967,9 @@ async function exportarTabela() {
               Criação Fim
               <span
                 @click="
-                  swalObservacao('Buscar solicitações criadas até esta data.')
+                  swalObservacao('Buscar tickets criadas até esta data.')
                 "
-                v-tooltip.top="'Buscar solicitações criadas até esta data.'"
+                v-tooltip.top="'Buscar tickets criadas até esta data.'"
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
                 i
@@ -1999,11 +1999,11 @@ async function exportarTabela() {
               <span
                 @click="
                   swalObservacao(
-                    'Buscar solicitações alteradas a partir desta data.'
+                    'Buscar tickets alteradas a partir desta data.'
                   )
                 "
                 v-tooltip.top="
-                  'Buscar solicitações alteradas a partir desta data.'
+                  'Buscar tickets alteradas a partir desta data.'
                 "
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
@@ -2033,9 +2033,9 @@ async function exportarTabela() {
               Alteração Fim
               <span
                 @click="
-                  swalObservacao('Buscar solicitações alteradas até esta data.')
+                  swalObservacao('Buscar tickets alteradas até esta data.')
                 "
-                v-tooltip.top="'Buscar solicitações alteradas até esta data.'"
+                v-tooltip.top="'Buscar tickets alteradas até esta data.'"
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
                 i
@@ -2074,7 +2074,7 @@ async function exportarTabela() {
     <div class="relative w-full mx-auto">
       <!-- Dashboard - Cards de Estatísticas -->
       <div
-        v-if="!buscaPorIdAtiva && solicitações && aba !== 'aprovacoes'"
+        v-if="!buscaPorIdAtiva && tickets && aba !== 'aprovacoes'"
         class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-8 gap-3 mt-6 px-1 sm:px-0"
       >
         <!-- Card Total -->
@@ -2307,7 +2307,7 @@ async function exportarTabela() {
                   Aprovações Pendentes
                 </h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400">
-                  {{ totalAprovacoesPendentes }} solicitação{{
+                  {{ totalAprovacoesPendentes }} ticket{{
                     totalAprovacoesPendentes !== 1 ? "ões" : ""
                   }}
                   aguardando sua decisão
@@ -2369,7 +2369,7 @@ async function exportarTabela() {
             </h3>
             <p class="text-slate-500 dark:text-slate-400 text-center max-w-md">
               Você não possui aprovações pendentes no momento. Novas
-              solicitações aparecerão aqui quando necessitarem sua aprovação.
+              tickets aparecerão aqui quando necessitarem sua aprovação.
             </p>
           </div>
 
@@ -2390,9 +2390,9 @@ async function exportarTabela() {
         </div>
       </div>
 
-      <!-- Tabela de Solicitações -->
+      <!-- Tabela de Tickets -->
       <div
-        v-if="solicitações && aba !== 'aprovacoes'"
+        v-if="tickets && aba !== 'aprovacoes'"
         class="bg-white dark:bg-slate-800 rounded-3xl p-4 sm:p-6 mt-6 relative overflow-hidden hidden ipad:block"
       >
         <!-- Cabeçalho da Tabela -->
@@ -2415,15 +2415,15 @@ async function exportarTabela() {
                 <span
                   class="text-base font-normal text-gray-500 dark:text-gray-400 ml-2"
                 >
-                  ({{ solicitações?.contagem?.total ?? 0 }} registro{{
-                    (solicitações?.contagem?.total ?? 0) !== 1 ? "s" : ""
+                  ({{ tickets?.contagem?.total ?? 0 }} registro{{
+                    (tickets?.contagem?.total ?? 0) !== 1 ? "s" : ""
                   }})
                 </span>
               </h2>
               <div
                 class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium mt-1"
               >
-                Clique em uma linha para abrir a solicitação
+                Clique em uma linha para abrir a ticket
               </div>
             </div>
           </div>
@@ -2436,7 +2436,7 @@ async function exportarTabela() {
               label="Agendar"
               severity="help"
               outlined
-              v-tooltip.top="'Agendar Solicitações Selecionadas'"
+              v-tooltip.top="'Agendar Tickets Selecionadas'"
               @click="criarAgendamento()"
             />
             <Button
@@ -2469,7 +2469,7 @@ async function exportarTabela() {
             lazy
             paginator
             :rows="filtro.porPagina"
-            :totalRecords="solicitações?.contagem?.total ?? 0"
+            :totalRecords="tickets?.contagem?.total ?? 0"
             :rowsPerPageOptions="[10, 25, 50, 100]"
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords}"
@@ -2511,16 +2511,16 @@ async function exportarTabela() {
                 </span>
                 <template v-if="buscaPorIdAtiva">
                   <p class="text-gray-500 dark:text-gray-400 font-medium">
-                    Solicitação #{{ filtro.id }} não encontrada
+                    Ticket #{{ filtro.id }} não encontrada
                   </p>
                   <p class="text-gray-400 dark:text-gray-500 text-sm mt-1">
-                    A solicitação não existe ou você não tem permissão para
+                    A ticket não existe ou você não tem permissão para
                     visualizá-la.
                   </p>
                 </template>
                 <template v-else>
                   <p class="text-gray-500 dark:text-gray-400 font-medium">
-                    Nenhuma solicitação encontrada
+                    Nenhuma ticket encontrada
                   </p>
                   <p class="text-gray-400 dark:text-gray-500 text-sm mt-1">
                     Tente ajustar os filtros
@@ -2547,7 +2547,7 @@ async function exportarTabela() {
                     severity="info"
                     :title="
                       slot.data.desabilitaCheckbox
-                        ? 'O status da solicitação não permite novos agendamentos'
+                        ? 'O status da ticket não permite novos agendamentos'
                         : ''
                     "
                     :disabled="slot.data.desabilitaCheckbox"
@@ -2736,7 +2736,7 @@ async function exportarTabela() {
                   </div>
                 </template>
 
-                <!-- Solicitação Pai -->
+                <!-- Ticket Pai -->
                 <template v-else-if="col.coluna === 'solicitacao_pai_id'">
                   <Tag
                     v-if="data.solicitacao_pai_id"
@@ -2992,7 +2992,7 @@ async function exportarTabela() {
       </div>
 
       <div
-        v-if="solicitações && aba !== 'aprovacoes'"
+        v-if="tickets && aba !== 'aprovacoes'"
         class="block mt-5 space-y-4 ipad:hidden px-2"
       >
         <!-- Placeholder mobile quando não encontrar -->
@@ -3009,18 +3009,18 @@ async function exportarTabela() {
           </div>
           <template v-if="buscaPorIdAtiva">
             <p class="text-lg font-bold text-gray-700 dark:text-gray-200">
-              Solicitação #{{ filtro.id }} não encontrada
+              Ticket #{{ filtro.id }} não encontrada
             </p>
             <p
               class="text-sm mt-2 text-gray-500 dark:text-gray-400 text-center px-4"
             >
-              A solicitação não existe ou você não tem permissão para
+              A ticket não existe ou você não tem permissão para
               visualizá-la.
             </p>
           </template>
           <template v-else>
             <p class="text-lg font-bold text-gray-700 dark:text-gray-200">
-              Nenhuma solicitação encontrada
+              Nenhuma ticket encontrada
             </p>
             <p class="text-sm mt-2 text-gray-500 dark:text-gray-400">
               Tente ajustar os filtros.
@@ -3028,7 +3028,7 @@ async function exportarTabela() {
           </template>
         </div>
 
-        <!-- Cards de Solicitações Mobile -->
+        <!-- Cards de Tickets Mobile -->
         <div
           v-for="(item, index) in solicitacoesFiltered"
           :key="index"
@@ -3429,22 +3429,22 @@ async function exportarTabela() {
                 de
               </span>
               <span class="text-sm text-gray-800 dark:text-gray-200 font-bold">
-                {{ solicitações?.paginacao?.paginas || 1 }}
+                {{ tickets?.paginacao?.paginas || 1 }}
               </span>
             </div>
 
             <!-- Botão Próximo -->
             <button
               @click="
-                filtro.pagina < (solicitações?.paginacao?.paginas || 1) &&
+                filtro.pagina < (tickets?.paginacao?.paginas || 1) &&
                 (filtro.pagina++, getSolicitacoes())
               "
               :disabled="
-                filtro.pagina >= (solicitações?.paginacao?.paginas || 1)
+                filtro.pagina >= (tickets?.paginacao?.paginas || 1)
               "
               class="flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-200"
               :class="
-                filtro.pagina >= (solicitações?.paginacao?.paginas || 1)
+                filtro.pagina >= (tickets?.paginacao?.paginas || 1)
                   ? 'bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                   : 'bg-white dark:bg-slate-700 border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 active:scale-95'
               "

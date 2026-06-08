@@ -24,7 +24,7 @@ import { useToast } from "primevue/usetoast"
 import { FilterMatchMode } from "@primevue/core/api"
 import { swalConfirm } from "@/utils/globalFunctions"
 import Filial from "@/Components/New/Filial2.vue"
-import Solicitacao from "@/Pages/Solicitacoes/Solicitação.vue"
+import Solicitacao from "@/Pages/Solicitacoes/Ticket.vue"
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║                       CONFIGURAÇÃO                           ║
@@ -556,7 +556,7 @@ function getPrioridadeLabel(prioridade) {
   return labels[prioridade] || prioridade
 }
 
-// Abrir solicitação
+// Abrir ticket
 function abrirSolicitacao(sol) {
   solicitacaoSelecionada.value = sol
   dialogSolicitacao.value = true
@@ -623,7 +623,7 @@ function deParaColunas(coluna) {
     usuarios_destino: "Usuários Destino",
     filial: "Filial",
     previsao_entrega: "Previsão de Entrega",
-    solicitacao_pai_id: "Solicitação Pai",
+    solicitacao_pai_id: "Ticket Pai",
     dias_aberta: "Dias Aberto",
     dias_atraso: "Atraso",
     data_conclusao: "Data de Conclusão"
@@ -703,7 +703,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Head title="Relatórios - Solicitações" />
+  <Head title="Relatórios - Tickets" />
   <AuthenticatedLayout>
     <!-- Loading Inicial -->
     <div
@@ -729,7 +729,7 @@ onMounted(async () => {
           <i class="pi pi-home"></i>
           <span>Home</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
-          <span>Solicitações</span>
+          <span>Tickets</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
           <span
             class="text-gray-950 dark:text-white font-bold truncate max-w-[120px] sm:max-w-none"
@@ -749,13 +749,13 @@ onMounted(async () => {
           <div
             class="w-1 h-8 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full"
           ></div>
-          Relatórios de Solicitações
+          Relatórios de Tickets
         </h2>
       </div>
       <span
         class="block text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-bold pl-2 pr-2 sm:pr-0 break-words whitespace-normal"
       >
-        Gere relatórios detalhados das solicitações com filtros avançados e
+        Gere relatórios detalhados das tickets com filtros avançados e
         exportação para Excel.
       </span>
     </div>
@@ -782,7 +782,7 @@ onMounted(async () => {
             </h3>
             <div class="text-xs text-gray-500 dark:text-gray-400 font-medium">
               Utilize os filtros abaixo para refinar o relatório de
-              solicitações.
+              tickets.
             </div>
           </div>
         </div>
@@ -1217,7 +1217,7 @@ onMounted(async () => {
             <div
               class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium mt-1"
             >
-              Clique em uma linha para abrir a solicitação
+              Clique em uma linha para abrir a ticket
             </div>
           </div>
         </div>
@@ -1321,7 +1321,7 @@ onMounted(async () => {
                 ></i>
               </span>
               <p class="text-gray-500 dark:text-gray-400 font-medium">
-                Nenhuma solicitação encontrada
+                Nenhuma ticket encontrada
               </p>
               <p class="text-gray-400 dark:text-gray-500 text-sm mt-1">
                 Tente ajustar os filtros
@@ -1779,11 +1779,11 @@ onMounted(async () => {
             </template>
           </Column>
 
-          <!-- Solicitação Pai -->
+          <!-- Ticket Pai -->
           <Column
             v-if="colunaVisivel('solicitacao_pai_id')"
             field="solicitacao_pai_id"
-            header="Solicitação Pai"
+            header="Ticket Pai"
             class="whitespace-nowrap"
             sortable
             style="min-width: 100px"
@@ -1807,7 +1807,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Dialog de Visualização da Solicitação -->
+    <!-- Dialog de Visualização do Ticket -->
     <Dialog
       v-model:visible="dialogSolicitacao"
       modal

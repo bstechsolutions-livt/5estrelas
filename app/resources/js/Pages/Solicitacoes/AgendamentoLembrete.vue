@@ -136,7 +136,7 @@ const formValido = computed(() => {
 
 <template>
   <div class="space-y-5">
-    <!-- Info da Solicitação -->
+    <!-- Info do Ticket -->
     <div
       class="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800"
     >
@@ -148,7 +148,7 @@ const formValido = computed(() => {
         </div>
         <div class="min-w-0">
           <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">
-            Solicitação #{{ solicitacao.id }}
+            Ticket #{{ solicitacao.id }}
           </p>
           <p
             class="text-xs text-amber-600 dark:text-amber-400 truncate"
@@ -171,10 +171,10 @@ const formValido = computed(() => {
           <ul
             class="list-disc list-inside text-xs space-y-1 text-blue-600 dark:text-blue-400"
           >
-            <li>Marca uma data para atender esta solicitação</li>
+            <li>Marca uma data para atender esta ticket</li>
             <li>Aparece no calendário de agendamentos</li>
-            <li>Ao clicar, abre a solicitação para atendimento</li>
-            <li>Finaliza automaticamente quando a solicitação é resolvida</li>
+            <li>Ao clicar, abre a ticket para atendimento</li>
+            <li>Finaliza automaticamente quando a ticket é resolvida</li>
           </ul>
         </div>
       </div>

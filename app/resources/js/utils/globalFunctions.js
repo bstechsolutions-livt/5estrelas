@@ -641,11 +641,11 @@ export async function downloadFile(id) {
 
 import Swal from "sweetalert2"
 
-export function swalBloqueio(titulo = "Solicitação Bloqueada", mensagens = []) {
+export function swalBloqueio(titulo = "Ticket Bloqueado", mensagens = []) {
   const isDark = document.documentElement.classList.contains("dark")
 
   if (!Array.isArray(mensagens) || mensagens.length === 0) {
-    mensagens = ["Você está bloqueado(a) para novas solicitações."]
+    mensagens = ["Você está bloqueado(a) para novos tickets."]
   }
 
   const iconSvg = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayout.vue"
-import Solicitacao from "@/Pages/Solicitacoes/Solicitação.vue"
+import Solicitacao from "@/Pages/Solicitacoes/Ticket.vue"
 import {
   formatarData,
   formatarDataSemHoras,
@@ -53,7 +53,7 @@ const props = defineProps([
 ])
 
 const loadingInicial = ref(true)
-const solicitações = ref(null)
+const tickets = ref(null)
 const contagemCards = ref(null)
 const filtrandoPorCard = ref(false)
 const dialogSolicitacao = ref(false)
@@ -166,7 +166,7 @@ onMounted(async () => {
     dialogSolicitacao.value = true
   }
 
-  // Buscar filiais, colunas e solicitações em paralelo
+  // Buscar filiais, colunas e tickets em paralelo
   await Promise.all([
     buscarFiliais(),
     carregarConfigColunas(),
@@ -227,8 +227,8 @@ function isColumnSortable(field) {
 }
 
 const solicitacoesFiltered = computed(() => {
-  if (!solicitações.value) return []
-  return solicitações.value.filter((i) => !i.ocultarSolicitacao)
+  if (!tickets.value) return []
+  return tickets.value.filter((i) => !i.ocultarSolicitacao)
 })
 
 async function getSolicitacoes() {
@@ -251,9 +251,9 @@ async function getSolicitacoes() {
     }
 
     filtro.value.porPagina = response.data.paginacao.porPagina
-    solicitações.value = response.data["solicitacoes"].data
-    solicitações.value.paginacao = response.data["paginacao"]
-    solicitações.value.contagem = response.data["contagem"]
+    tickets.value = response.data["solicitacoes"].data
+    tickets.value.paginacao = response.data["paginacao"]
+    tickets.value.contagem = response.data["contagem"]
 
     if (!filtrandoPorCard.value) {
       contagemCards.value = response.data["contagem"]
@@ -270,7 +270,7 @@ async function getSolicitacoes() {
       colunas.value = mesclarColunasComCache(colunasServidor, colunasCache)
     }
 
-    solicitações.value.forEach((item) => {
+    tickets.value.forEach((item) => {
       if (
         item.status == "cancelada" ||
         item.status == "finalizada" ||
@@ -283,7 +283,7 @@ async function getSolicitacoes() {
       item.checked = false
     })
 
-    solicitações.value.totalAbertos = solicitações.value.filter(
+    tickets.value.totalAbertos = tickets.value.filter(
       (i) =>
         i.status != "finalizada" &&
         i.status != "cancelada" &&
@@ -404,7 +404,7 @@ function getStatusSeverity(status) {
   return severities[status] || "secondary"
 }
 
-// Verificar se a solicitação está atrasada (previsão de entrega vencida)
+// Verificar se a ticket está atrasada (previsão de entrega vencida)
 function estaAtrasada(solicitacao) {
   if (!solicitacao.previsao_entrega) return false
 
@@ -521,8 +521,8 @@ function getStatusVisual(status) {
 
 // Exportar para Excel - exporta apenas colunas visíveis
 async function exportarExcel() {
-  if (!solicitações.value || solicitações.value.length === 0) {
-    toastError("Nenhuma solicitação para exportar")
+  if (!tickets.value || tickets.value.length === 0) {
+    toastError("Nenhuma ticket para exportar")
     return
   }
 
@@ -847,13 +847,13 @@ function redirecionarNovaSolicitacao() {
 }
 
 function pageChanged(pg) {
-  solicitações.value.paginacao.pagina = pg
+  tickets.value.paginacao.pagina = pg
   getSolicitacoes()
 }
 </script>
 
 <template>
-  <Head title="Minhas Solicitações" />
+  <Head title="Meus Tickets" />
 
   <AuthenticatedLayout>
     <!-- Loading Inicial -->
@@ -878,7 +878,7 @@ function pageChanged(pg) {
         <!-- Texto -->
         <div class="text-center">
           <p class="text-xl font-semibold text-gray-700 dark:text-gray-200">
-            Carregando Solicitações
+            Carregando Tickets
           </p>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Aguarde um momento...
@@ -898,7 +898,7 @@ function pageChanged(pg) {
           <i class="pi pi-home"></i>
           <span>Home</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
-          <span>Solicitações</span>
+          <span>Tickets</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
           <span
             class="text-gray-950 dark:text-white font-bold truncate max-w-[120px] sm:max-w-none"
@@ -921,13 +921,13 @@ function pageChanged(pg) {
             <div
               class="w-1 h-8 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full"
             ></div>
-            Minhas Solicitações
+            Meus Tickets
           </h2>
         </div>
         <span
           class="block text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-bold pl-4 pr-2 sm:pr-0 break-words whitespace-normal"
         >
-          Acompanhe suas solicitações e veja o status de cada uma.
+          Acompanhe suas tickets e veja o status de cada uma.
         </span>
       </div>
     </div>
@@ -984,11 +984,11 @@ function pageChanged(pg) {
               <span
                 @click="
                   swalObservacao(
-                    'ID é um número único que identifica sua solicitação no sistema.'
+                    'ID é um número único que identifica sua ticket no sistema.'
                   )
                 "
                 v-tooltip.top="
-                  'ID é um número único que identifica sua solicitação no sistema.'
+                  'ID é um número único que identifica sua ticket no sistema.'
                 "
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
@@ -1014,11 +1014,11 @@ function pageChanged(pg) {
               <span
                 @click="
                   swalObservacao(
-                    'Filtre as solicitações por prioridade (urgente, alta, média ou baixa).'
+                    'Filtre as tickets por prioridade (urgente, alta, média ou baixa).'
                   )
                 "
                 v-tooltip.top="
-                  'Filtre as solicitações por prioridade (urgente, alta, média ou baixa).'
+                  'Filtre as tickets por prioridade (urgente, alta, média ou baixa).'
                 "
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
@@ -1055,11 +1055,11 @@ function pageChanged(pg) {
               <span
                 @click="
                   swalObservacao(
-                    'Filtre as solicitações pelo status atual (pendente, em atendimento, finalizada, etc).'
+                    'Filtre as tickets pelo status atual (pendente, em atendimento, finalizada, etc).'
                   )
                 "
                 v-tooltip.top="
-                  'Filtre as solicitações pelo status atual (pendente, em atendimento, finalizada, etc).'
+                  'Filtre as tickets pelo status atual (pendente, em atendimento, finalizada, etc).'
                 "
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
@@ -1096,10 +1096,10 @@ function pageChanged(pg) {
               <span
                 @click="
                   swalObservacao(
-                    'Filtre as solicitações pela filial de origem.'
+                    'Filtre as tickets pela filial de origem.'
                   )
                 "
-                v-tooltip.top="'Filtre as solicitações pela filial de origem.'"
+                v-tooltip.top="'Filtre as tickets pela filial de origem.'"
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
                 i
@@ -1131,11 +1131,11 @@ function pageChanged(pg) {
               <span
                 @click="
                   swalObservacao(
-                    'Buscar solicitações criadas a partir desta data.'
+                    'Buscar tickets criadas a partir desta data.'
                   )
                 "
                 v-tooltip.top="
-                  'Buscar solicitações criadas a partir desta data.'
+                  'Buscar tickets criadas a partir desta data.'
                 "
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
@@ -1165,9 +1165,9 @@ function pageChanged(pg) {
               Criação Fim
               <span
                 @click="
-                  swalObservacao('Buscar solicitações criadas até esta data.')
+                  swalObservacao('Buscar tickets criadas até esta data.')
                 "
-                v-tooltip.top="'Buscar solicitações criadas até esta data.'"
+                v-tooltip.top="'Buscar tickets criadas até esta data.'"
                 class="inline-flex items-center justify-center w-4 h-4 text-[10px] text-white bg-blue-600 rounded-full cursor-pointer ml-1"
               >
                 i
@@ -1209,7 +1209,7 @@ function pageChanged(pg) {
     <div class="relative w-full mx-auto">
       <!-- Cards de Estatísticas -->
       <div
-        v-if="!buscaPorIdAtiva && solicitações"
+        v-if="!buscaPorIdAtiva && tickets"
         class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-10 gap-3 mt-6 px-1 sm:px-0"
       >
         <!-- Card Total -->
@@ -1454,9 +1454,9 @@ function pageChanged(pg) {
         </div>
       </div>
 
-      <!-- Tabela de Solicitações (Desktop/iPad) -->
+      <!-- Tabela de Tickets (Desktop/iPad) -->
       <div
-        v-if="solicitações && solicitações.length > 0"
+        v-if="tickets && tickets.length > 0"
         class="bg-white dark:bg-slate-800 rounded-3xl p-4 sm:p-6 mt-6 relative overflow-hidden hidden ipad:block"
       >
         <!-- Cabeçalho da Tabela -->
@@ -1479,15 +1479,15 @@ function pageChanged(pg) {
                 <span
                   class="text-base font-normal text-gray-500 dark:text-gray-400 ml-2"
                 >
-                  ({{ solicitações?.contagem?.total ?? 0 }} registro{{
-                    (solicitações?.contagem?.total ?? 0) !== 1 ? "s" : ""
+                  ({{ tickets?.contagem?.total ?? 0 }} registro{{
+                    (tickets?.contagem?.total ?? 0) !== 1 ? "s" : ""
                   }})
                 </span>
               </h2>
               <div
                 class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium mt-1"
               >
-                Clique em uma linha para abrir a solicitação
+                Clique em uma linha para abrir a ticket
               </div>
             </div>
           </div>
@@ -1500,7 +1500,7 @@ function pageChanged(pg) {
               severity="info"
               outlined
               class="h-10"
-              v-tooltip.top="'Nova Solicitação'"
+              v-tooltip.top="'Novo Ticket'"
               raised
               icon="pi pi-plus-circle"
             />
@@ -1520,7 +1520,7 @@ function pageChanged(pg) {
               v-tooltip.top="'Exportar para Excel'"
               @click="exportarExcel"
               :loading="loadingExport"
-              :disabled="solicitações.length === 0"
+              :disabled="tickets.length === 0"
             />
           </div>
         </div>
@@ -1541,7 +1541,7 @@ function pageChanged(pg) {
             lazy
             paginator
             :rows="filtro.porPagina"
-            :totalRecords="solicitações?.contagem?.total ?? 0"
+            :totalRecords="tickets?.contagem?.total ?? 0"
             :rowsPerPageOptions="[10, 25, 50, 100]"
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords}"
@@ -1582,7 +1582,7 @@ function pageChanged(pg) {
                   ></i>
                 </span>
                 <p class="text-gray-500 dark:text-gray-400 font-medium">
-                  Nenhuma solicitação encontrada
+                  Nenhuma ticket encontrada
                 </p>
                 <p class="text-gray-400 dark:text-gray-500 text-sm mt-1">
                   Tente ajustar os filtros
@@ -1860,9 +1860,9 @@ function pageChanged(pg) {
         </div>
       </div>
 
-      <!-- Cards de Solicitações Mobile -->
+      <!-- Cards de Tickets Mobile -->
       <div
-        v-if="solicitações && solicitações.length > 0"
+        v-if="tickets && tickets.length > 0"
         class="block mt-5 space-y-4 ipad:hidden px-2"
       >
         <!-- Placeholder mobile quando não encontrar -->
@@ -1879,18 +1879,18 @@ function pageChanged(pg) {
           </div>
           <template v-if="buscaPorIdAtiva">
             <p class="text-lg font-bold text-gray-700 dark:text-gray-200">
-              Solicitação #{{ filtro.id }} não encontrada
+              Ticket #{{ filtro.id }} não encontrada
             </p>
             <p
               class="text-sm mt-2 text-gray-500 dark:text-gray-400 text-center px-4"
             >
-              A solicitação não existe ou você não tem permissão para
+              A ticket não existe ou você não tem permissão para
               visualizá-la.
             </p>
           </template>
           <template v-else>
             <p class="text-lg font-bold text-gray-700 dark:text-gray-200">
-              Nenhuma solicitação encontrada
+              Nenhuma ticket encontrada
             </p>
             <p class="text-sm mt-2 text-gray-500 dark:text-gray-400">
               Tente ajustar os filtros.
@@ -2276,22 +2276,22 @@ function pageChanged(pg) {
                 de
               </span>
               <span class="text-sm text-gray-800 dark:text-gray-200 font-bold">
-                {{ solicitações?.paginacao?.paginas || 1 }}
+                {{ tickets?.paginacao?.paginas || 1 }}
               </span>
             </div>
 
             <!-- Botão Próximo -->
             <button
               @click="
-                filtro.pagina < (solicitações?.paginacao?.paginas || 1) &&
+                filtro.pagina < (tickets?.paginacao?.paginas || 1) &&
                 (filtro.pagina++, getSolicitacoes())
               "
               :disabled="
-                filtro.pagina >= (solicitações?.paginacao?.paginas || 1)
+                filtro.pagina >= (tickets?.paginacao?.paginas || 1)
               "
               class="flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-200"
               :class="
-                filtro.pagina >= (solicitações?.paginacao?.paginas || 1)
+                filtro.pagina >= (tickets?.paginacao?.paginas || 1)
                   ? 'bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                   : 'bg-white dark:bg-slate-700 border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 active:scale-95'
               "
@@ -2305,24 +2305,24 @@ function pageChanged(pg) {
             class="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-slate-600"
           >
             <span class="text-xs text-gray-500 dark:text-gray-400">
-              Mostrando 1 a {{ solicitações?.paginacao?.porPagina || 10 }} de
-              {{ solicitações?.contagem?.total || 0 }}
+              Mostrando 1 a {{ tickets?.paginacao?.porPagina || 10 }} de
+              {{ tickets?.contagem?.total || 0 }}
             </span>
           </div>
         </div>
       </div>
 
-      <!-- Mensagem quando não há solicitações -->
+      <!-- Mensagem quando não há tickets -->
       <div
         v-else-if="!loadingInicial"
         class="flex flex-col items-center justify-center py-16 text-gray-500 dark:text-gray-400"
       >
         <i class="pi pi-inbox text-6xl mb-4"></i>
-        <p class="text-lg font-medium">Nenhuma solicitação encontrada</p>
-        <p class="text-sm">Crie uma nova solicitação para começar</p>
+        <p class="text-lg font-medium">Nenhuma ticket encontrada</p>
+        <p class="text-sm">Crie uma nova ticket para começar</p>
         <Button
           @click="redirecionarNovaSolicitacao()"
-          label="Nova Solicitação"
+          label="Novo Ticket"
           severity="contrast"
           class="mt-4"
           icon="fas fa-plus"
@@ -2432,7 +2432,7 @@ function pageChanged(pg) {
       </div>
     </Dialog>
 
-    <!-- Dialog Solicitação -->
+    <!-- Dialog Ticket -->
     <Dialog
       v-model:visible="dialogSolicitacao"
       modal

@@ -564,7 +564,7 @@ async function toggleAtivoAssunto(assunto) {
   const acao = estaAtivo ? "desativar" : "ativar"
   const acaoCapitalizada = estaAtivo ? "Desativar" : "Ativar"
   const mensagem = estaAtivo
-    ? "O assunto não aparecerá mais para os usuários criarem novas solicitações."
+    ? "O assunto não aparecerá mais para os usuários criarem novas tickets."
     : "O assunto voltará a aparecer para os usuários."
 
   const { isConfirmed } = await swalConfirm(
@@ -1505,7 +1505,7 @@ function toggleEdicao(item) {
 </script>
 
 <template>
-  <Head title="Config Solicitações" />
+  <Head title="Config Tickets" />
 
   <AuthenticatedLayout>
     <!-- Loader personalizado -->
@@ -1523,7 +1523,7 @@ function toggleEdicao(item) {
           <span>Home</span>
         </div>
         <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
-        <span>Solicitações</span>
+        <span>Tickets</span>
         <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
         <span
           class="text-gray-950 dark:text-white font-bold truncate max-w-[120px] sm:max-w-none"
@@ -1564,7 +1564,7 @@ function toggleEdicao(item) {
         </h2>
       </div>
       <span class="text-xs text-gray-500 dark:text-gray-400 font-bold pl-2">
-        Gerencie os departamentos habilitados para solicitações
+        Gerencie os departamentos habilitados para tickets
       </span>
     </div>
 
@@ -1604,7 +1604,7 @@ function toggleEdicao(item) {
         </h2>
       </div>
       <span class="text-xs text-gray-500 dark:text-gray-400 font-bold pl-2">
-        Gerencie os equipamentos disponíveis para solicitações
+        Gerencie os equipamentos disponíveis para tickets
       </span>
     </div>
 
@@ -1624,7 +1624,7 @@ function toggleEdicao(item) {
         </h2>
       </div>
       <span class="text-xs text-gray-500 dark:text-gray-400 font-bold pl-2">
-        Configure as notificações do sistema de solicitações
+        Configure as notificações do sistema de tickets
       </span>
     </div>
 
@@ -2016,12 +2016,12 @@ function toggleEdicao(item) {
                 <div
                   @click="
                     toastInfo(
-                      'Prazo de resolução (em dias) para uma solicitação ser resolvida automaticamente.'
+                      'Prazo de resolução (em dias) para uma ticket ser resolvida automaticamente.'
                     )
                   "
                   class="w-5 h-5 mt-5 2xl:mt-0 bg-blue-500 rounded-full flex items-center justify-center cursor-help"
                   v-tooltip.top="
-                    'Prazo de resolução (em dias) para uma solicitação ser resolvida automaticamente.'
+                    'Prazo de resolução (em dias) para uma ticket ser resolvida automaticamente.'
                   "
                 >
                   <i class="pi pi-info text-white !text-xs"></i>
@@ -2323,7 +2323,7 @@ function toggleEdicao(item) {
                     Lista de Equipamentos
                   </h3>
                   <p class="text-sm text-gray-500 dark:text-gray-400">
-                    Gerencie os equipamentos disponíveis para solicitações
+                    Gerencie os equipamentos disponíveis para tickets
                   </p>
                 </div>
               </div>
@@ -2789,7 +2789,7 @@ function toggleEdicao(item) {
               </h4>
               <p class="text-xs sm:text-sm text-blue-700">
                 Configure quais campos aparecerão no formulário de criação de
-                solicitações e suas respectivas configurações. Campos inativos
+                tickets e suas respectivas configurações. Campos inativos
                 não aparecerão para o usuário.
               </p>
             </div>
@@ -3762,7 +3762,7 @@ function toggleEdicao(item) {
             </div>
             <p class="text-sm text-purple-700">
               Configure instruções que aparecerão na tela de criação de
-              solicitações. Use formatação para destacar informações
+              tickets. Use formatação para destacar informações
               importantes.
             </p>
           </div>
@@ -3893,7 +3893,7 @@ function toggleEdicao(item) {
             </div>
             <p class="text-sm text-orange-700">
               Configure arquivos modelo que ficarão disponíveis para download na
-              criação de solicitações deste assunto.
+              criação de tickets deste assunto.
             </p>
           </div>
         </div>
@@ -4279,7 +4279,7 @@ function toggleEdicao(item) {
             </p>
             <p class="text-sm text-yellow-700">
               {{ qtdRespostasAlteracao }}
-              {{ qtdRespostasAlteracao <= 1 ? "solicitação" : "solicitações" }}
+              {{ qtdRespostasAlteracao <= 1 ? "ticket" : "tickets" }}
               já responderam este campo.
             </p>
           </div>
@@ -4296,12 +4296,12 @@ function toggleEdicao(item) {
             <li>
               O campo antigo será
               <strong>desativado</strong>
-              para novas solicitações
+              para novas tickets
             </li>
             <li>
               As respostas antigas
               <strong>continuarão visíveis</strong>
-              nas solicitações existentes
+              nas tickets existentes
             </li>
           </ul>
         </div>

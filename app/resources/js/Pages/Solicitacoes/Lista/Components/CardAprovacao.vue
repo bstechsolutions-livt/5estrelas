@@ -110,7 +110,7 @@
           class="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1"
         >
           <i class="pi pi-info-circle text-amber-500"></i>
-          Motivo da Solicitação
+          Motivo do Ticket
         </h4>
         <p
           class="text-xs text-slate-600 dark:text-slate-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 p-3 rounded-xl line-clamp-3"
@@ -177,11 +177,11 @@
           </button>
         </div>
 
-        <!-- Botão para abrir solicitação -->
+        <!-- Botão para abrir ticket -->
         <button
           @click="$emit('abrir-solicitacao', aprovacao)"
           class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all"
-          title="Ver detalhes da solicitação"
+          title="Ver detalhes da ticket"
         >
           <i class="pi pi-eye"></i>
           Ver Detalhes

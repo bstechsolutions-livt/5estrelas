@@ -32,11 +32,11 @@
           class="list-disc list-inside space-y-1 text-violet-700 text-xs sm:text-sm"
         >
           <li>
-            Configure etapas para acompanhar o progresso das solicitações deste
+            Configure etapas para acompanhar o progresso das tickets deste
             assunto (ex: "Triagem", "Desenvolvimento", "Teste")
           </li>
           <li>
-            O gestor poderá ver e alterar a etapa atual de cada solicitação na
+            O gestor poderá ver e alterar a etapa atual de cada ticket na
             listagem
           </li>
           <li>
@@ -51,7 +51,7 @@
           </li>
           <li>
             Todas as alterações de etapa ficam registradas no histórico e na
-            timeline da solicitação
+            timeline da ticket
           </li>
         </ul>
       </div>

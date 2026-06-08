@@ -53,11 +53,11 @@ onMounted(async () => {
 })
 
 function novoContrato() {
-  router.visit("/pagina/gestao-contratos/servicos-prestados-prestados/novo")
+  router.visit("/pagina/gestao-contratos/servicos-prestados/novo")
 }
 
 function editarContrato(id) {
-  router.visit(`/pagina/gestao-contratos/servicos-prestados-prestados/${id}`)
+  router.visit(`/pagina/gestao-contratos/servicos-prestados/${id}`)
 }
 
 function confirmarExclusao(contrato) {

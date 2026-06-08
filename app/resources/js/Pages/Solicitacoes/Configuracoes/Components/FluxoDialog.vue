@@ -38,11 +38,11 @@
           class="list-disc list-inside space-y-1 text-teal-700 text-xs sm:text-sm"
         >
           <li>
-            Configure a sequência de etapas por onde a solicitação passará
+            Configure a sequência de etapas por onde a ticket passará
             automaticamente
           </li>
           <li>
-            Cada etapa pertence a um departamento — ao avançar, a solicitação é
+            Cada etapa pertence a um departamento — ao avançar, a ticket é
             <strong>transferida automaticamente</strong>
           </li>
           <li>
@@ -69,7 +69,7 @@
           <li>
             Ao
             <strong>concluir</strong>
-            o fluxo, a solicitação é resolvida. Ao
+            o fluxo, a ticket é resolvida. Ao
             <strong>cancelar</strong>
             , é cancelada
           </li>
@@ -798,14 +798,14 @@
                       />
                     </div>
 
-                    <!-- Abrir solicitação: assunto vinculado -->
+                    <!-- Abrir ticket: assunto vinculado -->
                     <Select
                       v-if="decisao.acao === 'abrir_solicitacao'"
                       v-model="decisao.abrir_solicitacao_assunto_id"
                       :options="todosAssuntos"
                       optionLabel="label"
                       optionValue="value"
-                      placeholder="Assunto da solicitação vinculada"
+                      placeholder="Assunto da ticket vinculada"
                       filter
                       class="w-full mt-1.5"
                       :class="{
@@ -1425,7 +1425,7 @@ const departamentosOptions = computed(() => {
   return []
 })
 
-// Todos os assuntos para o selector de "abrir solicitação vinculada"
+// Todos os assuntos para o selector de "abrir ticket vinculada"
 const todosAssuntos = computed(() => {
   return (props.assuntos || []).map((a) => ({
     label: `${a.assunto} (${a.departamento || "?"})`,
@@ -1940,7 +1940,7 @@ const acoesDecisao = [
   { value: "avancar", label: "Ir para etapa" },
   { value: "atribuir_avancar", label: "Atribuir responsável e avançar" },
   { value: "voltar_solicitante", label: "Voltar para solicitante" },
-  { value: "abrir_solicitacao", label: "Abrir solicitação vinculada" },
+  { value: "abrir_solicitacao", label: "Abrir ticket vinculada" },
   { value: "finalizar", label: "Finalizar fluxo" },
   { value: "cancelar", label: "Cancelar fluxo" },
   { value: "resolver", label: "Resolver fluxo" }
@@ -2432,7 +2432,7 @@ async function salvarFluxo() {
   )
   if (abrirSemAssunto) {
     toastError(
-      'Decisões do tipo "Abrir solicitação vinculada" devem ter um assunto selecionado'
+      'Decisões do tipo "Abrir ticket vinculada" devem ter um assunto selecionado'
     )
     return
   }

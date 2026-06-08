@@ -14,7 +14,7 @@ import DatePicker from "primevue/datepicker"
 import Button from "primevue/button"
 import Panel from "primevue/panel"
 import Dialog from "primevue/dialog"
-import Solicitacao from "@/Pages/Solicitacoes/Solicitação.vue"
+import Solicitacao from "@/Pages/Solicitacoes/Ticket.vue"
 
 // Marcar como página nova
 layout.paginaNova.value = true
@@ -22,7 +22,7 @@ layout.paginaNova.value = true
 const page = usePage()
 const userPreferences = useUserPreferences()
 
-// Estados para modal de solicitação
+// Estados para modal de ticket
 const dialogSolicitacao = ref(false)
 const solicitacaoSelecionada = ref(null)
 
@@ -545,7 +545,7 @@ function getStatusClass(status) {
   )
 }
 
-// Função para exibir título da solicitação (prioriza título, depois assunto)
+// Função para exibir título da ticket (prioriza título, depois assunto)
 function getTituloSolicitacao(sol) {
   if (sol.titulo) return sol.titulo
   if (sol.assunto) return sol.assunto
@@ -653,7 +653,7 @@ function onImageError(event) {
   }
 }
 
-// Abrir solicitação em modal
+// Abrir ticket em modal
 function abrirSolicitacao(sol) {
   solicitacaoSelecionada.value = sol
   dialogSolicitacao.value = true
@@ -661,7 +661,7 @@ function abrirSolicitacao(sol) {
 </script>
 
 <template>
-  <Head title="Dashboard Solicitações" />
+  <Head title="Dashboard Tickets" />
   <AuthenticatedLayout>
     <!-- Loading Inicial -->
     <div
@@ -687,7 +687,7 @@ function abrirSolicitacao(sol) {
           <i class="pi pi-home"></i>
           <span>Home</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
-          <span>Solicitações</span>
+          <span>Tickets</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
           <span
             class="text-gray-950 dark:text-white font-bold truncate max-w-[120px] sm:max-w-none"
@@ -707,14 +707,14 @@ function abrirSolicitacao(sol) {
           <div
             class="w-1 h-8 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full"
           ></div>
-          Dashboard de Solicitações
+          Dashboard de Tickets
         </h2>
       </div>
       <span
         class="block text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-bold pl-2 pr-2 sm:pr-0 break-words whitespace-normal"
       >
         Visualize métricas, gráficos e indicadores de desempenho das
-        solicitações do seu departamento.
+        tickets do seu departamento.
       </span>
     </div>
 
@@ -1231,7 +1231,7 @@ function abrirSolicitacao(sol) {
             >
               <div class="text-center">
                 <i class="pi pi-check-circle mb-2 text-3xl text-green-400"></i>
-                <p>Nenhuma solicitação atrasada!</p>
+                <p>Nenhuma ticket atrasada!</p>
               </div>
             </div>
           </div>
@@ -1542,7 +1542,7 @@ function abrirSolicitacao(sol) {
                     {{ dados.atrasadasPorFaixa?.ate3dias || 0 }}
                   </span>
                   <span class="text-sm text-gray-400 dark:text-gray-500">
-                    solicitações
+                    tickets
                   </span>
                 </div>
 
@@ -1611,7 +1611,7 @@ function abrirSolicitacao(sol) {
                     {{ dados.atrasadasPorFaixa?.ate7dias || 0 }}
                   </span>
                   <span class="text-sm text-gray-400 dark:text-gray-500">
-                    solicitações
+                    tickets
                   </span>
                 </div>
 
@@ -1693,7 +1693,7 @@ function abrirSolicitacao(sol) {
                     {{ dados.atrasadasPorFaixa?.mais7dias || 0 }}
                   </span>
                   <span class="text-sm text-gray-400 dark:text-gray-500">
-                    solicitações
+                    tickets
                   </span>
                 </div>
 
@@ -1728,7 +1728,7 @@ function abrirSolicitacao(sol) {
           <div class="flex items-center gap-2">
             <i class="pi pi-info-circle text-gray-400 dark:text-gray-500"></i>
             <span class="text-sm text-gray-500 dark:text-gray-400">
-              Total de solicitações atrasadas:
+              Total de tickets atrasadas:
             </span>
           </div>
           <span class="text-lg font-bold text-red-600 dark:text-red-400">
@@ -1855,7 +1855,7 @@ function abrirSolicitacao(sol) {
                 Nenhuma pendente parada!
               </p>
               <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                Todas as solicitações foram iniciadas
+                Todas as tickets foram iniciadas
               </p>
             </div>
           </div>
@@ -1998,7 +1998,7 @@ function abrirSolicitacao(sol) {
         </div>
       </div>
 
-      <!-- Solicitações mais antigas abertas -->
+      <!-- Tickets mais antigas abertas -->
       <div
         class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md border border-gray-100 dark:border-slate-700"
       >
@@ -2012,7 +2012,7 @@ function abrirSolicitacao(sol) {
               <i class="pi pi-history text-white"></i>
             </span>
             <div>
-              <span>Solicitações Mais Antigas em Aberto</span>
+              <span>Tickets Mais Antigas em Aberto</span>
               <p class="text-xs font-normal text-gray-400 dark:text-gray-500">
                 Backlog mais antigo - requer atenção
               </p>
@@ -2159,16 +2159,16 @@ function abrirSolicitacao(sol) {
               ></i>
             </div>
             <p class="text-gray-500 dark:text-gray-400 font-medium">
-              Nenhuma solicitação em aberto!
+              Nenhuma ticket em aberto!
             </p>
             <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Todas as solicitações foram finalizadas
+              Todas as tickets foram finalizadas
             </p>
           </div>
         </div>
       </div>
 
-      <!-- Solicitações Atrasadas -->
+      <!-- Tickets Atrasadas -->
       <div
         class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md border border-gray-100 dark:border-slate-700"
       >
@@ -2182,7 +2182,7 @@ function abrirSolicitacao(sol) {
               <i class="pi pi-exclamation-triangle text-white"></i>
             </span>
             <div>
-              <span>Solicitações Atrasadas</span>
+              <span>Tickets Atrasadas</span>
               <p class="text-xs font-normal text-gray-400 dark:text-gray-500">
                 Prazo de entrega vencido
               </p>
@@ -2330,7 +2330,7 @@ function abrirSolicitacao(sol) {
               ></i>
             </div>
             <p class="text-gray-500 dark:text-gray-400 font-medium">
-              Nenhuma solicitação atrasada!
+              Nenhuma ticket atrasada!
             </p>
             <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
               Todas as entregas estão no prazo
@@ -2462,7 +2462,7 @@ function abrirSolicitacao(sol) {
               ></i>
             </div>
             <p class="text-gray-500 dark:text-gray-400 font-medium">
-              Nenhuma solicitação aguardando feedback!
+              Nenhuma ticket aguardando feedback!
             </p>
             <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
               Todas as resolvidas já foram finalizadas
@@ -2492,7 +2492,7 @@ function abrirSolicitacao(sol) {
       </p>
     </div>
 
-    <!-- Dialog de Visualização da Solicitação -->
+    <!-- Dialog de Visualização do Ticket -->
     <Dialog
       v-model:visible="dialogSolicitacao"
       modal

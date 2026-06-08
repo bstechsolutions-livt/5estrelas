@@ -75,7 +75,7 @@ const solicitacao = ref({
 })
 
 const loading = ref(null)
-const criandoSolicitacao = ref(false) // Estado para controlar o botão de criar solicitação
+const criandoSolicitacao = ref(false) // Estado para controlar o botão de criar ticket
 const textoBotao = ref("Solicitar") // Texto dinâmico do botão
 const termoFuncionario = ref("")
 const dialogFuncionario = ref(false)
@@ -276,7 +276,7 @@ const selectsVisiveis = computed(() => {
   if (!solicitacao.value.assunto?.selects) return []
 
   return solicitacao.value.assunto.selects.filter((select) => {
-    // Primeiro verificar se é para exibir na nova solicitação
+    // Primeiro verificar se é para exibir na nova ticket
     if (select.exibir_nova !== "S") return false
 
     // Depois verificar condição do campo pai
@@ -807,7 +807,7 @@ async function criarSolicitacao() {
         : null
     }
 
-    // Criar solicitação
+    // Criar ticket
     await axios
       .post("/solicitacoes/nova/criar", params)
       .then(async (res) => {
@@ -820,7 +820,7 @@ async function criarSolicitacao() {
         )
 
         // Exibir toast de sucesso
-        toastSuccess("Solicitação criada com sucesso!")
+        toastSuccess("Ticket criado com sucesso!")
 
         // Atualizar texto do botão para indicar redirecionamento
         textoBotao.value = "Redirecionando..."
@@ -829,7 +829,7 @@ async function criarSolicitacao() {
         if (assuntoSelecionado.redirect) {
           window.location.href = `/solicitacoes/nova?departamento=${solicitacao.value.departamento.condicao1}&assunto=${assuntoSelecionado.id}`
         } else {
-          // Redirecionar para página Minhas e abrir modal da solicitação criada
+          // Redirecionar para página Minhas e abrir modal da ticket criada
           window.location.href = `/solicitacoes/minhas?solicitacao=${res.data.solicitacao_id}`
         }
       })
@@ -837,9 +837,9 @@ async function criarSolicitacao() {
         // Se for erro de duplicata (código 409), mostra mensagem específica
         if (err.response?.status === 409) {
           swalErro(
-            "Solicitação Duplicada",
+            "Ticket Duplicada",
             err.response.data.mensagem ||
-              "Esta solicitação já foi criada recentemente."
+              "Esta ticket já foi criada recentemente."
           )
         }
         // Se for erro de rate limiting (código 429), mostra mensagem específica
@@ -853,7 +853,7 @@ async function criarSolicitacao() {
           swalErro(
             "Erro",
             err.response?.data?.mensagem ||
-              "Ocorreu um erro ao processar sua solicitação."
+              "Ocorreu um erro ao processar sua ticket."
           )
         }
 
@@ -865,7 +865,7 @@ async function criarSolicitacao() {
         }
       })
   } catch (error) {
-    console.error("Erro ao criar solicitação:", error)
+    console.error("Erro ao criar ticket:", error)
 
     // Detectar se é erro de arquivo grande (413 Payload Too Large)
     if (error?.response?.status === 413) {
@@ -883,7 +883,7 @@ async function criarSolicitacao() {
       )
     } else {
       swalErro(
-        "Erro inesperado ao criar solicitação",
+        "Erro inesperado ao criar ticket",
         "Ocorreu um erro inesperado. Tente novamente!"
       )
     }
@@ -1477,7 +1477,7 @@ function getAvatarColor(nome) {
 </script>
 
 <template>
-  <Head title="Nova Solicitação" />
+  <Head title="Novo Ticket" />
 
   <AuthenticatedLayout>
     <!-- Loading Overlay -->
@@ -1504,12 +1504,12 @@ function getAvatarColor(nome) {
           <i class="pi pi-home"></i>
           <span>Home</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
-          <span>Solicitações</span>
+          <span>Tickets</span>
           <span class="mx-1 sm:mx-2 text-gray-400 dark:text-gray-500">/</span>
           <span
             class="text-gray-950 dark:text-white font-bold truncate max-w-[120px] sm:max-w-none"
           >
-            Nova Solicitação
+            Novo Ticket
           </span>
         </div>
       </div>
@@ -1524,13 +1524,13 @@ function getAvatarColor(nome) {
           <div
             class="w-1 h-8 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full"
           ></div>
-          Nova Solicitação
+          Novo Ticket
         </h2>
       </div>
       <span
         class="block text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium pl-4"
       >
-        Preencha os campos abaixo para criar uma nova solicitação.
+        Preencha os campos abaixo para criar uma nova ticket.
       </span>
     </div>
 
@@ -1552,7 +1552,7 @@ function getAvatarColor(nome) {
             </span>
             <div>
               <h3 class="text-lg font-bold text-gray-800 dark:text-white">
-                Dados da Solicitação
+                Dados do Ticket
               </h3>
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 Informações do solicitante e seleção de departamento
@@ -1778,7 +1778,7 @@ function getAvatarColor(nome) {
               >
                 <i class="pi pi-lightbulb"></i>
                 <strong>Dica:</strong>
-                Baixe os modelos para preencher corretamente sua solicitação
+                Baixe os modelos para preencher corretamente sua ticket
               </p>
             </div>
           </div>
@@ -2397,10 +2397,10 @@ function getAvatarColor(nome) {
             </span>
             <div>
               <h3 class="text-lg font-bold text-gray-800 dark:text-white">
-                Detalhes da Solicitação
+                Detalhes do Ticket
               </h3>
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                Descreva sua solicitação com o máximo de detalhes
+                Descreva sua ticket com o máximo de detalhes
               </p>
             </div>
           </div>
@@ -2434,7 +2434,7 @@ function getAvatarColor(nome) {
                 v-if="tipoCampo('titulo') === 'selecao'"
                 v-model="solicitacao.titulo"
                 :options="opcoesTitulo()"
-                placeholder="Selecione o título da solicitação"
+                placeholder="Selecione o título da ticket"
                 class="w-full"
                 :filter="opcoesTitulo().length > 5"
                 filterPlaceholder="Buscar..."
@@ -2443,7 +2443,7 @@ function getAvatarColor(nome) {
               <!-- Renderizar InputText quando tipo = texto (padrão) -->
               <InputText
                 v-else
-                placeholder="Escreva um breve resumo sobre o assunto da solicitação"
+                placeholder="Escreva um breve resumo sobre o assunto da ticket"
                 maxlength="200"
                 v-model="solicitacao.titulo"
                 class="w-full"
@@ -3234,7 +3234,7 @@ function getAvatarColor(nome) {
                 </button>
               </h3>
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                Anexe arquivos relacionados à sua solicitação
+                Anexe arquivos relacionados à sua ticket
               </p>
             </div>
           </div>

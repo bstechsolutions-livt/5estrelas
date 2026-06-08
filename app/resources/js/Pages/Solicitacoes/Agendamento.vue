@@ -198,7 +198,7 @@ async function criarAgendamento() {
 
   const response = await swalConfirm(
     "Você tem certeza ?",
-    "O responsável pelo agendamento será atribuido como responsável pela solicitação."
+    "O responsável pelo agendamento será atribuido como responsável pela ticket."
   )
 
   if (!response.isConfirmed) {
@@ -258,7 +258,7 @@ async function atualizarAgendamento() {
 
   const response = await swalConfirm(
     "Você tem certeza ?",
-    "O responsável pelo agendamento será atribuido como responsável pela solicitação."
+    "O responsável pelo agendamento será atribuido como responsável pela ticket."
   )
 
   if (!response.isConfirmed) {

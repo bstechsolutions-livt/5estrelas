@@ -18,12 +18,12 @@
         <ul class="list-disc list-inside space-y-1 text-blue-700">
           <li>
             <strong>Sem liberações configuradas:</strong>
-            Qualquer usuário pode abrir solicitações deste assunto
+            Qualquer usuário pode abrir tickets deste assunto
           </li>
           <li>
             <strong>Com liberações configuradas:</strong>
             Apenas usuários das filiais, funcionários ou departamentos
-            especificados podem abrir solicitações
+            especificados podem abrir tickets
           </li>
         </ul>
       </div>

@@ -123,14 +123,14 @@ class SolicitacoesController extends Controller
     public function indexNova()
     {
 
-        // Buscar departamentos ativos para redirecionar chamados
-        $departamentos = DB::table('intranet_parametros')
-            ->where('menu', 'SOLICITACOES')
-            ->where('submenu', 'CONFIGURACOES')
-            ->where('parametro', 'DEP_ATIVOS')
-            ->where('valor', 1)
-            ->orderBy('condicao1')
-            ->get();
+        // Departamentos ativos (5E: tabela `departments`, no lugar de intranet_parametros DEP_ATIVOS)
+        // Mantém a chave `condicao1` (= identificador do depto) que o fluxo/front espera
+        $departamentos = \App\Models\Department::where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($d) {
+                return (object) ['id' => $d->id, 'condicao1' => $d->name, 'department_id' => $d->id];
+            });
 
         // Gera um array fixo com os campos
         $campos = [
@@ -151,9 +151,13 @@ class SolicitacoesController extends Controller
 
         // Buscar responsáveis pelos departamentos
         foreach ($departamentos as $departamento) {
-            $departamento->responsaveis = Funcionario::where('areaatuacao', $departamento->condicao1)->where('situacao', 'A')->select('matricula', 'nome')->get();
+            $departamento->responsaveis = \App\Models\User::where('department_id', $departamento->id)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->map(fn($u) => (object) ['matricula' => $u->id, 'nome' => $u->name]);
 
-            $departamento->assuntos = SolicitacaoAssunto::where('departamento', $departamento->condicao1)
+            $departamento->assuntos = SolicitacaoAssunto::where('department_id', $departamento->id)
                 ->where('ativo', 'S')
                 ->with(['modelos.arquivo', 'liberacoes', 'responsaveis.funcionario:matricula,nome'])
                 ->orderBy('assunto')
@@ -225,7 +229,8 @@ class SolicitacoesController extends Controller
 
         $solicitante['nome'] = auth()->user()?->name;
         $solicitante['matricula'] = auth()->id();
-        $solicitante['departamento'] = auth()->user()?->department_id;
+        // 5E: exibir o NOME do departamento do solicitante (não o id), vindo da tabela `departments`
+        $solicitante['departamento'] = \App\Models\Department::where('id', auth()->user()?->department_id)->value('name');
 
         // Dptos (5E: tabela `departments`, no lugar de ERP-legado/ERP legado)
         $dptos = \App\Models\Department::orderBy('name')
@@ -254,7 +259,7 @@ class SolicitacoesController extends Controller
     {
         // Obter os assuntos do departamento
         // Na configuração, incluir assuntos inativos para permitir reativação
-        $query = SolicitacaoAssunto::where('departamento', $request->input('departamento'))
+        $query = SolicitacaoAssunto::where('department_id', $request->input('departamento'))
             ->with(['modelos.arquivo', 'liberacoes', 'responsaveis.funcionario:matricula,nome']);
 
         // Se não for configuração, filtrar apenas ativos
@@ -327,12 +332,12 @@ class SolicitacoesController extends Controller
             $assunto->setAttribute('campos', $camposArray);
             $assunto->setAttribute('selects', $selects);
         }
-        // Obter os responsáveis ativos no departamento
-        $responsaveis = Funcionario::where('areaatuacao', $request->input('departamento'))
-            ->where('situacao', 'A')
-            ->whereNotIn('matricula', [99999999, 7801, 10000]) // excluir usuarios ficiticios
-            ->select('matricula', 'nome')
-            ->get();
+        // Obter os responsáveis ativos no departamento (5E: tabela users por department_id)
+        $responsaveis = \App\Models\User::where('department_id', $request->input('departamento'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(fn($u) => (object) ['matricula' => $u->id, 'nome' => $u->name]);
 
         // Retornar os dados formatados
         return [
@@ -385,7 +390,7 @@ class SolicitacoesController extends Controller
             $idsEnviados = array_column($assuntos, 'id');
 
             // Buscar assuntos existentes (todos, incluindo inativos, pois agora enviamos inativos também)
-            $assuntosExistentes = SolicitacaoAssunto::where('departamento', $departamento)->pluck('id')->toArray();
+            $assuntosExistentes = SolicitacaoAssunto::where('department_id', $departamento)->pluck('id')->toArray();
 
             // Identificar IDs a serem excluídos (apenas os que foram removidos da lista, não os inativos)
             $idsParaExcluir = array_diff($assuntosExistentes, $idsEnviados);
@@ -400,7 +405,7 @@ class SolicitacoesController extends Controller
                 $assuntoEncontrado = SolicitacaoAssunto::where('id', $assunto['id'])->firstOrNew();
 
                 // Inserir novas informações
-                $assuntoEncontrado->departamento = $departamento;
+                $assuntoEncontrado->department_id = $departamento;
                 $assuntoEncontrado->assunto = $assunto['assunto'];
                 $assuntoEncontrado->responsavel = $assunto['responsavel'];
                 $assuntoEncontrado->prioridade = $assunto['prioridade'];
@@ -820,11 +825,35 @@ class SolicitacoesController extends Controller
         return Excel::download(new SolicitacoesCamposExport($filtros), $nomeArquivo);
     }
 
+    /**
+     * 5E: normaliza uma lista de identificadores de filial (que o front envia como
+     * `codigo` = vw_filiais.codigo) para os ids canônicos de `branches`.
+     * Aceita mistura de code/id e ignora valores vazios.
+     */
+    private function normalizarFiliaisParaId($valores): array
+    {
+        $valores = array_values(array_filter((array) $valores, fn($v) => $v !== null && $v !== ''));
+        if (empty($valores)) {
+            return [];
+        }
+
+        return \App\Models\Branch::where(function ($q) use ($valores) {
+            $q->whereIn('code', $valores)->orWhereIn('id', $valores);
+        })->pluck('id')->all();
+    }
+
     public function criarSolicitacao(Request $request)
     {
 
         $solicitacao = $request->all();
 
+        // 5E: o front envia `filial_id` = `codigo` (vw_filiais.codigo = COALESCE(code, id)).
+        // Normalizar para o id canônico de `branches`, garantindo que a relação filial() resolva
+        // corretamente (branches podem ter code != id).
+        if (! empty($solicitacao['filial_id'])) {
+            $solicitacao['filial_id'] = \App\Models\Branch::where('code', $solicitacao['filial_id'])
+                ->value('id') ?? $solicitacao['filial_id'];
+        }
         // Criar hash único baseado nos dados principais da solicitação para evitar duplicatas
         $hashData = [
             'titulo' => $solicitacao['titulo'] ?? '',
@@ -1426,7 +1455,7 @@ class SolicitacoesController extends Controller
             }
 
             if ($request->has('filiais') && ! empty($request->input('filiais'))) {
-                $solicitacoes->whereIn('filial_id', $request->input('filiais'));
+                $solicitacoes->whereIn('filial_id', $this->normalizarFiliaisParaId($request->input('filiais')));
             }
 
             if ($request->has('ufs') && ! empty($request->input('ufs'))) {
@@ -1764,7 +1793,7 @@ class SolicitacoesController extends Controller
 
         // Filtro por filiais
         if ($request->has('filiais') && ! empty($request->input('filiais'))) {
-            $queryContagem->whereIn('filial_id', $request->input('filiais'));
+            $queryContagem->whereIn('filial_id', $this->normalizarFiliaisParaId($request->input('filiais')));
         }
 
         // Filtro por UF
@@ -3737,16 +3766,17 @@ class SolicitacoesController extends Controller
 
     public function getDeptoAtivo()
     {
-        $departamentosQuery = DB::table('intranet_parametros')
-            ->where('menu', 'SOLICITACOES')
-            ->where('submenu', 'CONFIGURACOES')
-            ->where('parametro', 'DEP_ATIVOS')
-            ->where('valor', 1)
-            ->get();
+        // Departamentos ativos (5E: tabela `departments`, no lugar de intranet_parametros DEP_ATIVOS)
+        $departamentosQuery = \App\Models\Department::where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($d) {
+                return (object) ['id' => $d->id, 'condicao1' => $d->name, 'department_id' => $d->id];
+            });
 
         foreach ($departamentosQuery as $depto) {
             $depto->assuntos = SolicitacaoAssunto::where('ativo', 'S')
-                ->where('departamento', $depto->condicao1)
+                ->where('department_id', $depto->id)
                 ->orderBy('assunto', 'asc')
                 ->get();
 
@@ -5772,7 +5802,7 @@ class SolicitacoesController extends Controller
         try {
             $id = $request->input('id');
             $departamento = $request->input('departamento');
-            $codfiliais = $request->input('codfiliais', []);
+            $codfiliais = $this->normalizarFiliaisParaId($request->input('codfiliais', []));
             $assuntos = $request->input('assuntos', []);
             $responsavel = $request->input('responsavel');
             $solicitante = $request->input('solicitante');
@@ -5900,7 +5930,7 @@ class SolicitacoesController extends Controller
         try {
             $id = $request->input('id');
             $departamento = $request->input('departamento');
-            $codfiliais = $request->input('codfiliais', []);
+            $codfiliais = $this->normalizarFiliaisParaId($request->input('codfiliais', []));
             $assuntos = $request->input('assuntos', []);
             $responsavel = $request->input('responsavel');
             $solicitante = $request->input('solicitante');
@@ -6072,7 +6102,7 @@ class SolicitacoesController extends Controller
             // Filtros (mesmos do relatório)
             $id = $request->input('id');
             $departamento = $request->input('departamento');
-            $codfiliais = $request->input('codfiliais', []);
+            $codfiliais = $this->normalizarFiliaisParaId($request->input('codfiliais', []));
             $assuntos = $request->input('assuntos', []);
             $responsavel = $request->input('responsavel');
             $solicitante = $request->input('solicitante');
