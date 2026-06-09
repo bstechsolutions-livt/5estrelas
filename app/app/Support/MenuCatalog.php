@@ -10,14 +10,41 @@ class MenuCatalog
      * Estrutura completa do menu com suporte a grupos/submenus.
      * Items sem 'group' ficam no nível raiz.
      * Items com 'group' são agrupados automaticamente.
+     *
+     * Ordem dos grupos: "Plano de Voo" fixo no topo; os demais em ordem alfabética.
      */
     public static function all(): array
     {
         return [
-            // Raiz (sem grupo)
-
-            // Plano de Voo
+            // Plano de Voo (sempre primeiro)
             ['key' => 'dashboard', 'label' => 'Painel de Entrada', 'icon' => 'pi pi-home', 'href' => '/dashboard', 'permission' => null, 'group' => 'Plano de Voo'],
+
+            // Cadastros
+            ['key' => 'departamentos', 'label' => 'Departamentos', 'icon' => 'pi pi-building', 'href' => '/departamentos', 'permission' => 'departamentos.gerenciar', 'group' => 'Cadastros'],
+            ['key' => 'filiais', 'label' => 'Filiais', 'icon' => 'pi pi-map-marker', 'href' => '/filiais', 'permission' => 'filiais.gerenciar', 'group' => 'Cadastros'],
+            ['key' => 'contratos_equip_tipos', 'label' => 'Tipos de Equip.', 'icon' => 'pi pi-tags', 'href' => '/pagina/gestao-contratos/equipamentos/tipos', 'permission' => 'contratos.visualizar', 'group' => 'Cadastros'],
+            ['key' => 'usuarios', 'label' => 'Usuários', 'icon' => 'pi pi-users', 'href' => '/usuarios', 'permission' => 'usuarios.listar', 'group' => 'Cadastros'],
+
+            // Configurações
+            ['key' => 'aparencia', 'label' => 'Aparência', 'icon' => 'pi pi-palette', 'href' => '/settings/aparencia', 'permission' => 'aparencia.editar', 'group' => 'Configurações'],
+            ['key' => 'auditoria', 'label' => 'Auditoria', 'icon' => 'pi pi-history', 'href' => '/auditoria', 'permission' => 'auditoria.visualizar', 'group' => 'Configurações'],
+            ['key' => 'backups', 'label' => 'Backups', 'icon' => 'pi pi-database', 'href' => '/backups', 'permission' => 'backups.gerenciar', 'group' => 'Configurações'],
+            ['key' => 'perfil', 'label' => 'Meu perfil', 'icon' => 'pi pi-user', 'href' => '/perfil', 'permission' => null, 'group' => 'Configurações'],
+
+            // Conteúdo
+            ['key' => 'noticias', 'label' => 'Notícias', 'icon' => 'pi pi-megaphone', 'href' => '/noticias', 'permission' => 'noticias.gerenciar', 'group' => 'Conteúdo'],
+
+            // Contratos (portado da Biglar)
+            ['key' => 'contratos_dashboard', 'label' => 'Painel', 'icon' => 'pi pi-chart-pie', 'href' => '/pagina/gestao-contratos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+            ['key' => 'contratos_locacao', 'label' => 'Locação', 'icon' => 'pi pi-building', 'href' => '/pagina/gestao-contratos/locacao', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+            ['key' => 'contratos_servicos', 'label' => 'Serviços Contratados', 'icon' => 'pi pi-briefcase', 'href' => '/pagina/gestao-contratos/servicos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+            ['key' => 'contratos_servicos_prestados', 'label' => 'Serviços Prestados', 'icon' => 'pi pi-send', 'href' => '/pagina/gestao-contratos/servicos-prestados', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+            ['key' => 'contratos_alvaras', 'label' => 'Alvarás', 'icon' => 'pi pi-id-card', 'href' => '/pagina/gestao-contratos/alvaras', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+            ['key' => 'contratos_equipamentos', 'label' => 'Equipamentos', 'icon' => 'pi pi-box', 'href' => '/pagina/gestao-contratos/equipamentos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+
+            // Financeiro
+            ['key' => 'contas_pagar', 'label' => 'Contas a Pagar', 'icon' => 'pi pi-wallet', 'href' => '/financeiro/contas-pagar', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
+            ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
 
             // Tickets (portado da Biglar)
             ['key' => 'sol_nova', 'label' => 'Novo Ticket', 'icon' => 'pi pi-plus-circle', 'href' => '/solicitacoes/nova', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
@@ -27,33 +54,6 @@ class MenuCatalog
             ['key' => 'sol_agenda', 'label' => 'Agenda', 'icon' => 'pi pi-calendar', 'href' => '/solicitacoes/agendamento', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
             ['key' => 'sol_relatorios', 'label' => 'Relatórios', 'icon' => 'pi pi-chart-bar', 'href' => '/solicitacoes/relatorios', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
             ['key' => 'sol_config', 'label' => 'Configurações', 'icon' => 'pi pi-cog', 'href' => '/solicitacoes/configuracoes', 'permission' => 'solicitacoes.configurar', 'group' => 'Tickets'],
-
-            // Financeiro
-            ['key' => 'contas_pagar', 'label' => 'Contas a Pagar', 'icon' => 'pi pi-wallet', 'href' => '/financeiro/contas-pagar', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
-            ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
-
-            // Contratos (portado da Biglar)
-            ['key' => 'contratos_dashboard', 'label' => 'Painel', 'icon' => 'pi pi-chart-pie', 'href' => '/pagina/gestao-contratos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
-            ['key' => 'contratos_locacao', 'label' => 'Locação', 'icon' => 'pi pi-building', 'href' => '/pagina/gestao-contratos/locacao', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
-            ['key' => 'contratos_servicos', 'label' => 'Serviços Contratados', 'icon' => 'pi pi-briefcase', 'href' => '/pagina/gestao-contratos/servicos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
-            ['key' => 'contratos_servicos_prestados', 'label' => 'Serviços Prestados', 'icon' => 'pi pi-send', 'href' => '/pagina/gestao-contratos/servicos-prestados', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
-            ['key' => 'contratos_alvaras', 'label' => 'Alvarás', 'icon' => 'pi pi-id-card', 'href' => '/pagina/gestao-contratos/alvaras', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
-            ['key' => 'contratos_equipamentos', 'label' => 'Equipamentos', 'icon' => 'pi pi-box', 'href' => '/pagina/gestao-contratos/equipamentos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
-            ['key' => 'contratos_equip_tipos', 'label' => 'Tipos de Equip.', 'icon' => 'pi pi-tags', 'href' => '/pagina/gestao-contratos/equipamentos/tipos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
-
-            // Conteúdo
-            ['key' => 'noticias', 'label' => 'Notícias', 'icon' => 'pi pi-megaphone', 'href' => '/noticias', 'permission' => 'noticias.gerenciar', 'group' => 'Conteúdo'],
-
-            // Cadastros
-            ['key' => 'usuarios', 'label' => 'Usuários', 'icon' => 'pi pi-users', 'href' => '/usuarios', 'permission' => 'usuarios.listar', 'group' => 'Cadastros'],
-            ['key' => 'departamentos', 'label' => 'Departamentos', 'icon' => 'pi pi-building', 'href' => '/departamentos', 'permission' => 'departamentos.gerenciar', 'group' => 'Cadastros'],
-            ['key' => 'filiais', 'label' => 'Filiais', 'icon' => 'pi pi-map-marker', 'href' => '/filiais', 'permission' => 'filiais.gerenciar', 'group' => 'Cadastros'],
-
-            // Configurações
-            ['key' => 'aparencia', 'label' => 'Aparência', 'icon' => 'pi pi-palette', 'href' => '/settings/aparencia', 'permission' => 'aparencia.editar', 'group' => 'Configurações'],
-            ['key' => 'backups', 'label' => 'Backups', 'icon' => 'pi pi-database', 'href' => '/backups', 'permission' => 'backups.gerenciar', 'group' => 'Configurações'],
-            ['key' => 'auditoria', 'label' => 'Auditoria', 'icon' => 'pi pi-history', 'href' => '/auditoria', 'permission' => 'auditoria.visualizar', 'group' => 'Configurações'],
-            ['key' => 'perfil', 'label' => 'Meu perfil', 'icon' => 'pi pi-user', 'href' => '/perfil', 'permission' => null, 'group' => 'Configurações'],
         ];
     }
 
