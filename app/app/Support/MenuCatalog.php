@@ -19,14 +19,7 @@ class MenuCatalog
             // Plano de Voo
             ['key' => 'dashboard', 'label' => 'Painel de Entrada', 'icon' => 'pi pi-home', 'href' => '/dashboard', 'permission' => null, 'group' => 'Plano de Voo'],
 
-            // Conteúdo
-            ['key' => 'noticias', 'label' => 'Notícias', 'icon' => 'pi pi-megaphone', 'href' => '/noticias', 'permission' => 'noticias.gerenciar', 'group' => 'Conteúdo'],
-
-            // Financeiro
-            ['key' => 'contas_pagar', 'label' => 'Contas a Pagar', 'icon' => 'pi pi-wallet', 'href' => '/financeiro/contas-pagar', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
-            ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
-
-            // Solicitações (portado da Biglar)
+            // Tickets (portado da Biglar)
             ['key' => 'sol_nova', 'label' => 'Novo Ticket', 'icon' => 'pi pi-plus-circle', 'href' => '/solicitacoes/nova', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
             ['key' => 'sol_lista', 'label' => 'Acompanhar', 'icon' => 'pi pi-list', 'href' => '/solicitacoes/lista', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
             ['key' => 'sol_minhas', 'label' => 'Meus Tickets', 'icon' => 'pi pi-user', 'href' => '/solicitacoes/minhas', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
@@ -34,6 +27,10 @@ class MenuCatalog
             ['key' => 'sol_agenda', 'label' => 'Agenda', 'icon' => 'pi pi-calendar', 'href' => '/solicitacoes/agendamento', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
             ['key' => 'sol_relatorios', 'label' => 'Relatórios', 'icon' => 'pi pi-chart-bar', 'href' => '/solicitacoes/relatorios', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
             ['key' => 'sol_config', 'label' => 'Configurações', 'icon' => 'pi pi-cog', 'href' => '/solicitacoes/configuracoes', 'permission' => 'solicitacoes.configurar', 'group' => 'Tickets'],
+
+            // Financeiro
+            ['key' => 'contas_pagar', 'label' => 'Contas a Pagar', 'icon' => 'pi pi-wallet', 'href' => '/financeiro/contas-pagar', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
+            ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
 
             // Contratos (portado da Biglar)
             ['key' => 'contratos_dashboard', 'label' => 'Painel', 'icon' => 'pi pi-chart-pie', 'href' => '/pagina/gestao-contratos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
@@ -43,6 +40,9 @@ class MenuCatalog
             ['key' => 'contratos_alvaras', 'label' => 'Alvarás', 'icon' => 'pi pi-id-card', 'href' => '/pagina/gestao-contratos/alvaras', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
             ['key' => 'contratos_equipamentos', 'label' => 'Equipamentos', 'icon' => 'pi pi-box', 'href' => '/pagina/gestao-contratos/equipamentos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
             ['key' => 'contratos_equip_tipos', 'label' => 'Tipos de Equip.', 'icon' => 'pi pi-tags', 'href' => '/pagina/gestao-contratos/equipamentos/tipos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
+
+            // Conteúdo
+            ['key' => 'noticias', 'label' => 'Notícias', 'icon' => 'pi pi-megaphone', 'href' => '/noticias', 'permission' => 'noticias.gerenciar', 'group' => 'Conteúdo'],
 
             // Cadastros
             ['key' => 'usuarios', 'label' => 'Usuários', 'icon' => 'pi pi-users', 'href' => '/usuarios', 'permission' => 'usuarios.listar', 'group' => 'Cadastros'],
