@@ -33,11 +33,19 @@ const items = computed(() => {
 const openGroups = ref({})
 
 function toggleGroup(label) {
-    openGroups.value[label] = !openGroups.value[label]
+    // Accordion: abrir um grupo fecha os demais
+    if (openGroups.value[label]) {
+        openGroups.value = {}
+    } else {
+        openGroups.value = { [label]: true }
+    }
 }
 
 function isGroupOpen(label) {
-    if (openGroups.value[label]) return true
+    // Se o usuário abriu algum grupo manualmente, respeita só esse (accordion)
+    if (Object.keys(openGroups.value).length > 0) {
+        return !!openGroups.value[label]
+    }
     const group = (page.props.menuGrouped || []).find(g => g.type === 'group' && g.label === label)
     if (!group) return false
     return group.items.some(i => isActive(i.href))
