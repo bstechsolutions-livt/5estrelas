@@ -22,20 +22,12 @@ const menuItems = computed(() => page.props.menuOptions || [])
 const openGroups = ref({})
 
 function toggleGroup(label) {
-    // Accordion: abrir um grupo fecha os demais
-    if (openGroups.value[label]) {
-        openGroups.value = {}
-    } else {
-        openGroups.value = { [label]: true }
-    }
+    openGroups.value[label] = !openGroups.value[label]
 }
 
 function isGroupOpen(label) {
-    // Se o usuário abriu algum grupo manualmente, respeita só esse (accordion)
-    if (Object.keys(openGroups.value).length > 0) {
-        return !!openGroups.value[label]
-    }
-    // Senão, abre automaticamente o grupo da página atual
+    // Aberto se marcado OU se algum item do grupo está ativo
+    if (openGroups.value[label]) return true
     const group = menuGrouped.value.find(g => g.type === 'group' && g.label === label)
     if (!group) return false
     return group.items.some(i => isActive(i.href))
