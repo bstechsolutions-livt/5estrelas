@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Comercial;
 use App\Http\Controllers\Controller;
 use App\Models\Comercial\Categoria;
 use App\Models\Comercial\Cct;
+use App\Models\Comercial\Encargo;
 use App\Models\Comercial\Escala;
 use App\Models\Comercial\Indice;
 use Illuminate\Http\Request;
@@ -30,6 +31,7 @@ class ComercialConfigController extends Controller
             'categorias' => Categoria::with('cct:id,nome')->orderBy('nome')->get(),
             'escalas' => Escala::orderBy('nome')->get(),
             'indices' => Indice::orderBy('chave')->get(),
+            'encargos' => Encargo::orderBy('ordem')->get(),
         ]);
     }
 
@@ -194,5 +196,31 @@ class ComercialConfigController extends Controller
         }
 
         return response()->json(['sucesso' => true, 'dados' => Indice::orderBy('chave')->get()]);
+    }
+
+    // ─── Encargos (detalhamento A/B/C/D) ─────────────────────
+    public function salvarEncargos(Request $request)
+    {
+        $encargos = $request->input('encargos', []);
+        foreach ($encargos as $item) {
+            if (empty($item['id'])) {
+                continue;
+            }
+            Encargo::where('id', $item['id'])->update([
+                'percentual' => $item['percentual'] ?? 0,
+            ]);
+        }
+
+        // Atualiza o índice total de encargos com o somatório
+        Indice::updateOrCreate(
+            ['chave' => 'encargos'],
+            ['valor' => Encargo::totalGeral(), 'descricao' => 'Encargos sociais (%)'],
+        );
+
+        return response()->json([
+            'sucesso' => true,
+            'encargos' => Encargo::orderBy('ordem')->get(),
+            'total' => Encargo::totalGeral(),
+        ]);
     }
 }

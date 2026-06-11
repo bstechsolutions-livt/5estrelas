@@ -291,6 +291,9 @@ Route::middleware('auth')->group(function () {
 
             // Índices
             Route::post('indices', [ComercialConfigController::class, 'salvarIndices'])->name('indices.salvar');
+
+            // Encargos (detalhamento A/B/C/D)
+            Route::post('encargos', [ComercialConfigController::class, 'salvarEncargos'])->name('encargos.salvar');
         });
     });
 

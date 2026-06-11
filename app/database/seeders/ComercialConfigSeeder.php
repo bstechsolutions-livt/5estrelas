@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Comercial\Categoria;
 use App\Models\Comercial\Cct;
+use App\Models\Comercial\Encargo;
 use App\Models\Comercial\Escala;
 use App\Models\Comercial\Indice;
 use Illuminate\Database\Seeder;
@@ -89,6 +90,48 @@ class ComercialConfigSeeder extends Seeder
         }
 
         $this->seedCcts();
+        $this->seedEncargos();
+    }
+
+    /** Encargos sociais detalhados (grupos A/B/C/D) — valores do protótipo. */
+    private function seedEncargos(): void
+    {
+        // [grupo, codigo, label, percentual]
+        $itens = [
+            ['A', 'a01', 'INSS — Previdência Social', 20.00],
+            ['A', 'a02', 'FGTS', 8.00],
+            ['A', 'a03', 'Salário Educação', 2.50],
+            ['A', 'a04', 'SESI', 1.50],
+            ['A', 'a05', 'SENAI', 1.00],
+            ['A', 'a06', 'INCRA', 0.20],
+            ['A', 'a07', 'Seguro de Acidente de Trabalho (RAT × FAP)', 2.11],
+            ['A', 'a08', 'SEBRAE', 0.60],
+            ['B', 'b01', '13º Salário', 8.93],
+            ['B', 'b02', 'Férias', 9.09],
+            ['B', 'b03', 'Abono de Férias (1/3)', 3.03],
+            ['B', 'b04', 'Auxílio Doença (reposição)', 2.85],
+            ['B', 'b05', 'Licença Paternidade / Maternidade', 0.85],
+            ['B', 'b06', 'Faltas Legais', 2.38],
+            ['B', 'b07', 'Acidente de Trabalho (15 dias INSS)', 0.75],
+            ['B', 'b08', 'Aviso Prévio Indenizado (reposição)', 2.37],
+            ['C', 'c01', 'Aviso Prévio Trabalhado', 1.85],
+            ['C', 'c02', 'Indenização Adicional', 0.22],
+            ['C', 'c03', 'Multa FGTS — Rescisão sem Justa Causa (40% + 10%)', 4.00],
+            ['D', 'd01', 'Incidência dos encargos do Grupo A sobre os Grupos B e C', 9.77],
+        ];
+        $ordem = 0;
+        foreach ($itens as $i) {
+            Encargo::updateOrCreate(
+                ['codigo' => $i[1]],
+                ['grupo' => $i[0], 'label' => $i[2], 'percentual' => $i[3], 'ordem' => $ordem++],
+            );
+        }
+
+        // Sincroniza o índice "encargos" com o somatório do detalhamento
+        Indice::updateOrCreate(
+            ['chave' => 'encargos'],
+            ['valor' => Encargo::totalGeral(), 'descricao' => 'Encargos sociais (%)'],
+        );
     }
 
     /**

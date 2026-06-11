@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayout.vue"
-import { onMounted, ref } from "vue"
+import { onMounted, ref, computed } from "vue"
 import axios from "axios"
 import Tabs from "primevue/tabs"
 import TabList from "primevue/tablist"
@@ -25,6 +25,7 @@ const ccts = ref([])
 const categorias = ref([])
 const escalas = ref([])
 const indices = ref([])
+const encargos = ref([])
 
 async function carregar() {
   loading.value = true
@@ -34,6 +35,7 @@ async function carregar() {
     categorias.value = data.categorias || []
     escalas.value = data.escalas || []
     indices.value = data.indices || []
+    encargos.value = data.encargos || []
   } catch (e) {
     toast.add({ severity: "error", summary: "Erro", detail: "Falha ao carregar dados", life: 4000 })
   } finally {
@@ -181,6 +183,30 @@ async function salvarIndices() {
     ok("Índices salvos")
   } catch (e) { fail("Não foi possível salvar os índices") }
 }
+
+// ─── Encargos (A/B/C/D) ──────────────────────────────
+const GRUPOS_ENC = {
+  A: "Grupo A — Encargos Sociais e Trabalhistas",
+  B: "Grupo B — 13º, Férias e Afastamentos",
+  C: "Grupo C — Provisão para Rescisão",
+  D: "Grupo D — Incidência (A sobre B e C)",
+}
+function encargosDoGrupo(g) {
+  return encargos.value.filter((e) => e.grupo === g)
+}
+function subtotalGrupo(g) {
+  return encargosDoGrupo(g).reduce((s, e) => s + Number(e.percentual || 0), 0)
+}
+const totalEncargos = computed(() =>
+  encargos.value.reduce((s, e) => s + Number(e.percentual || 0), 0)
+)
+async function salvarEncargos() {
+  try {
+    await axios.post("/comercial/configuracoes/encargos", { encargos: encargos.value })
+    ok("Encargos salvos")
+    carregar()
+  } catch (e) { fail("Não foi possível salvar os encargos") }
+}
 </script>
 
 <template>
@@ -199,6 +225,7 @@ async function salvarIndices() {
           <Tab value="1">Categorias</Tab>
           <Tab value="2">Escalas</Tab>
           <Tab value="3">Índices</Tab>
+          <Tab value="4">Encargos</Tab>
         </TabList>
         <TabPanels>
           <!-- CCTs -->
@@ -291,6 +318,29 @@ async function salvarIndices() {
                   {{ idx.descricao || idx.chave }}
                 </label>
                 <InputNumber v-model="idx.valor" :minFractionDigits="2" :maxFractionDigits="4" suffix=" %" class="w-full" />
+              </div>
+            </div>
+          </TabPanel>
+
+          <!-- Encargos (A/B/C/D) -->
+          <TabPanel value="4">
+            <div class="flex justify-between items-center mb-3">
+              <p class="text-sm text-gray-500">
+                Detalhamento dos encargos sociais (IN 05). Total geral:
+                <strong class="text-amber-600">{{ totalEncargos.toFixed(2) }}%</strong>
+              </p>
+              <Button label="Salvar Encargos" icon="pi pi-save" size="small" @click="salvarEncargos" />
+            </div>
+            <div v-for="g in ['A', 'B', 'C', 'D']" :key="g" class="mb-5">
+              <div class="flex justify-between items-center bg-gray-50 dark:bg-slate-800 px-3 py-2 rounded-t-lg border border-gray-200 dark:border-slate-700">
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ GRUPOS_ENC[g] }}</span>
+                <span class="text-sm font-bold text-amber-600">{{ subtotalGrupo(g).toFixed(2) }}%</span>
+              </div>
+              <div class="border-x border-b border-gray-200 dark:border-slate-700 rounded-b-lg divide-y divide-gray-100 dark:divide-slate-700">
+                <div v-for="e in encargosDoGrupo(g)" :key="e.id" class="flex items-center justify-between gap-3 px-3 py-2">
+                  <span class="text-sm text-gray-600 dark:text-gray-300 flex-1">{{ e.label }}</span>
+                  <InputNumber v-model="e.percentual" :minFractionDigits="2" :maxFractionDigits="4" suffix=" %" class="w-32" size="small" />
+                </div>
               </div>
             </div>
           </TabPanel>
