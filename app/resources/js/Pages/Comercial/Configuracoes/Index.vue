@@ -317,7 +317,7 @@ async function salvarEncargos() {
                 <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
                   {{ idx.descricao || idx.chave }}
                 </label>
-                <InputNumber v-model="idx.valor" :minFractionDigits="2" :maxFractionDigits="4" suffix=" %" class="w-full" />
+                <InputNumber v-model="idx.valor" :minFractionDigits="2" :maxFractionDigits="4" suffix=" %" fluid />
               </div>
             </div>
           </TabPanel>
@@ -356,17 +356,17 @@ async function salvarEncargos() {
         <div><label class="text-sm font-medium">UF</label><InputText v-model="cctForm.uf" maxlength="2" class="w-full" /></div>
         <div class="col-span-2"><label class="text-sm font-medium">Sindicato</label><InputText v-model="cctForm.sindicato" class="w-full" /></div>
         <div><label class="text-sm font-medium">Ano-base</label><InputText v-model="cctForm.ano_base" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Salário base (R$)</label><InputNumber v-model="cctForm.salario_base" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Periculosidade (%)</label><InputNumber v-model="cctForm.periculosidade_pct" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Ad. noturno (%)</label><InputNumber v-model="cctForm.adicional_noturno_pct" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Horas/mês</label><InputNumber v-model="cctForm.horas_mes" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Dias/mês</label><InputNumber v-model="cctForm.dias_mes" :minFractionDigits="1" class="w-full" /></div>
-        <div><label class="text-sm font-medium">VA (R$)</label><InputNumber v-model="cctForm.va" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">VT (R$/dia)</label><InputNumber v-model="cctForm.vt" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Plano de saúde (R$)</label><InputNumber v-model="cctForm.plano_saude" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Seguro de vida (R$)</label><InputNumber v-model="cctForm.seguro_vida" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Uniforme (R$)</label><InputNumber v-model="cctForm.uniforme" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Reciclagem (R$)</label><InputNumber v-model="cctForm.reciclagem" :minFractionDigits="2" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Salário base (R$)</label><InputNumber v-model="cctForm.salario_base" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">Periculosidade (%)</label><InputNumber v-model="cctForm.periculosidade_pct" fluid /></div>
+        <div><label class="text-sm font-medium">Ad. noturno (%)</label><InputNumber v-model="cctForm.adicional_noturno_pct" fluid /></div>
+        <div><label class="text-sm font-medium">Horas/mês</label><InputNumber v-model="cctForm.horas_mes" fluid /></div>
+        <div><label class="text-sm font-medium">Dias/mês</label><InputNumber v-model="cctForm.dias_mes" :minFractionDigits="1" fluid /></div>
+        <div><label class="text-sm font-medium">VA (R$)</label><InputNumber v-model="cctForm.va" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">VT (R$/dia)</label><InputNumber v-model="cctForm.vt" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">Plano de saúde (R$)</label><InputNumber v-model="cctForm.plano_saude" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">Seguro de vida (R$)</label><InputNumber v-model="cctForm.seguro_vida" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">Uniforme (R$)</label><InputNumber v-model="cctForm.uniforme" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">Reciclagem (R$)</label><InputNumber v-model="cctForm.reciclagem" :minFractionDigits="2" fluid /></div>
         <div class="col-span-2 flex items-center gap-2"><ToggleSwitch v-model="cctForm.ativo" /><span class="text-sm">Ativa</span></div>
       </div>
       <template #footer>
@@ -380,16 +380,16 @@ async function salvarEncargos() {
       <div class="grid grid-cols-2 gap-3">
         <div class="col-span-2"><label class="text-sm font-medium">Nome *</label><InputText v-model="catForm.nome" class="w-full" /></div>
         <div><label class="text-sm font-medium">CBO</label><InputText v-model="catForm.cbo" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Salário base (R$)</label><InputNumber v-model="catForm.salario_base" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Periculosidade (%)</label><InputNumber v-model="catForm.periculosidade_pct" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Intrajornada (h)</label><InputNumber v-model="catForm.intrajornada_h" :minFractionDigits="1" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Desconto VT (%)</label><InputNumber v-model="catForm.desconto_vt_pct" class="w-full" /></div>
-        <div><label class="text-sm font-medium">VA (R$)</label><InputNumber v-model="catForm.va" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">VT (R$/dia)</label><InputNumber v-model="catForm.vt" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Plano de saúde (R$)</label><InputNumber v-model="catForm.plano_saude" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Seguro de vida (R$)</label><InputNumber v-model="catForm.seguro_vida" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Uniforme (R$)</label><InputNumber v-model="catForm.uniforme" :minFractionDigits="2" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Reciclagem (R$)</label><InputNumber v-model="catForm.reciclagem" :minFractionDigits="2" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Salário base (R$)</label><InputNumber v-model="catForm.salario_base" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">Periculosidade (%)</label><InputNumber v-model="catForm.periculosidade_pct" fluid /></div>
+        <div><label class="text-sm font-medium">Intrajornada (h)</label><InputNumber v-model="catForm.intrajornada_h" :minFractionDigits="1" fluid /></div>
+        <div><label class="text-sm font-medium">Desconto VT (%)</label><InputNumber v-model="catForm.desconto_vt_pct" fluid /></div>
+        <div><label class="text-sm font-medium">VA (R$)</label><InputNumber v-model="catForm.va" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">VT (R$/dia)</label><InputNumber v-model="catForm.vt" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">Plano de saúde (R$)</label><InputNumber v-model="catForm.plano_saude" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">Seguro de vida (R$)</label><InputNumber v-model="catForm.seguro_vida" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">Uniforme (R$)</label><InputNumber v-model="catForm.uniforme" :minFractionDigits="2" fluid /></div>
+        <div><label class="text-sm font-medium">Reciclagem (R$)</label><InputNumber v-model="catForm.reciclagem" :minFractionDigits="2" fluid /></div>
         <div class="flex items-center gap-2"><ToggleSwitch v-model="catForm.tem_arma" /><span class="text-sm">Tem arma</span></div>
         <div class="flex items-center gap-2"><ToggleSwitch v-model="catForm.ativo" /><span class="text-sm">Ativa</span></div>
       </div>
@@ -404,8 +404,8 @@ async function salvarEncargos() {
       <div class="space-y-3">
         <div><label class="text-sm font-medium">Nome *</label><InputText v-model="escForm.nome" class="w-full" /></div>
         <div class="grid grid-cols-2 gap-3">
-          <div><label class="text-sm font-medium">Dias/mês</label><InputNumber v-model="escForm.dias_mes" :minFractionDigits="0" class="w-full" /></div>
-          <div><label class="text-sm font-medium">Horas/mês</label><InputNumber v-model="escForm.horas_mes" :minFractionDigits="0" class="w-full" /></div>
+          <div><label class="text-sm font-medium">Dias/mês</label><InputNumber v-model="escForm.dias_mes" :minFractionDigits="0" fluid /></div>
+          <div><label class="text-sm font-medium">Horas/mês</label><InputNumber v-model="escForm.horas_mes" :minFractionDigits="0" fluid /></div>
         </div>
         <div class="flex items-center gap-2"><ToggleSwitch v-model="escForm.ativo" /><span class="text-sm">Ativa</span></div>
       </div>
