@@ -36,8 +36,25 @@ class ComercialConfigController extends Controller
     // ─── CCT ─────────────────────────────────────────────────
     public function storeCct(Request $request)
     {
+        $cct = Cct::create($this->dadosCct($request));
+
+        return response()->json(['sucesso' => true, 'dados' => $cct]);
+    }
+
+    public function updateCct(Request $request, $id)
+    {
+        $cct = Cct::findOrFail($id);
+        $cct->update($this->dadosCct($request));
+
+        return response()->json(['sucesso' => true, 'dados' => $cct]);
+    }
+
+    private function dadosCct(Request $request): array
+    {
         $data = $request->validate([
             'nome' => 'required|string|max:255',
+            'titulo' => 'nullable|string|max:255',
+            'servico' => 'nullable|string|max:50',
             'sindicato' => 'nullable|string|max:255',
             'uf' => 'nullable|string|max:2',
             'ano_base' => 'nullable|string|max:50',
@@ -46,22 +63,29 @@ class ComercialConfigController extends Controller
             'vigencia_fim' => 'nullable|date',
             'ativo' => 'boolean',
             'observacao' => 'nullable|string',
+            'horas_mes' => 'nullable|numeric',
+            'dias_mes' => 'nullable|numeric',
+            'salario_base' => 'nullable|numeric',
+            'periculosidade_pct' => 'nullable|numeric',
+            'adicional_noturno_pct' => 'nullable|numeric',
+            'intrajornada_h' => 'nullable|numeric',
+            'desconto_vt_pct' => 'nullable|numeric',
+            'va' => 'nullable|numeric',
+            'vt' => 'nullable|numeric',
+            'plano_saude' => 'nullable|numeric',
+            'fundo_social' => 'nullable|numeric',
+            'sst' => 'nullable|numeric',
+            'cna' => 'nullable|numeric',
+            'seguro_vida' => 'nullable|numeric',
+            'uniforme' => 'nullable|numeric',
+            'reciclagem' => 'nullable|numeric',
+            'gta' => 'nullable|numeric',
+            'cofre' => 'nullable|numeric',
+            'arma' => 'nullable|numeric',
+            'colete' => 'nullable|numeric',
         ]);
 
-        $cct = Cct::create($data);
-
-        return response()->json(['sucesso' => true, 'dados' => $cct]);
-    }
-
-    public function updateCct(Request $request, $id)
-    {
-        $cct = Cct::findOrFail($id);
-        $cct->update($request->only([
-            'nome', 'sindicato', 'uf', 'ano_base', 'data_base',
-            'vigencia_inicio', 'vigencia_fim', 'ativo', 'observacao',
-        ]));
-
-        return response()->json(['sucesso' => true, 'dados' => $cct]);
+        return $data;
     }
 
     public function destroyCct($id)

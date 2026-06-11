@@ -13,6 +13,7 @@ import Button from "primevue/button"
 import InputText from "primevue/inputtext"
 import InputNumber from "primevue/inputnumber"
 import Dialog from "primevue/dialog"
+import Select from "primevue/select"
 import Tag from "primevue/tag"
 import ToggleSwitch from "primevue/toggleswitch"
 import { useToast } from "primevue/usetoast"
@@ -68,8 +69,20 @@ async function confirmarExclusao() {
 // ─── CCT ─────────────────────────────────────────────
 const cctDialog = ref(false)
 const cctForm = ref({})
+const servicoOpts = [
+  { label: "Vigilância", value: "vigilancia" },
+  { label: "Portaria", value: "portaria" },
+  { label: "Limpeza", value: "limpeza" },
+  { label: "Bombeiro Civil", value: "bombeiro" },
+]
 function novoCct() {
-  cctForm.value = { id: null, nome: "", sindicato: "", uf: "", ano_base: "", ativo: true }
+  cctForm.value = {
+    id: null, nome: "", titulo: "", servico: "vigilancia", sindicato: "", uf: "", ano_base: "2026", ativo: true,
+    salario_base: 0, periculosidade_pct: 0, adicional_noturno_pct: 0, intrajornada_h: 1.5, desconto_vt_pct: 6,
+    horas_mes: 220, dias_mes: 30,
+    va: 0, vt: 0, plano_saude: 0, fundo_social: 0, sst: 0, cna: 0, seguro_vida: 0,
+    uniforme: 0, reciclagem: 0, gta: 0, cofre: 0, arma: 0, colete: 0,
+  }
   cctDialog.value = true
 }
 function editarCct(row) {
@@ -194,10 +207,13 @@ async function salvarIndices() {
               <Button label="Nova CCT" icon="pi pi-plus" size="small" @click="novoCct" />
             </div>
             <DataTable :value="ccts" :loading="loading" dataKey="id" paginator :rows="10" size="small" stripedRows>
-              <Column field="nome" header="Nome" sortable />
+              <Column field="titulo" header="CCT" sortable />
+              <Column field="servico" header="Serviço" sortable />
+              <Column field="uf" header="UF" sortable />
               <Column field="sindicato" header="Sindicato" />
-              <Column field="uf" header="UF" />
-              <Column field="ano_base" header="Ano-base" />
+              <Column header="Salário base">
+                <template #body="{ data }">R$ {{ Number(data.salario_base).toFixed(2) }}</template>
+              </Column>
               <Column header="Status">
                 <template #body="{ data }">
                   <Tag :value="data.ativo ? 'Ativa' : 'Inativa'" :severity="data.ativo ? 'success' : 'secondary'" />
@@ -283,15 +299,25 @@ async function salvarIndices() {
     </div>
 
     <!-- Dialog CCT -->
-    <Dialog v-model:visible="cctDialog" modal header="CCT" :style="{ width: '480px' }">
-      <div class="space-y-3">
-        <div><label class="text-sm font-medium">Nome *</label><InputText v-model="cctForm.nome" class="w-full" /></div>
-        <div><label class="text-sm font-medium">Sindicato</label><InputText v-model="cctForm.sindicato" class="w-full" /></div>
-        <div class="grid grid-cols-2 gap-3">
-          <div><label class="text-sm font-medium">UF</label><InputText v-model="cctForm.uf" maxlength="2" class="w-full" /></div>
-          <div><label class="text-sm font-medium">Ano-base</label><InputText v-model="cctForm.ano_base" class="w-full" /></div>
-        </div>
-        <div class="flex items-center gap-2"><ToggleSwitch v-model="cctForm.ativo" /><span class="text-sm">Ativa</span></div>
+    <Dialog v-model:visible="cctDialog" modal header="CCT" :style="{ width: '640px' }">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2"><label class="text-sm font-medium">Título / Nome *</label><InputText v-model="cctForm.titulo" class="w-full" @input="cctForm.nome = cctForm.titulo" /></div>
+        <div><label class="text-sm font-medium">Serviço</label><Select v-model="cctForm.servico" :options="servicoOpts" optionLabel="label" optionValue="value" class="w-full" /></div>
+        <div><label class="text-sm font-medium">UF</label><InputText v-model="cctForm.uf" maxlength="2" class="w-full" /></div>
+        <div class="col-span-2"><label class="text-sm font-medium">Sindicato</label><InputText v-model="cctForm.sindicato" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Ano-base</label><InputText v-model="cctForm.ano_base" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Salário base (R$)</label><InputNumber v-model="cctForm.salario_base" :minFractionDigits="2" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Periculosidade (%)</label><InputNumber v-model="cctForm.periculosidade_pct" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Ad. noturno (%)</label><InputNumber v-model="cctForm.adicional_noturno_pct" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Horas/mês</label><InputNumber v-model="cctForm.horas_mes" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Dias/mês</label><InputNumber v-model="cctForm.dias_mes" :minFractionDigits="1" class="w-full" /></div>
+        <div><label class="text-sm font-medium">VA (R$)</label><InputNumber v-model="cctForm.va" :minFractionDigits="2" class="w-full" /></div>
+        <div><label class="text-sm font-medium">VT (R$/dia)</label><InputNumber v-model="cctForm.vt" :minFractionDigits="2" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Plano de saúde (R$)</label><InputNumber v-model="cctForm.plano_saude" :minFractionDigits="2" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Seguro de vida (R$)</label><InputNumber v-model="cctForm.seguro_vida" :minFractionDigits="2" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Uniforme (R$)</label><InputNumber v-model="cctForm.uniforme" :minFractionDigits="2" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Reciclagem (R$)</label><InputNumber v-model="cctForm.reciclagem" :minFractionDigits="2" class="w-full" /></div>
+        <div class="col-span-2 flex items-center gap-2"><ToggleSwitch v-model="cctForm.ativo" /><span class="text-sm">Ativa</span></div>
       </div>
       <template #footer>
         <Button label="Cancelar" text @click="cctDialog = false" />
