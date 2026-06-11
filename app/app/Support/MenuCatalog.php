@@ -25,6 +25,9 @@ class MenuCatalog
             ['key' => 'contratos_equip_tipos', 'label' => 'Tipos de Equip.', 'icon' => 'pi pi-tags', 'href' => '/pagina/gestao-contratos/equipamentos/tipos', 'permission' => 'contratos.visualizar', 'group' => 'Cadastros'],
             ['key' => 'usuarios', 'label' => 'Usuários', 'icon' => 'pi pi-users', 'href' => '/usuarios', 'permission' => 'usuarios.listar', 'group' => 'Cadastros'],
 
+            // Comercial ("Gestão 360º")
+            ['key' => 'comercial_config', 'label' => 'Valores', 'icon' => 'pi pi-dollar', 'href' => '/comercial/configuracoes', 'permission' => 'comercial.configurar', 'group' => 'Comercial'],
+
             // Configurações
             ['key' => 'aparencia', 'label' => 'Aparência', 'icon' => 'pi pi-palette', 'href' => '/settings/aparencia', 'permission' => 'aparencia.editar', 'group' => 'Configurações'],
             ['key' => 'auditoria', 'label' => 'Auditoria', 'icon' => 'pi pi-history', 'href' => '/auditoria', 'permission' => 'auditoria.visualizar', 'group' => 'Configurações'],

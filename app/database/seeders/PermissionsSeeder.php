@@ -53,6 +53,12 @@ class PermissionsSeeder extends Seeder
             ['key' => 'solicitacoes.criar', 'label' => 'Abrir solicitações', 'module' => 'solicitacoes'],
             ['key' => 'solicitacoes.configurar', 'label' => 'Configurar solicitações (assuntos/fluxos)', 'module' => 'solicitacoes'],
             ['key' => 'solicitacoes.aprovar', 'label' => 'Aprovar solicitações', 'module' => 'solicitacoes'],
+
+            // Comercial ("Gestão 360º")
+            ['key' => 'comercial.visualizar', 'label' => 'Ver módulo comercial', 'module' => 'comercial'],
+            ['key' => 'comercial.cotar', 'label' => 'Criar cotações/propostas', 'module' => 'comercial'],
+            ['key' => 'comercial.aprovar', 'label' => 'Aprovar propostas', 'module' => 'comercial'],
+            ['key' => 'comercial.configurar', 'label' => 'Configurar comercial (CCT/valores/índices)', 'module' => 'comercial'],
         ];
 
         foreach ($permissions as $row) {

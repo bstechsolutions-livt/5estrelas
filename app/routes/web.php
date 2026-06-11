@@ -22,6 +22,7 @@ use App\Http\Controllers\UserShortcutController;
 use App\Http\Controllers\v2\GestaoContratosController;
 use App\Http\Controllers\v2\GestaoEquipamentosController;
 use App\Http\Controllers\SolicitacoesController;
+use App\Http\Controllers\Comercial\ComercialConfigController;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 
@@ -260,6 +261,37 @@ Route::middleware('auth')->group(function () {
         Route::post('/ocorrencias/{id}/fotos', 'uploadFotoOcorrencia')->name('ocorrencias.fotos.store');
         Route::delete('/equipamento-fotos/{id}', 'deleteFoto')->name('fotos.destroy');
         Route::get('/equipamento-fotos/{id}/download', 'downloadFoto')->name('fotos.download');
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    //   COMERCIAL ("Gestão 360º") — esteira comercial / precificação IN 05
+    //   Spec 1: Configuração / Valores (CCT, categorias, escalas, índices)
+    // ═══════════════════════════════════════════════════════════════
+    Route::prefix('comercial')->middleware('permission:comercial.visualizar')->name('comercial.')->group(function () {
+        // Configuração / Valores
+        Route::get('configuracoes', [ComercialConfigController::class, 'index'])->name('configuracoes');
+
+        Route::prefix('configuracoes')->name('config.')->group(function () {
+            Route::get('dados', [ComercialConfigController::class, 'dados'])->name('dados');
+
+            // CCT
+            Route::post('ccts', [ComercialConfigController::class, 'storeCct'])->name('ccts.store');
+            Route::put('ccts/{id}', [ComercialConfigController::class, 'updateCct'])->name('ccts.update');
+            Route::delete('ccts/{id}', [ComercialConfigController::class, 'destroyCct'])->name('ccts.destroy');
+
+            // Categorias
+            Route::post('categorias', [ComercialConfigController::class, 'storeCategoria'])->name('categorias.store');
+            Route::put('categorias/{id}', [ComercialConfigController::class, 'updateCategoria'])->name('categorias.update');
+            Route::delete('categorias/{id}', [ComercialConfigController::class, 'destroyCategoria'])->name('categorias.destroy');
+
+            // Escalas
+            Route::post('escalas', [ComercialConfigController::class, 'storeEscala'])->name('escalas.store');
+            Route::put('escalas/{id}', [ComercialConfigController::class, 'updateEscala'])->name('escalas.update');
+            Route::delete('escalas/{id}', [ComercialConfigController::class, 'destroyEscala'])->name('escalas.destroy');
+
+            // Índices
+            Route::post('indices', [ComercialConfigController::class, 'salvarIndices'])->name('indices.salvar');
+        });
     });
 
     // ═══════════════════════════════════════════════════════════════
