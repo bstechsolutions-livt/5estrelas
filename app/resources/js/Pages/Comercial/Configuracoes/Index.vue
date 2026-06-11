@@ -339,7 +339,7 @@ async function salvarEncargos() {
               <div class="border-x border-b border-gray-200 dark:border-slate-700 rounded-b-lg divide-y divide-gray-100 dark:divide-slate-700">
                 <div v-for="e in encargosDoGrupo(g)" :key="e.id" class="flex items-center justify-between gap-3 px-3 py-2">
                   <span class="text-sm text-gray-600 dark:text-gray-300 flex-1">{{ e.label }}</span>
-                  <InputNumber v-model="e.percentual" :minFractionDigits="2" :maxFractionDigits="4" suffix=" %" class="w-32" size="small" />
+                  <InputNumber v-model="e.percentual" :minFractionDigits="2" :maxFractionDigits="2" suffix=" %" :inputStyle="{ width: '120px', textAlign: 'right' }" />
                 </div>
               </div>
             </div>
