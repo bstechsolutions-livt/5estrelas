@@ -49,6 +49,22 @@ function fail(msg) {
   toast.add({ severity: "error", summary: "Erro", detail: msg, life: 4000 })
 }
 
+// ─── Confirmação de exclusão (dialog) ────────────────
+const confirmDialog = ref(false)
+const confirmTexto = ref("")
+const confirmAcao = ref(null)
+function pedirConfirmacao(texto, acao) {
+  confirmTexto.value = texto
+  confirmAcao.value = acao
+  confirmDialog.value = true
+}
+async function confirmarExclusao() {
+  const acao = confirmAcao.value
+  confirmDialog.value = false
+  if (acao) await acao()
+  confirmAcao.value = null
+}
+
 // ─── CCT ─────────────────────────────────────────────
 const cctDialog = ref(false)
 const cctForm = ref({})
@@ -73,9 +89,10 @@ async function salvarCct() {
   } catch (e) { fail("Não foi possível salvar a CCT") }
 }
 async function excluirCct(row) {
-  if (!confirm(`Excluir a CCT "${row.nome}"?`)) return
-  try { await axios.delete(`/comercial/configuracoes/ccts/${row.id}`); ok("CCT excluída"); carregar() }
-  catch (e) { fail("Não foi possível excluir") }
+  pedirConfirmacao(`Excluir a CCT "${row.nome}"?`, async () => {
+    try { await axios.delete(`/comercial/configuracoes/ccts/${row.id}`); ok("CCT excluída"); carregar() }
+    catch (e) { fail("Não foi possível excluir") }
+  })
 }
 
 // ─── Categorias ──────────────────────────────────────
@@ -108,9 +125,10 @@ async function salvarCat() {
   } catch (e) { fail("Não foi possível salvar a categoria") }
 }
 async function excluirCat(row) {
-  if (!confirm(`Excluir a categoria "${row.nome}"?`)) return
-  try { await axios.delete(`/comercial/configuracoes/categorias/${row.id}`); ok("Categoria excluída"); carregar() }
-  catch (e) { fail("Não foi possível excluir") }
+  pedirConfirmacao(`Excluir a categoria "${row.nome}"?`, async () => {
+    try { await axios.delete(`/comercial/configuracoes/categorias/${row.id}`); ok("Categoria excluída"); carregar() }
+    catch (e) { fail("Não foi possível excluir") }
+  })
 }
 
 // ─── Escalas ─────────────────────────────────────────
@@ -137,9 +155,10 @@ async function salvarEsc() {
   } catch (e) { fail("Não foi possível salvar a escala") }
 }
 async function excluirEsc(row) {
-  if (!confirm(`Excluir a escala "${row.nome}"?`)) return
-  try { await axios.delete(`/comercial/configuracoes/escalas/${row.id}`); ok("Escala excluída"); carregar() }
-  catch (e) { fail("Não foi possível excluir") }
+  pedirConfirmacao(`Excluir a escala "${row.nome}"?`, async () => {
+    try { await axios.delete(`/comercial/configuracoes/escalas/${row.id}`); ok("Escala excluída"); carregar() }
+    catch (e) { fail("Não foi possível excluir") }
+  })
 }
 
 // ─── Índices ─────────────────────────────────────────
@@ -317,6 +336,18 @@ async function salvarIndices() {
       <template #footer>
         <Button label="Cancelar" text @click="escDialog = false" />
         <Button label="Salvar" icon="pi pi-check" @click="salvarEsc" />
+      </template>
+    </Dialog>
+
+    <!-- Dialog Confirmar Exclusão -->
+    <Dialog v-model:visible="confirmDialog" modal header="Confirmar Exclusão" :style="{ width: '420px' }">
+      <div class="flex items-start gap-3">
+        <i class="pi pi-exclamation-triangle text-3xl text-amber-500"></i>
+        <p class="text-gray-700 dark:text-gray-200 mt-1">{{ confirmTexto }}</p>
+      </div>
+      <template #footer>
+        <Button label="Cancelar" severity="secondary" outlined @click="confirmDialog = false" />
+        <Button label="Excluir" icon="pi pi-trash" severity="danger" @click="confirmarExclusao" />
       </template>
     </Dialog>
   </AuthenticatedLayout>
