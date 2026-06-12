@@ -51,12 +51,28 @@ class ComercialCotacaoTest extends DuskTestCase
         $this->browse(function (Browser $browser) {
             $browser->loginAs($this->bruno())
                 ->visit('/comercial/configuracoes')
-                ->waitForText('Comercial — Valores', 10)
-                ->assertSee('CCTs')
-                ->assertSee('Categorias')
-                ->assertSee('Escalas')
-                ->assertSee('Encargos')
-                ->assertSee('Insumos');
+                ->waitForText('Índices', 10)
+                ->assertSee('Convenções Coletivas')
+                ->assertSee('Taxas')
+                ->assertSee('Insumos')
+                // estado tabs (cct-tab-nome é uppercase via CSS)
+                ->assertSee('BRASÍLIA')
+                ->assertSee('GOIÁS');
+        });
+    }
+
+    public function test_valores_aba_taxas_mostra_encargos(): void
+    {
+        $this->browse(function (Browser $browser) {
+            $browser->loginAs($this->bruno())
+                ->visit('/comercial/configuracoes')
+                ->waitForText('Taxas', 10)
+                ->press('Taxas')
+                ->pause(500)
+                // module-title é uppercase via CSS
+                ->assertSee('ENCARGOS SOCIAIS')
+                ->assertSee('ADMINISTRAÇÃO')
+                ->assertSee('LUCRO');
         });
     }
 }
