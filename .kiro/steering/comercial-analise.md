@@ -95,3 +95,18 @@ Parâmetros que alimentam o cálculo:
 
 - Protótipo é a melhor referência visual/fluxo; o cálculo IN 05 já está implementado em JS e pode ser portado quase 1:1 para um Service PHP (testável).
 - É um módulo **grande**. Quebrar em specs pequenas: (1) CCT/Valores + Categorias, (2) Cotação/planilha IN 05, (3) Propostas/funil, (4) Clientes/Contratos + vínculo, (5) Faturamento, (6) Saúde Contratual, (7) Reajustes, (8) Dashboard.
+
+
+---
+
+## REGRA OBRIGATÓRIA (Bruno) — Fidelidade total ao protótipo
+
+**NADA do HTML `gestao360_5estrelas` pode ficar pra trás.** Cada tela/campo/botão/funcionalidade
+do protótipo DEVE ser portado. Não simplificar, não "cobrir ~40%". Antes de considerar qualquer
+spec do Comercial concluída, fazer conferência campo-a-campo contra a view correspondente do HTML
+e listar o que falta. Testar back (unit) + front (Dusk).
+
+### Status de fidelidade por tela (atualizar sempre)
+
+- **Config/Valores**: CCTs (20) ✅, Categorias (5) ✅, Índices ✅, Encargos A/B/C/D ✅, Escalas ⚠️ (parcial — faltam qtdD/qtdN/func_por_posto/temAN/jornada), **Insumos global ❌**, **Taxas** (coberto por Índices), cards CCT por estado (tabela cobre dados).
+- **Cotação**: motor de cálculo IN05 + 5E ✅ (verificado ao centavo, 7 unit + 3 Dusk). **Tela ❌ incompleta** — falta: cabeçalho "Identificação da Proposta" (empresa/CNPJ, cliente, nº, data, responsável, periodicidade), seletor de Modelo (IN05 × 5E), seleção empresa por sede/filial, "Configurar Posto" com múltiplos postos somados, Módulo 1 com turnos Diurno/Noturno, botões Salvar Proposta / Importar planilha / Exportar Excel.
