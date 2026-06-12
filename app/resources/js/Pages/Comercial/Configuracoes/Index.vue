@@ -25,7 +25,7 @@ const cctAtiva = ref(null)
 const encargosAberto = ref(false)
 
 const servicoMeta = {
-  vigilancia: { nome: "Vigilância", tipo: "seg", icone: "🛡️", cor: "var(--brand-gold)", bg: "rgba(184,146,42,.12)" },
+  vigilancia: { nome: "Vigilância", tipo: "seg", icone: "🛡️", cor: "var(--brand-gold)", bg: "color-mix(in srgb, var(--app-primary) 12%, transparent)" },
   bombeiro: { nome: "Bombeiro Civil", tipo: "seg", icone: "🔥", cor: "#E05454", bg: "rgba(224,84,84,.12)" },
   portaria: { nome: "Ag. de Portaria", tipo: "apoio", icone: "🏢", cor: "var(--blue)", bg: "rgba(41,128,185,.12)" },
   limpeza: { nome: "Limpeza", tipo: "apoio", icone: "🧹", cor: "#4CAF7D", bg: "rgba(76,175,125,.12)" },
@@ -202,7 +202,7 @@ async function salvarInsumos() {
           <div class="module-card encargos-card" style="margin-bottom:20px">
             <div class="module-header" style="cursor:pointer" @click="encargosAberto = !encargosAberto">
               <div style="display:flex;align-items:center;gap:10px;flex:1">
-                <div class="module-num" style="background:rgba(184,146,42,.15)">%</div>
+                <div class="module-num" style="background:color-mix(in srgb, var(--app-primary) 15%, transparent)">%</div>
                 <div><div class="module-title">Encargos Sociais</div>
                   <div style="font-size:11px;color:var(--text-muted)">Tabela completa — Grupos A, B, C e D · Base da composição</div></div>
               </div>
