@@ -68,4 +68,21 @@ class ComercialCotacaoController extends Controller
 
         return response()->json(['sucesso' => true, 'resultado' => $resultado]);
     }
+
+    /** Calcula pelo Modelo 5 Estrelas (diurno/noturno). */
+    public function calcular5e(Request $request, ComposicaoCustoService $svc)
+    {
+        $in = $request->validate([
+            'qtd_diurno' => 'nullable|integer', 'sal_diurno' => 'nullable|numeric',
+            'qtd_noturno' => 'nullable|integer', 'sal_noturno' => 'nullable|numeric',
+            'an_diurno' => 'nullable|integer', 'an_noturno' => 'nullable|integer',
+            'encargos_pct' => 'nullable|numeric', 'pct_adm' => 'nullable|numeric',
+            'pct_lucro' => 'nullable|numeric', 'pct_impostos' => 'nullable|numeric',
+            'peric_pct' => 'nullable|numeric', 'intra_h' => 'nullable|numeric', 'desc_vt_pct' => 'nullable|numeric',
+            'dias_mes' => 'nullable|numeric', 'horas_mes' => 'nullable|numeric',
+            'beneficios' => 'nullable|array', 'meses' => 'nullable|integer',
+        ]);
+
+        return response()->json(['sucesso' => true, 'resultado' => $svc->calcular5Estrelas($in)]);
+    }
 }

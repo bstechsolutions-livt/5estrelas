@@ -25,23 +25,24 @@ class ComercialCotacaoTest extends DuskTestCase
             $browser->loginAs($this->bruno())
                 ->visit('/comercial/cotacao')
                 ->waitForText('Nova Cotação de Custos', 10)
-                ->assertSee('Nova Cotação de Custos')
-                ->assertSee('Quadro-Resumo')
-                ->assertSee('Calcular');
+                ->assertSee('Identificação da Proposta')
+                ->assertSee('Configurar Posto')
+                ->assertSee('Composição Detalhada')
+                ->assertSee('Calcular Custo');
         });
     }
 
-    public function test_calcular_mostra_resultado(): void
+    public function test_calcular_e_adicionar_posto(): void
     {
         $this->browse(function (Browser $browser) {
             $browser->loginAs($this->bruno())
                 ->visit('/comercial/cotacao')
-                ->waitForText('Calcular', 10)
-                ->press('Calcular')
-                // Após calcular, o quadro mostra "Custo / empregado" e o valor do posto
-                ->waitForText('Custo / empregado', 10)
-                ->assertSee('Custo / empregado')
-                ->assertSee('Valor do Posto');
+                ->waitForText('Calcular Custo', 10)
+                ->press('Calcular Custo')
+                ->pause(1500)
+                ->press('Adicionar ao Resumo')
+                ->waitForText('Total Geral Mensal', 10)
+                ->assertSee('Total Geral Mensal');
         });
     }
 

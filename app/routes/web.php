@@ -273,6 +273,7 @@ Route::middleware('auth')->group(function () {
         Route::get('cotacao', [ComercialCotacaoController::class, 'index'])->name('cotacao');
         Route::get('cotacao/dados', [ComercialCotacaoController::class, 'dados'])->name('cotacao.dados');
         Route::post('cotacao/calcular', [ComercialCotacaoController::class, 'calcular'])->name('cotacao.calcular');
+        Route::post('cotacao/calcular-5e', [ComercialCotacaoController::class, 'calcular5e'])->name('cotacao.calcular5e');
 
         // Configuração / Valores
         Route::get('configuracoes', [ComercialConfigController::class, 'index'])->name('configuracoes');
