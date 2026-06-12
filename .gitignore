@@ -16,6 +16,8 @@ app/vendor
 app/.env
 app/.env.backup
 app/.env.production
+app/.env.dusk.local
+app/.env.dusk.*
 app/.phpunit.cache
 app/.phpunit.result.cache
 app/auth.json
