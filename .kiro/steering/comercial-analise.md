@@ -106,7 +106,44 @@ do protótipo DEVE ser portado. Não simplificar, não "cobrir ~40%". Antes de c
 spec do Comercial concluída, fazer conferência campo-a-campo contra a view correspondente do HTML
 e listar o que falta. Testar back (unit) + front (Dusk).
 
-### Status de fidelidade por tela (atualizar sempre)
+### Status de fidelidade por tela (atualizar sempre) — atualizado 12/06/2026
 
-- **Config/Valores**: CCTs (20) ✅, Categorias (5) ✅, Índices ✅, Encargos A/B/C/D ✅, Escalas ⚠️ (parcial — faltam qtdD/qtdN/func_por_posto/temAN/jornada), **Insumos global ❌**, **Taxas** (coberto por Índices), cards CCT por estado (tabela cobre dados).
-- **Cotação**: motor de cálculo IN05 + 5E ✅ (verificado ao centavo, 7 unit + 3 Dusk). **Tela ❌ incompleta** — falta: cabeçalho "Identificação da Proposta" (empresa/CNPJ, cliente, nº, data, responsável, periodicidade), seletor de Modelo (IN05 × 5E), seleção empresa por sede/filial, "Configurar Posto" com múltiplos postos somados, Módulo 1 com turnos Diurno/Noturno, botões Salvar Proposta / Importar planilha / Exportar Excel.
+- **Config/Valores: 100% ✅ e em produção.** Tela portada 1:1 do HTML (CSS `.g360`), abas Convenções Coletivas / Taxas / Insumos, cards CCT por estado (20 CCTs), painel de detalhe editável, Encargos A/B/C/D, Taxas (adm/lucro/tributos), Insumos (12). Cores em white-label (`--app-primary`). 4 Dusk + dados semeados.
+- **Cotação: motor 100% ✅ / tela ~70% ⚠️.** Motor IN05 + 5E verificado ao centavo (7 unit). Tela tem Identificação, modelo IN05×5E, Configurar Posto multi-posto, composição detalhada — MAS ainda foi feita com componentes nossos (PrimeVue), **NÃO portada 1:1 do HTML como a Valores**. PENDENTE: reportar a Cotação no padrão `.g360` (igual fiz na Valores) + Salvar Proposta + Importar/Exportar Excel + turnos Diurno/Noturno no 5E.
+- **Demais views** (Dashboard, Propostas, Clientes, Faturamento, Saúde, Reajuste): ❌ não iniciadas.
+
+---
+
+## PONTO DE RETOMADA (handoff) — ler ao voltar pra esta demanda
+
+### Como o módulo está montado
+- **Tabelas**: `bs_comercial_ccts` (20, uf×serviço, com valores), `_categorias` (5), `_escalas` (5, com qtdD/qtdN/func/AN/jornada), `_indices` (adm/lucro/iss/pis/cofins/encargos), `_encargos` (20, grupos A/B/C/D), `_insumos` (12).
+- **Models**: `App\Models\Comercial\{Cct,Categoria,Escala,Indice,Encargo,Insumo}`.
+- **Controllers**: `App\Http\Controllers\Comercial\ComercialConfigController` (Valores) e `ComercialCotacaoController` (Cotação).
+- **Motor de cálculo**: `App\Services\Comercial\ComposicaoCustoService` — `calcularIN05()` e `calcular5Estrelas()`. **Fonte da verdade. Verificado ao centavo contra o protótipo** (7 testes em `tests/Unit/ComposicaoCustoServiceTest.php`). Fórmulas literais em `comercial-calculo-in05.md`.
+- **Rotas**: prefixo `/comercial/*` (web.php), middleware `permission:comercial.visualizar`.
+- **Permissões**: `comercial.visualizar/cotar/aprovar/configurar` (PermissionsSeeder).
+- **Menu**: grupo "Comercial" (Nova Cotação, Valores) no `MenuCatalog`.
+- **Seeder**: `ComercialConfigSeeder` (idempotente, valores exatos do protótipo). Rodar: `php artisan db:seed --class=ComercialConfigSeeder --force`.
+- **Telas**: `resources/js/Pages/Comercial/Configuracoes/Index.vue` (Valores, portada 1:1) e `Cotacao/Index.vue` (a refazer no padrão g360).
+
+### REGRAS/APRENDIZADOS (valem pra todo o módulo Comercial)
+1. **Fidelidade total**: portar HTML+CSS do protótipo 1:1, mudando só a casca (nosso AppLayout/menu). NÃO recriar com PrimeVue (fica diferente — a Valores teve que ser refeita por isso).
+2. **CSS do protótipo**: já extraído e escopado sob `.g360` em `resources/css/comercial-g360.css` (importar com `import "@/../css/comercial-g360.css"`). Envolver o conteúdo em `<div class="g360"><div class="view active">...`. **Reutilizável pra todas as views.**
+3. **Cores white-label**: dentro do `.g360`, `--brand-gold` aponta pra `var(--app-primary)`; tons rgba viram `color-mix(... var(--app-primary) ...)`. Manter cores semânticas (verde/azul/vermelho). NÃO usar o dourado fixo do protótipo.
+4. **Cálculo sempre no backend** (ComposicaoCustoService), nunca só no front — o número é auditável.
+5. **Constantes do cálculo** (13º 0.0833, multa FGTS 40%, desc VT 6%, AN 20%) hoje fixas no Service; decisão: podem virar parâmetros no banco se o cliente pedir.
+6. **Fonte do protótipo**: `~/Downloads/gestao360_5estrelas (2).html` (restaurado da lixeira). Linhas-chave: CSS 15–1106; ESCALAS 4470–4578; calcIN 5891–6147; calcular/M2/M3 5667–5785; view-cct (Valores) 3568–4073; view-cotacao 1650–2383.
+
+### TESTES (back + front)
+- **Unit**: `php artisan test --filter=ComposicaoCustoServiceTest` (7 testes, motor ao centavo).
+- **Browser (Dusk)**: instalado. Rodar: subir `php artisan serve --port=8778` e `php artisan dusk --filter=ComercialCotacaoTest`. Config em `.env.dusk.local` (NÃO commitado, tem segredos; já no .gitignore). 
+  - **Gotcha Dusk**: `assertSee/getText` aplica `text-transform` — textos com classe `uppercase` (ex.: `.module-title`) aparecem MAIÚSCULOS pro Selenium. Asserções devem casar com o texto exibido (ex.: assertSee('ENCARGOS SOCIAIS')).
+  - **ChromeDriver**: tem que casar com a versão do Chrome. Se atualizar: `php artisan dusk:chrome-driver --detect`.
+- **Toda tela nova do Comercial**: criar teste Dusk no padrão de `tests/Browser/ComercialCotacaoTest.php`.
+
+### PRÓXIMOS PASSOS (ordem)
+1. **Reportar a Cotação no padrão g360** (1:1 com a view-cotacao do HTML) — é o item mais urgente, a tela atual não está fiel.
+2. Salvar Proposta (encosta na Spec 3) + Importar/Exportar Excel + turnos Diurno/Noturno (5E).
+3. Demais views: Propostas (funil), Clientes, Faturamento, Saúde Contratual, Reajuste, Dashboard.
+4. Adicionar Comercial no SearchController (Ctrl+K) quando houver entidades pesquisáveis (propostas/clientes).
