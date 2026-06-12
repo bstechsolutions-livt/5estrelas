@@ -7,6 +7,7 @@ use App\Models\Comercial\Cct;
 use App\Models\Comercial\Encargo;
 use App\Models\Comercial\Escala;
 use App\Models\Comercial\Indice;
+use App\Models\Comercial\Insumo;
 use Illuminate\Database\Seeder;
 
 /**
@@ -17,12 +18,15 @@ class ComercialConfigSeeder extends Seeder
 {
     public function run(): void
     {
-        // Escalas comuns de vigilância
+        // Escalas (valores e config do protótipo)
+        // Remove nomes antigos (versão inicial) para não duplicar
+        Escala::whereIn('nome', ['12x36 Diurno', '12x36 Noturno', '24h', '44h Semanais'])->delete();
         $escalas = [
-            ['nome' => '12x36 Diurno', 'dias_mes' => 15, 'horas_mes' => 180],
-            ['nome' => '12x36 Noturno', 'dias_mes' => 15, 'horas_mes' => 180],
-            ['nome' => '24h', 'dias_mes' => 15, 'horas_mes' => 180],
-            ['nome' => '44h Semanais', 'dias_mes' => 30, 'horas_mes' => 220],
+            ['nome' => '12x36 — Diurno', 'dias_mes' => 15.5, 'horas_mes' => 220, 'qtd_diurno' => 2, 'qtd_noturno' => 0, 'func_por_posto' => 2, 'tem_an' => false, 'jornada' => '07h00 às 19h00'],
+            ['nome' => '12x36 — Noturno', 'dias_mes' => 15.5, 'horas_mes' => 220, 'qtd_diurno' => 0, 'qtd_noturno' => 2, 'func_por_posto' => 2, 'tem_an' => true, 'jornada' => '19h00 às 07h00'],
+            ['nome' => '24 Horas (12x36)', 'dias_mes' => 15.5, 'horas_mes' => 220, 'qtd_diurno' => 2, 'qtd_noturno' => 2, 'func_por_posto' => 4, 'tem_an' => true, 'jornada' => '07h00 às 07h00 (ininterrupto)'],
+            ['nome' => '44h — 5×2', 'dias_mes' => 22, 'horas_mes' => 220, 'qtd_diurno' => 1, 'qtd_noturno' => 0, 'func_por_posto' => 1, 'tem_an' => false, 'jornada' => '08h/dia · Seg a Sex (ou Seg a Sab)'],
+            ['nome' => '44h — 6×1', 'dias_mes' => 26, 'horas_mes' => 220, 'qtd_diurno' => 1, 'qtd_noturno' => 0, 'func_por_posto' => 1, 'tem_an' => false, 'jornada' => '7h20/dia · Seg a Sab'],
         ];
         foreach ($escalas as $e) {
             Escala::updateOrCreate(['nome' => $e['nome']], $e);
@@ -91,6 +95,33 @@ class ComercialConfigSeeder extends Seeder
 
         $this->seedCcts();
         $this->seedEncargos();
+        $this->seedInsumos();
+    }
+
+    /** Insumos globais (12 itens) — defaults do protótipo. */
+    private function seedInsumos(): void
+    {
+        $itens = [
+            ['uniforme', 'Uniforme', 89.50],
+            ['epi', 'EPI', 0],
+            ['colete', 'Colete', 0],
+            ['reciclag', 'Reciclagem', 17.58],
+            ['treinamento', 'Treinamento', 0],
+            ['aso', 'ASO — Atestado de Saúde Ocupacional', 0],
+            ['gta', 'GTA — Guia de Tráfego de Armas', 47.00],
+            ['cofre', 'Cofre', 55.00],
+            ['arma', 'Armamento', 126.00],
+            ['guarita', 'Guarita', 0],
+            ['radio', 'Rádio', 0],
+            ['moto', 'Motocicleta', 0],
+        ];
+        $ordem = 0;
+        foreach ($itens as $i) {
+            Insumo::updateOrCreate(
+                ['chave' => $i[0]],
+                ['label' => $i[1], 'valor' => $i[2], 'ordem' => $ordem++],
+            );
+        }
     }
 
     /** Encargos sociais detalhados (grupos A/B/C/D) — valores do protótipo. */

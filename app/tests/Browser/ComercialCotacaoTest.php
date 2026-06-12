@@ -54,7 +54,8 @@ class ComercialCotacaoTest extends DuskTestCase
                 ->assertSee('CCTs')
                 ->assertSee('Categorias')
                 ->assertSee('Escalas')
-                ->assertSee('Encargos');
+                ->assertSee('Encargos')
+                ->assertSee('Insumos');
         });
     }
 }

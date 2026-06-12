@@ -8,6 +8,7 @@ use App\Models\Comercial\Cct;
 use App\Models\Comercial\Encargo;
 use App\Models\Comercial\Escala;
 use App\Models\Comercial\Indice;
+use App\Models\Comercial\Insumo;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -32,6 +33,7 @@ class ComercialConfigController extends Controller
             'escalas' => Escala::orderBy('nome')->get(),
             'indices' => Indice::orderBy('chave')->get(),
             'encargos' => Encargo::orderBy('ordem')->get(),
+            'insumos' => Insumo::orderBy('ordem')->get(),
         ]);
     }
 
@@ -155,13 +157,7 @@ class ComercialConfigController extends Controller
     // ─── Escalas ─────────────────────────────────────────────
     public function storeEscala(Request $request)
     {
-        $data = $request->validate([
-            'nome' => 'required|string|max:255',
-            'dias_mes' => 'numeric',
-            'horas_mes' => 'numeric',
-            'ativo' => 'boolean',
-        ]);
-        $escala = Escala::create($data);
+        $escala = Escala::create($this->dadosEscala($request));
 
         return response()->json(['sucesso' => true, 'dados' => $escala]);
     }
@@ -169,9 +165,24 @@ class ComercialConfigController extends Controller
     public function updateEscala(Request $request, $id)
     {
         $escala = Escala::findOrFail($id);
-        $escala->update($request->only(['nome', 'dias_mes', 'horas_mes', 'ativo']));
+        $escala->update($this->dadosEscala($request));
 
         return response()->json(['sucesso' => true, 'dados' => $escala]);
+    }
+
+    private function dadosEscala(Request $request): array
+    {
+        return $request->validate([
+            'nome' => 'required|string|max:255',
+            'dias_mes' => 'numeric',
+            'horas_mes' => 'numeric',
+            'qtd_diurno' => 'nullable|integer',
+            'qtd_noturno' => 'nullable|integer',
+            'func_por_posto' => 'nullable|integer',
+            'tem_an' => 'boolean',
+            'jornada' => 'nullable|string|max:255',
+            'ativo' => 'boolean',
+        ]);
     }
 
     public function destroyEscala($id)
@@ -179,6 +190,20 @@ class ComercialConfigController extends Controller
         Escala::findOrFail($id)->delete();
 
         return response()->json(['sucesso' => true]);
+    }
+
+    // ─── Insumos (global) ────────────────────────────────────
+    public function salvarInsumos(Request $request)
+    {
+        $insumos = $request->input('insumos', []);
+        foreach ($insumos as $item) {
+            if (empty($item['id'])) {
+                continue;
+            }
+            Insumo::where('id', $item['id'])->update(['valor' => $item['valor'] ?? 0]);
+        }
+
+        return response()->json(['sucesso' => true, 'insumos' => Insumo::orderBy('ordem')->get()]);
     }
 
     // ─── Índices ─────────────────────────────────────────────

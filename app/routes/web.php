@@ -299,6 +299,9 @@ Route::middleware('auth')->group(function () {
 
             // Encargos (detalhamento A/B/C/D)
             Route::post('encargos', [ComercialConfigController::class, 'salvarEncargos'])->name('encargos.salvar');
+
+            // Insumos (global)
+            Route::post('insumos', [ComercialConfigController::class, 'salvarInsumos'])->name('insumos.salvar');
         });
     });
 

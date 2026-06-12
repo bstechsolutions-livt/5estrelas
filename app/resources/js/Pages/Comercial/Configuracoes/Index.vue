@@ -26,6 +26,7 @@ const categorias = ref([])
 const escalas = ref([])
 const indices = ref([])
 const encargos = ref([])
+const insumos = ref([])
 
 async function carregar() {
   loading.value = true
@@ -36,6 +37,7 @@ async function carregar() {
     escalas.value = data.escalas || []
     indices.value = data.indices || []
     encargos.value = data.encargos || []
+    insumos.value = data.insumos || []
   } catch (e) {
     toast.add({ severity: "error", summary: "Erro", detail: "Falha ao carregar dados", life: 4000 })
   } finally {
@@ -150,7 +152,7 @@ async function excluirCat(row) {
 const escDialog = ref(false)
 const escForm = ref({})
 function novaEsc() {
-  escForm.value = { id: null, nome: "", dias_mes: 30, horas_mes: 220, ativo: true }
+  escForm.value = { id: null, nome: "", dias_mes: 30, horas_mes: 220, qtd_diurno: 0, qtd_noturno: 0, func_por_posto: 1, tem_an: false, jornada: "", ativo: true }
   escDialog.value = true
 }
 function editarEsc(row) {
@@ -207,6 +209,14 @@ async function salvarEncargos() {
     carregar()
   } catch (e) { fail("Não foi possível salvar os encargos") }
 }
+
+// ─── Insumos (global) ────────────────────────────────
+async function salvarInsumos() {
+  try {
+    await axios.post("/comercial/configuracoes/insumos", { insumos: insumos.value })
+    ok("Insumos salvos")
+  } catch (e) { fail("Não foi possível salvar os insumos") }
+}
 </script>
 
 <template>
@@ -226,6 +236,7 @@ async function salvarEncargos() {
           <Tab value="2">Escalas</Tab>
           <Tab value="3">Índices</Tab>
           <Tab value="4">Encargos</Tab>
+          <Tab value="5">Insumos</Tab>
         </TabList>
         <TabPanels>
           <!-- CCTs -->
@@ -344,6 +355,20 @@ async function salvarEncargos() {
               </div>
             </div>
           </TabPanel>
+
+          <!-- Insumos (global) -->
+          <TabPanel value="5">
+            <div class="flex justify-between items-center mb-3">
+              <p class="text-sm text-gray-500">Valores unitários de insumos (uniforme, EPI, armamento, etc.).</p>
+              <Button label="Salvar Insumos" icon="pi pi-save" size="small" @click="salvarInsumos" />
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div v-for="ins in insumos" :key="ins.id" class="border border-gray-200 dark:border-slate-700 rounded-lg p-3">
+                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ ins.label }}</label>
+                <InputNumber v-model="ins.valor" :minFractionDigits="2" mode="currency" currency="BRL" locale="pt-BR" fluid />
+              </div>
+            </div>
+          </TabPanel>
         </TabPanels>
       </Tabs>
     </div>
@@ -400,14 +425,17 @@ async function salvarEncargos() {
     </Dialog>
 
     <!-- Dialog Escala -->
-    <Dialog v-model:visible="escDialog" modal header="Escala" :style="{ width: '420px' }">
-      <div class="space-y-3">
-        <div><label class="text-sm font-medium">Nome *</label><InputText v-model="escForm.nome" class="w-full" /></div>
-        <div class="grid grid-cols-2 gap-3">
-          <div><label class="text-sm font-medium">Dias/mês</label><InputNumber v-model="escForm.dias_mes" :minFractionDigits="0" fluid /></div>
-          <div><label class="text-sm font-medium">Horas/mês</label><InputNumber v-model="escForm.horas_mes" :minFractionDigits="0" fluid /></div>
-        </div>
-        <div class="flex items-center gap-2"><ToggleSwitch v-model="escForm.ativo" /><span class="text-sm">Ativa</span></div>
+    <Dialog v-model:visible="escDialog" modal header="Escala" :style="{ width: '520px' }">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2"><label class="text-sm font-medium">Nome *</label><InputText v-model="escForm.nome" class="w-full" /></div>
+        <div><label class="text-sm font-medium">Dias/mês</label><InputNumber v-model="escForm.dias_mes" :minFractionDigits="0" fluid /></div>
+        <div><label class="text-sm font-medium">Horas/mês</label><InputNumber v-model="escForm.horas_mes" :minFractionDigits="0" fluid /></div>
+        <div><label class="text-sm font-medium">Qtd Diurno</label><InputNumber v-model="escForm.qtd_diurno" fluid /></div>
+        <div><label class="text-sm font-medium">Qtd Noturno</label><InputNumber v-model="escForm.qtd_noturno" fluid /></div>
+        <div><label class="text-sm font-medium">Func. por posto</label><InputNumber v-model="escForm.func_por_posto" fluid /></div>
+        <div class="flex items-end gap-2"><ToggleSwitch v-model="escForm.tem_an" /><span class="text-sm">Tem adicional noturno</span></div>
+        <div class="col-span-2"><label class="text-sm font-medium">Jornada</label><InputText v-model="escForm.jornada" class="w-full" placeholder="ex: 07h00 às 19h00" /></div>
+        <div class="col-span-2 flex items-center gap-2"><ToggleSwitch v-model="escForm.ativo" /><span class="text-sm">Ativa</span></div>
       </div>
       <template #footer>
         <Button label="Cancelar" text @click="escDialog = false" />
