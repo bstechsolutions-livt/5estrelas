@@ -23,6 +23,7 @@ use App\Http\Controllers\v2\GestaoContratosController;
 use App\Http\Controllers\v2\GestaoEquipamentosController;
 use App\Http\Controllers\SolicitacoesController;
 use App\Http\Controllers\Comercial\ComercialConfigController;
+use App\Http\Controllers\Comercial\ComercialCotacaoController;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 
@@ -268,9 +269,13 @@ Route::middleware('auth')->group(function () {
     //   Spec 1: Configuração / Valores (CCT, categorias, escalas, índices)
     // ═══════════════════════════════════════════════════════════════
     Route::prefix('comercial')->middleware('permission:comercial.visualizar')->name('comercial.')->group(function () {
+        // Cotação (planilha IN 05)
+        Route::get('cotacao', [ComercialCotacaoController::class, 'index'])->name('cotacao');
+        Route::get('cotacao/dados', [ComercialCotacaoController::class, 'dados'])->name('cotacao.dados');
+        Route::post('cotacao/calcular', [ComercialCotacaoController::class, 'calcular'])->name('cotacao.calcular');
+
         // Configuração / Valores
         Route::get('configuracoes', [ComercialConfigController::class, 'index'])->name('configuracoes');
-
         Route::prefix('configuracoes')->name('config.')->group(function () {
             Route::get('dados', [ComercialConfigController::class, 'dados'])->name('dados');
 

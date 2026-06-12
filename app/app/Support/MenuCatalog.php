@@ -26,6 +26,7 @@ class MenuCatalog
             ['key' => 'usuarios', 'label' => 'Usuários', 'icon' => 'pi pi-users', 'href' => '/usuarios', 'permission' => 'usuarios.listar', 'group' => 'Cadastros'],
 
             // Comercial ("Gestão 360º")
+            ['key' => 'comercial_cotacao', 'label' => 'Nova Cotação', 'icon' => 'pi pi-calculator', 'href' => '/comercial/cotacao', 'permission' => 'comercial.cotar', 'group' => 'Comercial'],
             ['key' => 'comercial_config', 'label' => 'Valores', 'icon' => 'pi pi-dollar', 'href' => '/comercial/configuracoes', 'permission' => 'comercial.configurar', 'group' => 'Comercial'],
 
             // Configurações
