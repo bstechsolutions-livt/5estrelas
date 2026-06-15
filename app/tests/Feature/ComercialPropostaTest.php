@@ -12,11 +12,11 @@ class ComercialPropostaTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function userComPermissao(): User
+    private function userComPermissao(array $keys = ['comercial.visualizar', 'comercial.cotar']): User
     {
         $user = User::factory()->create();
 
-        foreach (['comercial.visualizar', 'comercial.cotar'] as $key) {
+        foreach ($keys as $key) {
             $perm = Permission::firstOrCreate(
                 ['key' => $key],
                 ['label' => $key, 'module' => 'comercial'],
@@ -62,10 +62,10 @@ class ComercialPropostaTest extends TestCase
         $response = $this->actingAs($user)->postJson('/comercial/propostas', $payload);
 
         $response->assertOk()
-            ->assertJson(['sucesso' => true, 'numero' => 'PRP-0001']);
+            ->assertJson(['sucesso' => true, 'numero' => 'Nº 132']);
 
         $this->assertDatabaseHas('bs_comercial_propostas', [
-            'numero' => 'PRP-0001',
+            'numero' => 'Nº 132',
             'cliente' => 'Condomínio Teste',
             'modelo' => '5estrelas',
             'status' => 'rascunho',
@@ -84,12 +84,12 @@ class ComercialPropostaTest extends TestCase
         $user = $this->userComPermissao();
 
         Proposta::create([
-            'numero' => 'PRP-0132',
+            'numero' => 'Nº 132',
             'modelo' => 'in05',
             'postos' => [['id' => 1]],
         ]);
 
-        $this->assertEquals('PRP-0133', Proposta::gerarNumero());
+        $this->assertEquals('Nº 133', Proposta::gerarNumero());
     }
 
     public function test_rejeita_quando_postos_vazio(): void
@@ -110,5 +110,98 @@ class ComercialPropostaTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors('postos');
+    }
+
+    public function test_index_renderiza_lista_para_usuario_com_permissao(): void
+    {
+        $user = $this->userComPermissao();
+
+        Proposta::create([
+            'numero' => 'Nº 132',
+            'modelo' => 'manual',
+            'cliente' => 'Condomínio Aurora',
+            'situacao' => 'EM ANÁLISE',
+            'valor' => 12000.00,
+            'postos' => [['id' => 1]],
+        ]);
+
+        $response = $this->actingAs($user)->get('/comercial/propostas');
+
+        $response->assertOk();
+        $response->assertInertia(
+            fn ($page) => $page
+                // 2º arg `false`: pula a checagem de existência em disco do Inertia.
+                // O config padrão aponta para `js/pages` (minúsculo) mas o projeto usa
+                // `js/Pages`; em FS case-sensitive (Linux) a checagem falharia. O nome
+                // do componente continua sendo asseverado normalmente.
+                ->component('Comercial/Propostas/Index', false)
+                ->has('propostas', 1)
+                ->where('propostas.0.cliente', 'Condomínio Aurora')
+                ->where('propostas.0.situacao', 'EM ANÁLISE')
+                ->has('situacaoLabels')
+        );
+    }
+
+    public function test_update_situacao_persiste_e_espelha_aprovacao(): void
+    {
+        $user = $this->userComPermissao(['comercial.visualizar', 'comercial.aprovar']);
+
+        $proposta = Proposta::create([
+            'numero' => 'Nº 140',
+            'modelo' => 'manual',
+            'cliente' => 'Cliente X',
+            'situacao' => 'EM ANÁLISE',
+            'valor' => 9000.00,
+            'postos' => [['id' => 1]],
+        ]);
+
+        $response = $this->actingAs($user)->patchJson("/comercial/propostas/{$proposta->id}/situacao", [
+            'situacao' => 'APROVADO',
+            'valor_aprovado' => 9000.00,
+            'data_aprovacao' => '2026-06-25',
+        ]);
+
+        $response->assertOk()->assertJson(['sucesso' => true]);
+
+        $this->assertDatabaseHas('bs_comercial_propostas', [
+            'id' => $proposta->id,
+            'situacao' => 'APROVADO',
+            'valor_aprovado' => 9000.00,
+        ]);
+    }
+
+    public function test_update_situacao_rejeita_valor_invalido(): void
+    {
+        $user = $this->userComPermissao(['comercial.visualizar', 'comercial.aprovar']);
+
+        $proposta = Proposta::create([
+            'numero' => 'Nº 141',
+            'modelo' => 'manual',
+            'situacao' => 'EM ANÁLISE',
+            'postos' => [['id' => 1]],
+        ]);
+
+        $response = $this->actingAs($user)->patchJson("/comercial/propostas/{$proposta->id}/situacao", [
+            'situacao' => 'INEXISTENTE',
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('situacao');
+    }
+
+    public function test_destroy_exclui_proposta(): void
+    {
+        $user = $this->userComPermissao();
+
+        $proposta = Proposta::create([
+            'numero' => 'Nº 150',
+            'modelo' => 'manual',
+            'situacao' => 'EM ANÁLISE',
+            'postos' => [['id' => 1]],
+        ]);
+
+        $response = $this->actingAs($user)->deleteJson("/comercial/propostas/{$proposta->id}");
+
+        $response->assertOk()->assertJson(['sucesso' => true]);
+        $this->assertDatabaseMissing('bs_comercial_propostas', ['id' => $proposta->id]);
     }
 }
