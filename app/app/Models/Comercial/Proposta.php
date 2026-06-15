@@ -82,6 +82,11 @@ class Proposta extends Model
     }
 
     // ─── Relations ──────────────────────────────────────────────────────────────
+    public function cliente(): BelongsTo
+    {
+        return $this->belongsTo(Cliente::class, 'cliente_id');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
