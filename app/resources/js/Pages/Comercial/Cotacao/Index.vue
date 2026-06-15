@@ -1147,8 +1147,8 @@ onMounted(carregar)
             </div><!-- /form-detalhes -->
           </div><!-- /coluna esquerda -->
 
-          <!-- COLUNA DIREITA: Resumo da proposta (sticky) -->
-          <div style="position:sticky;top:80px">
+          <!-- COLUNA DIREITA: Resumo da proposta (fixo) -->
+          <div style="position:sticky;top:1rem;max-height:calc(100vh - 6rem);overflow-y:auto">
             <div class="module-card">
               <div class="module-header" style="flex-wrap:wrap;gap:8px">
                 <div class="module-title"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h8M4 8h8M4 12h5"/><circle cx="1.5" cy="4" r="1" fill="currentColor" stroke="none"/><circle cx="1.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="1.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg> Resumo dos Postos</div>
