@@ -7,6 +7,7 @@ use App\Models\Post;
 use App\Models\PostComment;
 use App\Models\User;
 use App\Models\Comercial\Cliente;
+use App\Models\Comercial\Faturamento;
 use App\Models\Comercial\Proposta;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -96,6 +97,10 @@ class DemoSeeder extends Seeder
         // 5. Criar clientes comerciais e vincular propostas
         $this->command->info('Criando clientes comerciais...');
         $this->createClientes($admin ?? User::first());
+
+        // 6. Criar faturamento comercial (2025 e 2026)
+        $this->command->info('Criando faturamento comercial...');
+        $this->createFaturamento();
 
         // Limpa autenticação
         auth()->logout();
@@ -465,5 +470,64 @@ class DemoSeeder extends Seeder
             $this->command->warn("  ! Erro ao baixar {$url}: " . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Cria dados de faturamento para 2025 e 2026 com locais realistas.
+     * Idempotente: limpa e recria.
+     */
+    private function createFaturamento(): void
+    {
+        Faturamento::query()->delete();
+
+        $locais = [
+            'Banco Regional do Brasil — Vigilância',
+            'Tribunal de Justiça DF — Segurança',
+            'Hospital São Lucas — Portaria',
+            'Condomínio Residencial Jardins — Vigilância',
+            'Shopping Center Norte — Segurança',
+            'Receita Federal DF — Vigilância',
+            'Faculdade Horizonte — Portaria',
+            'Ministério da Educação — Segurança',
+        ];
+
+        // Vincular a clientes existentes se possível
+        $clientesMap = Cliente::pluck('id', 'nome')->toArray();
+
+        foreach ([2025, 2026] as $ano) {
+            foreach ($locais as $nome) {
+                $dados = [
+                    'ano' => $ano,
+                    'local_nome' => $nome,
+                    'cliente_id' => null,
+                ];
+
+                // Tenta vincular pelo nome parcial
+                foreach ($clientesMap as $cliNome => $cliId) {
+                    if (str_contains($nome, $cliNome) || str_contains($cliNome, explode(' — ', $nome)[0])) {
+                        $dados['cliente_id'] = $cliId;
+                        break;
+                    }
+                }
+
+                // Valores mensais com distribuição realista (entre 30k e 180k)
+                $base = random_int(30000, 180000);
+                foreach (Faturamento::MESES as $idx => $mes) {
+                    // 2026: crescimento de 5-15% sobre 2025
+                    $variacao = $ano === 2026 ? (random_int(5, 15) / 100) : 0;
+                    // Meses futuros zerados em 2026
+                    if ($ano === 2026 && $idx > (int) date('n') - 1) {
+                        $dados[$mes] = 0;
+                    } else {
+                        $valor = $base * (1 + $variacao) + random_int(-5000, 5000);
+                        $dados[$mes] = round(max(0, $valor), 2);
+                    }
+                }
+
+                Faturamento::create($dados);
+            }
+        }
+
+        $this->command->info('  → ' . count($locais) . ' locais × 2 anos = ' . (count($locais) * 2) . ' linhas de faturamento.');
     }
 }
