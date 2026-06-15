@@ -295,6 +295,9 @@ Route::middleware('auth')->group(function () {
             Route::put('ccts/{id}', [ComercialConfigController::class, 'updateCct'])->name('ccts.update');
             Route::delete('ccts/{id}', [ComercialConfigController::class, 'destroyCct'])->name('ccts.destroy');
 
+            // Estados (cria UF com CCTs padrão)
+            Route::post('estados', [ComercialConfigController::class, 'storeEstado'])->name('estados.store');
+
             // Categorias
             Route::post('categorias', [ComercialConfigController::class, 'storeCategoria'])->name('categorias.store');
             Route::put('categorias/{id}', [ComercialConfigController::class, 'updateCategoria'])->name('categorias.update');

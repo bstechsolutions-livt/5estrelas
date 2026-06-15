@@ -195,11 +195,20 @@ class ComercialConfigSeeder extends Seeder
             ['sp', 'bombeiro', 'CCT Bombeiro Civil — SP', 'SINDESV/SP', 2950.00, 220, 15.5, 30, 0, 1.5, 260.00, 34.00, 24.00, 24.00, 20.00, 100.00, 48.00, 32.00, 11.20, 6, 0, 0, 0, 0],
         ];
 
+        $tipoMeta = [
+            'vigilancia' => ['tipo' => 'seg', 'icone' => '🛡️'],
+            'bombeiro' => ['tipo' => 'seg', 'icone' => '🔥'],
+            'portaria' => ['tipo' => 'apoio', 'icone' => '🏢'],
+            'limpeza' => ['tipo' => 'apoio', 'icone' => '🧹'],
+        ];
+
         foreach ($rows as $r) {
             Cct::updateOrCreate(
                 ['uf' => $r[0], 'servico' => $r[1]],
                 [
                     'nome' => $r[2], 'titulo' => $r[2], 'sindicato' => $r[3], 'ano_base' => '2026', 'ativo' => true,
+                    'tipo' => $tipoMeta[$r[1]]['tipo'] ?? 'apoio',
+                    'icone' => $tipoMeta[$r[1]]['icone'] ?? '⭐',
                     'salario_base' => $r[4], 'horas_mes' => $r[5], 'dias_mes' => $r[6],
                     'periculosidade_pct' => $r[7], 'adicional_noturno_pct' => $r[8], 'intrajornada_h' => $r[9],
                     'plano_saude' => $r[10], 'fundo_social' => $r[11], 'sst' => $r[12], 'cna' => $r[13], 'seguro_vida' => $r[14],

@@ -10,13 +10,20 @@ const ok = (m) => toast.add({ severity: "success", summary: "Pronto", detail: m,
 const fail = (m) => toast.add({ severity: "error", summary: "Erro", detail: m, life: 4000 })
 const fmt = (v) => v ? "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"
 
+// ─── Mapa de UFs do Brasil ──────────────────────────────
+const ufNomes = {
+  ac: "Acre", al: "Alagoas", ap: "Amapá", am: "Amazonas", ba: "Bahia",
+  ce: "Ceará", df: "Brasília", es: "Espírito Santo", go: "Goiás",
+  ma: "Maranhão", mt: "Mato Grosso", ms: "Mato Grosso do Sul",
+  mg: "Minas Gerais", pa: "Pará", pb: "Paraíba", pr: "Paraná",
+  pe: "Pernambuco", pi: "Piauí", rj: "Rio de Janeiro", rn: "Rio Grande do Norte",
+  rs: "Rio Grande do Sul", ro: "Rondônia", rr: "Roraima", sc: "Santa Catarina",
+  sp: "São Paulo", se: "Sergipe", to: "Tocantins",
+}
+
 // ─── Estado ──────────────────────────────────────────
 const aba = ref("cct")            // cct | taxas | insumos
-const estadoUf = ref("df")
-const estados = [
-  { uf: "df", nome: "Brasília" }, { uf: "go", nome: "Goiás" }, { uf: "mg", nome: "Minas Gerais" },
-  { uf: "mt", nome: "Mato Grosso" }, { uf: "sp", nome: "São Paulo" },
-]
+const estadoUf = ref("")
 const ccts = ref([])
 const indices = ref([])
 const encargos = ref([])
@@ -24,16 +31,54 @@ const insumos = ref([])
 const cctAtiva = ref(null)
 const encargosAberto = ref(false)
 
-const servicoMeta = {
+// ─── Estados derivados das CCTs ──────────────────────
+const estados = computed(() => {
+  const ufs = [...new Set(ccts.value.map((c) => (c.uf || "").toLowerCase()).filter(Boolean))]
+  ufs.sort()
+  return ufs.map((uf) => ({ uf, nome: ufNomes[uf] || uf.toUpperCase() }))
+})
+
+// UFs disponíveis para novo estado (que ainda não têm CCTs)
+const ufsDisponiveis = computed(() => {
+  const existentes = new Set(estados.value.map((e) => e.uf))
+  return Object.entries(ufNomes)
+    .filter(([uf]) => !existentes.has(uf))
+    .map(([uf, nome]) => ({ uf, nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+})
+
+// ─── servicoMeta extensível ──────────────────────────
+const servicoMetaBase = {
   vigilancia: { nome: "Vigilância", tipo: "seg", icone: "🛡️", cor: "var(--brand-gold)", bg: "color-mix(in srgb, var(--app-primary) 12%, transparent)" },
   bombeiro: { nome: "Bombeiro Civil", tipo: "seg", icone: "🔥", cor: "#E05454", bg: "rgba(224,84,84,.12)" },
   portaria: { nome: "Ag. de Portaria", tipo: "apoio", icone: "🏢", cor: "var(--blue)", bg: "rgba(41,128,185,.12)" },
   limpeza: { nome: "Limpeza", tipo: "apoio", icone: "🧹", cor: "#4CAF7D", bg: "rgba(76,175,125,.12)" },
 }
 
-const cctsDoEstado = computed(() => ccts.value.filter((c) => c.uf === estadoUf.value))
-const cctsSeg = computed(() => cctsDoEstado.value.filter((c) => servicoMeta[c.servico]?.tipo === "seg"))
-const cctsApoio = computed(() => cctsDoEstado.value.filter((c) => servicoMeta[c.servico]?.tipo === "apoio"))
+const defaultMeta = { icone: "⭐", cor: "var(--text-secondary)", bg: "rgba(127,127,127,.1)" }
+
+function getMeta(c) {
+  if (servicoMetaBase[c.servico]) return servicoMetaBase[c.servico]
+  return {
+    nome: c.nome || c.servico || "Serviço",
+    tipo: c.tipo || "apoio",
+    icone: c.icone || defaultMeta.icone,
+    cor: defaultMeta.cor,
+    bg: defaultMeta.bg,
+  }
+}
+
+const cctsDoEstado = computed(() => ccts.value.filter((c) => (c.uf || "").toLowerCase() === estadoUf.value))
+const cctsSeg = computed(() => cctsDoEstado.value.filter((c) => {
+  if (c.tipo) return c.tipo === "seg"
+  const meta = getMeta(c)
+  return meta.tipo === "seg"
+}))
+const cctsApoio = computed(() => cctsDoEstado.value.filter((c) => {
+  if (c.tipo) return c.tipo === "apoio"
+  const meta = getMeta(c)
+  return meta.tipo === "apoio"
+}))
 const sindSeg = computed(() => cctsDoEstado.value.find((c) => c.servico === "vigilancia")?.sindicato || "—")
 const sindApoio = computed(() => cctsDoEstado.value.find((c) => c.servico === "portaria")?.sindicato || "—")
 
@@ -56,6 +101,19 @@ const insGrupos = [
 const ins = (chave) => insumos.value.find((i) => i.chave === chave)
 const insTotal = computed(() => insumos.value.reduce((s, i) => s + Number(i.valor || 0), 0))
 
+// ─── Modal: Novo Estado ──────────────────────────────
+const showNovoEstado = ref(false)
+const novoEstadoUf = ref("")
+const novoEstadoLoading = ref(false)
+
+// ─── Modal: Novo Serviço ─────────────────────────────
+const showNovoServico = ref(false)
+const novoServicoTipo = ref("seg")
+const novoServicoNome = ref("")
+const novoServicoIcone = ref("⭐")
+const novoServicoLoading = ref(false)
+const iconesDisponiveis = ["🛡️", "🔥", "🏢", "🧹", "⭐", "👤", "🚗"]
+
 async function carregar() {
   try {
     const { data } = await axios.get("/comercial/configuracoes/dados")
@@ -63,6 +121,11 @@ async function carregar() {
     indices.value = data.indices || []
     encargos.value = data.encargos || []
     insumos.value = data.insumos || []
+    // Selecionar primeiro estado se necessário
+    if (!estadoUf.value || !ccts.value.some((c) => c.uf === estadoUf.value)) {
+      const ufs = [...new Set(ccts.value.map((c) => c.uf).filter(Boolean))].sort()
+      estadoUf.value = ufs[0] || ""
+    }
   } catch (e) { fail("Falha ao carregar dados") }
 }
 onMounted(carregar)
@@ -89,6 +152,79 @@ async function salvarInsumos() {
   try { await axios.post("/comercial/configuracoes/insumos", { insumos: insumos.value }); ok("Insumos salvos") }
   catch (e) { fail("Erro ao salvar insumos") }
 }
+
+// ─── Criar novo estado ───────────────────────────────
+async function criarEstado() {
+  if (!novoEstadoUf.value) return
+  novoEstadoLoading.value = true
+  try {
+    const { data } = await axios.post("/comercial/configuracoes/estados", {
+      uf: novoEstadoUf.value,
+      nome: ufNomes[novoEstadoUf.value] || novoEstadoUf.value.toUpperCase(),
+    })
+    if (data.sucesso) {
+      ok(`Estado ${novoEstadoUf.value.toUpperCase()} criado com sucesso`)
+      showNovoEstado.value = false
+      novoEstadoUf.value = ""
+      await carregar()
+      // Selecionar o novo estado
+      const ufCriada = data.ccts?.[0]?.uf
+      if (ufCriada) estadoUf.value = ufCriada
+    }
+  } catch (e) {
+    const msg = e.response?.data?.mensagem || "Erro ao criar estado"
+    fail(msg)
+  } finally {
+    novoEstadoLoading.value = false
+  }
+}
+
+// ─── Criar novo serviço/CCT ──────────────────────────
+function abrirNovoServico(tipo) {
+  novoServicoTipo.value = tipo
+  novoServicoNome.value = ""
+  novoServicoIcone.value = "⭐"
+  showNovoServico.value = true
+}
+
+async function criarServico() {
+  if (!novoServicoNome.value.trim()) return
+  novoServicoLoading.value = true
+  const slug = novoServicoNome.value.trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")
+  try {
+    const { data } = await axios.post("/comercial/configuracoes/ccts", {
+      nome: `CCT ${novoServicoNome.value.trim()} — ${estadoUf.value.toUpperCase()}`,
+      titulo: `CCT ${novoServicoNome.value.trim()} — ${estadoUf.value.toUpperCase()}`,
+      servico: slug,
+      tipo: novoServicoTipo.value,
+      icone: novoServicoIcone.value,
+      uf: estadoUf.value,
+      ativo: true,
+      ano_base: String(new Date().getFullYear()),
+      horas_mes: novoServicoTipo.value === "seg" ? 220 : 220,
+      dias_mes: novoServicoTipo.value === "seg" ? 15.5 : 22,
+      salario_base: 0,
+      periculosidade_pct: 0,
+      adicional_noturno_pct: 0,
+      intrajornada_h: 1.5,
+      desconto_vt_pct: 6,
+      va: 0, vt: 0, plano_saude: 0, fundo_social: 0,
+      sst: 0, cna: 0, seguro_vida: 0,
+      uniforme: 0, reciclagem: 0, gta: 0, cofre: 0, arma: 0, colete: 0,
+    })
+    if (data.sucesso) {
+      ok(`Serviço "${novoServicoNome.value}" criado`)
+      showNovoServico.value = false
+      await carregar()
+    }
+  } catch (e) {
+    fail("Erro ao criar serviço")
+  } finally {
+    novoServicoLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -112,11 +248,13 @@ async function salvarInsumos() {
         <!-- ABA: CONVENÇÕES COLETIVAS -->
         <div v-show="aba === 'cct'">
           <!-- Estado tabs -->
-          <div style="display:flex;gap:0;margin-bottom:28px;border-bottom:2px solid var(--brand-border-soft);overflow-x:auto">
+          <div style="display:flex;gap:0;margin-bottom:28px;border-bottom:2px solid var(--brand-border-soft);overflow-x:auto;align-items:center">
             <button v-for="e in estados" :key="e.uf" class="cct-estado-tab" :class="{ active: estadoUf === e.uf }"
               @click="estadoUf = e.uf; fecharPainel()">
               <span class="cct-tab-uf">{{ e.uf.toUpperCase() }}</span><span class="cct-tab-nome">{{ e.nome }}</span>
             </button>
+            <!-- Botão + Novo Estado -->
+            <button class="cct-add-tab" @click="showNovoEstado = true" title="Adicionar novo estado">+</button>
           </div>
 
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;font-size:12px;color:var(--text-muted)">
@@ -132,10 +270,15 @@ async function salvarInsumos() {
             </div>
             <div class="cct-card-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-bottom:20px">
               <div v-for="c in cctsSeg" :key="c.id" class="cct-card" :class="{ active: cctAtiva?.id === c.id }" @click="abrirCard(c)">
-                <div class="cct-card-icon" :style="{ background: servicoMeta[c.servico]?.bg, color: servicoMeta[c.servico]?.cor }">{{ servicoMeta[c.servico]?.icone }}</div>
-                <div class="cct-card-nome">{{ servicoMeta[c.servico]?.nome }}</div>
-                <div class="cct-card-sal" :style="{ color: servicoMeta[c.servico]?.cor }">{{ fmt(c.salario_base) }}</div>
+                <div class="cct-card-icon" :style="{ background: getMeta(c).bg, color: getMeta(c).cor }">{{ getMeta(c).icone }}</div>
+                <div class="cct-card-nome">{{ getMeta(c).nome }}</div>
+                <div class="cct-card-sal" :style="{ color: getMeta(c).cor }">{{ fmt(c.salario_base) }}</div>
                 <div class="cct-card-sub">VA: {{ fmt(c.va) }}/dia</div>
+              </div>
+              <!-- Botão + Novo serviço SEG -->
+              <div class="cct-card cct-card-add" @click="abrirNovoServico('seg')">
+                <div class="cct-card-add-icon">+</div>
+                <div class="cct-card-add-label">Novo serviço</div>
               </div>
             </div>
             <div class="cct-secao-label" style="color:var(--blue)">
@@ -144,10 +287,15 @@ async function salvarInsumos() {
             </div>
             <div class="cct-card-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
               <div v-for="c in cctsApoio" :key="c.id" class="cct-card apoio-card" :class="{ active: cctAtiva?.id === c.id }" @click="abrirCard(c)">
-                <div class="cct-card-icon" :style="{ background: servicoMeta[c.servico]?.bg, color: servicoMeta[c.servico]?.cor }">{{ servicoMeta[c.servico]?.icone }}</div>
-                <div class="cct-card-nome">{{ servicoMeta[c.servico]?.nome }}</div>
-                <div class="cct-card-sal apoio-sal" :style="{ color: servicoMeta[c.servico]?.cor }">{{ fmt(c.salario_base) }}</div>
+                <div class="cct-card-icon" :style="{ background: getMeta(c).bg, color: getMeta(c).cor }">{{ getMeta(c).icone }}</div>
+                <div class="cct-card-nome">{{ getMeta(c).nome }}</div>
+                <div class="cct-card-sal apoio-sal" :style="{ color: getMeta(c).cor }">{{ fmt(c.salario_base) }}</div>
                 <div class="cct-card-sub">VA: {{ fmt(c.va) }}/dia</div>
+              </div>
+              <!-- Botão + Novo serviço APOIO -->
+              <div class="cct-card cct-card-add" @click="abrirNovoServico('apoio')">
+                <div class="cct-card-add-icon">+</div>
+                <div class="cct-card-add-label">Novo serviço</div>
               </div>
             </div>
           </div>
@@ -297,6 +445,70 @@ async function salvarInsumos() {
               <div style="font-family:Syne,sans-serif;font-weight:800;font-size:22px;color:var(--brand-gold)">{{ fmt(insTotal) }}</div>
             </div>
             <button @click="salvarInsumos" class="btn btn-sm" style="background:var(--brand-gold);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;padding:6px 16px">Salvar Insumos</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ Modal: Novo Estado ══════ -->
+      <div v-if="showNovoEstado" class="g360-modal-overlay" @click.self="showNovoEstado = false">
+        <div class="g360-modal">
+          <div class="g360-modal-header">
+            <span>Adicionar novo Estado</span>
+            <button class="g360-modal-close" @click="showNovoEstado = false">✕</button>
+          </div>
+          <div class="g360-modal-body">
+            <div class="form-group">
+              <label class="form-label">UF (Estado)</label>
+              <select class="form-input" v-model="novoEstadoUf">
+                <option value="" disabled>Selecione...</option>
+                <option v-for="u in ufsDisponiveis" :key="u.uf" :value="u.uf">{{ u.uf.toUpperCase() }} — {{ u.nome }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="g360-modal-footer">
+            <button class="btn btn-ghost" @click="showNovoEstado = false">Cancelar</button>
+            <button class="btn btn-gold" :disabled="!novoEstadoUf || novoEstadoLoading" @click="criarEstado">
+              {{ novoEstadoLoading ? "Criando..." : "Criar Estado" }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ Modal: Novo Serviço ══════ -->
+      <div v-if="showNovoServico" class="g360-modal-overlay" @click.self="showNovoServico = false">
+        <div class="g360-modal">
+          <div class="g360-modal-header">
+            <span>Novo Serviço ({{ novoServicoTipo === 'seg' ? 'Segurança' : 'Apoio' }}) — {{ estadoUf.toUpperCase() }}</span>
+            <button class="g360-modal-close" @click="showNovoServico = false">✕</button>
+          </div>
+          <div class="g360-modal-body">
+            <div class="form-group">
+              <label class="form-label">Nome do serviço</label>
+              <input class="form-input" type="text" v-model="novoServicoNome" placeholder="Ex: Recepção, Escolta, CFTV...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tipo</label>
+              <select class="form-input" v-model="novoServicoTipo">
+                <option value="seg">Segurança</option>
+                <option value="apoio">Apoio</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ícone</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+                <button
+                  v-for="ic in iconesDisponiveis" :key="ic"
+                  class="icone-pick" :class="{ selected: novoServicoIcone === ic }"
+                  @click="novoServicoIcone = ic"
+                >{{ ic }}</button>
+              </div>
+            </div>
+          </div>
+          <div class="g360-modal-footer">
+            <button class="btn btn-ghost" @click="showNovoServico = false">Cancelar</button>
+            <button class="btn btn-gold" :disabled="!novoServicoNome.trim() || novoServicoLoading" @click="criarServico">
+              {{ novoServicoLoading ? "Criando..." : "Criar Serviço" }}
+            </button>
           </div>
         </div>
       </div>
