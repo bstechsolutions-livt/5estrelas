@@ -6,6 +6,7 @@ use App\Models\Permission;
 use App\Models\Post;
 use App\Models\PostComment;
 use App\Models\User;
+use App\Models\Comercial\Cliente;
 use App\Models\Comercial\Proposta;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -91,6 +92,10 @@ class DemoSeeder extends Seeder
         // 4. Criar propostas comerciais (snapshot de cotações)
         $this->command->info('Criando propostas comerciais...');
         $this->createPropostas($admin ?? User::first());
+
+        // 5. Criar clientes comerciais e vincular propostas
+        $this->command->info('Criando clientes comerciais...');
+        $this->createClientes($admin ?? User::first());
 
         // Limpa autenticação
         auth()->logout();
@@ -377,6 +382,69 @@ class DemoSeeder extends Seeder
         }
 
         $this->command->info("  → {$total} propostas criadas.");
+    }
+
+    /**
+     * Cria clientes comerciais demo e vincula propostas existentes a eles.
+     */
+    private function createClientes(?User $author): void
+    {
+        // Reset idempotente
+        Cliente::query()->delete();
+
+        if ($author) {
+            auth()->setUser($author);
+        }
+
+        $clientes = [
+            ['nome' => 'Banco Regional do Brasil', 'cidade' => 'Brasília', 'uf' => 'DF', 'situacao' => 'ativo', 'contato_nome' => 'Marcos Tavares', 'contato_email' => 'marcos.tavares@brb.com.br', 'contato_telefone' => '(61) 3322-4455'],
+            ['nome' => 'Tribunal de Justiça do DF', 'cidade' => 'Brasília', 'uf' => 'DF', 'situacao' => 'ativo', 'contato_nome' => 'Patrícia Moreira', 'contato_email' => 'patricia.moreira@tjdft.jus.br', 'contato_telefone' => '(61) 3048-9900'],
+            ['nome' => 'Hospital São Lucas', 'cidade' => 'Goiânia', 'uf' => 'GO', 'situacao' => 'ativo', 'contato_nome' => 'Dr. Fernando Lima', 'contato_email' => 'fernando@saolucas.com.br', 'contato_telefone' => '(62) 3241-5678'],
+            ['nome' => 'Condomínio Residencial Jardins', 'cidade' => 'Brasília', 'uf' => 'DF', 'situacao' => 'ativo', 'contato_nome' => 'Sra. Ana Paula', 'contato_email' => 'sindico@resjardins.com.br', 'contato_telefone' => '(61) 99876-5432'],
+            ['nome' => 'Shopping Center Norte', 'cidade' => 'Cuiabá', 'uf' => 'MT', 'situacao' => 'prospecto', 'contato_nome' => 'Roberto Almeida', 'contato_email' => 'roberto@centernorte.com.br', 'contato_telefone' => '(65) 3028-7700'],
+            ['nome' => 'Receita Federal — Delegacia DF', 'cidade' => 'Brasília', 'uf' => 'DF', 'situacao' => 'ativo', 'contato_nome' => 'Carlos Eduardo', 'contato_email' => 'carlos.eduardo@rfb.gov.br', 'contato_telefone' => '(61) 3412-3000'],
+            ['nome' => 'Faculdade Horizonte', 'cidade' => 'Belo Horizonte', 'uf' => 'MG', 'situacao' => 'inativo', 'contato_nome' => 'Prof. Lúcia Martins', 'contato_email' => 'lucia@fachorizonte.edu.br', 'contato_telefone' => '(31) 3225-8901'],
+            ['nome' => 'Ministério da Educação', 'cidade' => 'Brasília', 'uf' => 'DF', 'situacao' => 'prospecto', 'contato_nome' => 'João Vitor', 'contato_email' => 'joao.vitor@mec.gov.br', 'contato_telefone' => '(61) 2022-8000'],
+        ];
+
+        $propostas = Proposta::all();
+        $propIdx = 0;
+
+        foreach ($clientes as $dados) {
+            $cliente = Cliente::create(array_merge($dados, [
+                'valor_mensal' => 0,
+                'total_colaboradores' => 0,
+                'total_postos' => 0,
+                'observacao' => null,
+                'created_by' => $author?->id,
+            ]));
+
+            // Vincular 1-2 propostas a cada cliente (se disponíveis)
+            $remaining = $propostas->count() - $propIdx;
+            if ($remaining <= 0) {
+                continue;
+            }
+            $numVincular = random_int(1, min(2, $remaining));
+            $valorMensal = 0;
+            $totalPostos = 0;
+            $totalColab = 0;
+
+            for ($i = 0; $i < $numVincular && $propIdx < $propostas->count(); $i++, $propIdx++) {
+                $proposta = $propostas[$propIdx];
+                $proposta->update(['cliente_id' => $cliente->id]);
+                $valorMensal += (float) $proposta->total_mensal;
+                $totalPostos += $proposta->qtd_postos;
+                $totalColab += $proposta->qtd_funcionarios;
+            }
+
+            $cliente->update([
+                'valor_mensal' => round($valorMensal, 2),
+                'total_postos' => $totalPostos,
+                'total_colaboradores' => $totalColab,
+            ]);
+        }
+
+        $this->command->info('  → ' . count($clientes) . ' clientes criados com propostas vinculadas.');
     }
 
     private function downloadImage(string $url, string $destPath): ?string

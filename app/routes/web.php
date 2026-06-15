@@ -22,6 +22,7 @@ use App\Http\Controllers\UserShortcutController;
 use App\Http\Controllers\v2\GestaoContratosController;
 use App\Http\Controllers\v2\GestaoEquipamentosController;
 use App\Http\Controllers\SolicitacoesController;
+use App\Http\Controllers\Comercial\ComercialClienteController;
 use App\Http\Controllers\Comercial\ComercialConfigController;
 use App\Http\Controllers\Comercial\ComercialCotacaoController;
 use App\Http\Controllers\Comercial\ComercialPropostaController;
@@ -317,6 +318,15 @@ Route::middleware('auth')->group(function () {
             // Insumos (global)
             Route::post('insumos', [ComercialConfigController::class, 'salvarInsumos'])->name('insumos.salvar');
         });
+
+        // Clientes/Contratos
+        Route::get('clientes', [ComercialClienteController::class, 'index'])->name('clientes');
+        Route::get('clientes/{id}', [ComercialClienteController::class, 'show'])->name('clientes.show');
+        Route::post('clientes', [ComercialClienteController::class, 'store'])->middleware('permission:comercial.cotar')->name('clientes.store');
+        Route::put('clientes/{id}', [ComercialClienteController::class, 'update'])->middleware('permission:comercial.cotar')->name('clientes.update');
+        Route::delete('clientes/{id}', [ComercialClienteController::class, 'destroy'])->middleware('permission:comercial.cotar')->name('clientes.destroy');
+        Route::post('clientes/{id}/vincular', [ComercialClienteController::class, 'vincularProposta'])->middleware('permission:comercial.cotar')->name('clientes.vincular');
+        Route::delete('clientes/{id}/desvincular/{propostaId}', [ComercialClienteController::class, 'desvincularProposta'])->middleware('permission:comercial.cotar')->name('clientes.desvincular');
     });
 
     // ═══════════════════════════════════════════════════════════════
