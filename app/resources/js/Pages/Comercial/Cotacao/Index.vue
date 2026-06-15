@@ -520,7 +520,6 @@ const pdfForm = reactive({
 
 function gerarPdf() {
   if (!itens.value.length) { warn("Adicione ao menos um posto antes de gerar o PDF"); return }
-  if (!ident.cliente.trim()) { warn("Preencha o nome do cliente antes de gerar o PDF"); return }
   // Pré-preencher modal
   pdfForm.numProposta = ident.numProposta
   pdfForm.cliente = ident.cliente
@@ -733,6 +732,7 @@ body { font-family:'Inter','Calibri',sans-serif; font-size:11pt; color:#333; lin
 // ─── Exportar XLSX ─────────────────────────────────────────────────────────────
 function exportarXlsx() {
   if (!itens.value.length) { warn("Adicione ao menos um posto antes de exportar"); return }
+  try {
 
   const wb = XLSX.utils.book_new()
 
@@ -909,6 +909,10 @@ function exportarXlsx() {
   const filename = `Cotacao_${numLimpo}_${dataStr}.xlsx`
   XLSX.writeFile(wb, filename)
   ok(`Planilha "${filename}" exportada com sucesso!`)
+  } catch (e) {
+    console.error("Erro ao exportar XLSX:", e)
+    fail("Erro ao gerar a planilha. Verifique o console.")
+  }
 }
 function importarPlanilha(ev) {
   const file = ev?.target?.files?.[0]
