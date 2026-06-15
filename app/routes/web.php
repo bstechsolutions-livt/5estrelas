@@ -24,6 +24,7 @@ use App\Http\Controllers\v2\GestaoEquipamentosController;
 use App\Http\Controllers\SolicitacoesController;
 use App\Http\Controllers\Comercial\ComercialConfigController;
 use App\Http\Controllers\Comercial\ComercialCotacaoController;
+use App\Http\Controllers\Comercial\ComercialPropostaController;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 
@@ -274,6 +275,9 @@ Route::middleware('auth')->group(function () {
         Route::get('cotacao/dados', [ComercialCotacaoController::class, 'dados'])->name('cotacao.dados');
         Route::post('cotacao/calcular', [ComercialCotacaoController::class, 'calcular'])->name('cotacao.calcular');
         Route::post('cotacao/calcular-5e', [ComercialCotacaoController::class, 'calcular5e'])->name('cotacao.calcular5e');
+
+        // Propostas — salvar cotação (a listagem/funil fica para a próxima fatia)
+        Route::post('propostas', [ComercialPropostaController::class, 'store'])->middleware('permission:comercial.cotar')->name('propostas.store');
 
         // Configuração / Valores
         Route::get('configuracoes', [ComercialConfigController::class, 'index'])->name('configuracoes');
