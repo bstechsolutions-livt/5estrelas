@@ -37,6 +37,55 @@ class ComercialConfigController extends Controller
         ]);
     }
 
+    // ─── Estados (criar UF com 4 CCTs padrão) ──────────────
+    public function storeEstado(Request $request)
+    {
+        $request->validate([
+            'uf' => 'required|string|size:2',
+            'nome' => 'required|string|max:100',
+        ]);
+
+        $uf = strtolower($request->input('uf'));
+
+        // Verifica se já existem CCTs com essa UF (case-insensitive)
+        if (Cct::whereRaw('LOWER(uf) = ?', [$uf])->exists()) {
+            return response()->json(['sucesso' => false, 'mensagem' => 'UF já cadastrada.'], 422);
+        }
+
+        $servicosPadrao = [
+            ['servico' => 'vigilancia', 'titulo' => "CCT Vigilância — " . strtoupper($uf), 'tipo' => 'seg', 'icone' => '🛡️'],
+            ['servico' => 'bombeiro', 'titulo' => "CCT Bombeiro Civil — " . strtoupper($uf), 'tipo' => 'seg', 'icone' => '🔥'],
+            ['servico' => 'portaria', 'titulo' => "CCT Portaria e Recepção — " . strtoupper($uf), 'tipo' => 'apoio', 'icone' => '🏢'],
+            ['servico' => 'limpeza', 'titulo' => "CCT Limpeza e Conservação — " . strtoupper($uf), 'tipo' => 'apoio', 'icone' => '🧹'],
+        ];
+
+        $ccts = [];
+        foreach ($servicosPadrao as $s) {
+            $ccts[] = Cct::create([
+                'nome' => $s['titulo'],
+                'titulo' => $s['titulo'],
+                'servico' => $s['servico'],
+                'tipo' => $s['tipo'],
+                'icone' => $s['icone'],
+                'uf' => $uf,
+                'ano_base' => (string) date('Y'),
+                'ativo' => true,
+                'horas_mes' => 220,
+                'dias_mes' => $s['tipo'] === 'seg' ? 15.5 : 22,
+                'salario_base' => 0,
+                'periculosidade_pct' => 0,
+                'adicional_noturno_pct' => 0,
+                'intrajornada_h' => 1.5,
+                'desconto_vt_pct' => 6,
+                'va' => 0, 'vt' => 0, 'plano_saude' => 0, 'fundo_social' => 0,
+                'sst' => 0, 'cna' => 0, 'seguro_vida' => 0,
+                'uniforme' => 0, 'reciclagem' => 0, 'gta' => 0, 'cofre' => 0, 'arma' => 0, 'colete' => 0,
+            ]);
+        }
+
+        return response()->json(['sucesso' => true, 'ccts' => $ccts]);
+    }
+
     // ─── CCT ─────────────────────────────────────────────────
     public function storeCct(Request $request)
     {
@@ -59,6 +108,8 @@ class ComercialConfigController extends Controller
             'nome' => 'required|string|max:255',
             'titulo' => 'nullable|string|max:255',
             'servico' => 'nullable|string|max:50',
+            'tipo' => 'nullable|string|max:10',
+            'icone' => 'nullable|string|max:50',
             'sindicato' => 'nullable|string|max:255',
             'uf' => 'nullable|string|max:2',
             'ano_base' => 'nullable|string|max:50',
