@@ -461,12 +461,47 @@ const totCustoFunc = computed(() => totProfissionais.value > 0 ? totMensal.value
 // ─── Preview ──────────────────────────────────────────────────────────────────
 const prevFunc = computed(() => escala.value?.nome ? funcPorPosto.value + " func." : "—")
 
-// ─── Ações de proposta (stubs — backend Spec 3 ainda não existe) ────────────────
-// TODO(Spec 3 / Propostas): persistir cotação, gerar PDF, importar/exportar XLSX.
-function salvarProposta() {
+// ─── Ações de proposta ──────────────────────────────────────────────────────────
+// Salvar Proposta persiste de verdade (POST /comercial/propostas). PDF/Import/Export
+// continuam stubs até as próximas fatias.
+const salvando = ref(false)
+async function salvarProposta() {
   if (!ident.cliente.trim()) { warn("Preencha o nome do cliente antes de salvar"); return }
-  if (!grandTotal.value || grandTotal.value <= 0) { warn("Calcule os valores antes de salvar"); return }
-  emBreve("Salvar Proposta — disponível quando o módulo de Propostas (Spec 3) for entregue.")
+  if (!totMensal.value || totMensal.value <= 0) { warn("Calcule os valores antes de salvar"); return }
+  if (!itens.value.length) { warn("Adicione ao menos um posto ao resumo"); return }
+
+  const payload = {
+    cliente: ident.cliente,
+    empresa: ident.empresa,
+    modelo: modelo.value,
+    periodicidade: ident.periodicidade,
+    cct: ident.cct,
+    data_proposta: ident.data,
+    total_mensal: totMensal.value,
+    total_anual: totMensal.value * 12,
+    qtd_postos: totPostos.value,
+    qtd_funcionarios: totProfissionais.value,
+    va_total: totVa.value,
+    postos: itens.value,
+    identificacao: { ...ident, modelo: modelo.value },
+  }
+
+  salvando.value = true
+  try {
+    const { data } = await axios.post("/comercial/propostas", payload)
+    ok("Proposta " + data.numero + " salva!")
+    ident.numProposta = data.numero
+  } catch (e) {
+    if (e?.response?.status === 422) {
+      const errs = e.response.data?.errors || {}
+      const first = Object.values(errs)[0]
+      fail(Array.isArray(first) ? first[0] : (e.response.data?.message || "Dados inválidos"))
+    } else {
+      fail("Falha ao salvar a proposta")
+    }
+  } finally {
+    salvando.value = false
+  }
 }
 function gerarPdf() { emBreve("Geração de Proposta em PDF — em breve.") }
 function exportarXlsx() { emBreve("Exportação XLSX — em breve.") }

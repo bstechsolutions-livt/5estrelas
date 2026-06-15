@@ -6,6 +6,7 @@ use App\Models\Permission;
 use App\Models\Post;
 use App\Models\PostComment;
 use App\Models\User;
+use App\Models\Comercial\Proposta;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -86,6 +87,10 @@ class DemoSeeder extends Seeder
         $allUsers = User::all();
 
         $this->createInteractions($allPosts, $allUsers);
+
+        // 4. Criar propostas comerciais (snapshot de cotações)
+        $this->command->info('Criando propostas comerciais...');
+        $this->createPropostas($admin ?? User::first());
 
         // Limpa autenticação
         auth()->logout();
@@ -236,6 +241,115 @@ class DemoSeeder extends Seeder
 
         // Limpa o usuário logado ao final
         auth()->logout();
+    }
+
+    /**
+     * Cria propostas comerciais demo (snapshot de cotações).
+     * Idempotência: limpa a tabela antes de semear (truncate), pois numero é sequencial/único.
+     */
+    private function createPropostas(?User $author): void
+    {
+        // Reset idempotente: a numeração é sequencial e única, então zeramos antes.
+        Proposta::query()->delete();
+
+        if ($author) {
+            auth()->setUser($author);
+        }
+
+        $clientes = [
+            'Condomínio Residencial Jardins', 'Shopping Center Norte', 'Hospital São Lucas',
+            'Banco Regional do Brasil', 'Faculdade Horizonte', 'Indústria Metalúrgica Souza',
+            'Supermercados Bom Preço', 'Prefeitura de Valparaíso', 'Centro Empresarial Alvorada',
+            'Clínica Vida Plena', 'Distribuidora Central LTDA', 'Colégio Saber',
+            'Resort Águas Claras', 'Terminal Rodoviário Sul', 'Edifício Comercial Platinum',
+        ];
+        $empresas = ['seg-df', 'seg-go', 'seg-mt', 'seg-mg', 'seg-sp', 'apoio-df'];
+        $modelos = ['5estrelas', 'in05'];
+        $status = ['rascunho', 'enviada', 'aprovada', 'reprovada'];
+        $periodicidades = ['Mensal', 'Anual'];
+        $ccts = ['SINDESP-DF 2026', 'FETHE/MG 2026', 'SINDESP-GO 2026', 'SEAC-SP 2026'];
+        $categorias = ['Vigilante', 'Agente de Portaria', 'Controlador de Acesso', 'Vigilante (Motorizado)'];
+        $escalasNomes = ['12x36 — Diurno', '12x36 — Noturno', '24 Horas (12x36)', '44h — 5×2'];
+
+        $total = random_int(8, 15);
+
+        for ($i = 0; $i < $total; $i++) {
+            $cliente = $clientes[$i % count($clientes)];
+            $modelo = $modelos[array_rand($modelos)];
+
+            // Monta 1 a 4 postos de exemplo coerentes
+            $qtdItens = random_int(1, 4);
+            $postos = [];
+            $totalMensal = 0;
+            $qtdPostos = 0;
+            $qtdFunc = 0;
+            $vaTotal = 0;
+
+            for ($j = 0; $j < $qtdItens; $j++) {
+                $unit = round(random_int(450000, 1200000) / 100, 2); // R$ 4.500 a 12.000
+                $postosQtd = random_int(1, 6);
+                $funcPosto = [1, 2, 4][array_rand([1, 2, 4])];
+                $vaUnit = round(random_int(2000, 9000) / 100, 2);
+
+                $postos[] = [
+                    'id' => $j + 1,
+                    'cat' => $categorias[array_rand($categorias)],
+                    'catIcone' => 'shield',
+                    'escala' => $escalasNomes[array_rand($escalasNomes)],
+                    'funcPosto' => $funcPosto,
+                    'qtdPostos' => $postosQtd,
+                    'descr' => '',
+                    'unitVal' => $unit,
+                    'totalMensal' => round($unit * $postosQtd, 2),
+                    'vaUnit' => $vaUnit,
+                    'modelo' => $modelo,
+                ];
+
+                $totalMensal += $unit * $postosQtd;
+                $qtdPostos += $postosQtd;
+                $qtdFunc += $postosQtd * $funcPosto;
+                $vaTotal += $vaUnit * $postosQtd;
+            }
+
+            $totalMensal = round($totalMensal, 2);
+            $vaTotal = round($vaTotal, 2);
+            $empresa = $empresas[array_rand($empresas)];
+            $periodicidade = $periodicidades[array_rand($periodicidades)];
+            $cct = $ccts[array_rand($ccts)];
+            $data = now()->subDays(random_int(5, 240));
+            $numero = Proposta::gerarNumero();
+
+            Proposta::create([
+                'numero' => $numero,
+                'cliente' => $cliente,
+                'empresa' => $empresa,
+                'modelo' => $modelo,
+                'periodicidade' => $periodicidade,
+                'cct' => $cct,
+                'data_proposta' => $data->toDateString(),
+                'status' => $status[array_rand($status)],
+                'total_mensal' => $totalMensal,
+                'total_anual' => round($totalMensal * 12, 2),
+                'qtd_postos' => $qtdPostos,
+                'qtd_funcionarios' => $qtdFunc,
+                'va_total' => $vaTotal,
+                'postos' => $postos,
+                'identificacao' => [
+                    'numProposta' => $numero,
+                    'data' => $data->toDateString(),
+                    'cliente' => $cliente,
+                    'empresa' => $empresa,
+                    'cct' => $cct,
+                    'periodicidade' => $periodicidade,
+                    'modelo' => $modelo,
+                ],
+                'created_by' => $author?->id,
+                'created_at' => $data,
+                'updated_at' => $data,
+            ]);
+        }
+
+        $this->command->info("  → {$total} propostas criadas.");
     }
 
     private function downloadImage(string $url, string $destPath): ?string
