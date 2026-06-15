@@ -502,7 +502,7 @@ onMounted(carregar)
       <div class="view active" id="view-cotacao">
 
         <!-- ── Cabeçalho (fixo no topo ao rolar) ── -->
-        <div class="page-title-row" style="position:sticky;top:0;z-index:30;background:#F0F2F7;padding-top:8px;padding-bottom:14px;margin-bottom:14px;box-shadow:0 6px 12px -8px rgba(0,0,0,.18)">
+        <div class="page-title-row" style="position:sticky;top:0;z-index:30;background:#F0F2F7;padding-top:8px;padding-bottom:14px;margin-bottom:14px;box-shadow:0 6px 12px -8px rgba(0,0,0,.18);flex-wrap:wrap;gap:10px">
           <div>
             <div class="section-title">Nova Cotação de Custos</div>
             <div class="section-desc" id="cotacao-desc">Configure os postos e adicione ao resumo da proposta</div>
@@ -524,7 +524,7 @@ onMounted(carregar)
         </div>
 
         <!-- ── LAYOUT PRINCIPAL: Configurador + Resumo ── -->
-        <div style="display:grid;grid-template-columns:1fr 420px;gap:20px;align-items:start">
+        <div class="cot-layout">
 
           <!-- COLUNA ESQUERDA -->
           <div>
@@ -1148,8 +1148,8 @@ onMounted(carregar)
           </div><!-- /coluna esquerda -->
 
           <!-- COLUNA DIREITA: Resumo da proposta (fixo; só a lista de postos rola) -->
-          <div style="position:sticky;top:6rem;padding-right:2px">
-            <div class="module-card" style="display:flex;flex-direction:column;max-height:calc(100vh - 11.5rem)">
+          <div class="cot-resumo">
+            <div class="module-card">
               <div class="module-header" style="flex-wrap:wrap;gap:8px;flex-shrink:0">
                 <div class="module-title"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h8M4 8h8M4 12h5"/><circle cx="1.5" cy="4" r="1" fill="currentColor" stroke="none"/><circle cx="1.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="1.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg> Resumo dos Postos</div>
                 <button @click="limparItens()" style="margin-left:auto;background:transparent;border:1px solid var(--brand-border-soft);border-radius:6px;padding:3px 10px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:inherit">Limpar</button>
@@ -1162,8 +1162,8 @@ onMounted(carregar)
               </div>
 
               <!-- Tabela -->
-              <div v-else id="resumo-table" style="display:flex;flex-direction:column;min-height:0;flex:1">
-                <div style="display:grid;grid-template-columns:1fr 72px 50px 100px 110px 26px;gap:0;padding:8px 12px;background:rgba(0,0,0,0.02);border-bottom:1px solid var(--brand-border-soft);flex-shrink:0">
+              <div v-else id="resumo-table">
+                <div style="display:grid;grid-template-columns:1fr 72px 50px 100px 110px 26px;gap:0;padding:8px 12px;background:rgba(0,0,0,0.02);border-bottom:1px solid var(--brand-border-soft)">
                   <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Discriminação</span>
                   <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:center">Escala</span>
                   <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:center">Postos</span>
@@ -1171,7 +1171,7 @@ onMounted(carregar)
                   <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:right">Mensal</span>
                   <span></span>
                 </div>
-                <div id="resumo-tbody" style="flex:1;min-height:0;overflow-y:auto">
+                <div id="resumo-tbody" class="cot-resumo-list">
                   <div v-for="(item, idx) in itens" :key="item.id"
                     :style="{ display:'grid', gridTemplateColumns:'1fr 72px 50px 100px 110px 26px', padding:'7px 12px', borderBottom:'1px solid var(--brand-border-soft)', alignItems:'start', background: idx%2===1 ? 'rgba(0,0,0,0.012)' : '' }">
                     <div style="min-width:0">
@@ -1193,7 +1193,7 @@ onMounted(carregar)
                 </div>
 
                 <!-- Rodapé totalizador -->
-                <div id="resumo-totais" style="border-top:2px solid var(--brand-border-soft);flex-shrink:0">
+                <div id="resumo-totais" style="border-top:2px solid var(--brand-border-soft)">
                   <div style="display:grid;grid-template-columns:1fr 72px 50px 100px 110px 26px;padding:10px 12px;background:rgba(0,0,0,0.02);border-bottom:1px solid var(--brand-border-soft)">
                     <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">Subtotal</span>
                     <span></span>
@@ -1232,3 +1232,35 @@ onMounted(carregar)
     </div><!-- /g360 -->
   </AuthenticatedLayout>
 </template>
+
+<style scoped>
+/* Layout responsivo da Cotação (desktop-first). */
+.cot-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 20px;
+  align-items: start;
+}
+.cot-resumo {
+  position: sticky;
+  top: 6rem;
+  padding-right: 2px;
+}
+/* Só a lista de postos rola; altura limitada para o painel não ficar alto demais. */
+.cot-resumo-list {
+  max-height: 38vh;
+  overflow-y: auto;
+}
+
+/* Telas médias: coluna do resumo mais estreita. */
+@media (max-width: 1366px) {
+  .cot-layout { grid-template-columns: 1fr 340px; }
+}
+
+/* Telas menores: empilha (resumo abaixo), sem sticky, ocupando largura total. */
+@media (max-width: 1100px) {
+  .cot-layout { grid-template-columns: 1fr; }
+  .cot-resumo { position: static; padding-right: 0; }
+  .cot-resumo-list { max-height: 50vh; }
+}
+</style>
