@@ -18,6 +18,9 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
         DB::statement('DROP VIEW IF EXISTS "INTRANET_PARAMETROS"');
         DB::statement('CREATE VIEW "INTRANET_PARAMETROS" AS
             SELECT
@@ -34,6 +37,9 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
         DB::statement('DROP VIEW IF EXISTS "INTRANET_PARAMETROS"');
         DB::statement('CREATE VIEW "INTRANET_PARAMETROS" AS
             SELECT id AS "ID", menu AS "MENU", submenu AS "SUBMENU", parametro AS "PARAMETRO",

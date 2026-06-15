@@ -12,6 +12,9 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
         DB::statement('DROP VIEW IF EXISTS "INTRANET_USUARIO"');
         DB::statement("CREATE VIEW \"INTRANET_USUARIO\" AS
             SELECT
