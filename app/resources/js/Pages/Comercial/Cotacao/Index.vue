@@ -1163,52 +1163,39 @@ onMounted(carregar)
 
               <!-- Tabela -->
               <div v-else id="resumo-table">
-                <div style="display:grid;grid-template-columns:1fr 72px 50px 100px 110px 26px;gap:0;padding:8px 12px;background:rgba(0,0,0,0.02);border-bottom:1px solid var(--brand-border-soft)">
+                <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(0,0,0,0.02);border-bottom:1px solid var(--brand-border-soft)">
                   <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Discriminação</span>
-                  <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:center">Escala</span>
-                  <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:center">Postos</span>
-                  <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:right">Efetivo</span>
-                  <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:right">Mensal</span>
-                  <span></span>
+                  <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Mensal</span>
                 </div>
                 <div id="resumo-tbody" class="cot-resumo-list">
                   <div v-for="(item, idx) in itens" :key="item.id"
-                    :style="{ display:'grid', gridTemplateColumns:'1fr 72px 50px 100px 110px 26px', padding:'7px 12px', borderBottom:'1px solid var(--brand-border-soft)', alignItems:'start', background: idx%2===1 ? 'rgba(0,0,0,0.012)' : '' }">
-                    <div style="min-width:0">
+                    :style="{ display:'flex', gap:'8px', alignItems:'flex-start', padding:'8px 12px', borderBottom:'1px solid var(--brand-border-soft)', background: idx%2===1 ? 'rgba(0,0,0,0.012)' : '' }">
+                    <div style="flex:1;min-width:0">
                       <div style="font-size:12px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:5px;line-height:1.2">
                         <span class="cat-icon sm" v-html="icon(item.catIcone)"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ item.cat }}</span>
                       </div>
-                      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ item.descr || item.escala }} · {{ item.funcPosto }} func. · unit {{ fmt(item.unitVal) }}</div>
+                      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ escLabelCurto(item.escala) }} · {{ item.qtdPostos }} posto{{ item.qtdPostos !== 1 ? 's' : '' }} · {{ item.qtdPostos * item.funcPosto }} func. · unit {{ fmt(item.unitVal) }}</div>
                     </div>
-                    <div style="text-align:center;font-size:11px;color:var(--text-secondary);padding-top:3px;font-weight:600">{{ escLabelCurto(item.escala) }}</div>
-                    <div style="text-align:center;padding-top:2px">
-                      <span style="background:color-mix(in srgb, var(--app-primary) 12%, transparent);color:var(--brand-gold);font-weight:700;font-size:12px;padding:2px 8px;border-radius:99px">{{ item.qtdPostos }}</span>
-                    </div>
-                    <div style="text-align:right;font-size:12px;color:var(--text-primary);font-weight:600;padding-top:3px">{{ item.qtdPostos * item.funcPosto }} func.</div>
-                    <div style="text-align:right;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--text-primary);padding-top:3px">{{ fmt(item.totalMensal) }}</div>
-                    <div style="text-align:center;padding-top:1px">
-                      <button @click="removerItem(item.id)" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:15px;padding:2px 4px" title="Remover">×</button>
+                    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0;white-space:nowrap">
+                      <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--text-primary)">{{ fmt(item.totalMensal) }}</span>
+                      <button @click="removerItem(item.id)" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:0" title="Remover">remover</button>
                     </div>
                   </div>
                 </div>
 
                 <!-- Rodapé totalizador -->
                 <div id="resumo-totais" style="border-top:2px solid var(--brand-border-soft)">
-                  <div style="display:grid;grid-template-columns:1fr 72px 50px 100px 110px 26px;padding:10px 12px;background:rgba(0,0,0,0.02);border-bottom:1px solid var(--brand-border-soft)">
-                    <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">Subtotal</span>
-                    <span></span>
-                    <span style="font-size:12px;font-weight:700;text-align:center;color:var(--text-primary)">{{ totPostos }} posto{{ totPostos !== 1 ? 's' : '' }}</span>
-                    <span style="font-size:12px;font-weight:700;text-align:right;color:var(--text-primary)">{{ totProfissionais }} func.</span>
-                    <span style="font-size:12px;font-weight:700;text-align:right;color:var(--text-primary)">{{ fmt(totMensal) }}</span>
-                    <span></span>
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;background:rgba(0,0,0,0.02);border-bottom:1px solid var(--brand-border-soft)">
+                    <span style="font-size:11px;font-weight:700;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Subtotal · {{ totPostos }} posto{{ totPostos !== 1 ? 's' : '' }} · {{ totProfissionais }} func.</span>
+                    <span style="font-size:12px;font-weight:700;color:var(--text-primary);white-space:nowrap">{{ fmt(totMensal) }}</span>
                   </div>
                   <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--brand-border-soft)">
                     <span style="font-size:11px;color:var(--text-muted)">Valor Anual</span>
-                    <span style="font-size:13px;font-weight:600;color:var(--text-secondary)">{{ fmt(totMensal * 12) }}</span>
+                    <span style="font-size:13px;font-weight:600;color:var(--text-secondary);white-space:nowrap">{{ fmt(totMensal * 12) }}</span>
                   </div>
-                  <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 12px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 12px">
                     <span style="font-size:14px;font-weight:700;color:var(--text-primary)">Total Mensal</span>
-                    <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--brand-gold)">{{ fmt(totMensal) }}</span>
+                    <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:var(--brand-gold);white-space:nowrap">{{ fmt(totMensal) }}</span>
                   </div>
                 </div>
               </div>
