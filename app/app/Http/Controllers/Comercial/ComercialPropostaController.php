@@ -36,6 +36,27 @@ class ComercialPropostaController extends Controller
         $dados['status'] = 'rascunho';
         $dados['created_by'] = $request->user()->id;
 
+        // Recalcula os totais a partir dos itens no backend (não confiar só no front).
+        // Cada item traz: totalMensal, qtdPostos, funcPosto, vaUnit.
+        $itens = $dados['postos'];
+        $totalMensal = 0.0;
+        $qtdPostos = 0;
+        $qtdFunc = 0;
+        $vaTotal = 0.0;
+        foreach ($itens as $item) {
+            $qtd = (int) ($item['qtdPostos'] ?? 0);
+            $totalMensal += (float) ($item['totalMensal'] ?? 0);
+            $qtdPostos += $qtd;
+            $qtdFunc += $qtd * (int) ($item['funcPosto'] ?? 0);
+            $vaTotal += (float) ($item['vaUnit'] ?? 0) * $qtd;
+        }
+
+        $dados['total_mensal'] = round($totalMensal, 2);
+        $dados['total_anual'] = round($totalMensal * 12, 2);
+        $dados['qtd_postos'] = $qtdPostos;
+        $dados['qtd_funcionarios'] = $qtdFunc;
+        $dados['va_total'] = round($vaTotal, 2);
+
         // A trait Auditable registra o evento `created` automaticamente.
         $proposta = Proposta::create($dados);
 

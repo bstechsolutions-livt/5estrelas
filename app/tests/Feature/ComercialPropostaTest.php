@@ -70,6 +70,12 @@ class ComercialPropostaTest extends TestCase
             'modelo' => '5estrelas',
             'status' => 'rascunho',
             'created_by' => $user->id,
+            // Totais recalculados no backend a partir dos itens (não confiando no front).
+            'qtd_postos' => 3,
+            'qtd_funcionarios' => 6,
+            'total_mensal' => 15000.50,
+            'total_anual' => 180006.00,
+            'va_total' => 900.00,
         ]);
     }
 

@@ -12,6 +12,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // View legado Biglar é Postgres-only (identificadores case-sensitive + cast ::bigint).
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
         DB::statement('DROP VIEW IF EXISTS "INTRANET_USUARIO"');
         DB::statement("CREATE VIEW \"INTRANET_USUARIO\" AS
             SELECT
@@ -31,6 +35,9 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
         DB::statement('DROP VIEW IF EXISTS "INTRANET_USUARIO"');
         DB::statement('CREATE VIEW "INTRANET_USUARIO" AS
             SELECT id AS matricula, id, name AS nome, email,

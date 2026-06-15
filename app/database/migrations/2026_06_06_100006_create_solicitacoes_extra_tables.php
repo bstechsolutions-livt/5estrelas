@@ -26,8 +26,10 @@ return new class extends Migration
             $table->timestamps();
             $table->index('id_agendamento');
         });
-        // View maiúscula para os DB::table('INTRANET_AGEND_ANEXOS') do controller
-        DB::statement('CREATE VIEW "INTRANET_AGEND_ANEXOS" AS SELECT * FROM intranet_agend_anexos');
+        // View maiúscula para os DB::table('INTRANET_AGEND_ANEXOS') do controller (Postgres-only)
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('CREATE VIEW "INTRANET_AGEND_ANEXOS" AS SELECT * FROM intranet_agend_anexos');
+        }
 
         // Filial x Departamento selecionados na solicitação
         Schema::create('intranet_solicitacao_filial_depto_select', function (Blueprint $table) {

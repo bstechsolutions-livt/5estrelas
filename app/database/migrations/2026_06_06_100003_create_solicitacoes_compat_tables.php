@@ -72,23 +72,31 @@ return new class extends Migration
             $table->index(['usuario_id', 'permissao_id']);
         });
 
-        // VIEW maiúscula dos parâmetros (PG case-sensitive)
-        DB::statement('CREATE VIEW "INTRANET_PARAMETROS" AS
-            SELECT id AS "ID", menu AS "MENU", submenu AS "SUBMENU", parametro AS "PARAMETRO",
-                   valor AS "VALOR", condicao1 AS "CONDICAO1", condicao2 AS "CONDICAO2", condicao3 AS "CONDICAO3"
-            FROM intranet_parametros');
+        // As views maiúsculas existem por causa da case-sensitivity do PostgreSQL
+        // (o controller Biglar usa tanto minúsculo quanto MAIÚSCULO). No SQLite os
+        // identificadores são case-insensitive, então a view colidiria com a tabela
+        // real (e o cast `::bigint` nem é suportado). Só criamos no Postgres.
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            // VIEW maiúscula dos parâmetros (PG case-sensitive)
+            DB::statement('CREATE VIEW "INTRANET_PARAMETROS" AS
+                SELECT id AS "ID", menu AS "MENU", submenu AS "SUBMENU", parametro AS "PARAMETRO",
+                       valor AS "VALOR", condicao1 AS "CONDICAO1", condicao2 AS "CONDICAO2", condicao3 AS "CONDICAO3"
+                FROM intranet_parametros');
 
-        // VIEW INTRANET_USUARIO sobre nossos users (matrícula = id; foto_perfil_id nulo por enquanto)
-        DB::statement('CREATE VIEW "INTRANET_USUARIO" AS
-            SELECT id AS matricula, id, name AS nome, email,
-                   department_id, NULL::bigint AS foto_perfil_id, avatar_path
-            FROM users');
+            // VIEW INTRANET_USUARIO sobre nossos users (matrícula = id; foto_perfil_id nulo por enquanto)
+            DB::statement('CREATE VIEW "INTRANET_USUARIO" AS
+                SELECT id AS matricula, id, name AS nome, email,
+                       department_id, NULL::bigint AS foto_perfil_id, avatar_path
+                FROM users');
+        }
     }
 
     public function down(): void
     {
-        DB::statement('DROP VIEW IF EXISTS "INTRANET_USUARIO"');
-        DB::statement('DROP VIEW IF EXISTS "INTRANET_PARAMETROS"');
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('DROP VIEW IF EXISTS "INTRANET_USUARIO"');
+            DB::statement('DROP VIEW IF EXISTS "INTRANET_PARAMETROS"');
+        }
         Schema::dropIfExists('INTRANET_USUARIO_PERMISSAO');
         Schema::dropIfExists('INTRANET_AGEND_ANEXOS');
         Schema::dropIfExists('INTRANET_NOTIF_CANAL');

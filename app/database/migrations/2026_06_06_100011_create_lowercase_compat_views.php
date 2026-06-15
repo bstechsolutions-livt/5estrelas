@@ -19,6 +19,9 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
         DB::statement('CREATE OR REPLACE VIEW intranet_usuario AS
             SELECT *, fone AS telefone FROM "INTRANET_USUARIO"');
     }

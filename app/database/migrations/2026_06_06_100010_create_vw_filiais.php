@@ -19,6 +19,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // View de compatibilidade Postgres-only (usa cast ::text).
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
         DB::statement('CREATE OR REPLACE VIEW vw_filiais AS
             SELECT
                 b.*,
