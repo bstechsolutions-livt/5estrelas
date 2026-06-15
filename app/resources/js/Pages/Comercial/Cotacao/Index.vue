@@ -1147,8 +1147,8 @@ onMounted(carregar)
             </div><!-- /form-detalhes -->
           </div><!-- /coluna esquerda -->
 
-          <!-- COLUNA DIREITA: Resumo da proposta (fixo, abaixo do cabeçalho sticky) -->
-          <div style="position:sticky;top:5rem;max-height:calc(100vh - 7rem);overflow-y:auto">
+          <!-- COLUNA DIREITA: Resumo da proposta (fixo, com respiro abaixo do cabeçalho) -->
+          <div style="position:sticky;top:6rem;max-height:calc(100vh - 8rem);overflow-y:auto;padding-right:2px">
             <div class="module-card">
               <div class="module-header" style="flex-wrap:wrap;gap:8px">
                 <div class="module-title"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h8M4 8h8M4 12h5"/><circle cx="1.5" cy="4" r="1" fill="currentColor" stroke="none"/><circle cx="1.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="1.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg> Resumo dos Postos</div>
@@ -1173,15 +1173,12 @@ onMounted(carregar)
                 </div>
                 <div id="resumo-tbody">
                   <div v-for="(item, idx) in itens" :key="item.id"
-                    :style="{ display:'grid', gridTemplateColumns:'1fr 72px 50px 100px 110px 26px', padding:'9px 12px', borderBottom:'1px solid var(--brand-border-soft)', alignItems:'start', background: idx%2===1 ? 'rgba(0,0,0,0.012)' : '' }">
-                    <div>
-                      <div style="font-size:12px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:5px">
-                        <span class="cat-icon sm" v-html="icon(item.catIcone)"></span>{{ item.cat }}
+                    :style="{ display:'grid', gridTemplateColumns:'1fr 72px 50px 100px 110px 26px', padding:'7px 12px', borderBottom:'1px solid var(--brand-border-soft)', alignItems:'start', background: idx%2===1 ? 'rgba(0,0,0,0.012)' : '' }">
+                    <div style="min-width:0">
+                      <div style="font-size:12px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:5px;line-height:1.2">
+                        <span class="cat-icon sm" v-html="icon(item.catIcone)"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ item.cat }}</span>
                       </div>
-                      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">{{ item.descr || item.escala }} · {{ item.funcPosto }} func.</div>
-                      <div style="font-size:10px;color:var(--text-muted);margin-top:1px">
-                        Unit: {{ fmt(item.unitVal) }} &nbsp;|&nbsp; p/func: {{ fmt(item.qtdPostos * item.funcPosto > 0 ? item.unitVal / (item.qtdPostos * item.funcPosto) : 0) }}
-                      </div>
+                      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ item.descr || item.escala }} · {{ item.funcPosto }} func. · unit {{ fmt(item.unitVal) }}</div>
                     </div>
                     <div style="text-align:center;font-size:11px;color:var(--text-secondary);padding-top:3px;font-weight:600">{{ escLabelCurto(item.escala) }}</div>
                     <div style="text-align:center;padding-top:2px">
