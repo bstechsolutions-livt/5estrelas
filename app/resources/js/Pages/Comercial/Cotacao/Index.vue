@@ -501,8 +501,8 @@ onMounted(carregar)
     <div class="g360">
       <div class="view active" id="view-cotacao">
 
-        <!-- ── Cabeçalho ── -->
-        <div class="page-title-row">
+        <!-- ── Cabeçalho (fixo no topo ao rolar) ── -->
+        <div class="page-title-row" style="position:sticky;top:0;z-index:30;background:#F0F2F7;padding-top:8px;padding-bottom:14px;margin-bottom:14px;box-shadow:0 6px 12px -8px rgba(0,0,0,.18)">
           <div>
             <div class="section-title">Nova Cotação de Custos</div>
             <div class="section-desc" id="cotacao-desc">Configure os postos e adicione ao resumo da proposta</div>
@@ -1147,8 +1147,8 @@ onMounted(carregar)
             </div><!-- /form-detalhes -->
           </div><!-- /coluna esquerda -->
 
-          <!-- COLUNA DIREITA: Resumo da proposta (fixo) -->
-          <div style="position:sticky;top:1rem;max-height:calc(100vh - 6rem);overflow-y:auto">
+          <!-- COLUNA DIREITA: Resumo da proposta (fixo, abaixo do cabeçalho sticky) -->
+          <div style="position:sticky;top:5rem;max-height:calc(100vh - 7rem);overflow-y:auto">
             <div class="module-card">
               <div class="module-header" style="flex-wrap:wrap;gap:8px">
                 <div class="module-title"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h8M4 8h8M4 12h5"/><circle cx="1.5" cy="4" r="1" fill="currentColor" stroke="none"/><circle cx="1.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="1.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg> Resumo dos Postos</div>
