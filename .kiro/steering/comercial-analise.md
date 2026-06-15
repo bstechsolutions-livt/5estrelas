@@ -109,7 +109,7 @@ e listar o que falta. Testar back (unit) + front (Dusk).
 ### Status de fidelidade por tela (atualizar sempre) — atualizado 12/06/2026
 
 - **Config/Valores: 100% ✅ e em produção.** Tela portada 1:1 do HTML (CSS `.g360`), abas Convenções Coletivas / Taxas / Insumos, cards CCT por estado (20 CCTs), painel de detalhe editável, Encargos A/B/C/D, Taxas (adm/lucro/tributos), Insumos (12). Cores em white-label (`--app-primary`). 4 Dusk + dados semeados.
-- **Cotação: motor 100% ✅ / tela ~70% ⚠️.** Motor IN05 + 5E verificado ao centavo (7 unit). Tela tem Identificação, modelo IN05×5E, Configurar Posto multi-posto, composição detalhada — MAS ainda foi feita com componentes nossos (PrimeVue), **NÃO portada 1:1 do HTML como a Valores**. PENDENTE: reportar a Cotação no padrão `.g360` (igual fiz na Valores) + Salvar Proposta + Importar/Exportar Excel + turnos Diurno/Noturno no 5E.
+- **Cotação: motor 100% ✅ / tela 100% ✅ (portada 1:1).** Motor IN05 + 5E verificado ao centavo (7 unit). Tela **reportada no padrão `.g360`** (igual à Valores), fiel à `view-cotacao`: cabeçalho + botões, Identificação da Proposta, Configurar Posto (categorias/escalas do backend, banner, preview), detalhamento colapsável dos dois modelos (5 Estrelas com turnos Diurno/Noturno + IN 05 com Módulos 1–6 e quadro-resumo), Total Geral por modelo, coluna direita Resumo dos Postos + mini-KPIs. Recálculo reativo (debounce) chama o backend (`/calcular` e `/calcular-5e`); o número que vira posto usa o total do backend. Cores white-label. 3 Dusk (cotação) + 2 (Valores) passando. **Stubs (visual 1:1, handler "Em breve")**: Salvar Proposta, Gerar PDF, Importar/Exportar XLSX e "Adicionar item ao Módulo 02" — dependem da Spec 3 (Propostas), ainda não feita.
 - **Demais views** (Dashboard, Propostas, Clientes, Faturamento, Saúde, Reajuste): ❌ não iniciadas.
 
 ---
@@ -143,7 +143,7 @@ e listar o que falta. Testar back (unit) + front (Dusk).
 - **Toda tela nova do Comercial**: criar teste Dusk no padrão de `tests/Browser/ComercialCotacaoTest.php`.
 
 ### PRÓXIMOS PASSOS (ordem)
-1. **Reportar a Cotação no padrão g360** (1:1 com a view-cotacao do HTML) — é o item mais urgente, a tela atual não está fiel.
-2. Salvar Proposta (encosta na Spec 3) + Importar/Exportar Excel + turnos Diurno/Noturno (5E).
+1. ~~Reportar a Cotação no padrão g360~~ ✅ FEITO (tela 1:1, 5E + IN05, recálculo via backend).
+2. Spec 3 — Propostas: ligar os stubs da Cotação (Salvar Proposta, Gerar PDF, Importar/Exportar XLSX, itens extras do Módulo 02) ao backend real.
 3. Demais views: Propostas (funil), Clientes, Faturamento, Saúde Contratual, Reajuste, Dashboard.
 4. Adicionar Comercial no SearchController (Ctrl+K) quando houver entidades pesquisáveis (propostas/clientes).

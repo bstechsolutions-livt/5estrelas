@@ -21,28 +21,50 @@ class ComercialCotacaoTest extends DuskTestCase
 
     public function test_tela_cotacao_renderiza(): void
     {
+        // Tela portada 1:1 do protótipo (.g360). Os .module-title têm text-transform:uppercase
+        // via CSS, então o Selenium "vê" o texto em MAIÚSCULAS (mesmo gotcha da tela Valores).
         $this->browse(function (Browser $browser) {
             $browser->loginAs($this->bruno())
                 ->visit('/comercial/cotacao')
                 ->waitForText('Nova Cotação de Custos', 10)
-                ->assertSee('Identificação da Proposta')
-                ->assertSee('Configurar Posto')
-                ->assertSee('Composição Detalhada')
-                ->assertSee('Calcular Custo');
+                ->assertSee('IDENTIFICAÇÃO DA PROPOSTA')
+                ->assertSee('CONFIGURAR POSTO')
+                ->assertSee('RESUMO DOS POSTOS')
+                // Botões do cabeçalho (1:1 com o protótipo)
+                ->assertSee('Importar Planilha')
+                ->assertSee('Salvar Proposta');
         });
     }
 
-    public function test_calcular_e_adicionar_posto(): void
+    public function test_seletor_categoria_escala_e_detalhes(): void
     {
         $this->browse(function (Browser $browser) {
             $browser->loginAs($this->bruno())
                 ->visit('/comercial/cotacao')
-                ->waitForText('Calcular Custo', 10)
-                ->press('Calcular Custo')
-                ->pause(1500)
-                ->press('Adicionar ao Resumo')
-                ->waitForText('Total Geral Mensal', 10)
-                ->assertSee('Total Geral Mensal');
+                ->waitForText('Nova Cotação de Custos', 10)
+                // Categoria/Escala vêm do backend (/comercial/cotacao/dados)
+                ->waitForText('Vigilante', 10)
+                ->assertSee('Vigilante')
+                ->assertSee('24 Horas (12x36)')
+                // Abre o detalhamento colapsável e confere um módulo do Modelo 5 Estrelas
+                ->clickAtXPath("//button[contains(., 'Ver / editar detalhes do cálculo')]")
+                ->pause(400)
+                ->assertSee('MÓDULO 01 — COMPOSIÇÃO DA REMUNERAÇÃO');
+        });
+    }
+
+    public function test_adicionar_posto_ao_resumo(): void
+    {
+        // O cálculo é reativo via backend (debounce). Após carregar os dados, o custo
+        // já está calculado; basta adicionar o posto ao resumo.
+        $this->browse(function (Browser $browser) {
+            $browser->loginAs($this->bruno())
+                ->visit('/comercial/cotacao')
+                ->waitForText('Nova Cotação de Custos', 10)
+                ->pause(1500) // aguarda o recálculo (debounce + backend)
+                ->clickAtXPath("//button[contains(., 'Adicionar este posto ao resumo')]")
+                ->waitForText('Total Mensal', 10)
+                ->assertSee('Total Mensal');
         });
     }
 
