@@ -24,7 +24,10 @@
   background: #F0F2F7;
   color: var(--text-primary);
   min-height: 100vh;
-  overflow-x: hidden;
+  /* clip (em vez de hidden) evita scroll horizontal SEM criar contexto de
+     scroll — assim o position:sticky do resumo continua referenciando o
+     <main> e funciona corretamente. */
+  overflow-x: clip;
 }
 /* ─── LAYOUT ─── */
 .g360 .app { display: flex; min-height: 100vh; }
