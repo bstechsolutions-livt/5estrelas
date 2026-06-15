@@ -319,6 +319,23 @@ class DemoSeeder extends Seeder
             $data = now()->subDays(random_int(5, 240));
             $numero = Proposta::gerarNumero();
 
+            // ── Campos do "Controle de Propostas" (funil/KPIs) ──
+            // Distribuição realista de situações para o funil ter volume em cada coluna.
+            $situacoes = ['EM ANÁLISE', 'EM ANÁLISE', 'APROVADO', 'APROVADO', 'REPROVADO', 'ESTIMATIVA', 'REDUÇÃO'];
+            $situacao = $situacoes[array_rand($situacoes)];
+            $servicos = implode(', ', array_values(array_unique(array_map(
+                fn ($p) => (string) ($p['cat'] ?? ''),
+                $postos,
+            ))));
+            $contatos = ['Maria Souza', 'João Pereira', 'Ana Lima', 'Carlos Mendes', 'Patrícia Rocha', 'Rafael Alves'];
+            $valorAprovado = null;
+            $dataAprovacao = null;
+            if ($situacao === 'APROVADO') {
+                // Valor aprovado fica entre 90% e 100% do proposto (negociação).
+                $valorAprovado = round($totalMensal * (random_int(90, 100) / 100), 2);
+                $dataAprovacao = (clone $data)->addDays(random_int(3, 25))->toDateString();
+            }
+
             Proposta::create([
                 'numero' => $numero,
                 'cliente' => $cliente,
@@ -328,6 +345,16 @@ class DemoSeeder extends Seeder
                 'cct' => $cct,
                 'data_proposta' => $data->toDateString(),
                 'status' => $status[array_rand($status)],
+                // Controle de Propostas
+                'revisao' => random_int(0, 4) === 0 ? 'Rev.01' : 'N/A',
+                'situacao' => $situacao,
+                'servicos' => $servicos,
+                'posto' => $modelo === 'in05' ? 'IN 05' : 'Modelo 5 Estrelas',
+                'contato' => $contatos[array_rand($contatos)],
+                'valor' => $totalMensal,
+                'valor_aprovado' => $valorAprovado,
+                'data_aprovacao' => $dataAprovacao,
+                'da_cotacao' => true,
                 'total_mensal' => $totalMensal,
                 'total_anual' => round($totalMensal * 12, 2),
                 'qtd_postos' => $qtdPostos,

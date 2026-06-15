@@ -276,8 +276,14 @@ Route::middleware('auth')->group(function () {
         Route::post('cotacao/calcular', [ComercialCotacaoController::class, 'calcular'])->name('cotacao.calcular');
         Route::post('cotacao/calcular-5e', [ComercialCotacaoController::class, 'calcular5e'])->name('cotacao.calcular5e');
 
-        // Propostas — salvar cotação (a listagem/funil fica para a próxima fatia)
+        // Propostas — Controle de Propostas (listagem/funil) + salvar cotação
+        Route::get('propostas', [ComercialPropostaController::class, 'index'])->name('propostas');
+        Route::get('propostas/dados', [ComercialPropostaController::class, 'dados'])->name('propostas.dados');
         Route::post('propostas', [ComercialPropostaController::class, 'store'])->middleware('permission:comercial.cotar')->name('propostas.store');
+        Route::post('propostas/manual', [ComercialPropostaController::class, 'storeManual'])->middleware('permission:comercial.cotar')->name('propostas.manual');
+        Route::put('propostas/{id}', [ComercialPropostaController::class, 'update'])->middleware('permission:comercial.cotar')->name('propostas.update');
+        Route::patch('propostas/{id}/situacao', [ComercialPropostaController::class, 'updateSituacao'])->middleware('permission:comercial.aprovar')->name('propostas.situacao');
+        Route::delete('propostas/{id}', [ComercialPropostaController::class, 'destroy'])->middleware('permission:comercial.cotar')->name('propostas.destroy');
 
         // Configuração / Valores
         Route::get('configuracoes', [ComercialConfigController::class, 'index'])->name('configuracoes');
