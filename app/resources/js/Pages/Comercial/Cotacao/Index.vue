@@ -16,6 +16,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayo
 import { onMounted, reactive, ref, computed, watch } from "vue"
 import axios from "axios"
 import { useToast } from "primevue/usetoast"
+import * as XLSX from "xlsx"
 import "@/../css/comercial-g360.css"
 
 const toast = useToast()
@@ -503,8 +504,412 @@ async function salvarProposta() {
     salvando.value = false
   }
 }
-function gerarPdf() { emBreve("Geração de Proposta em PDF — em breve.") }
-function exportarXlsx() { emBreve("Exportação XLSX — em breve.") }
+// ─── Modal PDF ─────────────────────────────────────────────────────────────────
+const modalPdfAberto = ref(false)
+const pdfForm = reactive({
+  numProposta: "",
+  cliente: "",
+  destinatario: "",
+  objeto: "Prestação de serviços de vigilância/segurança patrimonial armada e desarmada, com fornecimento de mão de obra qualificada, uniformizada e equipada.",
+  tituloCct: "",
+  data: "",
+  cidade: "Brasília",
+  responsavel: "Leiliane Carolina",
+  cargo: "Gerente de Contratos",
+})
+
+function gerarPdf() {
+  if (!itens.value.length) { warn("Adicione ao menos um posto antes de gerar o PDF"); return }
+  if (!ident.cliente.trim()) { warn("Preencha o nome do cliente antes de gerar o PDF"); return }
+  // Pré-preencher modal
+  pdfForm.numProposta = ident.numProposta
+  pdfForm.cliente = ident.cliente
+  pdfForm.destinatario = ident.cliente
+  pdfForm.data = formatarDataPT(ident.data)
+  pdfForm.tituloCct = ident.cct || "CCT Vigente"
+  modalPdfAberto.value = true
+}
+
+function formatarDataPT(iso) {
+  if (!iso) return new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })
+  const d = new Date(iso + "T12:00:00")
+  return d.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })
+}
+
+function confirmarGerarPdf() {
+  modalPdfAberto.value = false
+  const dados = {
+    numero: pdfForm.numProposta,
+    cliente: pdfForm.cliente.toUpperCase(),
+    destinatario: pdfForm.destinatario,
+    data: pdfForm.data,
+    cidade: pdfForm.cidade,
+    responsavel: pdfForm.responsavel,
+    cargo: pdfForm.cargo,
+    empresa_razao: "Grupo 5 Estrelas Segurança e Serviços LTDA.",
+    objeto: pdfForm.objeto,
+    cct_titulo: pdfForm.tituloCct,
+    itens: itens.value.map(i => ({
+      discriminacao: i.cat + (i.descr ? " — " + i.descr : ""),
+      postos: i.qtdPostos,
+      efetivo: i.qtdPostos * i.funcPosto,
+      unitario: i.unitVal,
+      mensal: i.totalMensal,
+    })),
+    totalMensal: totMensal.value,
+  }
+  gerarPDFNoBrowser(dados)
+}
+
+function gerarPDFNoBrowser(d) {
+  const fmtR = (v) => "R$ " + (Number(v) || 0).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+
+  const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter','Calibri',sans-serif; font-size:11pt; color:#333; line-height:1.5; }
+@page { size:A4; margin:0; }
+.page { width:210mm; min-height:297mm; position:relative; overflow:hidden; page-break-after:always; }
+.page:last-child { page-break-after:auto; }
+
+/* Cores institucionais fixas */
+:root { --azul-escuro:#0D2B5C; --azul:#2E6DB4; --azul-medio:#1F4E88; --dourado:#C8A84B; --cinza-claro:#EEF3FA; }
+
+/* ─── PÁGINA 1: CAPA ─── */
+.capa { background:var(--azul-escuro); color:#fff; display:flex; align-items:center; justify-content:center; }
+.capa-content { text-align:center; z-index:2; position:relative; }
+.capa::before { content:''; position:absolute; top:0; right:0; width:58%; height:100%; background:var(--azul); clip-path:polygon(20% 0,100% 0,100% 100%,0% 100%); }
+.capa::after { content:''; position:absolute; top:0; right:0; width:50%; height:100%; background:var(--azul-medio); clip-path:polygon(30% 0,100% 0,100% 100%,10% 100%); opacity:.5; }
+.capa .logo-text { font-size:14pt; font-weight:800; letter-spacing:2px; text-transform:uppercase; margin-bottom:6px; }
+.capa .logo-sub { font-size:9pt; letter-spacing:4px; text-transform:uppercase; opacity:.8; margin-bottom:40px; }
+.capa h1 { font-size:32pt; font-weight:900; letter-spacing:1px; margin-bottom:16px; }
+.capa .estrelas { font-size:28pt; color:var(--dourado); margin-bottom:24px; letter-spacing:6px; }
+.capa .num-proposta { font-size:12pt; opacity:.85; border:1px solid rgba(255,255,255,.3); display:inline-block; padding:8px 24px; border-radius:4px; }
+
+/* ─── PÁGINA 2: APRESENTAÇÃO ─── */
+.apresentacao { padding:50px 60px; }
+.apresentacao .barra-lateral { position:absolute; left:0; top:0; width:4px; height:100%; background:var(--azul); }
+.apresentacao .letra-grande { font-size:80pt; font-weight:900; color:var(--azul); opacity:.15; position:absolute; top:30px; right:50px; }
+.apresentacao .cliente-destaque { font-size:16pt; font-weight:700; color:var(--azul-escuro); margin-bottom:20px; margin-top:20px; }
+.apresentacao h2 { font-size:14pt; color:var(--azul-escuro); margin-bottom:12px; border-bottom:2px solid var(--azul); display:inline-block; padding-bottom:4px; }
+.apresentacao p { margin-bottom:10px; text-align:justify; }
+.apresentacao .caixa-objeto { background:var(--cinza-claro); border-left:4px solid var(--azul); padding:16px 20px; margin-top:24px; border-radius:0 8px 8px 0; }
+.apresentacao .caixa-objeto h3 { font-size:11pt; color:var(--azul-escuro); margin-bottom:8px; }
+
+/* ─── PÁGINA 3: TABELA + CONDIÇÕES ─── */
+.tabela-page { padding:50px 60px; }
+.tabela-page h2 { font-size:14pt; color:var(--azul-escuro); margin-bottom:16px; }
+.tabela-postos { width:100%; border-collapse:collapse; margin-bottom:30px; font-size:10pt; }
+.tabela-postos thead th { background:var(--azul-escuro); color:#fff; padding:10px 12px; text-align:left; font-weight:600; }
+.tabela-postos thead th:last-child, .tabela-postos thead th:nth-child(4) { text-align:right; }
+.tabela-postos tbody td { padding:9px 12px; background:var(--cinza-claro); border-bottom:1px solid #dde5f0; }
+.tabela-postos tbody td:last-child, .tabela-postos tbody td:nth-child(4) { text-align:right; font-weight:600; }
+.tabela-postos tfoot td { background:var(--azul-escuro); color:#fff; padding:10px 12px; font-weight:700; }
+.tabela-postos tfoot td:last-child { text-align:right; }
+.condicoes h3 { font-size:11pt; color:var(--azul-escuro); margin-top:20px; margin-bottom:10px; }
+.condicoes ol { padding-left:20px; font-size:10pt; }
+.condicoes li { margin-bottom:6px; }
+
+/* ─── PÁGINA 4: REPACTUAÇÕES ─── */
+.repactuacoes { padding:50px 60px; }
+.repactuacoes h2 { font-size:14pt; color:var(--azul-escuro); margin-bottom:12px; }
+.repactuacoes h3 { font-size:11pt; color:var(--azul-escuro); margin-top:20px; margin-bottom:10px; }
+.repactuacoes ol, .repactuacoes ul { padding-left:20px; font-size:10pt; }
+.repactuacoes li { margin-bottom:6px; }
+.repactuacoes .iso-box { background:var(--cinza-claro); border:1px solid #dde5f0; border-radius:8px; padding:16px 20px; margin-top:16px; }
+.repactuacoes .iso-box strong { color:var(--azul-escuro); }
+
+/* ─── PÁGINA 5: ENCERRAMENTO ─── */
+.encerramento { padding:50px 60px; display:flex; flex-direction:column; justify-content:space-between; }
+.encerramento .texto-final { margin-bottom:40px; text-align:justify; font-size:10.5pt; }
+.encerramento .assinatura { text-align:center; margin-top:40px; }
+.encerramento .assinatura .linha { border-top:1px solid #333; width:300px; margin:0 auto 8px; }
+.encerramento .assinatura .nome { font-weight:700; font-size:11pt; }
+.encerramento .assinatura .cargo-empresa { font-size:9.5pt; color:#555; }
+.encerramento .contatos { background:var(--cinza-claro); border-radius:8px; padding:16px 24px; margin-top:auto; display:flex; justify-content:center; gap:30px; font-size:9.5pt; color:#555; flex-wrap:wrap; }
+.encerramento .contatos span { display:flex; align-items:center; gap:4px; }
+`
+
+  const tabelaRows = d.itens.map(i => `<tr><td>${i.discriminacao}</td><td>${i.postos}</td><td>${i.efetivo}</td><td>${fmtR(i.unitario)}</td><td>${fmtR(i.mensal)}</td></tr>`).join("")
+  const totalEfetivo = d.itens.reduce((s, i) => s + i.efetivo, 0)
+  const totalPostos = d.itens.reduce((s, i) => s + i.postos, 0)
+
+  const HTML = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Proposta ${d.numero}</title><style>${CSS}</style></head><body>
+
+<!-- PÁGINA 1 — CAPA -->
+<div class="page capa">
+  <div class="capa-content">
+    <div class="logo-text">GRUPO</div>
+    <div class="logo-text" style="font-size:22pt;color:var(--dourado)">5 ESTRELAS</div>
+    <div class="logo-sub">Segurança e Serviços</div>
+    <h1>PROPOSTA COMERCIAL</h1>
+    <div class="estrelas">★★★★★</div>
+    <div class="num-proposta">Proposta ${d.numero}</div>
+  </div>
+</div>
+
+<!-- PÁGINA 2 — APRESENTAÇÃO -->
+<div class="page apresentacao">
+  <div class="barra-lateral"></div>
+  <div class="letra-grande">A</div>
+  <h2>1. Apresentação</h2>
+  <div class="cliente-destaque">${d.cliente}</div>
+  <p>O <strong>Grupo 5 Estrelas Segurança e Serviços</strong>, empresa especializada na prestação de serviços de vigilância patrimonial armada e desarmada, segurança pessoal privada, escolta armada, segurança eletrônica e serviços de apoio, vem apresentar proposta comercial para prestação de serviços de segurança.</p>
+  <p>Sede: SAAN Quadra 03, Lote 420, Sala 01 – Brasília/DF – CEP 70.632-300.</p>
+  <p>Filiais: Cuiabá/MT · Goiânia/GO · Unaí/MG · São Paulo/SP.</p>
+  <p>Autorização de funcionamento nº 1762/2018-DELESP/DREX/SR/DPF/DF, publicada no D.O.U.</p>
+  <div class="caixa-objeto">
+    <h3>Objeto</h3>
+    <p>${d.objeto}</p>
+  </div>
+</div>
+
+<!-- PÁGINA 3 — TABELA + CONDIÇÕES -->
+<div class="page tabela-page">
+  <h2>1.1 Quadro de Postos e Valores</h2>
+  <table class="tabela-postos">
+    <thead><tr><th>Discriminação</th><th>Qtde Postos</th><th>Efetivo</th><th>Valor Unitário</th><th>Valor Mensal</th></tr></thead>
+    <tbody>${tabelaRows}</tbody>
+    <tfoot><tr><td>TOTAL</td><td>${totalPostos}</td><td>${totalEfetivo}</td><td></td><td>${fmtR(d.totalMensal)}</td></tr></tfoot>
+  </table>
+  <div class="condicoes">
+    <h3>2. Condições Gerais</h3>
+    <ol>
+      <li>A presente proposta tem validade de <strong>90 (noventa) dias</strong> a contar da data de emissão.</li>
+      <li>Os profissionais serão rigorosamente selecionados, treinados e habilitados conforme legislação vigente.</li>
+      <li>Não há vínculo empregatício entre os funcionários da CONTRATADA e a CONTRATANTE.</li>
+      <li>Em caso de afastamento, a CONTRATADA providenciará substituição em até 2 horas.</li>
+      <li>Os valores estão vinculados à ${d.cct_titulo}, podendo ser reajustados na data-base da categoria.</li>
+      <li>O faturamento ocorrerá até o 20º dia do mês subsequente à prestação dos serviços, com multa de 2% ao mês e juros de 0,16% ao dia em caso de atraso.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- PÁGINA 4 — REPACTUAÇÕES + ISO -->
+<div class="page repactuacoes">
+  <h2>3. Repactuações / Reequilíbrio Econômico-Financeiro</h2>
+  <p>Os valores poderão ser repactuados nas seguintes hipóteses:</p>
+  <ol>
+    <li><strong>Salários e benefícios:</strong> reajuste conforme Convenção Coletiva de Trabalho com data-base em janeiro/2027.</li>
+    <li><strong>Insumos:</strong> reajuste pelo INPC/IBGE acumulado dos últimos 12 meses.</li>
+    <li><strong>Vale-transporte:</strong> reajuste conforme reajuste da tarifa de transporte público.</li>
+    <li><strong>Encargos sociais:</strong> alteração por ato governamental que modifique alíquotas ou crie novos encargos.</li>
+  </ol>
+  <h3>4. Considerações Finais</h3>
+  <p>O Grupo 5 Estrelas possui Sistema de Gestão Integrado com as certificações:</p>
+  <div class="iso-box">
+    <p><strong>ISO 9001</strong> (Qualidade) · <strong>ISO 14001</strong> (Meio Ambiente) · <strong>ISO 45001</strong> (Saúde e Segurança) · <strong>ISO 37001</strong> (Antissuborno) · <strong>ISO 37301</strong> (Compliance) · <strong>ISO 18788</strong> (Segurança Privada)</p>
+    <p style="margin-top:8px;font-size:9.5pt;color:#555">Última auditoria de manutenção realizada em 12/03/2026.</p>
+  </div>
+</div>
+
+<!-- PÁGINA 5 — ENCERRAMENTO -->
+<div class="page encerramento">
+  <div class="texto-final">
+    <p>Comprometemo-nos a fornecer serviços de alta qualidade, com profissionais treinados e equipados, garantindo a segurança patrimonial e pessoal de nossos clientes. Estamos à disposição para esclarecimentos adicionais e adequações que se façam necessárias.</p>
+    <p style="margin-top:16px">${d.cidade}, ${d.data}.</p>
+  </div>
+  <div class="assinatura">
+    <div class="linha"></div>
+    <div class="nome">${d.responsavel}</div>
+    <div class="cargo-empresa">${d.cargo}<br>${d.empresa_razao}</div>
+  </div>
+  <div class="contatos">
+    <span>📞 (61) 3234-5678</span>
+    <span>✉ comercial@grupo5estrelas.com.br</span>
+    <span>🌐 www.grupo5estrelas.com.br</span>
+    <span>@ @grupo5estrelas</span>
+  </div>
+</div>
+
+</body></html>`
+
+  const blob = new Blob([HTML], { type: "text/html;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  window.open(url, "_blank")
+  ok("Proposta PDF aberta em nova aba — use Ctrl+P para imprimir/salvar como PDF")
+}
+
+// ─── Exportar XLSX ─────────────────────────────────────────────────────────────
+function exportarXlsx() {
+  if (!itens.value.length) { warn("Adicione ao menos um posto antes de exportar"); return }
+
+  const wb = XLSX.utils.book_new()
+
+  // ─── Aba "Identificação" ──────────────────────────────────────────────────────
+  const identData = [
+    ["Campo", "Valor"],
+    ["Nº Proposta", ident.numProposta],
+    ["Cliente", ident.cliente],
+    ["Empresa", empresas.find(e => e.value === ident.empresa)?.label || ident.empresa],
+    ["Data", ident.data],
+    ["CCT", ident.cct],
+    ["Modelo", modelo.value === "5estrelas" ? "Modelo 5 Estrelas" : "Modelo IN 05"],
+    ["Periodicidade", ident.periodicidade],
+  ]
+  const wsIdent = XLSX.utils.aoa_to_sheet(identData)
+  wsIdent["!cols"] = [{ wch: 16 }, { wch: 40 }]
+  XLSX.utils.book_append_sheet(wb, wsIdent, "Identificação")
+
+  // ─── Aba "Resumo" ────────────────────────────────────────────────────────────
+  const resumoHeader = ["Discriminação", "Escala", "Qtd Postos", "Func/Posto", "Custo Unitário", "Total Mensal"]
+  const resumoRows = itens.value.map(i => [
+    i.cat + (i.descr ? " — " + i.descr : ""),
+    i.escala,
+    i.qtdPostos,
+    i.funcPosto,
+    i.unitVal,
+    i.totalMensal,
+  ])
+  resumoRows.push(["TOTAL GERAL", "", totPostos.value, totProfissionais.value, "", totMensal.value])
+  const wsResumo = XLSX.utils.aoa_to_sheet([resumoHeader, ...resumoRows])
+  wsResumo["!cols"] = [{ wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 16 }]
+  XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo")
+
+  // ─── Aba "Composição" ────────────────────────────────────────────────────────
+  const compRows = []
+  if (modelo.value === "5estrelas") {
+    compRows.push(["MODELO 5 ESTRELAS — Composição Detalhada"])
+    compRows.push([])
+    compRows.push(["─── TURNO DIURNO ───"])
+    compRows.push(["Horário", f5.horarioDiurno])
+    compRows.push(["Nº Funcionários", f5.qtdDiurno])
+    compRows.push(["Salário", f5.salDiurno])
+    compRows.push(["Periculosidade", c5.value.pericD])
+    compRows.push(["Ad. Noturno", c5.value.adnD])
+    compRows.push(["Intrajornada", c5.value.intraD])
+    compRows.push(["Total Turno Diurno", c5.value.totD])
+    compRows.push([])
+    compRows.push(["─── TURNO NOTURNO ───"])
+    compRows.push(["Horário", f5.horarioNoturno])
+    compRows.push(["Nº Funcionários", f5.qtdNoturno])
+    compRows.push(["Salário", f5.salNoturno])
+    compRows.push(["Periculosidade", c5.value.pericN])
+    compRows.push(["Ad. Noturno", c5.value.adnN])
+    compRows.push(["Intrajornada", c5.value.intraN])
+    compRows.push(["Total Turno Noturno", c5.value.totN])
+    compRows.push([])
+    compRows.push(["─── MÓDULO 01 — Remuneração ───"])
+    compRows.push(["Total Funcionários", c5.value.totalFunc])
+    compRows.push(["Encargos (%)", f5.encargos])
+    compRows.push(["Valor Encargos", c5.value.encVal])
+    compRows.push(["TOTAL Módulo 01", c5.value.m1])
+    compRows.push([])
+    compRows.push(["─── MÓDULO 02 — Benefícios ───"])
+    compRows.push(["Item", "Unitário", "Total"])
+    compRows.push(["Uniforme", f5.b_uniforme, c5.value.bt.uniforme])
+    compRows.push(["Plano de Saúde", f5.b_saude, c5.value.bt.saude])
+    compRows.push(["Fundo Social/Odonto", f5.b_fundo, c5.value.bt.fundo])
+    compRows.push(["Saúde Ocupacional", f5.b_sst, c5.value.bt.sst])
+    compRows.push(["Contrib. Negocial", f5.b_cna, c5.value.bt.cna])
+    compRows.push(["Seguro de Vida", f5.b_seguro, c5.value.bt.seguro])
+    compRows.push(["Guia Tráfego Arm.", f5.b_gta, c5.value.bt.gta])
+    compRows.push(["Cofre", f5.b_cofre, c5.value.bt.cofre])
+    compRows.push(["Armamento", f5.b_arma, c5.value.bt.arma])
+    compRows.push(["Reciclagem", f5.b_reciclag, c5.value.bt.reciclag])
+    compRows.push(["Vale Transporte", f5.b_vt, c5.value.bt.vt])
+    compRows.push(["VA (Alimentação)", f5.b_va, c5.value.bt.va])
+    compRows.push(["TOTAL Módulo 02", "", c5.value.m2])
+    compRows.push([])
+    compRows.push(["─── MÓDULO 03 — Custos Indiretos, Tributos e Lucro ───"])
+    compRows.push(["Administração (%)", f5.pctAdm, c5.value.vAdm])
+    compRows.push(["Lucro (%)", f5.pctLucro, c5.value.vLucro])
+    compRows.push(["Impostos (%)", f5.pctImpostos, c5.value.vImp])
+    compRows.push(["TOTAL Módulo 03", "", c5.value.m3])
+    compRows.push([])
+    compRows.push(["═══ TOTAL GERAL MENSAL ═══", "", c5.value.grandTotal])
+  } else {
+    compRows.push(["MODELO IN 05 — Composição Detalhada"])
+    compRows.push([])
+    compRows.push(["─── MÓDULO 1 — Remuneração ───"])
+    compRows.push(["Item", "%", "Valor"])
+    compRows.push(["Salário Base", "", n(fin.sal)])
+    compRows.push(["Periculosidade", fin.peric_pct, cin.value.peric])
+    compRows.push(["Insalubridade", fin.insal_pct, cin.value.insal])
+    compRows.push(["Adicional Noturno", fin.an_pct, cin.value.anVal])
+    compRows.push(["Hora Noturna Reduzida", fin.hnr_pct, cin.value.hnrVal])
+    compRows.push(["Outros", fin.outros1_pct, cin.value.out1])
+    compRows.push(["TOTAL Módulo 1", "", cin.value.m1])
+    compRows.push([])
+    compRows.push(["─── MÓDULO 2.1 — 13º, Férias ───"])
+    compRows.push(["13º Salário", (cin.value.p13 * 100).toFixed(4) + "%", cin.value.v13])
+    compRows.push(["Férias + 1/3", (cin.value.pFer * 100).toFixed(4) + "%", cin.value.vFer])
+    compRows.push(["Incidência 2.2 s/ 2.1", (cin.value.pInc21 * 100).toFixed(4) + "%", cin.value.vInc21])
+    compRows.push(["Multa FGTS s/ 13º e Férias", (cin.value.pMultaFgts * 100).toFixed(4) + "%", cin.value.vMultaFgts])
+    compRows.push(["Total 2.1", "", cin.value.sub21])
+    compRows.push([])
+    compRows.push(["─── MÓDULO 2.2 — GPS, FGTS ───"])
+    compRows.push(["INSS", fin.inss_pct, cin.value.inss])
+    compRows.push(["Sal. Educação", fin.saledu_pct, cin.value.saledu])
+    compRows.push(["SAT (RAT×FAP)", fin.sat_pct, cin.value.sat])
+    compRows.push(["SESC/SESI", fin.sesc_pct, cin.value.sesc])
+    compRows.push(["SENAI/SENAC", fin.senai_pct, cin.value.senai])
+    compRows.push(["SEBRAE", fin.sebrae_pct, cin.value.sebrae])
+    compRows.push(["INCRA", fin.incra_pct, cin.value.incra])
+    compRows.push(["FGTS", fin.fgts_pct, cin.value.fgts])
+    compRows.push(["Total 2.2", "", cin.value.sub22])
+    compRows.push([])
+    compRows.push(["─── MÓDULO 2.3 — Benefícios ───"])
+    compRows.push(["Vale Transporte (líq.)", fin.vt_dia + "/dia", cin.value.vtLiq])
+    compRows.push(["VA/Alimentação", fin.va_dia + "/dia", cin.value.vaVal])
+    compRows.push(["Assistência Médica", "", cin.value.medico])
+    compRows.push(["Assist. Odontológica", "", cin.value.odonto])
+    compRows.push(["Cesta Básica", "", cin.value.cesta])
+    compRows.push(["Seguro de Vida", "", cin.value.seguro])
+    compRows.push(["PMQ", "", cin.value.pmq])
+    compRows.push(["Outros", "", cin.value.out23])
+    compRows.push(["Total 2.3", "", cin.value.sub23])
+    compRows.push(["TOTAL Módulo 2", "", cin.value.m2])
+    compRows.push([])
+    compRows.push(["─── MÓDULO 3 — Rescisão ───"])
+    compRows.push(["Aviso Prévio Inden.", fin.avisoind_pct, cin.value.vAvisoInd])
+    compRows.push(["FGTS s/ Aviso", "", cin.value.vFgtsAviso])
+    compRows.push(["Aviso Prévio Trab.", fin.avistrab_pct, cin.value.vAvisTrab])
+    compRows.push(["Multa FGTS Inden.", "", cin.value.vMultaInd])
+    compRows.push(["Multa FGTS Rescisão", "", cin.value.vMultaResc])
+    compRows.push(["Inc. GPS/FGTS Trab.", "", cin.value.vIncGPS])
+    compRows.push(["TOTAL Módulo 3", "", cin.value.m3])
+    compRows.push([])
+    compRows.push(["─── MÓDULO 4 — Reposição Ausente ───"])
+    compRows.push(["Cobertura Férias", "", cin.value.vCobFer])
+    compRows.push(["Ausências Legais", fin.ausleg_pct, cin.value.vAusleg])
+    compRows.push(["Lic. Paternidade", fin.paterni_pct, cin.value.vPatern])
+    compRows.push(["Acidente de Trabalho", fin.acident_pct, cin.value.vAcident])
+    compRows.push(["Afast. Maternidade", fin.matern_pct, cin.value.vMatern])
+    compRows.push(["Incidências", "", cin.value.vIncAus])
+    compRows.push(["Intrajornada", "", cin.value.m4intra])
+    compRows.push(["TOTAL Módulo 4", "", cin.value.m4])
+    compRows.push([])
+    compRows.push(["─── MÓDULO 5 — Insumos ───"])
+    compRows.push(["Uniformes", "", fin.uniforme])
+    compRows.push(["Materiais", "", fin.materiais])
+    compRows.push(["Ferramental", "", fin.ferramental])
+    compRows.push(["EPIs", "", fin.epi])
+    compRows.push(["Treinamento", "", fin.treinamento])
+    compRows.push(["SSO", "", fin.sso])
+    compRows.push(["TOTAL Módulo 5", "", cin.value.m5])
+    compRows.push([])
+    compRows.push(["─── MÓDULO 6 — Custos Ind./Trib./Lucro ───"])
+    compRows.push(["Custos Indiretos", fin.custoind_pct, cin.value.vCind])
+    compRows.push(["Lucro", fin.lucro_pct, cin.value.vLucro])
+    compRows.push(["ISS", fin.iss_pct, cin.value.vISS])
+    compRows.push(["PIS", fin.pis_pct, cin.value.vPIS])
+    compRows.push(["COFINS", fin.cofins_pct, cin.value.vCOFINS])
+    compRows.push(["TOTAL Módulo 6", "", cin.value.m6])
+    compRows.push([])
+    compRows.push(["═══ PREÇO POR EMPREGADO ═══", "", cin.value.precoEmp])
+  }
+  const wsComp = XLSX.utils.aoa_to_sheet(compRows)
+  wsComp["!cols"] = [{ wch: 36 }, { wch: 16 }, { wch: 16 }]
+  XLSX.utils.book_append_sheet(wb, wsComp, "Composição")
+
+  // ─── Gerar arquivo ──────────────────────────────────────────────────────────
+  const dataStr = ident.data ? ident.data.replace(/-/g, "") : new Date().toISOString().slice(0, 10).replace(/-/g, "")
+  const numLimpo = (ident.numProposta || "000").replace(/[^0-9]/g, "") || "000"
+  const filename = `Cotacao_${numLimpo}_${dataStr}.xlsx`
+  XLSX.writeFile(wb, filename)
+  ok(`Planilha "${filename}" exportada com sucesso!`)
+}
 function importarPlanilha(ev) {
   const file = ev?.target?.files?.[0]
   if (file) emBreve(`Importação de "${file.name}" — em breve.`)
@@ -1250,8 +1655,61 @@ onMounted(carregar)
           </div><!-- /coluna direita -->
 
         </div><!-- /layout principal -->
+
+      <!-- Modal Gerar Proposta PDF -->
+      <div v-if="modalPdfAberto" class="g360-modal-overlay" @click.self="modalPdfAberto = false">
+        <div class="g360-modal" style="max-width:560px">
+          <div class="g360-modal-header">
+            <h3>Gerar Proposta PDF</h3>
+            <button @click="modalPdfAberto = false" class="g360-modal-close">&times;</button>
+          </div>
+          <div class="g360-modal-body">
+            <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Confira e ajuste os dados que aparecerão no documento da proposta.</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%">
+              <div class="form-group">
+                <label class="form-label">Nº Proposta</label>
+                <input type="text" class="form-input" v-model="pdfForm.numProposta">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Data</label>
+                <input type="text" class="form-input" v-model="pdfForm.data">
+              </div>
+              <div class="form-group" style="grid-column:span 2">
+                <label class="form-label">Cliente / Destinatário</label>
+                <input type="text" class="form-input" v-model="pdfForm.cliente">
+              </div>
+              <div class="form-group" style="grid-column:span 2">
+                <label class="form-label">Objeto</label>
+                <textarea class="form-input" v-model="pdfForm.objeto" rows="3" style="resize:vertical"></textarea>
+              </div>
+              <div class="form-group" style="grid-column:span 2">
+                <label class="form-label">Título CCT / Convenção</label>
+                <input type="text" class="form-input" v-model="pdfForm.tituloCct">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Cidade</label>
+                <input type="text" class="form-input" v-model="pdfForm.cidade">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Responsável</label>
+                <input type="text" class="form-input" v-model="pdfForm.responsavel">
+              </div>
+              <div class="form-group" style="grid-column:span 2">
+                <label class="form-label">Cargo</label>
+                <input type="text" class="form-input" v-model="pdfForm.cargo">
+              </div>
+            </div>
+          </div>
+          <div class="g360-modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding:16px 20px;border-top:1px solid var(--brand-border-soft)">
+            <button class="btn btn-ghost" @click="modalPdfAberto = false">Cancelar</button>
+            <button class="btn btn-gold" @click="confirmarGerarPdf()">Gerar Proposta</button>
+          </div>
+        </div>
+      </div>
+
       </div><!-- /view-cotacao -->
     </div><!-- /g360 -->
+
   </AuthenticatedLayout>
 </template>
 
