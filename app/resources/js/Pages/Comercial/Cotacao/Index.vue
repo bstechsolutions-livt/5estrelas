@@ -1147,10 +1147,10 @@ onMounted(carregar)
             </div><!-- /form-detalhes -->
           </div><!-- /coluna esquerda -->
 
-          <!-- COLUNA DIREITA: Resumo da proposta (fixo, com respiro abaixo do cabeçalho) -->
-          <div style="position:sticky;top:6rem;max-height:calc(100vh - 8rem);overflow-y:auto;padding-right:2px">
-            <div class="module-card">
-              <div class="module-header" style="flex-wrap:wrap;gap:8px">
+          <!-- COLUNA DIREITA: Resumo da proposta (fixo; só a lista de postos rola) -->
+          <div style="position:sticky;top:6rem;padding-right:2px">
+            <div class="module-card" style="display:flex;flex-direction:column;max-height:calc(100vh - 11.5rem)">
+              <div class="module-header" style="flex-wrap:wrap;gap:8px;flex-shrink:0">
                 <div class="module-title"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h8M4 8h8M4 12h5"/><circle cx="1.5" cy="4" r="1" fill="currentColor" stroke="none"/><circle cx="1.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="1.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg> Resumo dos Postos</div>
                 <button @click="limparItens()" style="margin-left:auto;background:transparent;border:1px solid var(--brand-border-soft);border-radius:6px;padding:3px 10px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:inherit">Limpar</button>
               </div>
@@ -1162,8 +1162,8 @@ onMounted(carregar)
               </div>
 
               <!-- Tabela -->
-              <div v-else id="resumo-table">
-                <div style="display:grid;grid-template-columns:1fr 72px 50px 100px 110px 26px;gap:0;padding:8px 12px;background:rgba(0,0,0,0.02);border-bottom:1px solid var(--brand-border-soft)">
+              <div v-else id="resumo-table" style="display:flex;flex-direction:column;min-height:0;flex:1">
+                <div style="display:grid;grid-template-columns:1fr 72px 50px 100px 110px 26px;gap:0;padding:8px 12px;background:rgba(0,0,0,0.02);border-bottom:1px solid var(--brand-border-soft);flex-shrink:0">
                   <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Discriminação</span>
                   <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:center">Escala</span>
                   <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:center">Postos</span>
@@ -1171,7 +1171,7 @@ onMounted(carregar)
                   <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:right">Mensal</span>
                   <span></span>
                 </div>
-                <div id="resumo-tbody">
+                <div id="resumo-tbody" style="flex:1;min-height:0;overflow-y:auto">
                   <div v-for="(item, idx) in itens" :key="item.id"
                     :style="{ display:'grid', gridTemplateColumns:'1fr 72px 50px 100px 110px 26px', padding:'7px 12px', borderBottom:'1px solid var(--brand-border-soft)', alignItems:'start', background: idx%2===1 ? 'rgba(0,0,0,0.012)' : '' }">
                     <div style="min-width:0">
@@ -1193,7 +1193,7 @@ onMounted(carregar)
                 </div>
 
                 <!-- Rodapé totalizador -->
-                <div id="resumo-totais" style="border-top:2px solid var(--brand-border-soft)">
+                <div id="resumo-totais" style="border-top:2px solid var(--brand-border-soft);flex-shrink:0">
                   <div style="display:grid;grid-template-columns:1fr 72px 50px 100px 110px 26px;padding:10px 12px;background:rgba(0,0,0,0.02);border-bottom:1px solid var(--brand-border-soft)">
                     <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">Subtotal</span>
                     <span></span>
