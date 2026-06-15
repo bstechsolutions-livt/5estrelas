@@ -25,6 +25,7 @@ use App\Http\Controllers\SolicitacoesController;
 use App\Http\Controllers\Comercial\ComercialClienteController;
 use App\Http\Controllers\Comercial\ComercialConfigController;
 use App\Http\Controllers\Comercial\ComercialCotacaoController;
+use App\Http\Controllers\Comercial\ComercialFaturamentoController;
 use App\Http\Controllers\Comercial\ComercialPropostaController;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
@@ -318,6 +319,13 @@ Route::middleware('auth')->group(function () {
             // Insumos (global)
             Route::post('insumos', [ComercialConfigController::class, 'salvarInsumos'])->name('insumos.salvar');
         });
+
+        // Faturamento
+        Route::get('faturamento', [ComercialFaturamentoController::class, 'index'])->name('faturamento');
+        Route::get('faturamento/dados', [ComercialFaturamentoController::class, 'dados'])->name('faturamento.dados');
+        Route::post('faturamento/salvar', [ComercialFaturamentoController::class, 'salvar'])->middleware('permission:comercial.cotar')->name('faturamento.salvar');
+        Route::post('faturamento/local', [ComercialFaturamentoController::class, 'adicionarLocal'])->middleware('permission:comercial.cotar')->name('faturamento.local');
+        Route::delete('faturamento/{id}', [ComercialFaturamentoController::class, 'excluirLocal'])->middleware('permission:comercial.cotar')->name('faturamento.excluir');
 
         // Clientes/Contratos
         Route::get('clientes', [ComercialClienteController::class, 'index'])->name('clientes');
