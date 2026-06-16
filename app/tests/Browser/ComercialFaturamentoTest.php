@@ -93,6 +93,23 @@ class ComercialFaturamentoTest extends DuskTestCase
         });
     }
 
+    public function test_exportar_excel_mostra_sucesso(): void
+    {
+        $nome = 'Local Export Fat ' . uniqid();
+        Faturamento::create(['ano' => 2025, 'local_nome' => $nome, 'jan' => 1234.56]);
+
+        $this->browse(function (Browser $browser) use ($nome) {
+            $browser->loginAs($this->bruno())
+                ->visit('/comercial/faturamento')
+                ->waitForText('Faturamento', 10)
+                ->waitForText($nome, 10)
+                ->click('@fat-exportar')
+                ->waitForText('exportada', 5);
+        });
+
+        Faturamento::where('local_nome', $nome)->delete();
+    }
+
     public function test_importar_excel_preenche_e_salva(): void
     {
         $nome = 'Local Import Fat ' . uniqid();
