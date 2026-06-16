@@ -2,6 +2,7 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayout.vue"
 import { onMounted, ref, computed } from "vue"
 import axios from "axios"
+import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
 import "@/../css/comercial-g360.css"
 
@@ -121,9 +122,11 @@ async function carregar() {
     indices.value = data.indices || []
     encargos.value = data.encargos || []
     insumos.value = data.insumos || []
-    // Selecionar primeiro estado se necessário
-    if (!estadoUf.value || !ccts.value.some((c) => c.uf === estadoUf.value)) {
-      const ufs = [...new Set(ccts.value.map((c) => c.uf).filter(Boolean))].sort()
+    // Selecionar primeiro estado se necessário (normalizado em minúsculas,
+    // pois toda a filtragem por UF compara em minúsculas — dados podem vir
+    // com UF em maiúsculas/minúsculas misturadas).
+    if (!estadoUf.value || !ccts.value.some((c) => (c.uf || "").toLowerCase() === estadoUf.value)) {
+      const ufs = [...new Set(ccts.value.map((c) => (c.uf || "").toLowerCase()).filter(Boolean))].sort()
       estadoUf.value = ufs[0] || ""
     }
   } catch (e) { fail("Falha ao carregar dados") }
@@ -229,6 +232,7 @@ async function criarServico() {
 
 <template>
   <AuthenticatedLayout>
+    <Toast />
     <div class="g360">
       <div class="view active" id="view-cct">
         <div class="page-title-row">

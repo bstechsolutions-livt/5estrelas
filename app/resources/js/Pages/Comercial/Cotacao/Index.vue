@@ -15,6 +15,7 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayout.vue"
 import { onMounted, reactive, ref, computed, watch } from "vue"
 import axios from "axios"
+import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
 import * as XLSX from "xlsx"
 import "@/../css/comercial-g360.css"
@@ -942,6 +943,7 @@ onMounted(carregar)
 
 <template>
   <AuthenticatedLayout>
+    <Toast />
     <div class="g360">
       <div class="view active" id="view-cotacao">
 
@@ -963,7 +965,7 @@ onMounted(carregar)
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3z"/><path d="M10 2v4h3"/><path d="M5 9h6M5 12h4"/></svg>
               Gerar Proposta PDF
             </button>
-            <button class="btn btn-gold" @click="salvarProposta()">Salvar Proposta</button>
+            <button class="btn btn-gold" dusk="btn-salvar-proposta" @click="salvarProposta()">Salvar Proposta</button>
           </div>
         </div>
 
@@ -1128,7 +1130,7 @@ onMounted(carregar)
                   </div>
                 </div>
 
-                <button class="btn btn-gold" style="width:100%;justify-content:center;padding:12px" @click="adicionarItem()">
+                <button class="btn btn-gold" dusk="btn-adicionar-posto" style="width:100%;justify-content:center;padding:12px" @click="adicionarItem()">
                   + Adicionar este posto ao resumo
                 </button>
               </div>
