@@ -39,6 +39,14 @@ Teste de browser real (Chrome) que **aperta cada botão**. Para CADA tela:
 - Telas que usam `toast.add()` (PrimeVue) PRECISAM renderizar `<Toast />` no template (com `import Toast from "primevue/toast"`), senão o feedback nunca aparece. Conferir isso em toda tela com toast.
 
 ## Cobertura pendente (dívida a quitar)
-Telas antigas do Comercial sem teste de feature completo / com possível bug de `<Toast />`:
-- Cotação (só Dusk), Valores/Configuracoes (só Dusk), Propostas (feature ok, revisar Dusk de cada ação), Clientes (feature ok, falta Dusk).
-Quitar essa dívida quando tocar em cada tela.
+
+### Comercial — estado atual (atualizado v1.7.0)
+- **Cotação**: feature ✓ (`ComercialCotacaoTest`) + Dusk ✓. COMPLETO.
+- **Valores/Configurações**: feature ✓ (`ComercialConfigTest`) + Dusk ✓. COMPLETO.
+- **Clientes**: feature ✓ + Dusk ✓. COMPLETO.
+- **Faturamento**: feature ✓ + Dusk ✓. COMPLETO.
+- **Propostas**: feature ✓ + Dusk básico (2 cenários). DÍVIDA: expandir Dusk pra cobrir cada ação (entrada manual, editar, alterar situação aprovar/reprovar, excluir).
+
+Resultado da suíte Comercial em v1.7.0: 67 feature passed (281 asserts) + 22 Dusk passed.
+
+Quitar a dívida restante (Dusk de Propostas) quando tocar nessa tela.
