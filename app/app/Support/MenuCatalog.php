@@ -32,6 +32,7 @@ class MenuCatalog
             ['key' => 'comercial_reajustes', 'label' => 'Reajustes', 'icon' => 'pi pi-percentage', 'href' => '/comercial/reajustes', 'permission' => 'comercial.cotar', 'group' => 'Comercial'],
             ['key' => 'comercial_faturamento', 'label' => 'Faturamento', 'icon' => 'pi pi-chart-bar', 'href' => '/comercial/faturamento', 'permission' => 'comercial.cotar', 'group' => 'Comercial'],
             ['key' => 'comercial_config', 'label' => 'Valores', 'icon' => 'pi pi-dollar', 'href' => '/comercial/configuracoes', 'permission' => 'comercial.configurar', 'group' => 'Comercial'],
+            ['key' => 'comercial_saude', 'label' => 'Saúde Contratual', 'icon' => 'pi pi-heart', 'href' => '/comercial/saude', 'permission' => 'comercial.cotar', 'group' => 'Comercial'],
 
             // Configurações
             ['key' => 'aparencia', 'label' => 'Aparência', 'icon' => 'pi pi-palette', 'href' => '/settings/aparencia', 'permission' => 'aparencia.editar', 'group' => 'Configurações'],
