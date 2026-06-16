@@ -29,6 +29,8 @@ use App\Http\Controllers\Comercial\ComercialFaturamentoController;
 use App\Http\Controllers\Comercial\ComercialPropostaController;
 use App\Http\Controllers\Comercial\ComercialReajusteController;
 use App\Http\Controllers\Comercial\ComercialSaudeController;
+use App\Http\Controllers\Comercial\ComercialContratoController;
+use App\Http\Controllers\Comercial\ComercialDashboardController;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 
@@ -274,6 +276,9 @@ Route::middleware('auth')->group(function () {
     //   Spec 1: Configuração / Valores (CCT, categorias, escalas, índices)
     // ═══════════════════════════════════════════════════════════════
     Route::prefix('comercial')->middleware('permission:comercial.visualizar')->name('comercial.')->group(function () {
+        // Dashboard do Comercial
+        Route::get('dashboard', [ComercialDashboardController::class, 'index'])->name('dashboard');
+
         // Cotação (planilha IN 05)
         Route::get('cotacao', [ComercialCotacaoController::class, 'index'])->name('cotacao');
         Route::get('cotacao/dados', [ComercialCotacaoController::class, 'dados'])->name('cotacao.dados');
@@ -351,6 +356,9 @@ Route::middleware('auth')->group(function () {
 
         // Saúde Contratual
         Route::get('saude', [ComercialSaudeController::class, 'index'])->name('saude');
+
+        // Contratos Ativos
+        Route::get('contratos', [ComercialContratoController::class, 'index'])->name('contratos');
         Route::get('saude/{clienteId}/dados', [ComercialSaudeController::class, 'dados'])->name('saude.dados');
         Route::post('saude/{clienteId}/lancamento', [ComercialSaudeController::class, 'storeLancamento'])->middleware('permission:comercial.cotar')->name('saude.lancamento.store');
         Route::delete('saude/{clienteId}/lancamento/{lancId}', [ComercialSaudeController::class, 'destroyLancamento'])->middleware('permission:comercial.cotar')->name('saude.lancamento.destroy');
