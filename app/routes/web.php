@@ -343,6 +343,8 @@ Route::middleware('auth')->group(function () {
         // Reajustes de contrato
         Route::get('reajustes', [ComercialReajusteController::class, 'index'])->name('reajustes');
         Route::get('reajustes/dados', [ComercialReajusteController::class, 'dados'])->name('reajustes.dados');
+        Route::post('reajustes', [ComercialReajusteController::class, 'store'])->middleware('permission:comercial.cotar')->name('reajustes.store');
+        Route::put('reajustes/{id}', [ComercialReajusteController::class, 'update'])->middleware('permission:comercial.cotar')->name('reajustes.update');
         Route::patch('reajustes/{id}/status', [ComercialReajusteController::class, 'updateStatus'])->middleware('permission:comercial.aprovar')->name('reajustes.status');
         Route::delete('reajustes/{id}', [ComercialReajusteController::class, 'destroy'])->middleware('permission:comercial.cotar')->name('reajustes.destroy');
     });

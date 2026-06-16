@@ -21,6 +21,13 @@ class ComercialReajusteController extends Controller
         return Inertia::render('Comercial/Reajustes/Index', [
             'reajustes' => $this->lista(),
             'statusLabels' => Reajuste::STATUS_LABELS,
+            'clientes' => \App\Models\Comercial\Cliente::orderBy('nome')
+                ->get(['id', 'nome', 'valor_mensal', 'observacao'])
+                ->map(fn ($c) => [
+                    'id' => $c->id,
+                    'nome' => $c->nome,
+                    'valor_mensal' => (float) $c->valor_mensal,
+                ]),
         ]);
     }
 
@@ -50,6 +57,100 @@ class ComercialReajusteController extends Controller
                 'novo_valor' => round((float) $r->valor_atual + (float) $r->impacto_mensal, 2),
                 'itens' => $r->itens ?? [],
             ]);
+    }
+
+    /** Cria um reajuste a partir de um cliente (Iniciar Reajuste). */
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'cliente_id' => 'nullable|exists:bs_comercial_clientes,id',
+            'cliente_nome' => 'required|string|max:255',
+            'empresa' => 'nullable|string|max:50',
+            'tipo' => 'nullable|string|max:30',
+            'pct' => 'required|numeric|min:0|max:100',
+            'competencia' => 'nullable|string|max:20',
+            'obs' => 'nullable|string',
+            'valor_atual' => 'required|numeric|min:0',
+        ]);
+
+        $pct = round((float) $data['pct'], 2);
+        $valorAtual = round((float) $data['valor_atual'], 2);
+        $novoValor = round($valorAtual * (1 + $pct / 100), 2);
+        $variacao = round($novoValor - $valorAtual, 2);
+
+        $reajuste = Reajuste::create([
+            'cliente_id' => $data['cliente_id'] ?? null,
+            'cliente_nome' => $data['cliente_nome'],
+            'empresa' => $data['empresa'] ?? null,
+            'tipo' => $data['tipo'] ?? 'manual',
+            'pct' => $pct,
+            'competencia' => $data['competencia'] ?? null,
+            'obs' => $data['obs'] ?? null,
+            'status' => 'calculado',
+            'valor_atual' => $valorAtual,
+            'impacto_mensal' => $variacao,
+            'data_criacao' => now()->toDateString(),
+            'created_by' => $request->user()->id,
+            'historico' => [['data' => now()->toDateString(), 'status' => 'calculado', 'nota' => 'Reajuste iniciado']],
+            'itens' => [[
+                'nome' => 'Contrato', 'escala' => 'Mensal', 'qtd' => 1,
+                'valorAtual' => $valorAtual, 'pct' => $pct,
+                'novoValor' => $novoValor, 'variacao' => $variacao, 'selecionado' => true,
+            ]],
+        ]);
+
+        return response()->json(['sucesso' => true, 'id' => $reajuste->id]);
+    }
+
+    /** Edita a planilha de um reajuste (índice/%, itens, observação) e recalcula totais. */
+    public function update(Request $request, int $id)
+    {
+        $reajuste = Reajuste::findOrFail($id);
+
+        $data = $request->validate([
+            'tipo' => 'nullable|string|max:30',
+            'pct' => 'nullable|numeric|min:0|max:100',
+            'competencia' => 'nullable|string|max:20',
+            'obs' => 'nullable|string',
+            'itens' => 'required|array|min:1',
+            'itens.*.nome' => 'nullable|string',
+            'itens.*.valorAtual' => 'required|numeric',
+            'itens.*.pct' => 'nullable|numeric',
+            'itens.*.selecionado' => 'nullable|boolean',
+        ]);
+
+        // Recalcula cada item e os totais a partir dos selecionados (fonte da verdade no backend).
+        $valorAtualTotal = 0.0;
+        $impacto = 0.0;
+        $itens = array_map(function ($it) use (&$valorAtualTotal, &$impacto) {
+            $valorAtual = round((float) ($it['valorAtual'] ?? 0), 2);
+            $pct = round((float) ($it['pct'] ?? 0), 2);
+            $novoValor = round($valorAtual * (1 + $pct / 100), 2);
+            $variacao = round($novoValor - $valorAtual, 2);
+            $sel = (bool) ($it['selecionado'] ?? true);
+            if ($sel) {
+                $valorAtualTotal += $valorAtual;
+                $impacto += $variacao;
+            }
+
+            return [
+                'nome' => $it['nome'] ?? '—', 'escala' => $it['escala'] ?? 'Mensal',
+                'valorAtual' => $valorAtual, 'pct' => $pct,
+                'novoValor' => $novoValor, 'variacao' => $variacao, 'selecionado' => $sel,
+            ];
+        }, $data['itens']);
+
+        $reajuste->update([
+            'tipo' => $data['tipo'] ?? $reajuste->tipo,
+            'pct' => isset($data['pct']) ? round((float) $data['pct'], 2) : $reajuste->pct,
+            'competencia' => $data['competencia'] ?? $reajuste->competencia,
+            'obs' => $data['obs'] ?? $reajuste->obs,
+            'itens' => $itens,
+            'valor_atual' => round($valorAtualTotal, 2),
+            'impacto_mensal' => round($impacto, 2),
+        ]);
+
+        return response()->json(['sucesso' => true]);
     }
 
     /** Altera o status de um reajuste (workflow). */

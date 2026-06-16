@@ -9,7 +9,7 @@
 // "novo reajuste" do protótipo ficam para a próxima fatia (TODO).
 // ─────────────────────────────────────────────────────────────────────────────
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayout.vue"
-import { ref, computed } from "vue"
+import { ref, computed, reactive } from "vue"
 import { router } from "@inertiajs/vue3"
 import axios from "axios"
 import Toast from "primevue/toast"
@@ -20,6 +20,7 @@ import "@/../css/comercial-g360.css"
 const props = defineProps({
   reajustes: { type: Array, default: () => [] },
   statusLabels: { type: Object, default: () => ({}) },
+  clientes: { type: Array, default: () => [] },
 })
 
 const toast = useToast()
@@ -128,6 +129,117 @@ async function excluir(r) {
     else fail("Falha ao excluir")
   }
 }
+// ─── Novo Reajuste (Iniciar) ────────────────────────────────────────────────────
+const modalNovo = ref(false)
+const buscaCli = ref("")
+const novoForm = reactive({ cliente_id: null, cliente_nome: "", valor_atual: 0, pct: "", tipo: "manual", competencia: "", obs: "" })
+const salvandoNovo = ref(false)
+
+const clientesFiltrados = computed(() => {
+  const b = buscaCli.value.toLowerCase()
+  return props.clientes.filter((c) => !b || (c.nome || "").toLowerCase().includes(b)).slice(0, 50)
+})
+
+function abrirNovo() {
+  Object.assign(novoForm, { cliente_id: null, cliente_nome: "", valor_atual: 0, pct: "", tipo: "manual", competencia: "", obs: "" })
+  buscaCli.value = ""
+  modalNovo.value = true
+}
+function escolherCliente(c) {
+  novoForm.cliente_id = c.id
+  novoForm.cliente_nome = c.nome
+  novoForm.valor_atual = c.valor_mensal || 0
+}
+async function salvarNovo() {
+  if (!novoForm.cliente_nome) { fail("Selecione um cliente"); return }
+  if (novoForm.pct === "" || isNaN(Number(novoForm.pct))) { fail("Informe o percentual"); return }
+  salvandoNovo.value = true
+  try {
+    await axios.post("/comercial/reajustes", {
+      cliente_id: novoForm.cliente_id,
+      cliente_nome: novoForm.cliente_nome,
+      pct: Number(novoForm.pct),
+      tipo: novoForm.tipo,
+      competencia: novoForm.competencia || null,
+      obs: novoForm.obs || null,
+      valor_atual: Number(novoForm.valor_atual) || 0,
+    })
+    ok("Reajuste iniciado!")
+    modalNovo.value = false
+    recarregar()
+  } catch (e) {
+    if (e?.response?.status === 403) fail("Sem permissão para criar reajuste")
+    else fail("Falha ao criar o reajuste")
+  } finally {
+    salvandoNovo.value = false
+  }
+}
+
+// ─── Editar planilha ──────────────────────────────────────────────────────────
+const modalEditar = ref(false)
+const editId = ref(null)
+const editForm = reactive({ tipo: "manual", pct: "", competencia: "", obs: "", itens: [] })
+const salvandoEdit = ref(false)
+
+function abrirEditar(r) {
+  editId.value = r.id
+  editForm.tipo = r.tipo || "manual"
+  editForm.pct = r.pct ?? ""
+  editForm.competencia = r.competencia || ""
+  editForm.obs = r.obs || ""
+  // Clona os itens com os campos editáveis.
+  editForm.itens = (r.itens || []).map((it) => ({
+    nome: it.nome || "—",
+    valorAtual: Number(it.valorAtual || 0),
+    pct: Number(it.pct ?? r.pct ?? 0),
+    selecionado: it.selecionado !== false,
+  }))
+  if (!editForm.itens.length) {
+    editForm.itens = [{ nome: "Contrato", valorAtual: Number(r.valor_atual || 0), pct: Number(r.pct || 0), selecionado: true }]
+  }
+  modalEditar.value = true
+}
+
+// Aplica o % global do índice a todos os itens selecionados.
+function aplicarIndice() {
+  const p = Number(editForm.pct)
+  if (isNaN(p)) return
+  editForm.itens.forEach((it) => { if (it.selecionado) it.pct = p })
+}
+
+const editItemNovo = (it) => round2(Number(it.valorAtual || 0) * (1 + Number(it.pct || 0) / 100))
+const editItemVar = (it) => round2(editItemNovo(it) - Number(it.valorAtual || 0))
+const round2 = (n) => Math.round(n * 100) / 100
+
+const editResumo = computed(() => {
+  let atual = 0, novo = 0
+  editForm.itens.forEach((it) => {
+    if (it.selecionado) { atual += Number(it.valorAtual || 0); novo += editItemNovo(it) }
+  })
+  return { atual: round2(atual), novo: round2(novo), impacto: round2(novo - atual), sel: editForm.itens.filter((i) => i.selecionado).length }
+})
+
+async function salvarEditar() {
+  salvandoEdit.value = true
+  try {
+    await axios.put(`/comercial/reajustes/${editId.value}`, {
+      tipo: editForm.tipo,
+      pct: editForm.pct === "" ? null : Number(editForm.pct),
+      competencia: editForm.competencia || null,
+      obs: editForm.obs || null,
+      itens: editForm.itens,
+    })
+    ok("Reajuste salvo!")
+    modalEditar.value = false
+    recarregar()
+  } catch (e) {
+    if (e?.response?.status === 403) fail("Sem permissão para editar")
+    else if (e?.response?.status === 422) fail("Dados inválidos")
+    else fail("Falha ao salvar")
+  } finally {
+    salvandoEdit.value = false
+  }
+}
 </script>
 
 <template>
@@ -140,6 +252,9 @@ async function excluir(r) {
           <div>
             <div class="section-title">Reajuste de Contratos</div>
             <div class="section-desc">Acompanhe e aplique reajustes — por empresa e estado</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button class="btn btn-gold" dusk="raj-novo" @click="abrirNovo()">+ Iniciar Reajuste</button>
           </div>
         </div>
 
@@ -230,6 +345,9 @@ async function excluir(r) {
                       <button @click="verDetalhe(r)" class="raj-acao" :dusk="'raj-detalhe-' + r.id" title="Ver itens">
                         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="1.8"/></svg>
                       </button>
+                      <button @click="abrirEditar(r)" class="raj-acao" :dusk="'raj-editar-' + r.id" title="Editar planilha">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 2l3 3-9 9H2v-3l9-9z"/></svg>
+                      </button>
                       <button @click="alterarStatus(r)" class="raj-acao" :dusk="'raj-status-' + r.id" title="Alterar status">
                         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v4l2 2"/></svg>
                       </button>
@@ -279,6 +397,95 @@ async function excluir(r) {
           </div>
           <div style="display:flex;justify-content:flex-end">
             <button class="btn btn-ghost" @click="modalDetalhe = false">Fechar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Iniciar Reajuste (novo) -->
+      <div class="modal-overlay" :class="{ open: modalNovo }" @click.self="modalNovo = false">
+        <div class="modal" style="width:560px;max-width:94vw">
+          <div class="modal-title">Iniciar Reajuste</div>
+          <div style="margin-bottom:12px">
+            <label class="form-label">Selecionar Cliente</label>
+            <input v-model="buscaCli" type="text" class="form-input" dusk="raj-novo-busca" placeholder="Buscar cliente..." style="margin-top:6px">
+          </div>
+          <div style="max-height:220px;overflow-y:auto;border:1px solid var(--brand-border-soft);border-radius:8px;margin-bottom:12px">
+            <button v-for="c in clientesFiltrados" :key="c.id" :dusk="'raj-novo-cli-' + c.id"
+              @click="escolherCliente(c)"
+              :style="{ background: novoForm.cliente_id === c.id ? 'color-mix(in srgb, var(--app-primary) 10%, transparent)' : 'transparent' }"
+              style="width:100%;text-align:left;border:none;border-bottom:1px solid var(--brand-border-soft);padding:9px 12px;cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;gap:10px">
+              <span style="font-size:12px;font-weight:600">{{ c.nome }}</span>
+              <span style="font-size:11px;color:var(--text-muted)">{{ fmt(c.valor_mensal) }}</span>
+            </button>
+            <div v-if="!clientesFiltrados.length" style="padding:14px;text-align:center;color:var(--text-muted);font-size:12px">Nenhum cliente</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+            <div class="form-group"><label class="form-label">Percentual (%)</label><input v-model="novoForm.pct" type="number" step="0.01" class="form-input" dusk="raj-novo-pct"></div>
+            <div class="form-group"><label class="form-label">Valor Atual</label><input v-model="novoForm.valor_atual" type="number" step="0.01" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Competência</label><input v-model="novoForm.competencia" type="month" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Observação</label><input v-model="novoForm.obs" type="text" class="form-input"></div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn btn-ghost" @click="modalNovo = false">Cancelar</button>
+            <button class="btn btn-gold" dusk="raj-novo-salvar" :disabled="salvandoNovo" @click="salvarNovo()">{{ salvandoNovo ? 'Salvando...' : 'Iniciar' }}</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Editar planilha -->
+      <div class="modal-overlay" :class="{ open: modalEditar }" @click.self="modalEditar = false">
+        <div class="modal" style="width:760px;max-width:96vw">
+          <div class="modal-title">Editar Reajuste</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
+            <div class="form-group"><label class="form-label">Tipo de Índice</label>
+              <select v-model="editForm.tipo" class="form-select">
+                <option value="inpc">INPC</option><option value="ipca">IPCA</option>
+                <option value="cct">Dissídio / CCT</option><option value="manual">Percentual Manual</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label">Percentual (%)</label>
+              <input v-model="editForm.pct" type="number" step="0.01" class="form-input" dusk="raj-edit-pct" @input="aplicarIndice()">
+            </div>
+            <div class="form-group"><label class="form-label">Competência</label><input v-model="editForm.competencia" type="month" class="form-input"></div>
+          </div>
+
+          <div class="contracts-table-wrap" style="overflow-x:auto;margin-bottom:14px">
+            <table style="width:100%;border-collapse:collapse;min-width:560px">
+              <thead>
+                <tr>
+                  <th style="text-align:center;width:36px"></th>
+                  <th style="text-align:left">Posto / Serviço</th>
+                  <th style="text-align:right">Valor Atual</th>
+                  <th style="text-align:center">%</th>
+                  <th style="text-align:right">Novo Valor</th>
+                  <th style="text-align:right">Variação</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(it, i) in editForm.itens" :key="i">
+                  <td style="text-align:center"><input type="checkbox" v-model="it.selecionado"></td>
+                  <td style="text-align:left;font-size:12px">{{ it.nome }}</td>
+                  <td style="text-align:right;font-size:12px">{{ fmt(it.valorAtual) }}</td>
+                  <td style="text-align:center"><input v-model.number="it.pct" type="number" step="0.01" class="form-input" style="width:80px;text-align:center;padding:4px 6px" :dusk="'raj-edit-item-pct-' + i"></td>
+                  <td style="text-align:right;font-size:12px;font-weight:600">{{ fmt(editItemNovo(it)) }}</td>
+                  <td style="text-align:right;font-size:12px;color:var(--green)">{{ fmt(editItemVar(it)) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px">
+            <div style="font-size:12px;color:var(--text-muted)">
+              Atual: <strong>{{ fmt(editResumo.atual) }}</strong> · Novo: <strong style="color:var(--brand-gold)">{{ fmt(editResumo.novo) }}</strong>
+              · Impacto: <strong style="color:var(--green)" dusk="raj-edit-impacto">{{ fmt(editResumo.impacto) }}</strong>
+              ({{ editResumo.sel }} de {{ editForm.itens.length }} itens)
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:14px"><label class="form-label">Observação</label><input v-model="editForm.obs" type="text" class="form-input"></div>
+
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn btn-ghost" @click="modalEditar = false">Cancelar</button>
+            <button class="btn btn-gold" dusk="raj-edit-salvar" :disabled="salvandoEdit" @click="salvarEditar()">{{ salvandoEdit ? 'Salvando...' : 'Salvar' }}</button>
           </div>
         </div>
       </div>
