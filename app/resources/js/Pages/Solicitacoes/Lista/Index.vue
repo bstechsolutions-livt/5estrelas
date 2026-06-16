@@ -1414,6 +1414,7 @@ async function exportarTabela() {
     <!-- Loading Inicial -->
     <div
       v-if="loadingInicial"
+      dusk="tickets-loading"
       class="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-50/95 via-white/95 to-blue-50/95 dark:from-slate-900/95 dark:via-slate-800/95 dark:to-slate-900/95 backdrop-blur-md"
     >
       <div class="flex flex-col items-center gap-6">
