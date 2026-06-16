@@ -27,6 +27,7 @@ use App\Http\Controllers\Comercial\ComercialConfigController;
 use App\Http\Controllers\Comercial\ComercialCotacaoController;
 use App\Http\Controllers\Comercial\ComercialFaturamentoController;
 use App\Http\Controllers\Comercial\ComercialPropostaController;
+use App\Http\Controllers\Comercial\ComercialReajusteController;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 
@@ -338,6 +339,12 @@ Route::middleware('auth')->group(function () {
         Route::delete('clientes/{id}', [ComercialClienteController::class, 'destroy'])->middleware('permission:comercial.cotar')->name('clientes.destroy');
         Route::post('clientes/{id}/vincular', [ComercialClienteController::class, 'vincularProposta'])->middleware('permission:comercial.cotar')->name('clientes.vincular');
         Route::delete('clientes/{id}/desvincular/{propostaId}', [ComercialClienteController::class, 'desvincularProposta'])->middleware('permission:comercial.cotar')->name('clientes.desvincular');
+
+        // Reajustes de contrato
+        Route::get('reajustes', [ComercialReajusteController::class, 'index'])->name('reajustes');
+        Route::get('reajustes/dados', [ComercialReajusteController::class, 'dados'])->name('reajustes.dados');
+        Route::patch('reajustes/{id}/status', [ComercialReajusteController::class, 'updateStatus'])->middleware('permission:comercial.aprovar')->name('reajustes.status');
+        Route::delete('reajustes/{id}', [ComercialReajusteController::class, 'destroy'])->middleware('permission:comercial.cotar')->name('reajustes.destroy');
     });
 
     // ═══════════════════════════════════════════════════════════════

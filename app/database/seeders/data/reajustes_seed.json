@@ -1,0 +1,1706 @@
+[
+  {
+    "_id": 561903310,
+    "cliente": "BINATURAL",
+    "clienteId": 323152630,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 6,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 18750.05,
+    "impactoMensal": 1125,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 18750.05,
+        "pct": 6,
+        "novoValor": 19875.05,
+        "variacao": 1125,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1848883087,
+    "cliente": "CAF",
+    "clienteId": 1498008650,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 7.5,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 17345.29,
+    "impactoMensal": 1300.89,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Copa e Recepção",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 17345.29,
+        "pct": 7.5,
+        "novoValor": 18646.18,
+        "variacao": 1300.89,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1725229960,
+    "cliente": "CAF",
+    "clienteId": 1498008650,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 7.5,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 16326.28,
+    "impactoMensal": 1224.47,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Assistente Administrativo",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 16326.28,
+        "pct": 7.5,
+        "novoValor": 17550.75,
+        "variacao": 1224.47,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1597844585,
+    "cliente": "SESI",
+    "clienteId": 936015691,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 6.05,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 762866.35,
+    "impactoMensal": 44431.74,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 334736.47,
+        "pct": 6.05,
+        "novoValor": 354991.94,
+        "variacao": 20255.47,
+        "selecionado": true
+      },
+      {
+        "id": 1,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 428129.88,
+        "pct": 5.65,
+        "novoValor": 452306.15,
+        "variacao": 24176.27,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 424663881,
+    "cliente": "SENAI",
+    "clienteId": 1221123773,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 6,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 412648.79,
+    "impactoMensal": 23942.79,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 215687.51,
+        "pct": 6,
+        "novoValor": 228637.2,
+        "variacao": 12949.69,
+        "selecionado": true
+      },
+      {
+        "id": 1,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 196961.28,
+        "pct": 5.58,
+        "novoValor": 207954.38,
+        "variacao": 10993.1,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 778269319,
+    "cliente": "4BOSS",
+    "clienteId": 1189626501,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.4,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 6834.02,
+    "impactoMensal": 369.39,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 6834.02,
+        "pct": 5.4,
+        "novoValor": 7203.41,
+        "variacao": 369.39,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1128478851,
+    "cliente": "ARENA BSB",
+    "clienteId": 967340216,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 3.9,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 36429.16,
+    "impactoMensal": 1419.96,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 36429.16,
+        "pct": 3.9,
+        "novoValor": 37849.12,
+        "variacao": 1419.96,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1514240823,
+    "cliente": "CAF",
+    "clienteId": 1498008650,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.7,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 14756.22,
+    "impactoMensal": 844.46,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 14756.22,
+        "pct": 5.7,
+        "novoValor": 15600.68,
+        "variacao": 844.46,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1923527378,
+    "cliente": "CONSTRUTORA FONSECA & MARCADANTE - PKS - DF",
+    "clienteId": 1305742586,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.2,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "ENVIADO P FATURAR",
+    "status": "aprovado",
+    "valorAtual": 11463.65,
+    "impactoMensal": 595.67,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 11463.65,
+        "pct": 5.2,
+        "novoValor": 12059.32,
+        "variacao": 595.67,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1516683738,
+    "cliente": "DFPLAZA APART",
+    "clienteId": 861724738,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 6.02,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 135698.27,
+    "impactoMensal": 8163.03,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 135698.27,
+        "pct": 6.02,
+        "novoValor": 143861.3,
+        "variacao": 8163.03,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 740518188,
+    "cliente": "DFPLAZA GERAL",
+    "clienteId": 2020821360,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.5,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 162227.37,
+    "impactoMensal": 8925.2,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 162227.37,
+        "pct": 5.5,
+        "novoValor": 171152.57,
+        "variacao": 8925.2,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1553324836,
+    "cliente": "DFPLAZA OFFICE",
+    "clienteId": 1932576292,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.97,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 87786.87,
+    "impactoMensal": 5244.83,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria e Recepção",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 87786.87,
+        "pct": 5.97,
+        "novoValor": 93031.7,
+        "variacao": 5244.83,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1816603264,
+    "cliente": "EMBAIXADA DA RUANDA",
+    "clienteId": 1034196471,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.8,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "ENVIADO P FATURAR",
+    "status": "enviado",
+    "valorAtual": 10829.01,
+    "impactoMensal": 628.65,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 10829.01,
+        "pct": 5.8,
+        "novoValor": 11457.66,
+        "variacao": 628.65,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 2054439949,
+    "cliente": "EMBAIXADA DO EQUADOR",
+    "clienteId": 1841216261,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.4,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "FALTA DIF REAJ",
+    "status": "aprovado",
+    "valorAtual": 33395.64,
+    "impactoMensal": 2011.83,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 6395.64,
+        "pct": 5.4,
+        "novoValor": 6743.07,
+        "variacao": 347.43,
+        "selecionado": true
+      },
+      {
+        "id": 1,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 27000,
+        "pct": 6.2,
+        "novoValor": 28664.4,
+        "variacao": 1664.4,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 894448122,
+    "cliente": "FONPLATA",
+    "clienteId": 2108468451,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.5,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 6573.13,
+    "impactoMensal": 360.88,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 6573.13,
+        "pct": 5.5,
+        "novoValor": 6934.01,
+        "variacao": 360.88,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 2084729776,
+    "cliente": "IDP ASA NORTE",
+    "clienteId": 989110750,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 6,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 92126.39,
+    "impactoMensal": 5526.58,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 47586.47,
+        "pct": 6,
+        "novoValor": 50442.76,
+        "variacao": 2856.29,
+        "selecionado": true
+      },
+      {
+        "id": 1,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 44539.92,
+        "pct": 6,
+        "novoValor": 47210.21,
+        "variacao": 2670.29,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 2040509829,
+    "cliente": "IGUATEMI",
+    "clienteId": 1222188387,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 6,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 96824.56,
+    "impactoMensal": 5817.35,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 96824.56,
+        "pct": 6,
+        "novoValor": 102641.91,
+        "variacao": 5817.35,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 369466632,
+    "cliente": "MIRANTE INC",
+    "clienteId": 783812658,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 6.2,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "ENVIADO P FATURAR",
+    "status": "enviado",
+    "valorAtual": 29695.22,
+    "impactoMensal": 1836.38,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 29695.22,
+        "pct": 6.2,
+        "novoValor": 31531.6,
+        "variacao": 1836.38,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 136098099,
+    "cliente": "NDB - DF",
+    "clienteId": 22598994,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.3,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "REAJ RETROATIVO EM NOV/2026",
+    "status": "enviado",
+    "valorAtual": 7317.6,
+    "impactoMensal": 390.99,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 7317.6,
+        "pct": 5.3,
+        "novoValor": 7708.59,
+        "variacao": 390.99,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1225878534,
+    "cliente": "PARKSHOPPING",
+    "clienteId": 331942830,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 6,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 182030.78,
+    "impactoMensal": 10924.88,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 182030.78,
+        "pct": 6,
+        "novoValor": 192955.66,
+        "variacao": 10924.88,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 641200443,
+    "cliente": "PARKSHOPPING CORPORATE",
+    "clienteId": 1771743384,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.9,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 29044.61,
+    "impactoMensal": 1725.26,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 29044.61,
+        "pct": 5.9,
+        "novoValor": 30769.87,
+        "variacao": 1725.26,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 2035904691,
+    "cliente": "PONTÃO LAGO SUL",
+    "clienteId": 2140841141,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.9,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "SIM",
+    "status": "aprovado",
+    "valorAtual": 29555.14,
+    "impactoMensal": 1738.91,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 29555.14,
+        "pct": 5.9,
+        "novoValor": 31294.05,
+        "variacao": 1738.91,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 358779767,
+    "cliente": "SESI CN",
+    "clienteId": 138323683,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.6,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "ENVIAR AO FATURAMENTO",
+    "status": "aprovado",
+    "valorAtual": 77112.75,
+    "impactoMensal": 4304,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "aprovado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 77112.75,
+        "pct": 5.6,
+        "novoValor": 81416.75,
+        "variacao": 4304,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 807009953,
+    "cliente": "ROBERTO SIMONSEN",
+    "clienteId": 659006593,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.3,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 425440.81,
+    "impactoMensal": 22714.03,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 425440.81,
+        "pct": 5.3,
+        "novoValor": 448154.84,
+        "variacao": 22714.03,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1612726140,
+    "cliente": "ARMANDO NETO",
+    "clienteId": 922989061,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 5.2,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 126034.68,
+    "impactoMensal": 6552.2,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza e Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 126034.68,
+        "pct": 5.2,
+        "novoValor": 132586.88,
+        "variacao": 6552.2,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1326663268,
+    "cliente": "SESILAB",
+    "clienteId": 1165601558,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 6,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 275018.6,
+    "impactoMensal": 13177.05,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 34639.2,
+        "pct": 6,
+        "novoValor": 36710.28,
+        "variacao": 2071.08,
+        "selecionado": true
+      },
+      {
+        "id": 1,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 49596.66,
+        "pct": 3.4,
+        "novoValor": 51297.71,
+        "variacao": 1701.05,
+        "selecionado": true
+      },
+      {
+        "id": 2,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 12548.32,
+        "pct": 5.8,
+        "novoValor": 13276.32,
+        "variacao": 728,
+        "selecionado": true
+      },
+      {
+        "id": 3,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 178234.42,
+        "pct": 4.9,
+        "novoValor": 186911.34,
+        "variacao": 8676.92,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1439067899,
+    "cliente": "VIA ESTRUTURAL",
+    "clienteId": 1638540329,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 6.1,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 24105.16,
+    "impactoMensal": 1468.22,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 24105.16,
+        "pct": 6.1,
+        "novoValor": 25573.38,
+        "variacao": 1468.22,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 845933239,
+    "cliente": "SESI/DN - ROBERTO SIMONSEN",
+    "clienteId": 781608256,
+    "empresa": "apoio-df",
+    "tipo": "manual",
+    "pct": 7.2,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 6730.42,
+    "impactoMensal": 483.27,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Manobrista",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 6730.42,
+        "pct": 7.2,
+        "novoValor": 7213.69,
+        "variacao": 483.27,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1069906679,
+    "cliente": "BIOSCIE",
+    "clienteId": 1225588553,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 6.7,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 17518.87,
+    "impactoMensal": 1166.77,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 17518.87,
+        "pct": 6.7,
+        "novoValor": 18685.64,
+        "variacao": 1166.77,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1128894943,
+    "cliente": "BOM DIA ACESSÓRIOS",
+    "clienteId": 2004104134,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 6.4,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 7177.9,
+    "impactoMensal": 461.69,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 7177.9,
+        "pct": 6.4,
+        "novoValor": 7639.59,
+        "variacao": 461.69,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1613648314,
+    "cliente": "FRACTAL CENTRO DE EDUCAÇÃO CIDADE JARDIM - GO",
+    "clienteId": 1056623209,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 8.1,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 4733.14,
+    "impactoMensal": 383.97,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Vigia",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 4733.14,
+        "pct": 8.1,
+        "novoValor": 5117.11,
+        "variacao": 383.97,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 2044208007,
+    "cliente": "FRACTAL CENTRO DE EDUCAÇÃO SUDOESTE - GO",
+    "clienteId": 1186383584,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 8.1,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 4733.14,
+    "impactoMensal": 383.97,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Vigia",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 4733.14,
+        "pct": 8.1,
+        "novoValor": 5117.11,
+        "variacao": 383.97,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1295857399,
+    "cliente": "GCE S.A - FACULDADE SENAC - GO",
+    "clienteId": 1297427680,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 8.5,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 13472.71,
+    "impactoMensal": 1145.83,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 13472.71,
+        "pct": 8.5,
+        "novoValor": 14618.54,
+        "variacao": 1145.83,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1989329402,
+    "cliente": "GCE S.A CONSTRUTORA",
+    "clienteId": 1032517488,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 8.5,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 13492.69,
+    "impactoMensal": 1140.44,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 13492.69,
+        "pct": 8.5,
+        "novoValor": 14633.13,
+        "variacao": 1140.44,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 671673835,
+    "cliente": "GRUPO BELA ARTE GO",
+    "clienteId": 1653317695,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 8,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 5074.45,
+    "impactoMensal": 407.68,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 5074.45,
+        "pct": 8,
+        "novoValor": 5482.13,
+        "variacao": 407.68,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 268340770,
+    "cliente": "LAS DO BRASIL",
+    "clienteId": 1698122872,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 8.7,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 6228.23,
+    "impactoMensal": 541.41,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 6228.23,
+        "pct": 8.7,
+        "novoValor": 6769.64,
+        "variacao": 541.41,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 725611666,
+    "cliente": "MILLS",
+    "clienteId": 1896425298,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 7.8,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 5385.03,
+    "impactoMensal": 419.16,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 5385.03,
+        "pct": 7.8,
+        "novoValor": 5804.19,
+        "variacao": 419.16,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 786710922,
+    "cliente": "SÃO JORGE PORTARIA 1 MAIO 16 - GO",
+    "clienteId": 780547680,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 8,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 12016.09,
+    "impactoMensal": 966.01,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 12016.09,
+        "pct": 8,
+        "novoValor": 12982.1,
+        "variacao": 966.01,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1507992419,
+    "cliente": "SOCIAL DISTRIBUIDORA GO",
+    "clienteId": 1794571124,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 7.9,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 18832.8,
+    "impactoMensal": 1491.12,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 18832.8,
+        "pct": 7.9,
+        "novoValor": 20323.92,
+        "variacao": 1491.12,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 2074558451,
+    "cliente": "SUPERMERCADO TATICO",
+    "clienteId": 248069999,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 5.2,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 141855.66,
+    "impactoMensal": 7367.38,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 141855.66,
+        "pct": 5.2,
+        "novoValor": 149223.04,
+        "variacao": 7367.38,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 906677702,
+    "cliente": "TSE ENERGIA E AUTOMAÇÃO - GO",
+    "clienteId": 198258723,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 7.6,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 12874.45,
+    "impactoMensal": 983.69,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 12874.45,
+        "pct": 7.6,
+        "novoValor": 13858.14,
+        "variacao": 983.69,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1583226325,
+    "cliente": "TSE ENERGIA E AUTOMAÇÃO - GO",
+    "clienteId": 198258723,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 5.8,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 17380.27,
+    "impactoMensal": 1015.11,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 17380.27,
+        "pct": 5.8,
+        "novoValor": 18395.38,
+        "variacao": 1015.11,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1524674767,
+    "cliente": "JARDINS CAPRI",
+    "clienteId": 5183,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 8.1,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 35830.11,
+    "impactoMensal": 2915.93,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 35830.11,
+        "pct": 8.1,
+        "novoValor": 38746.04,
+        "variacao": 2915.93,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 1742952178,
+    "cliente": "TERRAS APLHA RES 2 - GO",
+    "clienteId": 955266319,
+    "empresa": "apoio-go",
+    "tipo": "manual",
+    "pct": 7.9,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 36708.11,
+    "impactoMensal": 2907.38,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 36708.11,
+        "pct": 7.9,
+        "novoValor": 39615.49,
+        "variacao": 2907.38,
+        "selecionado": true
+      }
+    ]
+  },
+  {
+    "_id": 2059717955,
+    "cliente": "CAF - SP",
+    "clienteId": 75142233,
+    "empresa": "apoio-sp",
+    "tipo": "manual",
+    "pct": 6.3,
+    "dataRef": "2026-01-01",
+    "competencia": "2026-01",
+    "obs": "",
+    "status": "enviado",
+    "valorAtual": 6797.31,
+    "impactoMensal": 429.36,
+    "dataCriacao": "2026-01-01",
+    "historico": [
+      {
+        "data": "2026-01-01",
+        "status": "enviado",
+        "nota": "Importado da planilha 2026"
+      }
+    ],
+    "itens": [
+      {
+        "id": 0,
+        "nome": "Recepção",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valorAtual": 6797.31,
+        "pct": 6.3,
+        "novoValor": 7226.67,
+        "variacao": 429.36,
+        "selecionado": true
+      }
+    ]
+  }
+]
