@@ -90,14 +90,10 @@ class DemoSeeder extends Seeder
 
         $this->createInteractions($allPosts, $allUsers);
 
-        // 4 + 5. Propostas e clientes comerciais — MASSA REAL do protótipo
-        // (HISTORICO_INICIAL Nº 100–131 + SEED_CLIENTES). Substitui os fakes aleatórios.
-        $this->command->info('Importando propostas e clientes reais do Comercial...');
+        // 4 + 5 + 6. Propostas, clientes e faturamento — MASSA REAL do protótipo
+        // (HISTORICO_INICIAL Nº 100–131 + SEED_CLIENTES + seed de faturamento 2025/2026).
+        $this->command->info('Importando propostas, clientes e faturamento reais do Comercial...');
         $this->call(ComercialRealSeeder::class);
-
-        // 6. Criar faturamento comercial (2025 e 2026)
-        $this->command->info('Criando faturamento comercial...');
-        $this->createFaturamento();
 
         // 7. Criar títulos a pagar (com campos Senior + rateios) — spec senior-contas-pagar-sync
         $this->command->info('Criando títulos a pagar (Contas a Pagar)...');

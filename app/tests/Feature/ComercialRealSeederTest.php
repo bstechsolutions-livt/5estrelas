@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Comercial\Cliente;
+use App\Models\Comercial\Faturamento;
 use App\Models\Comercial\Proposta;
 use Database\Seeders\ComercialRealSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -48,13 +49,30 @@ class ComercialRealSeederTest extends TestCase
         $this->assertEquals('DF', $sesi->uf);
     }
 
+    public function test_semeia_faturamento_real(): void
+    {
+        $this->seed(ComercialRealSeeder::class);
+
+        // 18 locais por ano (2025 + 2026).
+        $this->assertEquals(18, Faturamento::where('ano', 2025)->count());
+        $this->assertEquals(18, Faturamento::where('ano', 2026)->count());
+
+        // Matriz + Embaixadas 2025: janeiro e setembro (set->setembro) reais.
+        $matriz = Faturamento::where('ano', 2025)
+            ->where('local_nome', '5 ESTRELAS SEGURANÇA - MATRIZ + EMBAIXADAS')->first();
+        $this->assertNotNull($matriz);
+        $this->assertEquals(10267008.12, (float) $matriz->jan);
+        $this->assertEquals(12889327.50, (float) $matriz->setembro); // mapeado de 'set'
+    }
+
     public function test_seeder_e_idempotente(): void
     {
         $this->seed(ComercialRealSeeder::class);
         $this->seed(ComercialRealSeeder::class);
 
-        // Segunda execução não duplica (upsert por numero/nome).
+        // Segunda execução não duplica (upsert por numero/nome/ano+local).
         $this->assertEquals(32, Proposta::count());
         $this->assertEquals(45, Cliente::count());
+        $this->assertEquals(36, Faturamento::count());
     }
 }

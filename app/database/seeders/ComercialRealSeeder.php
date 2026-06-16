@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Comercial\Cliente;
+use App\Models\Comercial\Faturamento;
 use App\Models\Comercial\Proposta;
 use Illuminate\Database\Seeder;
 
@@ -20,6 +21,7 @@ class ComercialRealSeeder extends Seeder
     {
         $this->seedClientes();
         $this->seedPropostas();
+        $this->seedFaturamento();
     }
 
     private function readJson(string $arquivo): array
@@ -100,5 +102,34 @@ class ComercialRealSeeder extends Seeder
             );
         }
         $this->command?->info('✅ ' . count($propostas) . ' propostas reais (Nº 100–131) importadas.');
+    }
+
+    /**
+     * Faturamento mensal real por local (2025 completo + 2026 parcial).
+     * O protótipo usa a chave 'set' para setembro; aqui mapeamos para a coluna 'setembro'.
+     */
+    private function seedFaturamento(): void
+    {
+        $dados = $this->readJson('faturamento_seed.json');
+        $total = 0;
+
+        foreach (['2025', '2026'] as $ano) {
+            foreach (($dados[$ano]['locais'] ?? []) as $local) {
+                $valores = [];
+                foreach (Faturamento::MESES as $mes) {
+                    // 'setembro' (coluna) ← 'set' (protótipo); demais 1:1.
+                    $chave = $mes === 'setembro' ? 'set' : $mes;
+                    $valores[$mes] = round((float) ($local[$chave] ?? 0), 2);
+                }
+
+                Faturamento::updateOrCreate(
+                    ['ano' => (int) $ano, 'local_nome' => $local['nome']],
+                    $valores,
+                );
+                $total++;
+            }
+        }
+
+        $this->command?->info("✅ {$total} linhas de faturamento real importadas (2025 + 2026).");
     }
 }
