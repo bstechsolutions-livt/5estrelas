@@ -371,6 +371,9 @@ Route::middleware('auth')->group(function () {
     Route::prefix('solicitacoes')->middleware('permission:solicitacoes.visualizar')->group(function () {
         Route::get('possui-resolvidas', [SolicitacoesController::class, 'possuiResolvidas']);
 
+        // Redirect legado /fila → /lista (URL antiga da Biglar)
+        Route::get('fila', fn () => redirect('/solicitacoes/lista'))->name('solicitacoes.fila.redirect');
+
         // Configuração (admin)
         Route::prefix('configuracoes')->middleware('permission:solicitacoes.configurar')->group(function () {
             Route::get('', [SolicitacoesController::class, 'indexConfiguracoes']);
