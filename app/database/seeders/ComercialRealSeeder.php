@@ -59,7 +59,9 @@ class ComercialRealSeeder extends Seeder
                     'situacao' => $c['status'] ?? 'ativo',
                     'valor_mensal' => round((float) ($c['valor'] ?? 0), 2),
                     'total_postos' => (int) ($c['postos_qtd'] ?? 0),
+                    'total_colaboradores' => (int) ($c['colab'] ?? 0),
                     'uf' => $this->ufDaEmpresa($c['empresa'] ?? null),
+                    'postos' => $c['postos'] ?? [],
                     // serviços não tem coluna dedicada → vai na observação (visível na tela).
                     'observacao' => trim((string) ($c['obs'] ?? '')) !== ''
                         ? $c['obs']

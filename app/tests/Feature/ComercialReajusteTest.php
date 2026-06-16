@@ -133,13 +133,14 @@ class ComercialReajusteTest extends TestCase
         ]);
 
         $response->assertOk()->assertJson(['sucesso' => true]);
-        $this->assertDatabaseHas('bs_comercial_reajustes', [
-            'cliente_nome' => 'Cliente Novo',
-            'status' => 'calculado',
-            'pct' => 10,
-            'valor_atual' => 1000,
-            'impacto_mensal' => 100, // 10% de 1000
-        ]);
+
+        $r = Reajuste::where('cliente_nome', 'Cliente Novo')->first();
+        $this->assertNotNull($r);
+        $this->assertEquals('calculado', $r->status);
+        $this->assertEquals(10.0, (float) $r->pct);
+        // Sem cliente_id → item genérico "Contrato" com valor_atual passado.
+        $this->assertEquals(1000.0, (float) $r->valor_atual);
+        $this->assertEquals(100.0, (float) $r->impacto_mensal); // 10% de 1000
     }
 
     public function test_store_valida_campos(): void

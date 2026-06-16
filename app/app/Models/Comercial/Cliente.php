@@ -21,6 +21,7 @@ class Cliente extends Model
 
     protected $casts = [
         'valor_mensal' => 'decimal:2',
+        'postos' => 'array',
     ];
 
     // ─── Auditoria ────────────────────────────────────────────────────────────
