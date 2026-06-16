@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Branch;
 use App\Models\Bordero;
 use App\Models\Payable;
+use App\Models\PayableRateio;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -37,24 +38,118 @@ class PayableSeeder extends Seeder
             $supplier = $this->suppliers[array_rand($this->suppliers)];
             $daysFromNow = random_int(-10, 45);
             $amount = random_int(150, 85000) + random_int(0, 99) / 100;
+            $dueDate = now()->addDays($daysFromNow)->toDateString();
 
-            Payable::create([
-                'title_number' => 'TIT-' . str_pad($i + 1, 4, '0', STR_PAD_LEFT),
+            // Campos de origem Senior (Apêndice A.2) — todos não nulos (req 12.1),
+            // com as chaves de negócio derivadas do índice para unicidade (req 12.3).
+            $codEmp = (int) config('senior.cod_emp', 1);
+            $codFil = $branches ? random_int(1, max(1, count($branches))) : 1;
+            $numTit = 'TIT-' . str_pad($i + 1, 4, '0', STR_PAD_LEFT);
+            $codTpt = 'DP';
+            $codFor = 1000 + $i;
+            $businessKey = "{$codEmp}-{$codFil}-{$numTit}-{$codTpt}-{$codFor}";
+
+            $senior = $this->seniorHeaderValues([
+                'codEmp' => $codEmp,
+                'codFil' => $codFil,
+                'numTit' => $numTit,
+                'codTpt' => $codTpt,
+                'codFor' => $codFor,
+                'sitTit' => 'NOR',
+                'vlrOri' => $amount,
+                'vlrAbe' => $amount,
+                'vctOri' => $dueDate,
+                'vctPro' => $dueDate,
+            ]);
+
+            $payable = Payable::create(array_merge([
+                'title_number' => $numTit,
                 'supplier_name' => $supplier['name'],
                 'supplier_cnpj' => $supplier['cnpj'],
                 'amount' => $amount,
-                'due_date' => now()->addDays($daysFromNow)->toDateString(),
+                'due_date' => $dueDate,
                 'issue_date' => now()->subDays(random_int(5, 30))->toDateString(),
                 'description' => "Pagamento referente a {$supplier['cat']} - competência " . now()->subMonth()->format('m/Y'),
                 'category' => $supplier['cat'],
                 'status' => $statuses[array_rand($statuses)],
                 'branch_id' => $branches ? $branches[array_rand($branches)] : null,
-            ]);
+                // Origem Senior
+                'senior_id' => $businessKey,
+                'senior_situacao_original' => 'NOR',
+                'senior_synced_at' => now(),
+                'senior_raw' => ['_demo' => true, 'sitTit' => 'NOR'],
+            ], $senior));
+
+            // Rateios: 1 a 5, com perRat somando 100% (req 12.2).
+            $this->seedRateios($payable, $amount);
         }
 
-        $this->command->info('✅ 35 títulos fake criados para contas a pagar.');
+        $this->command->info('✅ 35 títulos fake (com campos Senior + rateios) criados para contas a pagar.');
 
         $this->seedBorderos();
+    }
+
+    /**
+     * Gera valores não nulos para TODOS os campos de cabeçalho da Senior (Apêndice A.2),
+     * por tipo lógico. Valores explícitos em $overrides têm prioridade (chaves de negócio,
+     * situação e valores consistentes com o Payable). Retorna [coluna => valor].
+     */
+    private function seniorHeaderValues(array $overrides = []): array
+    {
+        $out = [];
+        foreach (Payable::seniorHeaderFields() as $code => $type) {
+            $col = Payable::seniorColumn($code);
+            $out[$col] = array_key_exists($code, $overrides)
+                ? $overrides[$code]
+                : $this->fakeByType($type, $code);
+        }
+
+        return $out;
+    }
+
+    /** Valor fake plausível por tipo lógico (int|string|money|rate|date). */
+    private function fakeByType(string $type, string $code): mixed
+    {
+        return match ($type) {
+            'money' => random_int(50, 50000) + random_int(0, 99) / 100,
+            'rate' => random_int(0, 1000) / 100,
+            'date' => now()->addDays(random_int(-120, 120))->toDateString(),
+            'int' => random_int(1, 9999),
+            default => strtoupper(substr($code, 0, 3)) . random_int(1, 999), // string curta
+        };
+    }
+
+    /** Cria de 1 a 5 rateios cujos perRat somam 100% (req 12.2). */
+    private function seedRateios(Payable $payable, float $amount): void
+    {
+        $n = random_int(1, 5);
+
+        // Distribui 100% em N partes inteiras que somam exatamente 100.
+        $percents = [];
+        $resto = 100;
+        for ($k = 0; $k < $n; $k++) {
+            if ($k === $n - 1) {
+                $percents[] = $resto;
+            } else {
+                $p = $resto > ($n - $k) ? random_int(1, $resto - ($n - $k - 1)) : 1;
+                $percents[] = $p;
+                $resto -= $p;
+            }
+        }
+
+        foreach ($percents as $idx => $perRat) {
+            $rateio = [];
+            foreach (PayableRateio::SENIOR_FIELDS as $code => $type) {
+                $rateio[PayableRateio::seniorColumn($code)] = $this->fakeByType($type, $code);
+            }
+            // Sobrescreve os campos coerentes.
+            $rateio['perrat'] = $perRat;
+            $rateio['percta'] = $perRat;
+            $rateio['vlrrat'] = round($amount * $perRat / 100, 2);
+            $rateio['vlrcta'] = $rateio['vlrrat'];
+            $rateio['seqrat'] = $idx + 1;
+            $payable->rateios()->create($rateio);
+        }
     }
 
     /**

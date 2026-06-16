@@ -102,6 +102,10 @@ class DemoSeeder extends Seeder
         $this->command->info('Criando faturamento comercial...');
         $this->createFaturamento();
 
+        // 7. Criar títulos a pagar (com campos Senior + rateios) — spec senior-contas-pagar-sync
+        $this->command->info('Criando títulos a pagar (Contas a Pagar)...');
+        $this->call(PayableSeeder::class);
+
         // Limpa autenticação
         auth()->logout();
 
