@@ -58,13 +58,13 @@ class Solicitacao extends Model
     public function usuarioSolicitante()
     {
         return $this->belongsTo(Funcionario::class, 'usuario_solicitante')
-            ->select(['matricula', 'nome', 'email', 'areaatuacao', 'fone']);
+            ->select(['id', 'matricula', 'nome', 'email', 'areaatuacao', 'fone']);
     }
 
     public function usuarioResponsavel()
     {
         return $this->belongsTo(Funcionario::class, 'usuario_responsavel')
-            ->select(['matricula', 'nome', 'email', 'areaatuacao', 'fone']);
+            ->select(['id', 'matricula', 'nome', 'email', 'areaatuacao', 'fone']);
     }
 
     public function filial()

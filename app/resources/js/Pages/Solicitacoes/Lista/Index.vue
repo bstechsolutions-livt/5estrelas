@@ -922,7 +922,9 @@ async function atualizaAgendamentos() {
 }
 
 function validaPermissao(perm) {
-  return props.permissoes.includes(perm)
+  const lista =
+    props.permissoes ?? page.props?.auth?.user?.permissions ?? []
+  return lista.includes("*") || lista.includes(perm)
 }
 
 async function limparFiltros() {
@@ -1561,6 +1563,7 @@ async function exportarTabela() {
           </label>
           <Select
             @change="filtro.assuntos = []"
+            dusk="filtro-departamento"
             :options="props.departamentos"
             v-model="filtro.departamento"
             option-label="condicao1"
@@ -1620,6 +1623,7 @@ async function exportarTabela() {
           />
           <Button
             label="Aplicar Filtros"
+            dusk="filtro-buscar"
             icon="pi pi-search"
             severity="info"
             outlined
@@ -2103,6 +2107,7 @@ async function exportarTabela() {
 
         <!-- Card Pendentes -->
         <div
+          dusk="card-pendentes"
           class="bg-white dark:bg-gray-900 border border-slate-400 dark:border-slate-700 rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
           :class="{
             'ring-2 ring-yellow-400 scale-[1.02]':
@@ -2128,6 +2133,7 @@ async function exportarTabela() {
 
         <!-- Card Em Atendimento -->
         <div
+          dusk="card-em-atendimento"
           class="bg-white dark:bg-gray-900 border border-slate-400 dark:border-slate-700 rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
           :class="{
             'ring-2 ring-blue-500 scale-[1.02]':

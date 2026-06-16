@@ -1632,6 +1632,7 @@ function getAvatarColor(nome) {
               </label>
               <Select
                 v-model="solicitacao.departamento"
+                dusk="nova-departamento"
                 placeholder="Selecione um departamento"
                 :options="departamentosPermitidos"
                 option-label="condicao1"
@@ -1648,6 +1649,7 @@ function getAvatarColor(nome) {
               </label>
               <Select
                 v-model="solicitacao.assunto"
+                dusk="nova-assunto"
                 placeholder="Selecione um assunto"
                 :disabled="!solicitacao.departamento"
                 :options="solicitacao.departamento.assuntos"
@@ -2443,6 +2445,7 @@ function getAvatarColor(nome) {
               <!-- Renderizar InputText quando tipo = texto (padrão) -->
               <InputText
                 v-else
+                dusk="nova-titulo"
                 placeholder="Escreva um breve resumo sobre o assunto da ticket"
                 maxlength="200"
                 v-model="solicitacao.titulo"
@@ -2475,6 +2478,7 @@ function getAvatarColor(nome) {
               </label>
               <Textarea
                 rows="8"
+                dusk="nova-descricao"
                 maxlength="4000"
                 placeholder="Informe o máximo de detalhes sobre o que você está solicitando, para que possamos entender claramente e atender sua demanda."
                 v-model="solicitacao.descricao"
@@ -3336,6 +3340,7 @@ function getAvatarColor(nome) {
         <!-- Botão Enviar -->
         <Button
           class="w-full sm:w-auto sm:mr-8 sm:mt-4"
+          dusk="nova-submit"
           @click="criarSolicitacao()"
           :label="textoBotao"
           :disabled="criandoSolicitacao"
