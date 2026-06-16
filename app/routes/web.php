@@ -292,32 +292,35 @@ Route::middleware('auth')->group(function () {
         Route::prefix('configuracoes')->name('config.')->group(function () {
             Route::get('dados', [ComercialConfigController::class, 'dados'])->name('dados');
 
-            // CCT
-            Route::post('ccts', [ComercialConfigController::class, 'storeCct'])->name('ccts.store');
-            Route::put('ccts/{id}', [ComercialConfigController::class, 'updateCct'])->name('ccts.update');
-            Route::delete('ccts/{id}', [ComercialConfigController::class, 'destroyCct'])->name('ccts.destroy');
+            // Escrita de configuração (CCT/valores/índices) — só admin (comercial.configurar)
+            Route::middleware('permission:comercial.configurar')->group(function () {
+                // CCT
+                Route::post('ccts', [ComercialConfigController::class, 'storeCct'])->name('ccts.store');
+                Route::put('ccts/{id}', [ComercialConfigController::class, 'updateCct'])->name('ccts.update');
+                Route::delete('ccts/{id}', [ComercialConfigController::class, 'destroyCct'])->name('ccts.destroy');
 
-            // Estados (cria UF com CCTs padrão)
-            Route::post('estados', [ComercialConfigController::class, 'storeEstado'])->name('estados.store');
+                // Estados (cria UF com CCTs padrão)
+                Route::post('estados', [ComercialConfigController::class, 'storeEstado'])->name('estados.store');
 
-            // Categorias
-            Route::post('categorias', [ComercialConfigController::class, 'storeCategoria'])->name('categorias.store');
-            Route::put('categorias/{id}', [ComercialConfigController::class, 'updateCategoria'])->name('categorias.update');
-            Route::delete('categorias/{id}', [ComercialConfigController::class, 'destroyCategoria'])->name('categorias.destroy');
+                // Categorias
+                Route::post('categorias', [ComercialConfigController::class, 'storeCategoria'])->name('categorias.store');
+                Route::put('categorias/{id}', [ComercialConfigController::class, 'updateCategoria'])->name('categorias.update');
+                Route::delete('categorias/{id}', [ComercialConfigController::class, 'destroyCategoria'])->name('categorias.destroy');
 
-            // Escalas
-            Route::post('escalas', [ComercialConfigController::class, 'storeEscala'])->name('escalas.store');
-            Route::put('escalas/{id}', [ComercialConfigController::class, 'updateEscala'])->name('escalas.update');
-            Route::delete('escalas/{id}', [ComercialConfigController::class, 'destroyEscala'])->name('escalas.destroy');
+                // Escalas
+                Route::post('escalas', [ComercialConfigController::class, 'storeEscala'])->name('escalas.store');
+                Route::put('escalas/{id}', [ComercialConfigController::class, 'updateEscala'])->name('escalas.update');
+                Route::delete('escalas/{id}', [ComercialConfigController::class, 'destroyEscala'])->name('escalas.destroy');
 
-            // Índices
-            Route::post('indices', [ComercialConfigController::class, 'salvarIndices'])->name('indices.salvar');
+                // Índices
+                Route::post('indices', [ComercialConfigController::class, 'salvarIndices'])->name('indices.salvar');
 
-            // Encargos (detalhamento A/B/C/D)
-            Route::post('encargos', [ComercialConfigController::class, 'salvarEncargos'])->name('encargos.salvar');
+                // Encargos (detalhamento A/B/C/D)
+                Route::post('encargos', [ComercialConfigController::class, 'salvarEncargos'])->name('encargos.salvar');
 
-            // Insumos (global)
-            Route::post('insumos', [ComercialConfigController::class, 'salvarInsumos'])->name('insumos.salvar');
+                // Insumos (global)
+                Route::post('insumos', [ComercialConfigController::class, 'salvarInsumos'])->name('insumos.salvar');
+            });
         });
 
         // Faturamento

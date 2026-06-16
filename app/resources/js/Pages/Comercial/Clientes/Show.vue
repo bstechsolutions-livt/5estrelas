@@ -3,6 +3,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayo
 import { ref, computed } from "vue"
 import { router } from "@inertiajs/vue3"
 import axios from "axios"
+import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
 import "@/../css/comercial-g360.css"
 
@@ -165,6 +166,7 @@ function voltar() {
 
 <template>
   <AuthenticatedLayout>
+    <Toast />
     <div class="g360">
       <div class="view active" id="view-cliente-detalhe">
         <!-- Cabeçalho -->
@@ -184,7 +186,7 @@ function voltar() {
           </div>
           <div style="display:flex;gap:10px">
             <button class="btn btn-ghost" @click="abrirEditar">Editar</button>
-            <button class="btn btn-gold" @click="abrirVincular">Vincular Proposta</button>
+            <button class="btn btn-gold" dusk="btn-vincular-proposta" @click="abrirVincular">Vincular Proposta</button>
           </div>
         </div>
 

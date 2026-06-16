@@ -3,6 +3,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayo
 import { ref, computed } from "vue"
 import { router } from "@inertiajs/vue3"
 import axios from "axios"
+import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
 import "@/../css/comercial-g360.css"
 
@@ -135,6 +136,7 @@ function badgeClass(situacao) {
 
 <template>
   <AuthenticatedLayout>
+    <Toast />
     <div class="g360">
       <div class="view active" id="view-clientes">
         <!-- Cabeçalho -->
@@ -143,7 +145,7 @@ function badgeClass(situacao) {
             <div class="section-title">Clientes / Contratos</div>
             <div class="section-desc">Gestão de clientes e contratos ativos — {{ kpiTotal }} no total</div>
           </div>
-          <button class="btn btn-gold" @click="abrirNovo">+ Novo Cliente</button>
+          <button class="btn btn-gold" dusk="btn-novo-cliente" @click="abrirNovo">+ Novo Cliente</button>
         </div>
 
         <!-- KPIs -->
@@ -230,7 +232,7 @@ function badgeClass(situacao) {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
               <div class="form-group" style="grid-column:span 2">
                 <label class="form-label">Nome do Cliente *</label>
-                <input type="text" class="form-input" v-model="form.nome" placeholder="Nome completo ou razão social">
+                <input type="text" class="form-input" dusk="input-cliente-nome" v-model="form.nome" placeholder="Nome completo ou razão social">
               </div>
               <div class="form-group">
                 <label class="form-label">Situação</label>
@@ -278,7 +280,7 @@ function badgeClass(situacao) {
           </div>
           <div class="g360-modal-footer">
             <button class="btn btn-ghost" @click="showModal = false">Cancelar</button>
-            <button class="btn btn-gold" :disabled="loading" @click="salvar">
+            <button class="btn btn-gold" dusk="btn-salvar-cliente" :disabled="loading" @click="salvar">
               {{ loading ? 'Salvando...' : 'Salvar' }}
             </button>
           </div>
