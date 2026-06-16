@@ -920,10 +920,94 @@ function exportarXlsx() {
     fail("Erro ao gerar a planilha. Verifique o console.")
   }
 }
+// ─── Importar Planilha (round-trip do nosso Exportar XLSX) ──────────────────────
+// Lê um arquivo gerado por esta tela (aba "Resumo" + "Identificação") e reconstrói
+// a lista de postos do resumo. Observação: o VA por posto não está na aba Resumo,
+// então é reimportado como 0 (os totais recalculam).
+function impNum(v) {
+  if (v === null || v === undefined || v === "") return 0
+  if (typeof v === "number") return v
+  const s = String(v).replace(/[R$\s]/g, "").replace(/\./g, "").replace(",", ".")
+  const n = parseFloat(s)
+  return isNaN(n) ? 0 : n
+}
+
 function importarPlanilha(ev) {
   const file = ev?.target?.files?.[0]
-  if (file) emBreve(`Importação de "${file.name}" — em breve.`)
   if (ev?.target) ev.target.value = ""
+  if (!file) return
+  if (!/\.xlsx?$/i.test(file.name)) { fail("Envie um arquivo .xlsx ou .xls"); return }
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" })
+      const wsResumo = wb.Sheets["Resumo"]
+      if (!wsResumo) {
+        fail("Planilha sem aba 'Resumo'. Use um arquivo exportado por esta tela.")
+        return
+      }
+
+      const rows = XLSX.utils.sheet_to_json(wsResumo, { header: 1, blankrows: false })
+      const novos = []
+      let seq = 1
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r] || []
+        const disc = String(row[0] ?? "").trim()
+        if (!disc || /^total geral$/i.test(disc)) continue
+        const partes = disc.split(" — ")
+        const cat = (partes.shift() || "").trim()
+        const qtdPostos = Math.max(1, parseInt(impNum(row[2])) || 1)
+        const unitVal = impNum(row[4])
+        novos.push({
+          id: seq++,
+          cat,
+          catIcone: "user",
+          escala: String(row[1] ?? "").trim(),
+          funcPosto: Math.max(1, parseInt(impNum(row[3])) || 1),
+          qtdPostos,
+          descr: partes.join(" — ").trim(),
+          unitVal,
+          totalMensal: impNum(row[5]) || unitVal * qtdPostos,
+          vaUnit: 0,
+          modelo: modelo.value,
+        })
+      }
+
+      if (!novos.length) {
+        fail("Nenhum posto encontrado na aba 'Resumo'.")
+        return
+      }
+
+      // Identificação (opcional): re-hidrata os campos do cabeçalho.
+      const wsId = wb.Sheets["Identificação"] || wb.Sheets["Identificacao"]
+      if (wsId) {
+        const map = {}
+        XLSX.utils.sheet_to_json(wsId, { header: 1, blankrows: false }).forEach((r) => {
+          if (r && r[0] != null) map[String(r[0]).trim().toLowerCase()] = r[1]
+        })
+        const g = (k) => (map[k] != null ? String(map[k]) : "")
+        if (g("cliente")) ident.cliente = g("cliente")
+        if (g("nº proposta")) ident.numProposta = g("nº proposta")
+        if (g("cct")) ident.cct = g("cct")
+        if (g("periodicidade")) ident.periodicidade = g("periodicidade")
+        if (/^\d{4}-\d{2}-\d{2}/.test(g("data"))) ident.data = g("data").slice(0, 10)
+        if (g("empresa")) {
+          const emp = empresas.find((x) => x.label === g("empresa") || x.value === g("empresa"))
+          if (emp) ident.empresa = emp.value
+        }
+        if (g("modelo")) modelo.value = /in\s*0?5/i.test(g("modelo")) ? "in05" : "5estrelas"
+      }
+
+      itens.value = novos
+      _idSeq = novos.length + 1
+      ok(`Planilha importada — ${novos.length} posto(s) no resumo`)
+    } catch (err) {
+      console.error(err)
+      fail("Erro ao ler a planilha: " + (err?.message || err))
+    }
+  }
+  reader.readAsArrayBuffer(file)
 }
 
 // ─── Carga inicial ──────────────────────────────────────────────────────────────
@@ -996,7 +1080,7 @@ function hidratarProposta(p) {
               title="Importar planilha existente para preencher a cotação">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 2h7l3 3v9H3z"/><path d="M10 2v4h3M8 7v5M6 10l2 2 2-2"/></svg>
               Importar Planilha
-              <input type="file" accept=".xlsx,.xls" style="display:none" @change="importarPlanilha">
+              <input type="file" accept=".xlsx,.xls" dusk="cot-importar" style="display:none" @change="importarPlanilha">
             </label>
             <button class="btn btn-ghost" @click="exportarXlsx()">↓ Exportar XLSX</button>
             <button class="btn btn-ghost" @click="gerarPdf()" style="display:flex;align-items:center;gap:6px">
