@@ -204,4 +204,259 @@ class ComercialPropostaTest extends TestCase
         $response->assertOk()->assertJson(['sucesso' => true]);
         $this->assertDatabaseMissing('bs_comercial_propostas', ['id' => $proposta->id]);
     }
+
+    // ─── Entrada manual (storeManual) ────────────────────────────────────────────
+
+    public function test_store_manual_cria_proposta(): void
+    {
+        $user = $this->userComPermissao();
+
+        $payload = [
+            'cliente' => 'Cliente Manual',
+            'servicos' => 'Portaria',
+            'empresa' => 'seg-df',
+            'posto' => 'PORT 12H',
+            'valor' => 7500.00,
+            'contato' => 'comercial@cliente.com',
+            'data_proposta' => '2026-06-16',
+            'situacao' => 'EM ANÁLISE',
+        ];
+
+        $response = $this->actingAs($user)->postJson('/comercial/propostas/manual', $payload);
+
+        $response->assertOk()->assertJson(['sucesso' => true]);
+
+        $this->assertDatabaseHas('bs_comercial_propostas', [
+            'cliente' => 'Cliente Manual',
+            'modelo' => 'manual',
+            'da_cotacao' => false,
+            'valor' => 7500.00,
+            'situacao' => 'EM ANÁLISE',
+            'created_by' => $user->id,
+        ]);
+    }
+
+    public function test_store_manual_gera_numero_quando_vazio(): void
+    {
+        $user = $this->userComPermissao();
+
+        $response = $this->actingAs($user)->postJson('/comercial/propostas/manual', [
+            'cliente' => 'Sem Numero',
+            'valor' => 1000.00,
+            'situacao' => 'EM ANÁLISE',
+        ]);
+
+        $response->assertOk();
+        $this->assertNotNull($response->json('numero'));
+        $this->assertStringStartsWith('Nº', $response->json('numero'));
+    }
+
+    public function test_store_manual_valida_campos_obrigatorios(): void
+    {
+        $user = $this->userComPermissao();
+
+        // Sem 'valor' (required) e sem 'situacao' (required).
+        $response = $this->actingAs($user)->postJson('/comercial/propostas/manual', [
+            'cliente' => 'Faltando Campos',
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors(['valor', 'situacao']);
+    }
+
+    public function test_store_manual_rejeita_numero_duplicado(): void
+    {
+        $user = $this->userComPermissao();
+
+        Proposta::create([
+            'numero' => 'Nº 200',
+            'modelo' => 'manual',
+            'situacao' => 'EM ANÁLISE',
+            'valor' => 100,
+            'postos' => [['id' => 1]],
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/comercial/propostas/manual', [
+            'numero' => 'Nº 200',
+            'cliente' => 'Duplicado',
+            'valor' => 500,
+            'situacao' => 'EM ANÁLISE',
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('numero');
+    }
+
+    // ─── Edição (update) ─────────────────────────────────────────────────────────
+
+    public function test_update_edita_proposta(): void
+    {
+        $user = $this->userComPermissao();
+
+        $proposta = Proposta::create([
+            'numero' => 'Nº 210',
+            'modelo' => 'manual',
+            'cliente' => 'Nome Antigo',
+            'situacao' => 'EM ANÁLISE',
+            'valor' => 1000.00,
+            'postos' => [['id' => 1]],
+        ]);
+
+        $response = $this->actingAs($user)->putJson("/comercial/propostas/{$proposta->id}", [
+            'numero' => 'Nº 210',
+            'cliente' => 'Nome Novo',
+            'servicos' => 'Limpeza',
+            'valor' => 2500.00,
+            'situacao' => 'ESTIMATIVA',
+        ]);
+
+        $response->assertOk()->assertJson(['sucesso' => true]);
+
+        $this->assertDatabaseHas('bs_comercial_propostas', [
+            'id' => $proposta->id,
+            'cliente' => 'Nome Novo',
+            'valor' => 2500.00,
+            'situacao' => 'ESTIMATIVA',
+        ]);
+    }
+
+    public function test_update_permite_manter_o_proprio_numero(): void
+    {
+        $user = $this->userComPermissao();
+
+        $proposta = Proposta::create([
+            'numero' => 'Nº 211',
+            'modelo' => 'manual',
+            'situacao' => 'EM ANÁLISE',
+            'valor' => 1000.00,
+            'postos' => [['id' => 1]],
+        ]);
+
+        // Reenvia o mesmo número (unique deve ignorar o próprio id).
+        $response = $this->actingAs($user)->putJson("/comercial/propostas/{$proposta->id}", [
+            'numero' => 'Nº 211',
+            'cliente' => 'Mesmo Numero',
+            'valor' => 1500.00,
+            'situacao' => 'EM ANÁLISE',
+        ]);
+
+        $response->assertOk()->assertJson(['sucesso' => true]);
+    }
+
+    // ─── Endpoint de dados (JSON) ──────────────────────────────────────────────────
+
+    public function test_dados_retorna_json_com_propostas(): void
+    {
+        $user = $this->userComPermissao();
+
+        Proposta::create([
+            'numero' => 'Nº 220',
+            'modelo' => 'manual',
+            'cliente' => 'Cliente JSON',
+            'situacao' => 'EM ANÁLISE',
+            'valor' => 3000.00,
+            'postos' => [['id' => 1]],
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/comercial/propostas/dados');
+
+        $response->assertOk()
+            ->assertJsonStructure(['propostas' => [['id', 'numero', 'cliente', 'situacao', 'valor']]])
+            ->assertJsonFragment(['cliente' => 'Cliente JSON']);
+    }
+
+    // ─── Permissão (403) ───────────────────────────────────────────────────────────
+
+    public function test_store_exige_permissao_cotar(): void
+    {
+        // Só visualizar — não pode salvar cotação.
+        $user = $this->userComPermissao(['comercial.visualizar']);
+
+        $response = $this->actingAs($user)->postJson('/comercial/propostas', [
+            'modelo' => 'in05',
+            'postos' => [['id' => 1, 'qtdPostos' => 1, 'totalMensal' => 100]],
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_store_manual_exige_permissao_cotar(): void
+    {
+        $user = $this->userComPermissao(['comercial.visualizar']);
+
+        $response = $this->actingAs($user)->postJson('/comercial/propostas/manual', [
+            'cliente' => 'Sem Permissao',
+            'valor' => 100,
+            'situacao' => 'EM ANÁLISE',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_update_exige_permissao_cotar(): void
+    {
+        $user = $this->userComPermissao(['comercial.visualizar']);
+
+        $proposta = Proposta::create([
+            'numero' => 'Nº 230',
+            'modelo' => 'manual',
+            'situacao' => 'EM ANÁLISE',
+            'valor' => 100,
+            'postos' => [['id' => 1]],
+        ]);
+
+        $response = $this->actingAs($user)->putJson("/comercial/propostas/{$proposta->id}", [
+            'cliente' => 'Tentativa',
+            'valor' => 200,
+            'situacao' => 'EM ANÁLISE',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_update_situacao_exige_permissao_aprovar(): void
+    {
+        // Tem cotar mas não aprovar → 403 na rota de situação.
+        $user = $this->userComPermissao(['comercial.visualizar', 'comercial.cotar']);
+
+        $proposta = Proposta::create([
+            'numero' => 'Nº 240',
+            'modelo' => 'manual',
+            'situacao' => 'EM ANÁLISE',
+            'valor' => 100,
+            'postos' => [['id' => 1]],
+        ]);
+
+        $response = $this->actingAs($user)->patchJson("/comercial/propostas/{$proposta->id}/situacao", [
+            'situacao' => 'APROVADO',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_destroy_exige_permissao_cotar(): void
+    {
+        $user = $this->userComPermissao(['comercial.visualizar']);
+
+        $proposta = Proposta::create([
+            'numero' => 'Nº 250',
+            'modelo' => 'manual',
+            'situacao' => 'EM ANÁLISE',
+            'valor' => 100,
+            'postos' => [['id' => 1]],
+        ]);
+
+        $response = $this->actingAs($user)->deleteJson("/comercial/propostas/{$proposta->id}");
+
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('bs_comercial_propostas', ['id' => $proposta->id]);
+    }
+
+    public function test_index_exige_permissao_visualizar(): void
+    {
+        // Usuário sem nenhuma permissão de comercial.
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/comercial/propostas');
+
+        $response->assertStatus(403);
+    }
 }

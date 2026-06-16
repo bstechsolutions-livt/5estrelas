@@ -17,6 +17,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayo
 import { reactive, ref, computed } from "vue"
 import { router } from "@inertiajs/vue3"
 import axios from "axios"
+import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
 import { swalConfirm } from "@/utils/globalFunctions"
 import "@/../css/comercial-g360.css"
@@ -88,6 +89,9 @@ const fmtKpi = (v) =>
 
 // ─── Situações (do protótipo) ───────────────────────────────────────────────────
 const SITUACOES = ["EM ANÁLISE", "APROVADO", "REPROVADO", "ESTIMATIVA", "REDUÇÃO"]
+// Slug estável p/ seletores Dusk (sem acento/espaço): "EM ANÁLISE" → "em-analise".
+const sitSlug = (s) =>
+  String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "-")
 const sitClass = (sit) =>
   ({
     APROVADO: "badge-green",
@@ -350,6 +354,7 @@ function exportarPropostas() {
 
 <template>
   <AuthenticatedLayout>
+    <Toast />
     <div class="g360">
       <div class="view active" id="view-propostas">
         <!-- ── Cabeçalho ── -->
@@ -359,11 +364,11 @@ function exportarPropostas() {
             <div class="section-desc">Histórico e acompanhamento de todas as propostas emitidas</div>
           </div>
           <div style="display:flex;gap:10px;align-items:center">
-            <button class="btn btn-ghost" @click="exportarPropostas()">
+            <button class="btn btn-ghost" dusk="prop-exportar" @click="exportarPropostas()">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v9M4 8l4 4 4-4"/><path d="M2 13h12"/></svg>
               Exportar
             </button>
-            <button class="btn btn-gold" @click="abrirModalProposta()">+ Nova Entrada Manual</button>
+            <button class="btn btn-gold" dusk="prop-nova" @click="abrirModalProposta()">+ Nova Entrada Manual</button>
           </div>
         </div>
 
@@ -398,8 +403,8 @@ function exportarPropostas() {
 
         <!-- ── Filtros ── -->
         <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-          <input v-model="fBusca" type="text" class="form-input" placeholder="Buscar cliente, nº proposta, serviço..." style="width:280px;max-width:100%">
-          <select v-model="fSituacao" class="form-select" style="width:160px">
+          <input v-model="fBusca" type="text" class="form-input" dusk="prop-filtro-busca" placeholder="Buscar cliente, nº proposta, serviço..." style="width:280px;max-width:100%">
+          <select v-model="fSituacao" class="form-select" dusk="prop-filtro-situacao" style="width:160px">
             <option value="">Todas as situações</option>
             <option value="EM ANÁLISE">Em Análise</option>
             <option value="APROVADO">Aprovado</option>
@@ -419,7 +424,7 @@ function exportarPropostas() {
             <option value="apoio-go">Apoio Administrativo — GO</option>
             <option value="apoio-sp">Apoio Administrativo — SP</option>
           </select>
-          <button class="btn btn-ghost" @click="limparFiltros()" style="font-size:12px">Limpar filtros</button>
+          <button class="btn btn-ghost" dusk="prop-limpar-filtros" @click="limparFiltros()" style="font-size:12px">Limpar filtros</button>
           <span style="margin-left:auto;font-size:12px;color:var(--text-muted)">
             {{ listaFiltrada.length }} de {{ props.propostas.length }} propostas
           </span>
@@ -482,13 +487,13 @@ function exportarPropostas() {
                 <td style="text-align:right;font-size:12px;color:var(--green);font-weight:600">{{ fmtVal(p.valor_aprovado) }}</td>
                 <td style="font-size:12px;white-space:nowrap">{{ fmtData(p.data_aprovacao) }}</td>
                 <td style="white-space:nowrap">
-                  <button @click="editarProposta(p)" class="prop-acao" title="Editar">
+                  <button @click="editarProposta(p)" class="prop-acao" :dusk="'prop-editar-' + p.id" title="Editar">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 2l3 3-9 9H2v-3l9-9z"/></svg>
                   </button>
-                  <button @click="alterarSituacao(p)" class="prop-acao" title="Alterar situação">
+                  <button @click="alterarSituacao(p)" class="prop-acao" :dusk="'prop-situacao-' + p.id" title="Alterar situação">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v4l2 2"/></svg>
                   </button>
-                  <button @click="excluirProposta(p)" class="prop-acao prop-acao-del" title="Excluir proposta — o número volta para a fila">
+                  <button @click="excluirProposta(p)" class="prop-acao prop-acao-del" :dusk="'prop-excluir-' + p.id" title="Excluir proposta — o número volta para a fila">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M6 4V2h4v2M5 4v9a1 1 0 001 1h4a1 1 0 001-1V4"/><path d="M7 7v4M9 7v4"/></svg>
                   </button>
                 </td>
@@ -503,16 +508,16 @@ function exportarPropostas() {
         <div class="modal" style="width:680px;max-width:94vw">
           <div class="modal-title">{{ editId ? "Editar Proposta" : "Nova Entrada de Proposta" }}</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
-            <div class="form-group"><label class="form-label">Nº Proposta</label><input v-model="form.numero" type="text" class="form-input" placeholder="Nº 132 (auto se vazio)"></div>
+            <div class="form-group"><label class="form-label">Nº Proposta</label><input v-model="form.numero" type="text" class="form-input" dusk="prop-form-numero" placeholder="Nº 132 (auto se vazio)"></div>
             <div class="form-group"><label class="form-label">Revisão</label><input v-model="form.revisao" type="text" class="form-input" placeholder="N/A ou Rev.01"></div>
-            <div class="form-group" style="grid-column:span 2"><label class="form-label">Cliente</label><input v-model="form.cliente" type="text" class="form-input"></div>
+            <div class="form-group" style="grid-column:span 2"><label class="form-label">Cliente</label><input v-model="form.cliente" type="text" class="form-input" dusk="prop-form-cliente"></div>
             <div class="form-group"><label class="form-label">Serviços</label><input v-model="form.servicos" type="text" class="form-input" placeholder="Vigilância, Portaria..."></div>
             <div class="form-group"><label class="form-label">Empresa</label>
               <select v-model="form.empresa" class="form-select">
                 <option v-for="e in GRUPO_EMPRESAS" :key="e.id" :value="e.id">{{ e.short }}</option>
               </select>
             </div>
-            <div class="form-group"><label class="form-label">Valor (R$)</label><input v-model="form.valor" type="number" step="0.01" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Valor (R$)</label><input v-model="form.valor" type="number" step="0.01" class="form-input" dusk="prop-form-valor"></div>
             <div class="form-group"><label class="form-label">Tipo de Posto</label><input v-model="form.posto" type="text" class="form-input" placeholder="VIG 24H, PORT 12H..."></div>
             <div class="form-group"><label class="form-label">Contato de Envio</label><input v-model="form.contato" type="text" class="form-input"></div>
             <div class="form-group"><label class="form-label">Data de Envio</label><input v-model="form.data_proposta" type="date" class="form-input"></div>
@@ -526,8 +531,8 @@ function exportarPropostas() {
             <div class="form-group" style="grid-column:span 2"><label class="form-label">Observação</label><input v-model="form.observacao" type="text" class="form-input"></div>
           </div>
           <div style="display:flex;gap:10px;justify-content:flex-end">
-            <button class="btn btn-ghost" @click="fecharModal()">Cancelar</button>
-            <button class="btn btn-gold" :disabled="salvando" @click="salvarProposta()">{{ salvando ? "Salvando..." : "Salvar" }}</button>
+            <button class="btn btn-ghost" dusk="prop-cancelar" @click="fecharModal()">Cancelar</button>
+            <button class="btn btn-gold" dusk="prop-salvar" :disabled="salvando" @click="salvarProposta()">{{ salvando ? "Salvando..." : "Salvar" }}</button>
           </div>
         </div>
       </div>
@@ -543,7 +548,7 @@ function exportarPropostas() {
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">
-            <button v-for="s in SITUACOES" :key="s" class="sit-opt" :class="{ atual: propostaSituacao && propostaSituacao.situacao === s }" @click="aplicarSituacao(s)">
+            <button v-for="s in SITUACOES" :key="s" class="sit-opt" :dusk="'sit-opt-' + sitSlug(s)" :class="{ atual: propostaSituacao && propostaSituacao.situacao === s }" @click="aplicarSituacao(s)">
               <span class="badge" :class="sitClass(s)">{{ s }}</span>
             </button>
           </div>
