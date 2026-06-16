@@ -7,6 +7,7 @@ use App\Models\Comercial\Categoria;
 use App\Models\Comercial\Cct;
 use App\Models\Comercial\Escala;
 use App\Models\Comercial\Indice;
+use App\Models\Comercial\Proposta;
 use App\Services\Comercial\ComposicaoCustoService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,9 +19,34 @@ use Inertia\Inertia;
  */
 class ComercialCotacaoController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return Inertia::render('Comercial/Cotacao/Index');
+        // Reabrir uma proposta na cotação (botão "Abrir na cotação" — 1:1 protótipo
+        // abrirCotacaoDaProposta). Quando veio da plataforma (da_cotacao), restaura o
+        // snapshot completo de postos; senão, pré-preenche cliente/número.
+        $propostaInicial = null;
+        if ($request->filled('proposta')) {
+            $p = Proposta::find($request->integer('proposta'));
+            if ($p) {
+                $propostaInicial = [
+                    'id' => $p->id,
+                    'numero' => $p->numero,
+                    'cliente' => $p->cliente,
+                    'empresa' => $p->empresa,
+                    'modelo' => $p->modelo,
+                    'cct' => $p->cct,
+                    'periodicidade' => $p->periodicidade,
+                    'data_proposta' => optional($p->data_proposta)->format('Y-m-d'),
+                    'postos' => $p->postos ?? [],
+                    'identificacao' => $p->identificacao ?? [],
+                    'da_cotacao' => (bool) $p->da_cotacao,
+                ];
+            }
+        }
+
+        return Inertia::render('Comercial/Cotacao/Index', [
+            'propostaInicial' => $propostaInicial,
+        ]);
     }
 
     /** Dados para os seletores da cotação. */
