@@ -89,6 +89,11 @@ const escalas = ref([])
 const categorias = ref([])
 const indices = ref({})
 
+// Proposta a reabrir (vem do controller quando a URL tem ?proposta={id}).
+const props = defineProps({
+  propostaInicial: { type: Object, default: null },
+})
+
 // ─── Identificação da proposta ──────────────────────────────────────────────────
 const empresas = [
   { value: "seg-df", label: "Segurança — Sede DF", uf: "df" },
@@ -933,11 +938,44 @@ async function carregar() {
     catSel.value = categorias.value.find((c) => /vigilante/i.test(c.nome)) || categorias.value[0] || null
     escSel.value = escalas.value.find((e) => (e.nome || "").includes("24")) || escalas.value[0] || null
     aplicar()
+
+    // Reabrir proposta existente (?proposta={id}) — restaura o resumo.
+    if (props.propostaInicial) {
+      hidratarProposta(props.propostaInicial)
+    }
   } catch (e) {
     fail("Falha ao carregar dados da cotação")
   }
 }
 onMounted(carregar)
+
+/**
+ * Re-hidrata a cotação a partir de uma proposta salva (1:1 com o snapshot do salvar):
+ * identificação + modelo + lista de postos do resumo. Postos só existem quando a
+ * proposta foi gerada na plataforma (da_cotacao); caso contrário só pré-preenche
+ * a identificação, como o abrirCotacaoDaProposta do protótipo.
+ */
+function hidratarProposta(p) {
+  const idt = p.identificacao && typeof p.identificacao === "object" ? p.identificacao : {}
+  ident.numProposta = p.numero || idt.numProposta || ident.numProposta
+  ident.cliente = p.cliente ?? idt.cliente ?? ""
+  ident.empresa = p.empresa ?? idt.empresa ?? ident.empresa
+  ident.cct = p.cct ?? idt.cct ?? ident.cct
+  ident.periodicidade = p.periodicidade ?? idt.periodicidade ?? ident.periodicidade
+  ident.data = p.data_proposta ?? idt.data ?? ident.data
+
+  if (p.modelo === "in05" || p.modelo === "5estrelas") {
+    modelo.value = p.modelo
+  }
+
+  if (Array.isArray(p.postos) && p.postos.length) {
+    itens.value = p.postos.map((x) => ({ ...x }))
+    _idSeq = Math.max(0, ...itens.value.map((i) => Number(i.id) || 0)) + 1
+    ok(`Proposta ${p.numero || ""} reaberta — ${itens.value.length} posto(s) no resumo`)
+  } else {
+    ok(`Proposta ${p.numero || ""} aberta na cotação`)
+  }
+}
 </script>
 
 
@@ -1000,7 +1038,7 @@ onMounted(carregar)
                   </div>
                   <div class="form-group" style="grid-column:span 2">
                     <label class="form-label">Cliente</label>
-                    <input type="text" class="form-input" id="cliente" v-model="ident.cliente" placeholder="Nome do cliente">
+                    <input type="text" class="form-input" id="cliente" dusk="cot-cliente" v-model="ident.cliente" placeholder="Nome do cliente">
                   </div>
                 </div>
                 <div class="form-grid-3">

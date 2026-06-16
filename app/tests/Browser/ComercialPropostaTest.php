@@ -221,6 +221,37 @@ class ComercialPropostaTest extends DuskTestCase
         $pOutro->delete();
     }
 
+    public function test_reabrir_proposta_na_cotacao(): void
+    {
+        // Proposta gerada na plataforma (da_cotacao) com snapshot de postos.
+        $proposta = $this->novaProposta([
+            'cliente' => 'Cliente Reabrir Dusk',
+            'modelo' => 'in05',
+            'da_cotacao' => true,
+            'postos' => [
+                ['id' => 1, 'cat' => 'Vigilante', 'escala' => '12x36 — Diurno', 'funcPosto' => 1,
+                    'qtdPostos' => 2, 'unitVal' => 5000, 'totalMensal' => 10000, 'vaUnit' => 300, 'modelo' => 'in05'],
+            ],
+            'identificacao' => ['cliente' => 'Cliente Reabrir Dusk', 'modelo' => 'in05'],
+        ]);
+
+        $this->browse(function (Browser $browser) use ($proposta) {
+            $browser->loginAs($this->bruno())
+                ->visit('/comercial/propostas')
+                ->waitForText('Controle de Propostas', 10)
+                ->waitForText('Cliente Reabrir Dusk', 10)
+                // Clica na linha (gerada na plataforma) → navega para a Cotação.
+                ->click('@prop-abrir-' . $proposta->id)
+                ->waitForLocation('/comercial/cotacao', 10)
+                ->waitForText('reaberta', 10)
+                // O cliente foi restaurado no formulário da cotação.
+                ->waitFor('@cot-cliente', 10)
+                ->assertInputValue('@cot-cliente', 'Cliente Reabrir Dusk');
+        });
+
+        $proposta->delete();
+    }
+
     public function test_exportar_xlsx_mostra_sucesso(): void
     {
         // Garante ao menos uma proposta na lista para a exportação ter conteúdo.

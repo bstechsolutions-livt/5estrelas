@@ -6,6 +6,7 @@ use App\Models\Comercial\Categoria;
 use App\Models\Comercial\Cct;
 use App\Models\Comercial\Escala;
 use App\Models\Comercial\Indice;
+use App\Models\Comercial\Proposta;
 use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -89,6 +90,49 @@ class ComercialCotacaoTest extends TestCase
             ->assertStatus(200)
             ->assertInertia(
                 fn (AssertableInertia $page) => $page->component('Comercial/Cotacao/Index', false)
+                    ->where('propostaInicial', null)
+            );
+    }
+
+    public function test_index_reabre_proposta_da_plataforma_restaurando_snapshot(): void
+    {
+        $proposta = Proposta::create([
+            'numero' => 'Nº 200',
+            'modelo' => 'in05',
+            'cliente' => 'Condomínio Reabrir',
+            'empresa' => 'seg-df',
+            'cct' => 'CCT Vigilância — DF',
+            'periodicidade' => 'Mensal',
+            'data_proposta' => '2026-06-16',
+            'da_cotacao' => true,
+            'postos' => [
+                ['id' => 1, 'cat' => 'Vigilante', 'escala' => '12x36 — Diurno', 'funcPosto' => 1,
+                    'qtdPostos' => 2, 'unitVal' => 5000, 'totalMensal' => 10000, 'vaUnit' => 300, 'modelo' => 'in05'],
+            ],
+            'identificacao' => ['cliente' => 'Condomínio Reabrir', 'modelo' => 'in05'],
+        ]);
+
+        $this->actingAs($this->user)
+            ->get('/comercial/cotacao?proposta=' . $proposta->id)
+            ->assertStatus(200)
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page->component('Comercial/Cotacao/Index', false)
+                    ->where('propostaInicial.id', $proposta->id)
+                    ->where('propostaInicial.cliente', 'Condomínio Reabrir')
+                    ->where('propostaInicial.modelo', 'in05')
+                    ->where('propostaInicial.da_cotacao', true)
+                    ->has('propostaInicial.postos', 1)
+            );
+    }
+
+    public function test_index_com_proposta_inexistente_ignora(): void
+    {
+        $this->actingAs($this->user)
+            ->get('/comercial/cotacao?proposta=999999')
+            ->assertStatus(200)
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page->component('Comercial/Cotacao/Index', false)
+                    ->where('propostaInicial', null)
             );
     }
 

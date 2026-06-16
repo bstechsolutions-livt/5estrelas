@@ -181,6 +181,13 @@ function recarregar() {
   router.reload({ only: ["propostas"], preserveScroll: true })
 }
 
+// Reabrir na Cotação (1:1 protótipo abrirCotacaoDaProposta). Só faz sentido para
+// propostas geradas na plataforma (têm snapshot de postos para restaurar).
+function abrirNaCotacao(p) {
+  if (!p?.da_cotacao) return
+  router.visit("/comercial/cotacao?proposta=" + p.id)
+}
+
 // ─── Modal de entrada manual / edição ────────────────────────────────────────────
 const modalAberto = ref(false)
 const editId = ref(null)
@@ -510,7 +517,11 @@ function exportarPropostas() {
               </tr>
 
               <!-- Linhas -->
-              <tr v-for="p in listaFiltrada" :key="p.id" :class="{ 'tr-da-plataforma': p.da_cotacao }">
+              <tr v-for="p in listaFiltrada" :key="p.id"
+                  :class="{ 'tr-da-plataforma': p.da_cotacao, 'tr-clicavel': p.da_cotacao }"
+                  :title="p.da_cotacao ? 'Abrir na cotação' : ''"
+                  :dusk="p.da_cotacao ? 'prop-abrir-' + p.id : null"
+                  @click="abrirNaCotacao(p)">
                 <td style="font-weight:700;white-space:nowrap">{{ p.numero || "—" }}</td>
                 <td style="color:var(--text-muted)">{{ p.revisao || "N/A" }}</td>
                 <td style="max-width:220px">
@@ -530,13 +541,13 @@ function exportarPropostas() {
                 <td style="text-align:right;font-size:12px;color:var(--green);font-weight:600">{{ fmtVal(p.valor_aprovado) }}</td>
                 <td style="font-size:12px;white-space:nowrap">{{ fmtData(p.data_aprovacao) }}</td>
                 <td style="white-space:nowrap">
-                  <button @click="editarProposta(p)" class="prop-acao" :dusk="'prop-editar-' + p.id" title="Editar">
+                  <button @click.stop="editarProposta(p)" class="prop-acao" :dusk="'prop-editar-' + p.id" title="Editar">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 2l3 3-9 9H2v-3l9-9z"/></svg>
                   </button>
-                  <button @click="alterarSituacao(p)" class="prop-acao" :dusk="'prop-situacao-' + p.id" title="Alterar situação">
+                  <button @click.stop="alterarSituacao(p)" class="prop-acao" :dusk="'prop-situacao-' + p.id" title="Alterar situação">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v4l2 2"/></svg>
                   </button>
-                  <button @click="excluirProposta(p)" class="prop-acao prop-acao-del" :dusk="'prop-excluir-' + p.id" title="Excluir proposta — o número volta para a fila">
+                  <button @click.stop="excluirProposta(p)" class="prop-acao prop-acao-del" :dusk="'prop-excluir-' + p.id" title="Excluir proposta — o número volta para a fila">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M6 4V2h4v2M5 4v9a1 1 0 001 1h4a1 1 0 001-1V4"/><path d="M7 7v4M9 7v4"/></svg>
                   </button>
                 </td>
@@ -607,6 +618,8 @@ function exportarPropostas() {
 <style scoped>
 /* Linha de proposta gerada pela plataforma (injetada dinamicamente no protótipo). */
 .g360 :deep(.tr-da-plataforma) { border-left: 3px solid var(--brand-gold) !important; }
+.g360 :deep(.tr-clicavel) { cursor: pointer; }
+.g360 :deep(.tr-clicavel:hover) { background: color-mix(in srgb, var(--app-primary) 5%, transparent); }
 .g360 .prop-acao {
   background: transparent; border: none; color: var(--text-muted);
   cursor: pointer; padding: 2px 6px; transition: color 0.15s;
