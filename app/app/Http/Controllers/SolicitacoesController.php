@@ -2774,6 +2774,7 @@ class SolicitacoesController extends Controller
             $responsavel = $request->input('agendamento.usuarioResponsavel');
             $observacao = $request->input('agendamento.observacao');
             if ($observacao && mb_strlen($observacao) > 4000) {
+                DB::rollBack();
                 return response()->json(['message' => 'A observação não pode ultrapassar 4000 caracteres.'], 422);
             }
             $solicitacoes = $request->input('solicitacoes');
@@ -2790,6 +2791,7 @@ class SolicitacoesController extends Controller
                 ->get();
 
             if (count($existeAgendamento)) {
+                DB::rollBack();
                 return response()->json(['message' => 'Há conflito de horários com agendamentos existentes para o responsável.'], 400);
             }
 
@@ -2889,6 +2891,7 @@ class SolicitacoesController extends Controller
             $solicitacao = Solicitacao::where('id', $solicitacaoId)->first();
 
             if (! $solicitacao) {
+                DB::rollBack();
                 return response()->json(['message' => 'Solicitação não encontrada.'], 404);
             }
 
@@ -2974,6 +2977,7 @@ class SolicitacoesController extends Controller
                 ->first();
 
             if (! $lembrete) {
+                DB::rollBack();
                 return response()->json(['message' => 'Lembrete não encontrado.'], 404);
             }
 
@@ -3038,6 +3042,7 @@ class SolicitacoesController extends Controller
                 ->first();
 
             if (! $lembrete) {
+                DB::rollBack();
                 return response()->json(['message' => 'Lembrete não encontrado.'], 404);
             }
 
