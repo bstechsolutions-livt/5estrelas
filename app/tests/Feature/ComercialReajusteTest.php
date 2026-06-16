@@ -120,4 +120,74 @@ class ComercialReajusteTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user)->get('/comercial/reajustes')->assertStatus(403);
     }
+
+    public function test_store_cria_reajuste_calculado(): void
+    {
+        $user = $this->userComPermissao();
+
+        $response = $this->actingAs($user)->postJson('/comercial/reajustes', [
+            'cliente_nome' => 'Cliente Novo',
+            'empresa' => 'apoio-df',
+            'pct' => 10,
+            'valor_atual' => 1000,
+        ]);
+
+        $response->assertOk()->assertJson(['sucesso' => true]);
+        $this->assertDatabaseHas('bs_comercial_reajustes', [
+            'cliente_nome' => 'Cliente Novo',
+            'status' => 'calculado',
+            'pct' => 10,
+            'valor_atual' => 1000,
+            'impacto_mensal' => 100, // 10% de 1000
+        ]);
+    }
+
+    public function test_store_valida_campos(): void
+    {
+        $user = $this->userComPermissao();
+        $this->actingAs($user)->postJson('/comercial/reajustes', ['empresa' => 'x'])
+            ->assertStatus(422)->assertJsonValidationErrors(['cliente_nome', 'pct', 'valor_atual']);
+    }
+
+    public function test_store_exige_permissao_cotar(): void
+    {
+        $user = $this->userComPermissao(['comercial.visualizar']);
+        $this->actingAs($user)->postJson('/comercial/reajustes', [
+            'cliente_nome' => 'X', 'pct' => 5, 'valor_atual' => 100,
+        ])->assertStatus(403);
+    }
+
+    public function test_update_recalcula_itens_e_totais(): void
+    {
+        $user = $this->userComPermissao();
+        $r = $this->novoReajuste(['valor_atual' => 0, 'impacto_mensal' => 0, 'itens' => []]);
+
+        $response = $this->actingAs($user)->putJson("/comercial/reajustes/{$r->id}", [
+            'tipo' => 'manual',
+            'pct' => 8,
+            'itens' => [
+                ['nome' => 'Portaria', 'valorAtual' => 1000, 'pct' => 8, 'selecionado' => true],
+                ['nome' => 'Limpeza', 'valorAtual' => 500, 'pct' => 10, 'selecionado' => false], // não soma
+            ],
+        ]);
+
+        $response->assertOk()->assertJson(['sucesso' => true]);
+
+        $r->refresh();
+        // Só o item selecionado entra nos totais: atual=1000, impacto=80.
+        $this->assertEquals(1000.0, (float) $r->valor_atual);
+        $this->assertEquals(80.0, (float) $r->impacto_mensal);
+        // O novoValor/variação são recalculados no backend.
+        $this->assertEquals(1080.0, (float) $r->itens[0]['novoValor']);
+        $this->assertEquals(80.0, (float) $r->itens[0]['variacao']);
+    }
+
+    public function test_update_exige_permissao_cotar(): void
+    {
+        $user = $this->userComPermissao(['comercial.visualizar']);
+        $r = $this->novoReajuste();
+        $this->actingAs($user)->putJson("/comercial/reajustes/{$r->id}", [
+            'itens' => [['nome' => 'x', 'valorAtual' => 100, 'pct' => 5]],
+        ])->assertStatus(403);
+    }
 }
