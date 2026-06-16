@@ -28,6 +28,7 @@ use App\Http\Controllers\Comercial\ComercialCotacaoController;
 use App\Http\Controllers\Comercial\ComercialFaturamentoController;
 use App\Http\Controllers\Comercial\ComercialPropostaController;
 use App\Http\Controllers\Comercial\ComercialReajusteController;
+use App\Http\Controllers\Comercial\ComercialSaudeController;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 
@@ -347,6 +348,13 @@ Route::middleware('auth')->group(function () {
         Route::put('reajustes/{id}', [ComercialReajusteController::class, 'update'])->middleware('permission:comercial.cotar')->name('reajustes.update');
         Route::patch('reajustes/{id}/status', [ComercialReajusteController::class, 'updateStatus'])->middleware('permission:comercial.aprovar')->name('reajustes.status');
         Route::delete('reajustes/{id}', [ComercialReajusteController::class, 'destroy'])->middleware('permission:comercial.cotar')->name('reajustes.destroy');
+
+        // Saúde Contratual
+        Route::get('saude', [ComercialSaudeController::class, 'index'])->name('saude');
+        Route::get('saude/{clienteId}/dados', [ComercialSaudeController::class, 'dados'])->name('saude.dados');
+        Route::post('saude/{clienteId}/lancamento', [ComercialSaudeController::class, 'storeLancamento'])->middleware('permission:comercial.cotar')->name('saude.lancamento.store');
+        Route::delete('saude/{clienteId}/lancamento/{lancId}', [ComercialSaudeController::class, 'destroyLancamento'])->middleware('permission:comercial.cotar')->name('saude.lancamento.destroy');
+        Route::post('saude/{clienteId}/metas', [ComercialSaudeController::class, 'storeMetas'])->middleware('permission:comercial.configurar')->name('saude.metas');
     });
 
     // ═══════════════════════════════════════════════════════════════
