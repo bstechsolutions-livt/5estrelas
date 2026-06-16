@@ -1,0 +1,1131 @@
+[
+  {
+    "_id": 323152630,
+    "nome": "BINATURAL",
+    "empresa": "apoio-go",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 19875.05,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 19875.05
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1498008650,
+    "nome": "CAF",
+    "empresa": "apoio-df",
+    "servicos": "Assistente Administrativo, Copa e Recepção, Limpeza",
+    "status": "ativo",
+    "valor": 51797.61,
+    "colab": 0,
+    "postos_qtd": 3,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Copa e Recepção",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 18646.18
+      },
+      {
+        "tipo": "Assistente Administrativo",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 17550.75
+      },
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 15600.68
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 936015691,
+    "nome": "SESI",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza, Portaria",
+    "status": "ativo",
+    "valor": 807298.09,
+    "colab": 0,
+    "postos_qtd": 2,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 354991.94
+      },
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 452306.15
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1221123773,
+    "nome": "SENAI",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza, Portaria",
+    "status": "ativo",
+    "valor": 436591.58,
+    "colab": 0,
+    "postos_qtd": 2,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 228637.2
+      },
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 207954.38
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1189626501,
+    "nome": "4BOSS",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 7203.41,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 7203.41
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 967340216,
+    "nome": "ARENA BSB",
+    "empresa": "apoio-df",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 37849.12,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 37849.12
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1305742586,
+    "nome": "CONSTRUTORA FONSECA & MARCADANTE - PKS - DF",
+    "empresa": "apoio-df",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 12059.32,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 12059.32
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 861724738,
+    "nome": "DFPLAZA APART",
+    "empresa": "apoio-df",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 143861.3,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 143861.3
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 2020821360,
+    "nome": "DFPLAZA GERAL",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 171152.57,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 171152.57
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1932576292,
+    "nome": "DFPLAZA OFFICE",
+    "empresa": "apoio-df",
+    "servicos": "Portaria e Recepção",
+    "status": "ativo",
+    "valor": 93031.7,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria e Recepção",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 93031.7
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1034196471,
+    "nome": "EMBAIXADA DA RUANDA",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 11457.66,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 11457.66
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1841216261,
+    "nome": "EMBAIXADA DO EQUADOR",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 6743.07,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 6743.07
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 370427363,
+    "nome": "EMBAIXADA DO IRAQUE",
+    "empresa": "apoio-df",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 28664.4,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 28664.4
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 2108468451,
+    "nome": "FONPLATA",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 6934.01,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 6934.01
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 989110750,
+    "nome": "IDP ASA NORTE",
+    "empresa": "apoio-df",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 50442.76,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 50442.76
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 151880602,
+    "nome": "IDP ASA SUL",
+    "empresa": "apoio-df",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 47210.21,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 47210.21
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1222188387,
+    "nome": "IGUATEMI",
+    "empresa": "apoio-df",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 102641.91,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 102641.91
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 783812658,
+    "nome": "MIRANTE INC",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 31531.6,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 31531.6
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 22598994,
+    "nome": "NDB - DF",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 7708.59,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 7708.59
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 331942830,
+    "nome": "PARKSHOPPING",
+    "empresa": "apoio-df",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 192955.66,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 192955.66
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1771743384,
+    "nome": "PARKSHOPPING CORPORATE",
+    "empresa": "apoio-df",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 30769.87,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 30769.87
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 2140841141,
+    "nome": "PONTÃO LAGO SUL",
+    "empresa": "apoio-df",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 31294.05,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 31294.05
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 138323683,
+    "nome": "SESI CN",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 81416.75,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 81416.75
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 659006593,
+    "nome": "ROBERTO SIMONSEN",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 448154.84,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 448154.84
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 922989061,
+    "nome": "ARMANDO NETO",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza e Portaria",
+    "status": "ativo",
+    "valor": 132586.88,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza e Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 132586.88
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1165601558,
+    "nome": "SESILAB",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza, Portaria",
+    "status": "ativo",
+    "valor": 223621.62,
+    "colab": 0,
+    "postos_qtd": 2,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 36710.28
+      },
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 186911.34
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1113104431,
+    "nome": "INSTITUTO SESI",
+    "empresa": "apoio-df",
+    "servicos": "Limpeza, Portaria",
+    "status": "ativo",
+    "valor": 64574.03,
+    "colab": 0,
+    "postos_qtd": 2,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 51297.71
+      },
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 13276.32
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1638540329,
+    "nome": "VIA ESTRUTURAL",
+    "empresa": "apoio-df",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 25573.38,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 25573.38
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 781608256,
+    "nome": "SESI/DN - ROBERTO SIMONSEN",
+    "empresa": "apoio-df",
+    "servicos": "Manobrista",
+    "status": "ativo",
+    "valor": 7213.69,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Manobrista",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 7213.69
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1225588553,
+    "nome": "BIOSCIE",
+    "empresa": "apoio-go",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 18685.64,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 18685.64
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 2004104134,
+    "nome": "BOM DIA ACESSÓRIOS",
+    "empresa": "apoio-go",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 7639.59,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 7639.59
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1056623209,
+    "nome": "FRACTAL CENTRO DE EDUCAÇÃO CIDADE JARDIM - GO",
+    "empresa": "apoio-go",
+    "servicos": "Vigia",
+    "status": "ativo",
+    "valor": 5117.11,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Vigia",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 5117.11
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1186383584,
+    "nome": "FRACTAL CENTRO DE EDUCAÇÃO SUDOESTE - GO",
+    "empresa": "apoio-go",
+    "servicos": "Vigia",
+    "status": "ativo",
+    "valor": 5117.11,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Vigia",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 5117.11
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1297427680,
+    "nome": "GCE S.A - FACULDADE SENAC - GO",
+    "empresa": "apoio-go",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 14618.54,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 14618.54
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1032517488,
+    "nome": "GCE S.A CONSTRUTORA",
+    "empresa": "apoio-go",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 14633.13,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 14633.13
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1653317695,
+    "nome": "GRUPO BELA ARTE GO",
+    "empresa": "apoio-go",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 5482.13,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 5482.13
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1698122872,
+    "nome": "LAS DO BRASIL",
+    "empresa": "apoio-go",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 6769.64,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 6769.64
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1896425298,
+    "nome": "MILLS",
+    "empresa": "apoio-go",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 5804.19,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 5804.19
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 780547680,
+    "nome": "SÃO JORGE PORTARIA 1 MAIO 16 - GO",
+    "empresa": "apoio-go",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 12982.1,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 12982.1
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 1794571124,
+    "nome": "SOCIAL DISTRIBUIDORA GO",
+    "empresa": "apoio-go",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 20323.92,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 20323.92
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 248069999,
+    "nome": "SUPERMERCADO TATICO",
+    "empresa": "apoio-go",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 149223.04,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 149223.04
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 198258723,
+    "nome": "TSE ENERGIA E AUTOMAÇÃO - GO",
+    "empresa": "apoio-go",
+    "servicos": "Limpeza, Portaria",
+    "status": "ativo",
+    "valor": 32253.52,
+    "colab": 0,
+    "postos_qtd": 2,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 13858.14
+      },
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 18395.38
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 5183,
+    "nome": "JARDINS CAPRI",
+    "empresa": "apoio-go",
+    "servicos": "Portaria",
+    "status": "ativo",
+    "valor": 38746.04,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Portaria",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 38746.04
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 955266319,
+    "nome": "TERRAS APLHA RES 2 - GO",
+    "empresa": "apoio-go",
+    "servicos": "Limpeza",
+    "status": "ativo",
+    "valor": 39615.49,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Limpeza",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 39615.49
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  },
+  {
+    "_id": 75142233,
+    "nome": "CAF - SP",
+    "empresa": "apoio-sp",
+    "servicos": "Recepção",
+    "status": "ativo",
+    "valor": 7226.67,
+    "colab": 0,
+    "postos_qtd": 1,
+    "obs": "",
+    "propostas": [],
+    "postos": [
+      {
+        "tipo": "Recepção",
+        "escala": "Mensal",
+        "qtd": 1,
+        "colab": 0,
+        "valor": 7226.67
+      }
+    ],
+    "inicio": "",
+    "reajuste": "",
+    "contato": ""
+  }
+]
