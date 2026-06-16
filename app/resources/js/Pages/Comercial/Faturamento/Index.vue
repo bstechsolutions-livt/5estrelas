@@ -180,6 +180,37 @@ function abrirNovoLocal() {
   showNovoLocal.value = true
 }
 
+// ─── Exportar Excel (mesmo formato do Importar — round-trip) ─
+// Aba "Faturamento": Local + 12 meses + Total, uma linha por local + linha TOTAL.
+function exportarExcel() {
+  const ano = anoAtivo.value === "comp" ? 2026 : anoAtivo.value
+  const locais = faturamento.value[ano]?.locais || []
+  if (!locais.length) { fail("Nenhum local para exportar neste ano"); return }
+
+  try {
+    const header = ["Local", ...MESES_LABEL, "Total"]
+    const rows = locais.map((l) => {
+      const vals = MESES.map((m) => Number(l[m] || 0))
+      return [l.local_nome, ...vals, vals.reduce((s, v) => s + v, 0)]
+    })
+    const totMeses = MESES.map((m) => locais.reduce((s, l) => s + (Number(l[m]) || 0), 0))
+    const totRow = ["TOTAL", ...totMeses, totMeses.reduce((s, v) => s + v, 0)]
+
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows, totRow])
+    ws["!cols"] = [{ wch: 28 }, ...MESES.map(() => ({ wch: 12 })), { wch: 14 }]
+    XLSX.utils.book_append_sheet(wb, ws, "Faturamento")
+
+    const dataStr = new Date().toISOString().slice(0, 10).replace(/-/g, "")
+    const filename = `Faturamento_${ano}_${dataStr}.xlsx`
+    XLSX.writeFile(wb, filename)
+    ok(`Planilha "${filename}" exportada (${locais.length} locais)`)
+  } catch (e) {
+    console.error(e)
+    fail("Erro ao gerar a planilha")
+  }
+}
+
 // ─── Importar Excel ─────────────────────────────────────────
 // Formato esperado: 1ª coluna = nome do Local, colunas 2..13 = meses (Jan..Dez).
 // Linha de cabeçalho opcional (detectada quando a 1ª célula não é o nome de um local
@@ -351,6 +382,12 @@ const anoAtual = new Date().getFullYear()
               Importar Excel
               <input type="file" accept=".xlsx,.xls" dusk="fat-importar" style="display:none" @change="importarExcel">
             </label>
+
+            <!-- Exportar Excel -->
+            <button @click="exportarExcel" dusk="fat-exportar" class="btn btn-ghost" style="font-size:12px;display:flex;align-items:center;gap:5px;white-space:nowrap">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v9M4 8l4 4 4-4"/><path d="M2 13h12"/></svg>
+              Exportar Excel
+            </button>
 
             <!-- Adicionar local -->
             <button @click="abrirNovoLocal" dusk="btn-adicionar-local" class="btn btn-ghost" style="font-size:12px;display:flex;align-items:center;gap:5px;white-space:nowrap">
