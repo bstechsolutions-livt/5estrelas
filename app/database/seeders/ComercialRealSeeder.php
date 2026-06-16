@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Comercial\Cliente;
 use App\Models\Comercial\Faturamento;
 use App\Models\Comercial\Proposta;
+use App\Models\Comercial\Reajuste;
 use Illuminate\Database\Seeder;
 
 /**
@@ -22,6 +23,7 @@ class ComercialRealSeeder extends Seeder
         $this->seedClientes();
         $this->seedPropostas();
         $this->seedFaturamento();
+        $this->seedReajustes();
     }
 
     private function readJson(string $arquivo): array
@@ -131,5 +133,37 @@ class ComercialRealSeeder extends Seeder
         }
 
         $this->command?->info("✅ {$total} linhas de faturamento real importadas (2025 + 2026).");
+    }
+
+    /** Reajustes reais por cliente (SEED_REAJUSTES). Linka cliente_id pelo nome. */
+    private function seedReajustes(): void
+    {
+        $reajustes = $this->readJson('reajustes_seed.json');
+        // Cache nome→id de clientes para linkar.
+        $clientesPorNome = Cliente::pluck('id', 'nome');
+
+        foreach ($reajustes as $r) {
+            Reajuste::updateOrCreate(
+                ['origem_id' => $r['_id'] ?? null],
+                [
+                    'cliente_id' => $clientesPorNome[$r['cliente'] ?? null] ?? null,
+                    'cliente_nome' => $r['cliente'] ?? '—',
+                    'empresa' => $r['empresa'] ?? null,
+                    'tipo' => $r['tipo'] ?? 'manual',
+                    'pct' => round((float) ($r['pct'] ?? 0), 2),
+                    'data_ref' => ! empty($r['dataRef']) ? $r['dataRef'] : null,
+                    'competencia' => $r['competencia'] ?? null,
+                    'obs' => $r['obs'] ?? null,
+                    'status' => $r['status'] ?? 'pendente',
+                    'valor_atual' => round((float) ($r['valorAtual'] ?? 0), 2),
+                    'impacto_mensal' => round((float) ($r['impactoMensal'] ?? 0), 2),
+                    'data_criacao' => ! empty($r['dataCriacao']) ? $r['dataCriacao'] : null,
+                    'historico' => $r['historico'] ?? [],
+                    'itens' => $r['itens'] ?? [],
+                ],
+            );
+        }
+
+        $this->command?->info('✅ ' . count($reajustes) . ' reajustes reais importados.');
     }
 }

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Comercial\Cliente;
 use App\Models\Comercial\Faturamento;
 use App\Models\Comercial\Proposta;
+use App\Models\Comercial\Reajuste;
 use Database\Seeders\ComercialRealSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -65,6 +66,22 @@ class ComercialRealSeederTest extends TestCase
         $this->assertEquals(12889327.50, (float) $matriz->setembro); // mapeado de 'set'
     }
 
+    public function test_semeia_reajustes_reais(): void
+    {
+        $this->seed(ComercialRealSeeder::class);
+
+        $this->assertEquals(45, Reajuste::count());
+
+        // Reajuste conhecido (BINATURAL, 6%, aprovado) linkado ao cliente.
+        $binatural = Reajuste::where('cliente_nome', 'BINATURAL')->first();
+        $this->assertNotNull($binatural);
+        $this->assertEquals('aprovado', $binatural->status);
+        $this->assertEquals(6.0, (float) $binatural->pct);
+        $this->assertNotNull($binatural->cliente_id); // linkado por nome
+        $this->assertIsArray($binatural->itens);
+        $this->assertNotEmpty($binatural->itens);
+    }
+
     public function test_seeder_e_idempotente(): void
     {
         $this->seed(ComercialRealSeeder::class);
@@ -74,5 +91,6 @@ class ComercialRealSeederTest extends TestCase
         $this->assertEquals(32, Proposta::count());
         $this->assertEquals(45, Cliente::count());
         $this->assertEquals(36, Faturamento::count());
+        $this->assertEquals(45, Reajuste::count());
     }
 }

@@ -56,15 +56,18 @@ function extractObjectAfter(src, marker) {
 const outDir = __dirname
 const histLit = extractArrayLiteral(html, 'HISTORICO_INICIAL')
 const cliLit = extractArrayLiteral(html, 'SEED_CLIENTES')
+const rajLit = extractArrayLiteral(html, 'SEED_REAJUSTES')
 const fatLit = extractObjectAfter(html, 'const seed =')
 
 const historico = toJson(histLit)
 const clientes = toJson(cliLit)
+const reajustes = toJson(rajLit)
 const faturamento = toJson(fatLit)
 
 fs.writeFileSync(path.join(outDir, 'propostas_historico.json'), JSON.stringify(historico, null, 2))
 fs.writeFileSync(path.join(outDir, 'clientes_seed.json'), JSON.stringify(clientes, null, 2))
+fs.writeFileSync(path.join(outDir, 'reajustes_seed.json'), JSON.stringify(reajustes, null, 2))
 fs.writeFileSync(path.join(outDir, 'faturamento_seed.json'), JSON.stringify(faturamento, null, 2))
 
 const fatLocais = (faturamento['2025']?.locais?.length || 0) + (faturamento['2026']?.locais?.length || 0)
-console.log('propostas:', historico.length, '| clientes:', clientes.length, '| fat locais(25+26):', fatLocais)
+console.log('propostas:', historico.length, '| clientes:', clientes.length, '| reajustes:', reajustes.length, '| fat locais(25+26):', fatLocais)

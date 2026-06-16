@@ -29,6 +29,7 @@ class MenuCatalog
             ['key' => 'comercial_cotacao', 'label' => 'Nova Cotação', 'icon' => 'pi pi-calculator', 'href' => '/comercial/cotacao', 'permission' => 'comercial.cotar', 'group' => 'Comercial'],
             ['key' => 'comercial_propostas', 'label' => 'Propostas', 'icon' => 'pi pi-file-edit', 'href' => '/comercial/propostas', 'permission' => 'comercial.cotar', 'group' => 'Comercial'],
             ['key' => 'comercial_clientes', 'label' => 'Clientes', 'icon' => 'pi pi-briefcase', 'href' => '/comercial/clientes', 'permission' => 'comercial.cotar', 'group' => 'Comercial'],
+            ['key' => 'comercial_reajustes', 'label' => 'Reajustes', 'icon' => 'pi pi-percentage', 'href' => '/comercial/reajustes', 'permission' => 'comercial.cotar', 'group' => 'Comercial'],
             ['key' => 'comercial_faturamento', 'label' => 'Faturamento', 'icon' => 'pi pi-chart-bar', 'href' => '/comercial/faturamento', 'permission' => 'comercial.cotar', 'group' => 'Comercial'],
             ['key' => 'comercial_config', 'label' => 'Valores', 'icon' => 'pi pi-dollar', 'href' => '/comercial/configuracoes', 'permission' => 'comercial.configurar', 'group' => 'Comercial'],
 
