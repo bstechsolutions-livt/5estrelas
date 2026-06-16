@@ -41,8 +41,24 @@ const kpiColaboradores = computed(() => props.cliente.total_colaboradores || 0)
 const kpiPostos = computed(() => props.cliente.total_postos || 0)
 const kpiPropostas = computed(() => (props.propostas || []).length)
 
-// ─── Postos ativos (derivados das propostas aprovadas) ──────
+// ─── Postos ativos ────────────────────────────────────────────
+// Preferência: postos reais cadastrados no cliente (JSON); fallback: derivar das
+// propostas aprovadas vinculadas (formato do snapshot da Cotação).
 const postosAtivos = computed(() => {
+  // Fonte 1: postos cadastrados no cliente (vindos do JSON real do protótipo).
+  const cadastrados = props.cliente.postos
+  if (Array.isArray(cadastrados) && cadastrados.length > 0) {
+    return cadastrados.map((p) => ({
+      tipo: p.tipo || "—",
+      escala: p.escala || "—",
+      qtd: p.qtd || 1,
+      colab: p.colab || 0,
+      valor: p.valor || 0,
+      proposta: null,
+    }))
+  }
+
+  // Fonte 2 (fallback): derivar de propostas aprovadas vinculadas.
   const postos = []
   for (const p of (props.propostas || [])) {
     if (p.situacao === "APROVADO" && Array.isArray(p.postos)) {
@@ -330,13 +346,13 @@ function voltar() {
                   <div v-for="(p, i) in postosAtivos" :key="i" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--brand-border-soft)">
                     <div style="flex:1;min-width:0">
                       <div style="font-size:12px;font-weight:600;color:var(--text-primary)">{{ p.tipo }}</div>
-                      <div style="font-size:10px;color:var(--text-muted)">{{ p.escala }} · {{ p.qtd }} posto(s) · {{ p.colab }} func. · {{ p.proposta }}</div>
+                      <div style="font-size:10px;color:var(--text-muted)">{{ p.escala }} · {{ p.qtd }} posto(s) · {{ p.colab }} func.{{ p.proposta ? ' · ' + p.proposta : '' }}</div>
                     </div>
                     <div style="font-size:12px;font-weight:700;color:var(--brand-gold);white-space:nowrap">{{ fmt(p.valor) }}</div>
                   </div>
                 </template>
                 <div v-else style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px">
-                  Postos aparecem aqui quando propostas aprovadas são vinculadas
+                  Nenhum posto cadastrado
                 </div>
               </div>
             </div>
