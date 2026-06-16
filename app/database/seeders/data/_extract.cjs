@@ -33,14 +33,38 @@ function toJson(literal) {
   return Function('"use strict"; return (' + literal + ')')()
 }
 
+function extractObjectAfter(src, marker) {
+  const idx = src.indexOf(marker)
+  if (idx === -1) throw new Error('marcador não encontrado: ' + marker)
+  const start = src.indexOf('{', idx)
+  let depth = 0, inStr = false, q = '', esc = false
+  for (let i = start; i < src.length; i++) {
+    const c = src[i]
+    if (inStr) {
+      if (esc) esc = false
+      else if (c === '\\') esc = true
+      else if (c === q) inStr = false
+      continue
+    }
+    if (c === '"' || c === "'") { inStr = true; q = c; continue }
+    if (c === '{') depth++
+    else if (c === '}') { depth--; if (depth === 0) return src.slice(start, i + 1) }
+  }
+  throw new Error('objeto não fechado para ' + marker)
+}
+
 const outDir = __dirname
 const histLit = extractArrayLiteral(html, 'HISTORICO_INICIAL')
 const cliLit = extractArrayLiteral(html, 'SEED_CLIENTES')
+const fatLit = extractObjectAfter(html, 'const seed =')
 
 const historico = toJson(histLit)
 const clientes = toJson(cliLit)
+const faturamento = toJson(fatLit)
 
 fs.writeFileSync(path.join(outDir, 'propostas_historico.json'), JSON.stringify(historico, null, 2))
 fs.writeFileSync(path.join(outDir, 'clientes_seed.json'), JSON.stringify(clientes, null, 2))
+fs.writeFileSync(path.join(outDir, 'faturamento_seed.json'), JSON.stringify(faturamento, null, 2))
 
-console.log('propostas:', historico.length, '| clientes:', clientes.length)
+const fatLocais = (faturamento['2025']?.locais?.length || 0) + (faturamento['2026']?.locais?.length || 0)
+console.log('propostas:', historico.length, '| clientes:', clientes.length, '| fat locais(25+26):', fatLocais)

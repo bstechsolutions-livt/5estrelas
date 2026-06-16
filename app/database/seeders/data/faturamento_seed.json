@@ -1,0 +1,340 @@
+{
+  "2025": {
+    "locais": [
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - MATRIZ + EMBAIXADAS",
+        "jan": 10267008.12,
+        "fev": 9359850.14,
+        "mar": 14042216.68,
+        "abr": 12235552.97,
+        "mai": 11920335.17,
+        "jun": 13173516.59,
+        "jul": 11069418.2,
+        "ago": 12588182.52,
+        "set": 12889327.5,
+        "out": 12478037.3,
+        "nov": 13673172.55,
+        "dez": 12589585.64
+      },
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - ARABIA",
+        "jan": 250424,
+        "fev": 250424,
+        "mar": 250424,
+        "abr": 250424,
+        "mai": 250424,
+        "jun": 250424,
+        "jul": 250424,
+        "ago": 250424,
+        "set": 250424,
+        "out": 250424,
+        "nov": 250424,
+        "dez": 250424
+      },
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - FILIAL GO",
+        "jan": 1641605.97,
+        "fev": 1845513.1,
+        "mar": 2212334,
+        "abr": 1444480.36,
+        "mai": 2038555,
+        "jun": 1880419.22,
+        "jul": 1655057.12,
+        "ago": 2041743.99,
+        "set": 1966256.06,
+        "out": 1858827.7,
+        "nov": 2113279.23,
+        "dez": 2320926.33
+      },
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - FILIAL MT",
+        "jan": 869521.23,
+        "fev": 837298.5,
+        "mar": 1311500.12,
+        "abr": 627371.56,
+        "mai": 1549631.5,
+        "jun": 862003.72,
+        "jul": 823421.19,
+        "ago": 993821.58,
+        "set": 1048049.46,
+        "out": 1335465.04,
+        "nov": 796457.15,
+        "dez": 1461844.06
+      },
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - FILIAL MG",
+        "jan": 80389.66,
+        "fev": 80388.66,
+        "mar": 376120.83,
+        "abr": 506426.42,
+        "mai": 140164.65,
+        "jun": 113604.54,
+        "jul": 125552.43,
+        "ago": 264847.45,
+        "set": 159134.07,
+        "out": 297904.17,
+        "nov": 373950.82,
+        "dez": 306081.82
+      },
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - FILIAL SP",
+        "jan": 133025.3,
+        "mar": 150277.93,
+        "abr": 118291.55,
+        "mai": 351799.62,
+        "jun": 299097,
+        "jul": 84334.79,
+        "ago": 28712.54,
+        "set": 168111.48,
+        "out": 99561.34,
+        "nov": 183009.79,
+        "dez": 372323.99
+      },
+      {
+        "nome": "5 ESTRELAS SERVIÇOS DE APOIO - DF",
+        "jan": 2806368.3,
+        "fev": 3428248.46,
+        "mar": 3235383.74,
+        "abr": 3173387,
+        "mai": 3897422.51,
+        "jun": 3947104.95,
+        "jul": 3661914.4,
+        "ago": 3432721.59,
+        "set": 2286338.05,
+        "out": 4229403.35,
+        "nov": 3185846.19,
+        "dez": 3217292.04
+      },
+      {
+        "nome": "5 ESTRELAS SERVIÇOS DE APOIO - GO",
+        "jan": 239587.75,
+        "fev": 148311.91,
+        "mar": 311306.97,
+        "abr": 252005.59,
+        "mai": 334448.67,
+        "jun": 326240.99,
+        "jul": 367882.37,
+        "ago": 363751,
+        "set": 321248.05,
+        "out": 354616.09,
+        "nov": 340395.82,
+        "dez": 312322.4
+      },
+      {
+        "nome": "5 ESTRELAS SERVIÇOS DE APOIO - MT",
+        "jan": 6296.82,
+        "fev": 5957.37,
+        "mar": 5575.82,
+        "abr": 5575.82,
+        "mai": 16717.98,
+        "jun": 11335.38,
+        "jul": 5328.18,
+        "ago": 5328.18,
+        "set": 5328.18,
+        "nov": 10656.36,
+        "dez": 5328.18
+      },
+      {
+        "nome": "5 ESTRELAS SERVIÇOS DE APOIO - MG",
+        "jan": 24646.42,
+        "mar": 18488.66,
+        "abr": 64103.27,
+        "mai": 28395.4,
+        "jun": 28395.4,
+        "jul": 28395.4,
+        "ago": 28395.4,
+        "set": 28395.4,
+        "out": 28395.4,
+        "nov": 28395.4,
+        "dez": 56790.8
+      },
+      {
+        "nome": "5 ESTRELAS SERVIÇOS DE APOIO - SP",
+        "jan": 228029.9,
+        "fev": 229290.64,
+        "mar": 227740.54,
+        "abr": 230390.81,
+        "mai": 5853.52,
+        "jun": 478948.32,
+        "jul": 7426.47,
+        "ago": 17661.83,
+        "set": 58477.28,
+        "out": 28443.67,
+        "nov": 48835.6,
+        "dez": 114038.94
+      },
+      {
+        "nome": "SS SERVIÇOS - SS",
+        "jan": 281721.65,
+        "fev": 535761.77,
+        "mar": 330272.73,
+        "abr": 568292.05,
+        "mai": 430389.51,
+        "jun": 426808.82,
+        "jul": 341801.81,
+        "ago": 430525.7,
+        "set": 406807.29,
+        "out": 945728.2,
+        "nov": 854470.24,
+        "dez": 1603436.99
+      },
+      {
+        "nome": "MULT SEGURANÇA ELETRONICA",
+        "jan": 220862.31,
+        "fev": 223995.04,
+        "mar": 231475.6,
+        "abr": 224308.3,
+        "mai": 260673.48,
+        "jun": 237342.81,
+        "jul": 239809.53,
+        "ago": 239726.61,
+        "set": 272230.23,
+        "out": 243183.05,
+        "nov": 241041.72,
+        "dez": 241105.24
+      },
+      {
+        "nome": "MULT SEGURANÇA ELETRONICA - DEFENSORIA",
+        "jan": 124110.31,
+        "fev": 120567.7,
+        "mar": 120381.24,
+        "abr": 120381.24,
+        "mai": 120381.24,
+        "jun": 120381.24,
+        "jul": 120381.24,
+        "ago": 120381.24,
+        "set": 120381.24,
+        "out": 120381.24,
+        "nov": 120381.24,
+        "dez": 120381.24
+      },
+      {
+        "nome": "MULT HMCA"
+      },
+      {
+        "nome": "STAR SEGURANÇA ELETRONICA",
+        "jan": 114436.69,
+        "fev": 134363.71,
+        "mar": 256518.93,
+        "abr": 195441.32,
+        "mai": 366122.86,
+        "jun": 368249.18,
+        "jul": 677470.66,
+        "ago": 692991.67,
+        "set": 439866.51,
+        "out": 681413.96,
+        "nov": 854443.36,
+        "dez": 445247.15
+      },
+      {
+        "nome": "CONSTRUTORA - LRB",
+        "fev": 126000,
+        "mar": 63000
+      },
+      {
+        "nome": "BALUARTE SERVIÇOS DE EVENTOS",
+        "jan": 57161.96,
+        "fev": 87503.08,
+        "mar": 42414.33,
+        "abr": 131546.37,
+        "mai": 154084.28,
+        "jun": 111093.74,
+        "jul": 149708.78,
+        "ago": 63232.01,
+        "set": 75559.94,
+        "out": 282040.71,
+        "nov": 79458.23,
+        "dez": 58987.22
+      }
+    ]
+  },
+  "2026": {
+    "locais": [
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - MATRIZ + EMBAIXADAS",
+        "jan": 12998459.58,
+        "fev": 14254876.75
+      },
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - ARABIA",
+        "jan": 250424,
+        "fev": 250424
+      },
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - FILIAL GO",
+        "jan": 1781531.22,
+        "fev": 2028244.47
+      },
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - FILIAL MT",
+        "jan": 1007550.75,
+        "fev": 927192.48
+      },
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - FILIAL MG",
+        "jan": 152837.81,
+        "fev": 73202.04
+      },
+      {
+        "nome": "5 ESTRELAS SEGURANÇA - FILIAL SP",
+        "jan": 221302.66,
+        "fev": 157017.3
+      },
+      {
+        "nome": "5 ESTRELAS SERVIÇOS DE APOIO - DF",
+        "jan": 1450785.91,
+        "fev": 4192792.66
+      },
+      {
+        "nome": "5 ESTRELAS SERVIÇOS DE APOIO - GO",
+        "jan": 138337.58,
+        "fev": 364227.67
+      },
+      {
+        "nome": "5 ESTRELAS SERVIÇOS DE APOIO - MT",
+        "jan": 3358.51,
+        "fev": 10656.36
+      },
+      {
+        "nome": "5 ESTRELAS SERVIÇOS DE APOIO - MG",
+        "fev": 28395.4
+      },
+      {
+        "nome": "5 ESTRELAS SERVIÇOS DE APOIO - SP",
+        "jan": 5950.36,
+        "fev": 47988.65
+      },
+      {
+        "nome": "SS SERVIÇOS - SS",
+        "jan": 1087334.22,
+        "fev": 1881844.02
+      },
+      {
+        "nome": "MULT SEGURANÇA ELETRONICA",
+        "jan": 245433.92,
+        "fev": 242081.1
+      },
+      {
+        "nome": "MULT SEGURANÇA ELETRONICA - DEFENSORIA",
+        "jan": 120381.84,
+        "fev": 120381.84
+      },
+      {
+        "nome": "MULT HMCA"
+      },
+      {
+        "nome": "STAR SEGURANÇA ELETRONICA",
+        "jan": 631485.65,
+        "fev": 502939.05
+      },
+      {
+        "nome": "CONSTRUTORA - LRB"
+      },
+      {
+        "nome": "BALUARTE SERVIÇOS DE EVENTOS",
+        "jan": 103150.06,
+        "fev": 66784.09
+      }
+    ]
+  }
+}
