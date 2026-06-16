@@ -5,6 +5,8 @@ namespace Tests\Browser;
 use App\Models\Comercial\Faturamento;
 use App\Models\User;
 use Laravel\Dusk\Browser;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use Tests\DuskTestCase;
 
 /**
@@ -89,5 +91,49 @@ class ComercialFaturamentoTest extends DuskTestCase
                 ->waitForText('FATURAMENTO MENSAL — 2025 VS 2026', 5)
                 ->assertSee('FATURAMENTO MENSAL — 2025 VS 2026');
         });
+    }
+
+    public function test_importar_excel_preenche_e_salva(): void
+    {
+        $nome = 'Local Import Fat ' . uniqid();
+        Faturamento::where('local_nome', 'like', 'Local Import Fat%')->delete();
+
+        // Fixture: cabeçalho Local + 12 meses, uma linha de dados.
+        $path = storage_path('app/dusk_faturamento_import.xlsx');
+        $ss = new Spreadsheet();
+        $sheet = $ss->getActiveSheet();
+        $sheet->fromArray([
+            ['Local', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+            [$nome, 1000, 2000, 0, 0, 0, 0, 0, 0, 5000, 0, 0, 0],
+        ], null, 'A1');
+        (new XlsxWriter($ss))->save($path);
+
+        try {
+            $this->browse(function (Browser $browser) use ($nome, $path) {
+                $browser->loginAs($this->bruno())
+                    ->visit('/comercial/faturamento')
+                    ->waitForText('Faturamento', 10)
+                    // Ano ativo = 2025 por padrão.
+                    ->attach('@fat-importar', $path)
+                    ->waitForText('Importado para 2025', 10)
+                    // A linha importada aparece na tabela.
+                    ->waitForText($nome, 10)
+                    // Aguarda o toast sumir (sobrepõe o botão Salvar no canto).
+                    ->pause(2800)
+                    // Salva e confirma persistência.
+                    ->click('@btn-salvar')
+                    ->waitForText('Faturamento salvo', 10);
+            });
+
+            $this->assertDatabaseHas('bs_comercial_faturamento', [
+                'ano' => 2025,
+                'local_nome' => $nome,
+                'jan' => 1000,
+                'setembro' => 5000,
+            ]);
+        } finally {
+            @unlink($path);
+            Faturamento::where('local_nome', $nome)->delete();
+        }
     }
 }
