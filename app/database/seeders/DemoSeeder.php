@@ -90,13 +90,10 @@ class DemoSeeder extends Seeder
 
         $this->createInteractions($allPosts, $allUsers);
 
-        // 4. Criar propostas comerciais (snapshot de cotações)
-        $this->command->info('Criando propostas comerciais...');
-        $this->createPropostas($admin ?? User::first());
-
-        // 5. Criar clientes comerciais e vincular propostas
-        $this->command->info('Criando clientes comerciais...');
-        $this->createClientes($admin ?? User::first());
+        // 4 + 5. Propostas e clientes comerciais — MASSA REAL do protótipo
+        // (HISTORICO_INICIAL Nº 100–131 + SEED_CLIENTES). Substitui os fakes aleatórios.
+        $this->command->info('Importando propostas e clientes reais do Comercial...');
+        $this->call(ComercialRealSeeder::class);
 
         // 6. Criar faturamento comercial (2025 e 2026)
         $this->command->info('Criando faturamento comercial...');
