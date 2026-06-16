@@ -5,6 +5,8 @@ namespace Tests\Browser;
 use App\Models\Comercial\Proposta;
 use App\Models\User;
 use Laravel\Dusk\Browser;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use Tests\DuskTestCase;
 
 /**
@@ -162,5 +164,49 @@ class ComercialCotacaoTest extends DuskTestCase
         ]);
 
         Proposta::where('cliente', $cliente)->delete();
+    }
+
+    public function test_importar_planilha_reconstroi_resumo(): void
+    {
+        // Gera um fixture .xlsx no formato do nosso Exportar (abas Identificação + Resumo).
+        $path = storage_path('app/dusk_cotacao_import.xlsx');
+        $ss = new Spreadsheet();
+
+        $ident = $ss->getActiveSheet();
+        $ident->setTitle('Identificação');
+        $ident->fromArray([
+            ['Campo', 'Valor'],
+            ['Nº Proposta', 'Nº 321'],
+            ['Cliente', 'Cliente Import Dusk'],
+            ['Empresa', 'Segurança — Sede DF'],
+            ['Data', '2026-06-16'],
+            ['CCT', 'CCT Teste'],
+            ['Modelo', 'Modelo IN 05'],
+            ['Periodicidade', 'Mensal'],
+        ], null, 'A1');
+
+        $resumo = $ss->createSheet();
+        $resumo->setTitle('Resumo');
+        $resumo->fromArray([
+            ['Discriminação', 'Escala', 'Qtd Postos', 'Func/Posto', 'Custo Unitário', 'Total Mensal'],
+            ['Vigilante — Posto Importado', '12x36 — Diurno', 2, 1, 5000, 10000],
+            ['TOTAL GERAL', '', 2, 2, '', 10000],
+        ], null, 'A1');
+
+        (new XlsxWriter($ss))->save($path);
+
+        try {
+            $this->browse(function (Browser $browser) use ($path) {
+                $browser->loginAs($this->bruno())
+                    ->visit('/comercial/cotacao')
+                    ->waitForText('Nova Cotação de Custos', 10)
+                    ->attach('@cot-importar', $path)
+                    ->waitForText('importada', 10)
+                    // Identificação re-hidratada a partir da planilha.
+                    ->assertInputValue('@cot-cliente', 'Cliente Import Dusk');
+            });
+        } finally {
+            @unlink($path);
+        }
     }
 }
