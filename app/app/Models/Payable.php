@@ -11,20 +11,124 @@ class Payable extends Model
 {
     use Auditable;
 
+    /**
+     * Campos de WORKFLOW interno do 5estrelas. NÃO são sobrescritos pela
+     * sincronização com a Senior (ver Payables_Sync / requirement 4 e 8).
+     */
+    public const WORKFLOW_FIELDS = [
+        'status', 'prepared_by', 'approved_by', 'sent_for_approval_at',
+        'approved_at', 'rejection_reason', 'bordero_id',
+    ];
+
+    /**
+     * Campos de cabeçalho da Senior (ConsultarTitulosAbertosCP v3 — Apêndice A.2),
+     * agrupados por categoria semântica. Reutilizado pela migration, pelo
+     * Payable_Mapper, pelo DemoSeeder e pelo agrupamento do Payable_Details_View.
+     *
+     * Chave = código Senior (camelCase). Valor = tipo lógico:
+     *   int | string | money | rate | date.
+     * A coluna no banco é o código em minúsculas (ver seniorColumn()).
+     */
+    public const SENIOR_FIELD_GROUPS = [
+        'identificacao' => [
+            'codEmp' => 'int', 'codFil' => 'int', 'numTit' => 'string', 'codTpt' => 'string',
+            'codFor' => 'int', 'codTns' => 'string', 'codNtg' => 'int', 'docIdeFav' => 'string',
+            'codDfs' => 'int', 'codFrj' => 'string', 'cpgSub' => 'string', 'gerTep' => 'string',
+            'seqCgt' => 'int', 'seqImo' => 'int', 'tipEfe' => 'string',
+        ],
+        'valores' => [
+            'sitTit' => 'string', 'vlrOri' => 'money', 'vlrAbe' => 'money', 'vlrDsc' => 'money',
+            'codMoe' => 'string', 'codFpg' => 'int', 'codMpt' => 'string',
+        ],
+        'datas' => [
+            'datEmi' => 'date', 'datEnt' => 'date', 'vctOri' => 'date', 'vctPro' => 'date',
+            'datPpt' => 'date', 'ultPgt' => 'date', 'datDsc' => 'date',
+        ],
+        'juros_descontos' => [
+            'perDsc' => 'int', 'tolDsc' => 'int', 'antDsc' => 'string', 'perJrs' => 'int',
+            'jrsDia' => 'rate', 'tipJrs' => 'string', 'tolJrs' => 'int', 'proJrs' => 'string',
+            'perMul' => 'int', 'tolMul' => 'int', 'datNeg' => 'date', 'jrsNeg' => 'money',
+            'mulNeg' => 'money', 'dscNeg' => 'money', 'outNeg' => 'money',
+        ],
+        'conta_centro_custo' => [
+            'ctaFin' => 'int', 'ctaRed' => 'int', 'codCcu' => 'string', 'numPrj' => 'int',
+            'codFpj' => 'int', 'codPor' => 'string', 'codCrt' => 'string', 'filCcr' => 'int',
+            'numCcr' => 'int',
+        ],
+        'origem_fiscal' => [
+            'filNfc' => 'int', 'numNfc' => 'int', 'forNfc' => 'int', 'snfNfc' => 'string',
+            'filCtr' => 'int', 'numCtr' => 'int', 'ctrFre' => 'int', 'ctrNre' => 'int',
+            'filNff' => 'int', 'numNff' => 'int', 'forNff' => 'int', 'filNfv' => 'int',
+            'numNfv' => 'int', 'snfNfv' => 'string', 'filOcp' => 'int', 'numOcp' => 'int',
+            'ocpFre' => 'int', 'ocpNre' => 'int', 'obsTcp' => 'string',
+        ],
+    ];
+
+    /** Coluna no banco para um código Senior (codEmp -> codemp). */
+    public static function seniorColumn(string $code): string
+    {
+        return strtolower($code);
+    }
+
+    /** Lista plana [codigoSenior => tipo] de todos os campos de cabeçalho. */
+    public static function seniorHeaderFields(): array
+    {
+        return array_merge(...array_values(self::SENIOR_FIELD_GROUPS));
+    }
+
+    /** Lista de colunas (snake/lower) de origem Senior no banco. */
+    public static function seniorColumns(): array
+    {
+        return array_map(
+            fn (string $code) => self::seniorColumn($code),
+            array_keys(self::seniorHeaderFields()),
+        );
+    }
+
     protected $fillable = [
         'title_number', 'supplier_name', 'supplier_cnpj', 'amount',
         'due_date', 'issue_date', 'description', 'category', 'status',
         'branch_id', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'senior_id',
+        'senior_situacao_original', 'senior_missing_at', 'senior_raw',
+        'senior_synced_at',
     ];
 
-    protected $casts = [
-        'amount' => 'decimal:2',
-        'due_date' => 'date',
-        'issue_date' => 'date',
-        'sent_for_approval_at' => 'datetime',
-        'approved_at' => 'datetime',
-    ];
+    /**
+     * As colunas de origem Senior (Apêndice A.2) são adicionadas ao fillable
+     * dinamicamente em getFillable() a partir de seniorColumns().
+     */
+    public function getFillable()
+    {
+        return array_values(array_unique(array_merge(parent::getFillable(), self::seniorColumns())));
+    }
+
+    protected function casts(): array
+    {
+        $casts = [
+            'amount' => 'decimal:2',
+            'due_date' => 'date',
+            'issue_date' => 'date',
+            'sent_for_approval_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'senior_missing_at' => 'datetime',
+            'senior_synced_at' => 'datetime',
+            'senior_raw' => 'array',
+        ];
+
+        foreach (self::seniorHeaderFields() as $code => $type) {
+            $col = self::seniorColumn($code);
+            $casts[$col] = match ($type) {
+                'money' => 'decimal:2',
+                'rate' => 'decimal:6',
+                'date' => 'date',
+                'int' => 'integer',
+                default => 'string',
+            };
+        }
+
+        return $casts;
+    }
 
     protected string $auditableModule = 'financeiro.contas_pagar';
     protected string $auditableEventPrefix = 'contas_pagar';
@@ -87,5 +191,16 @@ class Payable extends Model
     public function comments(): HasMany
     {
         return $this->hasMany(PayableComment::class)->orderBy('created_at');
+    }
+
+    public function rateios(): HasMany
+    {
+        return $this->hasMany(PayableRateio::class);
+    }
+
+    /** Título existe localmente mas não consta mais na Senior (baixado/excluído). */
+    public function isMissingInSenior(): bool
+    {
+        return $this->senior_missing_at !== null;
     }
 }
