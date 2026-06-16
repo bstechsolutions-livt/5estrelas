@@ -2,6 +2,7 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayout.vue"
 import { onMounted, ref, computed, nextTick } from "vue"
 import axios from "axios"
+import * as XLSX from "xlsx"
 import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
 import "@/../css/comercial-g360.css"
@@ -179,6 +180,88 @@ function abrirNovoLocal() {
   showNovoLocal.value = true
 }
 
+// ─── Importar Excel ─────────────────────────────────────────
+// Formato esperado: 1ª coluna = nome do Local, colunas 2..13 = meses (Jan..Dez).
+// Linha de cabeçalho opcional (detectada quando a 1ª célula não é o nome de um local
+// numérico). Importa para o ano ativo (comp → 2026), mesclando por nome do local; o
+// usuário revisa e clica em Salvar para persistir.
+function impNum(v) {
+  if (v === null || v === undefined || v === "") return 0
+  if (typeof v === "number") return v
+  const s = String(v).replace(/[R$\s]/g, "").replace(/\./g, "").replace(",", ".")
+  const n = parseFloat(s)
+  return isNaN(n) ? 0 : n
+}
+
+function importarExcel(ev) {
+  const file = ev?.target?.files?.[0]
+  if (ev?.target) ev.target.value = ""
+  if (!file) return
+  if (!/\.xlsx?$/i.test(file.name)) { fail("Envie um arquivo .xlsx ou .xls"); return }
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      if (!ws) { fail("Planilha vazia"); return }
+
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false })
+      if (!rows.length) { fail("Planilha sem dados"); return }
+
+      // Detecta cabeçalho: 1ª célula "Local" ou a coluna de mês (col 1) não-numérica.
+      let start = 0
+      const first = rows[0] || []
+      const c0 = String(first[0] ?? "").trim().toLowerCase()
+      const col1 = first[1]
+      const col1Numerica = col1 !== undefined && col1 !== "" &&
+        !(typeof col1 === "string" && /[a-z]/i.test(col1)) && !isNaN(impNum(col1))
+      if (c0 === "local" || !col1Numerica) {
+        start = 1
+      }
+
+      const ano = anoAtivo.value === "comp" ? 2026 : anoAtivo.value
+      if (!faturamento.value[ano]) faturamento.value[ano] = { locais: [] }
+      const arr = faturamento.value[ano].locais
+
+      let novos = 0
+      let atualizados = 0
+      for (let r = start; r < rows.length; r++) {
+        const row = rows[r] || []
+        const nome = String(row[0] ?? "").trim()
+        if (!nome || /^total$/i.test(nome)) continue
+
+        const vals = MESES.map((m, i) => impNum(row[i + 1]))
+        const total = vals.reduce((s, v) => s + v, 0)
+        const existente = arr.find((l) => (l.local_nome || "").toLowerCase() === nome.toLowerCase())
+
+        if (existente) {
+          MESES.forEach((m, i) => { existente[m] = vals[i] })
+          existente.total = total
+          atualizados++
+        } else {
+          const linha = { id: null, local_nome: nome, cliente_id: null }
+          MESES.forEach((m, i) => { linha[m] = vals[i] })
+          linha.total = total
+          arr.push(linha)
+          novos++
+        }
+      }
+
+      if (novos + atualizados === 0) {
+        fail("Nenhum local válido encontrado na planilha")
+        return
+      }
+
+      ok(`Importado para ${ano}: ${novos} novo(s), ${atualizados} atualizado(s) — clique em Salvar`)
+    } catch (err) {
+      console.error(err)
+      fail("Erro ao ler a planilha: " + (err?.message || err))
+    }
+  }
+  reader.readAsArrayBuffer(file)
+}
+
 async function criarLocal() {
   if (!novoLocalNome.value.trim()) return
   const ano = anoAtivo.value === 'comp' ? 2026 : anoAtivo.value
@@ -262,11 +345,11 @@ const anoAtual = new Date().getFullYear()
               >{{ a === 'comp' ? 'Comparativo' : a }}</button>
             </div>
 
-            <!-- Importar Excel (stub) -->
+            <!-- Importar Excel -->
             <label style="display:flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--brand-border-soft);border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-secondary);font-family:inherit;white-space:nowrap">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 2h7l3 3v9H3z"/><path d="M8 7v5M6 10l2 2 2-2"/></svg>
               Importar Excel
-              <input type="file" accept=".xlsx,.xls" style="display:none">
+              <input type="file" accept=".xlsx,.xls" dusk="fat-importar" style="display:none" @change="importarExcel">
             </label>
 
             <!-- Adicionar local -->
