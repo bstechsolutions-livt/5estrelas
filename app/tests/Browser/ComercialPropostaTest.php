@@ -221,14 +221,20 @@ class ComercialPropostaTest extends DuskTestCase
         $pOutro->delete();
     }
 
-    public function test_exportar_mostra_em_breve(): void
+    public function test_exportar_xlsx_mostra_sucesso(): void
     {
+        // Garante ao menos uma proposta na lista para a exportação ter conteúdo.
+        $proposta = $this->novaProposta(['cliente' => 'Cliente Export Dusk']);
+
         $this->browse(function (Browser $browser) {
             $browser->loginAs($this->bruno())
                 ->visit('/comercial/propostas')
                 ->waitForText('Controle de Propostas', 10)
+                ->waitForText('Cliente Export Dusk', 10)
                 ->click('@prop-exportar')
-                ->waitForText('em breve', 5);
+                ->waitForText('exportada', 5);
         });
+
+        $proposta->delete();
     }
 }

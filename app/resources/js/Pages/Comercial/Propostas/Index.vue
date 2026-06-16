@@ -10,8 +10,8 @@
 // Mutações (entrada manual, edição, mudança de situação, exclusão) batem nas rotas
 // REST do controller e recarregam a lista via router.reload({ only: ['propostas'] }).
 //
-// Fora de escopo desta fatia (deixados como TODO): reabrir a proposta na Cotação e
-// exportação real para XLSX/PDF (botão "Exportar" exibe toast "em breve").
+// Fora de escopo desta fatia (deixado como TODO): reabrir a proposta na Cotação.
+// Exportar a lista filtrada para XLSX já está implementado (exportarPropostas).
 // ─────────────────────────────────────────────────────────────────────────────
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayout.vue"
 import { reactive, ref, computed } from "vue"
@@ -19,6 +19,7 @@ import { router } from "@inertiajs/vue3"
 import axios from "axios"
 import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
+import * as XLSX from "xlsx"
 import { swalConfirm } from "@/utils/globalFunctions"
 import "@/../css/comercial-g360.css"
 
@@ -33,7 +34,6 @@ const toast = useToast()
 const ok = (m) => toast.add({ severity: "success", summary: "Pronto", detail: m, life: 2500 })
 const warn = (m) => toast.add({ severity: "warn", summary: "Atenção", detail: m, life: 3000 })
 const fail = (m) => toast.add({ severity: "error", summary: "Erro", detail: m, life: 4000 })
-const emBreve = (m) => toast.add({ severity: "info", summary: "Em breve", detail: m, life: 2800 })
 
 // ─── Estrutura do Grupo 5 Estrelas (do protótipo) ──────────────────────────────
 const GRUPO_EMPRESAS = [
@@ -345,9 +345,52 @@ async function excluirProposta(p) {
   }
 }
 
-// ─── Stubs (fora de escopo desta fatia) ───────────────────────────────────────────
+// ─── Exportar XLSX (lista filtrada) ───────────────────────────────────────────
 function exportarPropostas() {
-  emBreve("Exportação para XLSX — em breve.")
+  const lista = listaFiltrada.value
+  if (!lista.length) {
+    warn("Nenhuma proposta para exportar com os filtros atuais")
+    return
+  }
+
+  try {
+    const header = [
+      "Nº", "Revisão", "Cliente", "Serviços", "Empresa", "Posto", "Valor (R$)",
+      "Contato", "Envio", "Situação", "Vl. Aprovado (R$)", "Dt. Aprovação",
+    ]
+
+    const rows = lista.map((p) => [
+      p.numero || "",
+      p.revisao || "N/A",
+      p.cliente || "",
+      p.servicos || "",
+      getEmpresa(p.empresa).short,
+      p.posto || "",
+      p.valor != null ? Number(p.valor) : "",
+      p.contato || "",
+      p.data_proposta ? fmtData(p.data_proposta) : "",
+      p.situacao || "EM ANÁLISE",
+      p.valor_aprovado != null ? Number(p.valor_aprovado) : "",
+      p.data_aprovacao ? fmtData(p.data_aprovacao) : "",
+    ])
+
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
+    ws["!cols"] = [
+      { wch: 10 }, { wch: 8 }, { wch: 30 }, { wch: 24 }, { wch: 24 }, { wch: 14 },
+      { wch: 14 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
+    ]
+    XLSX.utils.book_append_sheet(wb, ws, "Propostas")
+
+    const dataStr = new Date().toISOString().slice(0, 10).replace(/-/g, "")
+    const filename = `Propostas_${dataStr}.xlsx`
+    XLSX.writeFile(wb, filename)
+
+    ok(`Planilha "${filename}" exportada (${lista.length} proposta${lista.length !== 1 ? "s" : ""})`)
+  } catch (e) {
+    console.error("Erro ao exportar XLSX:", e)
+    fail("Erro ao gerar a planilha. Verifique o console.")
+  }
 }
 // TODO: reabrir uma proposta existente na tela de Cotação (clicar na linha).
 </script>
