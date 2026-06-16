@@ -40,13 +40,13 @@ Teste de browser real (Chrome) que **aperta cada botão**. Para CADA tela:
 
 ## Cobertura pendente (dívida a quitar)
 
-### Comercial — estado atual (atualizado v1.7.0)
+### Comercial — estado atual (atualizado v1.7.1)
 - **Cotação**: feature ✓ (`ComercialCotacaoTest`) + Dusk ✓. COMPLETO.
 - **Valores/Configurações**: feature ✓ (`ComercialConfigTest`) + Dusk ✓. COMPLETO.
 - **Clientes**: feature ✓ + Dusk ✓. COMPLETO.
 - **Faturamento**: feature ✓ + Dusk ✓. COMPLETO.
-- **Propostas**: feature ✓ + Dusk básico (2 cenários). DÍVIDA: expandir Dusk pra cobrir cada ação (entrada manual, editar, alterar situação aprovar/reprovar, excluir).
+- **Propostas**: feature ✓ (20 casos: CRUD + storeManual + update + 403 de cada rota) + Dusk ✓ (8 cenários, cada ação clicando). COMPLETO.
 
-Resultado da suíte Comercial em v1.7.0: 67 feature passed (281 asserts) + 22 Dusk passed.
+Resultado da suíte em v1.7.1: **80 feature passed (315 asserts) + 28 Dusk passed**.
 
-Quitar a dívida restante (Dusk de Propostas) quando tocar nessa tela.
+Módulo Comercial 100% coberto (feature + Dusk em todas as telas). Dívida quitada.
