@@ -80,3 +80,18 @@ Boas práticas:
 - Distribuir datas no tempo (não tudo "agora")
 - Variação de status (ativo/inativo, com/sem foto, etc)
 - Relacionamentos em rede (todo mundo curte/comenta em todo mundo, não só cadeias lineares)
+
+## Pesquisa de padrão de mercado (regra permanente)
+
+Antes de implementar qualquer coisa nova (integração, biblioteca, padrão de arquitetura, componente de UI, abordagem de job/cron, etc), SEMPRE pesquisar na internet a melhor maneira / padrão atual de mercado de fazer aquilo. O objetivo é manter o nível profissional e atualizado, evitando soluções caseiras quando já existe um padrão consolidado. Citar/considerar a fonte ao decidir.
+
+## Testes automatizados — OBRIGATÓRIO em toda entrega (regra reforçada pelo Bruno)
+
+NENHUMA tela/feature é considerada concluída sem teste automatizado cobrindo TUDO. O Bruno não vai testar manualmente — a cobertura é responsabilidade do agente.
+
+Para CADA feature/tela nova ou alterada, criar e RODAR (passando) antes de deployar:
+- **Backend (Feature/Unit test)**: cobrir CADA rota/endpoint do controller (index, store, update, destroy, e ações específicas tipo salvar/vincular/mudar-status), incluindo casos de validação (422) e permissão.
+- **Frontend (Dusk)**: cobrir o carregamento da tela e CADA ação/botão principal (criar, editar, excluir, salvar, filtrar, trocar aba, abrir modal, etc.) — clicando de verdade no browser.
+- Rodar `php artisan test` (filtrando a feature) e `php artisan dusk` antes de dar a entrega como pronta. Reportar o resultado (X passed).
+- Se a suíte tiver problema de ambiente (ex.: SQLite vs Postgres), corrigir o que for do nosso código e validar via Postgres/tinker, deixando os testes coerentes.
+- Deploy só depois dos testes verdes.

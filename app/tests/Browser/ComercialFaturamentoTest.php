@@ -52,8 +52,10 @@ class ComercialFaturamentoTest extends DuskTestCase
                 ->visit('/comercial/faturamento')
                 ->waitForText('Faturamento', 10)
                 // Abre o modal "Adicionar Local"
+                ->waitFor('@btn-adicionar-local', 10)
                 ->click('@btn-adicionar-local')
                 ->waitForText('Adicionar Local', 5)
+                ->waitFor('@input-novo-local', 5)
                 ->type('@input-novo-local', $nome)
                 ->press('Adicionar')
                 // A linha nova aparece na tabela
