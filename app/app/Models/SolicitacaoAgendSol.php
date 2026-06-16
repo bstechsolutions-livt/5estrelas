@@ -15,4 +15,21 @@ class SolicitacaoAgendSol extends Model
         'solicitacao_id',
         'agendamento_id'
     ];
+
+    /**
+     * Agendamento vinculado (usado, p.ex., por cancelarLembrete para checar
+     * se há outros agendamentos ativos da mesma solicitação).
+     */
+    public function agendamento()
+    {
+        return $this->belongsTo(SolicitacaoAgendamento::class, 'agendamento_id', 'id');
+    }
+
+    /**
+     * Solicitação vinculada.
+     */
+    public function solicitacao()
+    {
+        return $this->belongsTo(Solicitacao::class, 'solicitacao_id', 'id');
+    }
 }
