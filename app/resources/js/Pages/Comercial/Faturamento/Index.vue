@@ -2,6 +2,7 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayout.vue"
 import { onMounted, ref, computed, nextTick } from "vue"
 import axios from "axios"
+import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
 import "@/../css/comercial-g360.css"
 
@@ -234,6 +235,7 @@ const anoAtual = new Date().getFullYear()
 
 <template>
   <AuthenticatedLayout>
+    <Toast />
     <div class="g360">
       <div class="view active" id="view-faturamento">
         <!-- Header -->
@@ -248,6 +250,7 @@ const anoAtual = new Date().getFullYear()
               <button
                 v-for="a in [2025, 2026, 'comp']" :key="a"
                 @click="selecionarAno(a)"
+                :dusk="'tab-' + a"
                 :style="{
                   padding: '5px 14px', border: 'none', borderRadius: '6px',
                   fontFamily: 'inherit', fontSize: '12px', cursor: 'pointer', transition: '.15s',
@@ -267,13 +270,13 @@ const anoAtual = new Date().getFullYear()
             </label>
 
             <!-- Adicionar local -->
-            <button @click="abrirNovoLocal" class="btn btn-ghost" style="font-size:12px;display:flex;align-items:center;gap:5px;white-space:nowrap">
+            <button @click="abrirNovoLocal" dusk="btn-adicionar-local" class="btn btn-ghost" style="font-size:12px;display:flex;align-items:center;gap:5px;white-space:nowrap">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg>
               Adicionar local
             </button>
 
             <!-- Salvar -->
-            <button @click="salvar" class="btn btn-gold" style="font-size:12px" :disabled="salvando">
+            <button @click="salvar" dusk="btn-salvar" class="btn btn-gold" style="font-size:12px" :disabled="salvando">
               {{ salvando ? 'Salvando...' : 'Salvar' }}
             </button>
           </div>
@@ -432,7 +435,7 @@ const anoAtual = new Date().getFullYear()
           <div class="g360-modal-body">
             <div class="form-group">
               <label class="form-label">Nome do local / contrato</label>
-              <input class="form-input" type="text" v-model="novoLocalNome" placeholder="Ex: Hospital São Lucas — Vigilância" @keyup.enter="criarLocal">
+              <input class="form-input" type="text" dusk="input-novo-local" v-model="novoLocalNome" placeholder="Ex: Hospital São Lucas — Vigilância" @keyup.enter="criarLocal">
             </div>
           </div>
           <div class="g360-modal-footer">
