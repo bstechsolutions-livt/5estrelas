@@ -2203,7 +2203,9 @@ function getIconeMovimentacao(tipo, movimentacao = null) {
 }
 
 function validaPermissao(perm) {
-  return props.permissoes.includes(perm)
+  const lista =
+    props.permissoes ?? page.props?.auth?.user?.permissions ?? []
+  return lista.includes("*") || lista.includes(perm)
 }
 
 async function verificarBranchExistente() {
@@ -3357,6 +3359,7 @@ async function novoAgendamento() {
 
           <!-- Aba Comentários -->
           <button
+            dusk="ticket-tab-comentarios"
             @click="trocarAba('acompanhar')"
             class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-300"
             :class="
@@ -3679,6 +3682,7 @@ async function novoAgendamento() {
             >
               <Button
                 @click="iniciarAtendimento()"
+                dusk="ticket-atender"
                 label="Atender"
                 icon="pi pi-play"
                 class="w-full !h-10 !rounded-xl !bg-gradient-to-r !from-indigo-500 !to-blue-600 hover:!from-indigo-600 hover:!to-blue-700 !shadow-lg !shadow-indigo-500/25 !border-0"
@@ -3728,6 +3732,7 @@ async function novoAgendamento() {
                   )
                 "
                 @click="resolver()"
+                dusk="ticket-resolver"
                 label="Resolver"
                 severity="success"
                 class="w-full !h-10 !rounded-xl !bg-gradient-to-r !from-emerald-500 !to-green-600 hover:!from-emerald-600 hover:!to-green-700 !shadow-lg !shadow-emerald-500/25 !border-0"
@@ -6697,6 +6702,7 @@ async function novoAgendamento() {
               <div class="flex items-start gap-3">
                 <!-- Editor de texto -->
                 <div
+                  dusk="ticket-editor"
                   class="flex-1 rounded-xl border border-gray-200 overflow-hidden bg-gray-50 focus-within:ring-2 focus-within:ring-cyan-500/50 focus-within:border-cyan-400 transition-all"
                   :class="
                     enviandoComentario ? 'opacity-60 pointer-events-none' : ''
@@ -6879,6 +6885,7 @@ async function novoAgendamento() {
 
                   <!-- Enviar -->
                   <button
+                    dusk="ticket-comentar"
                     @click="comentar('comentarios')"
                     :disabled="
                       enviandoComentario ||

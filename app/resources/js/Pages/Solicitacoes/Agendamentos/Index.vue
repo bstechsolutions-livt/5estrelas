@@ -340,7 +340,9 @@ async function atualizarAgenda() {
 }
 
 function validaPermissao(perm) {
-  return props.permissoes.includes(perm)
+  const lista =
+    props.permissoes ?? page.props?.auth?.user?.permissions ?? []
+  return lista.includes("*") || lista.includes(perm)
 }
 
 async function filtrarStatus() {

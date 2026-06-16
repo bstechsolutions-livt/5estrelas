@@ -1936,7 +1936,6 @@ class SolicitacoesController extends Controller
             'filial',
             'arquivos.file',
             'movimentacoes.usuarioMovimentacao',
-            'responsaveisRelacionados',
             'comentarios.arquivos.file',
             'comentarios.usuario',
             'rotinas',
@@ -1956,8 +1955,19 @@ class SolicitacoesController extends Controller
         // TODO: revisar vínculo departamento — responsáveis adicionais (intranet_parametros RESPONSAVEL_ADICIONAL) não portado
         $responsaveisAdicionais = [];
 
+        // 5E: `departamento_responsavel` guarda o NOME do departamento (string), enquanto a
+        // relação legada `responsaveisRelacionados` casa contra INTRANET_USUARIO.areaatuacao
+        // (bigint). Carregar a relação com um nome não-numérico estoura SQLSTATE[22P02]
+        // (invalid input syntax for type bigint) e quebra TODA a tela de detalhe do ticket.
+        // Só carregamos a relação quando o valor é numérico (compatível com o legado);
+        // caso contrário, fica vazia (que já era o resultado efetivo no 5E).
+        $responsaveisRelacionados = collect();
+        if ($solicitacao && is_numeric($solicitacao->departamento_responsavel)) {
+            $responsaveisRelacionados = $solicitacao->responsaveisRelacionados()->get();
+        }
+
         // Mescla e remove duplicados por matrícula
-        $colecaoMescladas = collect($solicitacao->responsaveisRelacionados)
+        $colecaoMescladas = $responsaveisRelacionados
             ->merge($responsaveisAdicionais)
             ->unique(fn($item) => is_array($item) ? $item['MATRICULA'] : $item->matricula)
             ->values();

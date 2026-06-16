@@ -11,6 +11,7 @@ import {
 } from "@/utils/globalFunctions"
 import { split } from "postcss/lib/list"
 import { ref, onMounted, watch } from "vue"
+import { usePage } from "@inertiajs/vue3"
 import Button from "primevue/button"
 import Dialog from "primevue/dialog"
 import Textarea from "primevue/textarea"
@@ -45,6 +46,7 @@ const emits = defineEmits([
   "acao:finalizar",
   "acao:atualizar"
 ])
+const page = usePage()
 const isFlutter = ref(typeof window.flutter_inappwebview !== "undefined") // Verifica se está no ambiente Flutter
 const dataSemHoras = ref("")
 const endFilial = ref({})
@@ -649,7 +651,9 @@ async function verArquivo(file) {
 }
 
 function validaPermissao(perm) {
-  return props.permissoes.includes(perm)
+  const lista =
+    props.permissoes ?? page.props?.auth?.user?.permissions ?? []
+  return lista.includes("*") || lista.includes(perm)
 }
 
 async function editarAgendamento() {
