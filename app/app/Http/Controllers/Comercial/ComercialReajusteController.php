@@ -75,8 +75,43 @@ class ComercialReajusteController extends Controller
 
         $pct = round((float) $data['pct'], 2);
         $valorAtual = round((float) $data['valor_atual'], 2);
-        $novoValor = round($valorAtual * (1 + $pct / 100), 2);
-        $variacao = round($novoValor - $valorAtual, 2);
+
+        // Se o cliente tem postos detalhados, gera 1 item por posto; senão 1 item genérico.
+        $cliente = isset($data['cliente_id']) && $data['cliente_id']
+            ? \App\Models\Comercial\Cliente::find($data['cliente_id']) : null;
+        $postosCliente = $cliente && is_array($cliente->postos) && count($cliente->postos) > 0
+            ? $cliente->postos : null;
+
+        $itens = [];
+        $totalAtual = 0.0;
+        $totalImpacto = 0.0;
+
+        if ($postosCliente) {
+            foreach ($postosCliente as $posto) {
+                $va = round((float) ($posto['valor'] ?? 0), 2);
+                $nv = round($va * (1 + $pct / 100), 2);
+                $var = round($nv - $va, 2);
+                $totalAtual += $va;
+                $totalImpacto += $var;
+                $itens[] = [
+                    'nome' => $posto['tipo'] ?? 'Posto',
+                    'escala' => $posto['escala'] ?? 'Mensal',
+                    'qtd' => (int) ($posto['qtd'] ?? 1),
+                    'valorAtual' => $va, 'pct' => $pct,
+                    'novoValor' => $nv, 'variacao' => $var, 'selecionado' => true,
+                ];
+            }
+        } else {
+            $nv = round($valorAtual * (1 + $pct / 100), 2);
+            $var = round($nv - $valorAtual, 2);
+            $totalAtual = $valorAtual;
+            $totalImpacto = $var;
+            $itens[] = [
+                'nome' => 'Contrato', 'escala' => 'Mensal', 'qtd' => 1,
+                'valorAtual' => $valorAtual, 'pct' => $pct,
+                'novoValor' => $nv, 'variacao' => $var, 'selecionado' => true,
+            ];
+        }
 
         $reajuste = Reajuste::create([
             'cliente_id' => $data['cliente_id'] ?? null,
@@ -87,16 +122,12 @@ class ComercialReajusteController extends Controller
             'competencia' => $data['competencia'] ?? null,
             'obs' => $data['obs'] ?? null,
             'status' => 'calculado',
-            'valor_atual' => $valorAtual,
-            'impacto_mensal' => $variacao,
+            'valor_atual' => round($totalAtual, 2),
+            'impacto_mensal' => round($totalImpacto, 2),
             'data_criacao' => now()->toDateString(),
             'created_by' => $request->user()->id,
             'historico' => [['data' => now()->toDateString(), 'status' => 'calculado', 'nota' => 'Reajuste iniciado']],
-            'itens' => [[
-                'nome' => 'Contrato', 'escala' => 'Mensal', 'qtd' => 1,
-                'valorAtual' => $valorAtual, 'pct' => $pct,
-                'novoValor' => $novoValor, 'variacao' => $variacao, 'selecionado' => true,
-            ]],
+            'itens' => $itens,
         ]);
 
         return response()->json(['sucesso' => true, 'id' => $reajuste->id]);

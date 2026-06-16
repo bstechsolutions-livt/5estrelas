@@ -34,6 +34,7 @@ class ComercialClienteController extends Controller
                 'total_colaboradores' => $c->total_colaboradores,
                 'total_postos' => $c->total_postos,
                 'observacao' => $c->observacao,
+                'postos' => $c->postos ?? [],
                 'propostas_count' => $c->propostas_count,
                 'created_at' => $c->created_at?->toISOString(),
             ]);
@@ -83,6 +84,7 @@ class ComercialClienteController extends Controller
                 'valor_mensal' => (float) $cliente->valor_mensal,
                 'total_colaboradores' => $cliente->total_colaboradores,
                 'total_postos' => $cliente->total_postos,
+                'postos' => $cliente->postos ?? [],
                 'observacao' => $cliente->observacao,
             ],
             'propostas' => $propostas,
