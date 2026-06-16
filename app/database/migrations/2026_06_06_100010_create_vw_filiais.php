@@ -19,18 +19,33 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // View de compatibilidade Postgres-only (usa cast ::text).
-        if (DB::connection()->getDriverName() !== 'pgsql') {
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'pgsql') {
+            DB::statement('CREATE OR REPLACE VIEW vw_filiais AS
+                SELECT
+                    b.*,
+                    COALESCE(b.code, b.id::text) AS codigo,
+                    b.name  AS razaosocial,
+                    b.name  AS fantasia,
+                    b.cnpj  AS cgc
+                FROM branches b');
+
             return;
         }
-        DB::statement('CREATE OR REPLACE VIEW vw_filiais AS
-            SELECT
-                b.*,
-                COALESCE(b.code, b.id::text) AS codigo,
-                b.name  AS razaosocial,
-                b.name  AS fantasia,
-                b.cnpj  AS cgc
-            FROM branches b');
+
+        if ($driver === 'sqlite') {
+            // Equivalente para o ambiente de testes (SQLite): mesma view com cast SQLite.
+            DB::statement('DROP VIEW IF EXISTS vw_filiais');
+            DB::statement('CREATE VIEW vw_filiais AS
+                SELECT
+                    b.*,
+                    COALESCE(b.code, CAST(b.id AS TEXT)) AS codigo,
+                    b.name  AS razaosocial,
+                    b.name  AS fantasia,
+                    b.cnpj  AS cgc
+                FROM branches b');
+        }
     }
 
     public function down(): void
