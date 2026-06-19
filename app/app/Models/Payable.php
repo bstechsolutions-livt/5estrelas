@@ -18,6 +18,16 @@ class Payable extends Model
     public const WORKFLOW_FIELDS = [
         'status', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id',
+        'paid_at', 'payment_method', 'paid_by',
+    ];
+
+    /** Formas de pagamento aceitas no registro de pagamento (Spec alçada+pagamento). */
+    public const PAYMENT_METHODS = [
+        'PIX' => 'PIX',
+        'TED' => 'TED',
+        'Boleto' => 'Boleto',
+        'Dinheiro' => 'Dinheiro',
+        'Outro' => 'Outro',
     ];
 
     /**
@@ -90,6 +100,7 @@ class Payable extends Model
         'due_date', 'issue_date', 'description', 'category', 'status',
         'branch_id', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'senior_id',
+        'paid_at', 'payment_method', 'paid_by',
         'senior_situacao_original', 'senior_missing_at', 'senior_raw',
         'senior_synced_at',
     ];
@@ -111,6 +122,7 @@ class Payable extends Model
             'issue_date' => 'date',
             'sent_for_approval_at' => 'datetime',
             'approved_at' => 'datetime',
+            'paid_at' => 'date',
             'senior_missing_at' => 'datetime',
             'senior_synced_at' => 'datetime',
             'senior_raw' => 'array',
@@ -176,6 +188,11 @@ class Payable extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function payer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'paid_by');
     }
 
     public function bordero(): BelongsTo

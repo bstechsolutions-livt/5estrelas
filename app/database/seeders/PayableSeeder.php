@@ -5,7 +5,10 @@ namespace Database\Seeders;
 use App\Models\Branch;
 use App\Models\Bordero;
 use App\Models\Payable;
+use App\Models\PayableDocument;
 use App\Models\PayableRateio;
+use App\Models\PayableRole;
+use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -31,6 +34,17 @@ class PayableSeeder extends Seeder
 
     public function run(): void
     {
+        // Limpa dados demo anteriores para idempotência (R10.3).
+        // Remove apenas títulos que foram criados pelo seeder (senior_raw contém _demo).
+        Payable::whereJsonContains('senior_raw->_demo', true)->each(function (Payable $p) {
+            $p->rateios()->delete();
+            $p->documents()->delete();
+            $p->comments()->delete();
+            $p->delete();
+        });
+        Bordero::whereHas('payables', fn ($q) => $q->whereRaw("1=0"))->delete(); // noop — borderôs sem títulos já morreram
+        Bordero::whereDoesntHave('payables')->delete();
+
         $branches = Branch::pluck('id')->toArray();
         $statuses = ['pendente', 'pendente', 'pendente', 'em_preparacao', 'aguardando_aprovacao', 'aprovado', 'reprovado'];
 
@@ -87,6 +101,9 @@ class PayableSeeder extends Seeder
         $this->command->info('✅ 35 títulos fake (com campos Senior + rateios) criados para contas a pagar.');
 
         $this->seedBorderos();
+
+        $this->ensureAprovadosEPagos();
+        $this->seedAlcada();
     }
 
     /**
@@ -213,5 +230,94 @@ class PayableSeeder extends Seeder
         }
 
         $this->command->info("✅ {$count} borderôs fake criados.");
+    }
+
+    /**
+     * Garante massa para a Spec Alçada+Pagamento: títulos `aprovado` (prontos para
+     * pagar) e títulos já `pago` (com data/forma/quem pagou + comprovante).
+     */
+    private function ensureAprovadosEPagos(): void
+    {
+        $pagador = User::where('email', 'bruno@bstechsolutions.com')->first()
+            ?? User::where('email', 'admin@5estrelas.com.br')->first()
+            ?? User::first();
+
+        // 3 aprovados livres (fora de borderô), prontos para pagamento
+        Payable::whereNull('bordero_id')->where('status', '!=', 'pago')
+            ->inRandomOrder()->limit(3)->get()
+            ->each(function (Payable $p) use ($pagador) {
+                $p->update([
+                    'status' => 'aprovado',
+                    'prepared_by' => $pagador?->id,
+                    'approved_by' => $pagador?->id,
+                    'approved_at' => now()->subDays(random_int(1, 5)),
+                ]);
+            });
+
+        // 3 pagos (com data/forma/quem pagou + comprovante)
+        $formas = array_keys(Payable::PAYMENT_METHODS);
+        Payable::whereNull('bordero_id')->where('status', '!=', 'pago')
+            ->inRandomOrder()->limit(3)->get()
+            ->each(function (Payable $p) use ($pagador, $formas) {
+                $p->update([
+                    'status' => 'pago',
+                    'prepared_by' => $pagador?->id,
+                    'approved_by' => $pagador?->id,
+                    'approved_at' => now()->subDays(random_int(6, 12)),
+                    'paid_at' => now()->subDays(random_int(0, 5))->toDateString(),
+                    'payment_method' => $formas[array_rand($formas)],
+                    'paid_by' => $pagador?->id,
+                ]);
+                PayableDocument::create([
+                    'payable_id' => $p->id,
+                    'uploaded_by' => $pagador?->id,
+                    'name' => 'comprovante-' . $p->title_number . '.pdf',
+                    'path' => 'payables/docs/demo-comprovante.pdf',
+                    'mime_type' => 'application/pdf',
+                    'size' => random_int(20000, 200000),
+                ]);
+            });
+
+        $this->command->info('✅ Massa Alçada+Pagamento: 3 aprovados + 3 pagos (com comprovante).');
+    }
+
+    /**
+     * Configura a Alçada do Contas a Pagar: pelo menos um responsável por papel.
+     * bruno@bstechsolutions.com entra como pagador (necessário para os testes Dusk).
+     */
+    private function seedAlcada(): void
+    {
+        $bruno = User::where('email', 'bruno@bstechsolutions.com')->first();
+        $admin = User::where('email', 'admin@5estrelas.com.br')->first();
+        $outros = User::where('is_active', true)
+            ->when($bruno, fn ($q) => $q->where('id', '!=', $bruno->id))
+            ->inRandomOrder()->limit(2)->get();
+
+        $pagadores = collect([$bruno, $admin])->filter()->unique('id')->values();
+        $conciliador = $admin ?? $bruno ?? User::first();
+        $assinante = $outros->first() ?? $admin ?? $bruno ?? User::first();
+
+        foreach ($pagadores as $u) {
+            PayableRole::firstOrCreate(['role' => 'pagador', 'user_id' => $u->id]);
+        }
+        if ($conciliador) {
+            PayableRole::firstOrCreate(['role' => 'conciliador', 'user_id' => $conciliador->id]);
+        }
+        if ($assinante) {
+            PayableRole::firstOrCreate(['role' => 'assinante', 'user_id' => $assinante->id]);
+        }
+
+        // Pagadores precisam enxergar o módulo (a tela/rota exige a permissão de visualizar).
+        $visualizar = Permission::firstOrCreate(
+            ['key' => 'financeiro.contas_pagar.visualizar'],
+            ['label' => 'Ver contas a pagar', 'module' => 'financeiro']
+        );
+        foreach ($pagadores as $u) {
+            if (! $u->hasPermission('*')) {
+                $u->permissions()->syncWithoutDetaching([$visualizar->id]);
+            }
+        }
+
+        $this->command->info('✅ Alçada do Contas a Pagar configurada (pagador/conciliador/assinante).');
     }
 }
