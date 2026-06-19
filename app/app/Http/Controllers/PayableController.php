@@ -7,8 +7,12 @@ use App\Models\Payable;
 use App\Models\PayableComment;
 use App\Models\PayableDocument;
 use App\Services\AuditLogger;
+use App\Services\PayableAlcadaService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class PayableController extends Controller
@@ -71,20 +75,27 @@ class PayableController extends Controller
         ]);
     }
 
-    public function show(int $id)
+    public function show(int $id, PayableAlcadaService $alcada)
     {
         $payable = Payable::with([
             'branch:id,name',
             'preparer:id,name',
             'approver:id,name',
+            'payer:id,name',
             'documents.uploader:id,name',
             'comments.user:id,name,avatar_path',
         ])->findOrFail($id);
+
+        $user = request()->user();
+        $isPagador = $user ? $alcada->isAssigned($user, 'pagador') : false;
 
         return Inertia::render('Payables/Show', [
             'payable' => $payable,
             'statusLabels' => Payable::STATUS_LABELS,
             'statusColors' => Payable::STATUS_COLORS,
+            'canPay' => $isPagador && $payable->status === 'aprovado',
+            'paymentMethods' => Payable::PAYMENT_METHODS,
+            'pagadorConfigured' => $alcada->hasRole('pagador'),
         ]);
     }
 
@@ -247,6 +258,95 @@ class PayableController extends Controller
         );
 
         return back()->with('success', 'Título reprovado.');
+    }
+
+    /**
+     * Registra o pagamento de um título APROVADO (aprovado -> pago).
+     * Governado pela ALÇADA: só quem está como `pagador` paga — nem o curinga '*' fura.
+     */
+    public function pay(Request $request, int $id, PayableAlcadaService $alcada)
+    {
+        $payable = Payable::findOrFail($id);
+        $user = $request->user();
+
+        // Elegibilidade pela alçada (segregação de função). Não checamos permissão aqui.
+        if (! $alcada->isAssigned($user, 'pagador')) {
+            abort(403, 'Você não está na alçada como pagador deste módulo.');
+        }
+
+        $data = $request->validate([
+            'paid_at' => ['required', 'date', 'before_or_equal:today'],
+            'payment_method' => ['nullable', 'string', Rule::in(array_keys(Payable::PAYMENT_METHODS))],
+            'file' => ['nullable', 'file', 'max:10240'], // 10MB — comprovante opcional
+        ]);
+
+        $paid = DB::transaction(function () use ($payable, $user, $data, $request) {
+            // Trava o registro para evitar pagamento concorrente (idempotência).
+            $fresh = Payable::whereKey($payable->id)->lockForUpdate()->first();
+
+            // Só de 'aprovado'. Um 2º request concorrente encontra 'pago' e cai aqui.
+            if ($fresh->status !== 'aprovado') {
+                return false;
+            }
+
+            $old = $fresh->status;
+            $fresh->update([
+                'status' => 'pago',
+                'paid_at' => $data['paid_at'],
+                'payment_method' => $data['payment_method'] ?? null,
+                'paid_by' => $user->id,
+            ]);
+
+            // Comprovante (opcional) reaproveita a estrutura de documentos do título.
+            $docName = null;
+            if ($request->hasFile('file')) {
+                $file = $request->file('file');
+                $path = $file->store('payables/docs', 'public');
+                PayableDocument::create([
+                    'payable_id' => $fresh->id,
+                    'uploaded_by' => $user->id,
+                    'name' => $file->getClientOriginalName(),
+                    'path' => $path,
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                ]);
+                $docName = $file->getClientOriginalName();
+            }
+
+            $dataFmt = Carbon::parse($data['paid_at'])->format('d/m/Y');
+            $forma = $data['payment_method'] ?? null;
+
+            PayableComment::create([
+                'payable_id' => $fresh->id,
+                'user_id' => $user->id,
+                'body' => "Pagamento registrado em {$dataFmt}"
+                    . ($forma ? " · {$forma}" : '')
+                    . ($docName ? " · Comprovante: {$docName}" : ''),
+                'type' => 'payment',
+            ]);
+
+            AuditLogger::log(
+                event: 'contas_pagar.pago',
+                module: 'financeiro.contas_pagar',
+                description: "Título {$fresh->title_number} pago (R$ {$fresh->amount}) em {$dataFmt}",
+                auditable: $fresh,
+                oldValues: ['status' => $old],
+                newValues: [
+                    'status' => 'pago',
+                    'paid_at' => $data['paid_at'],
+                    'payment_method' => $forma,
+                    'paid_by' => $user->id,
+                ],
+            );
+
+            return true;
+        });
+
+        if (! $paid) {
+            return back()->with('error', 'Este título não está apto a ser pago.');
+        }
+
+        return back()->with('success', 'Pagamento registrado.');
     }
 
     public function removeDocument(int $payableId, int $docId)

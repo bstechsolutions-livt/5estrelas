@@ -9,6 +9,7 @@ use App\Http\Controllers\BorderoController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PayableController;
+use App\Http\Controllers\PayableAlcadaController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DeviceTokenController;
 use App\Http\Controllers\NotificationController;
@@ -145,16 +146,24 @@ Route::middleware('auth')->group(function () {
         Route::delete('/filiais/{id}', [BranchController::class, 'destroy'])->name('branches.destroy');
     });
 
+    // Financeiro - Contas a Pagar - Alçada (gestão de quem paga/concilia/assina)
+    Route::prefix('financeiro/contas-pagar/alcada')->middleware('permission:financeiro.contas_pagar.alcada_gerenciar')->group(function () {
+        Route::get('/', [PayableAlcadaController::class, 'index'])->name('payables.alcada.index');
+        Route::post('/', [PayableAlcadaController::class, 'store'])->name('payables.alcada.store');
+        Route::delete('/{role}/{userId}', [PayableAlcadaController::class, 'destroy'])->whereNumber('userId')->name('payables.alcada.destroy');
+    });
+
     // Financeiro - Contas a Pagar
     Route::prefix('financeiro/contas-pagar')->middleware('permission:financeiro.contas_pagar.visualizar')->group(function () {
         Route::get('/', [PayableController::class, 'index'])->name('payables.index');
-        Route::get('/{id}', [PayableController::class, 'show'])->name('payables.show');
+        Route::get('/{id}', [PayableController::class, 'show'])->whereNumber('id')->name('payables.show');
         Route::post('/{id}/comentarios', [PayableController::class, 'addComment'])->name('payables.comment');
         Route::post('/{id}/documentos', [PayableController::class, 'addDocument'])->name('payables.document');
         Route::delete('/{payableId}/documentos/{docId}', [PayableController::class, 'removeDocument'])->name('payables.document.remove');
         Route::post('/{id}/enviar-aprovacao', [PayableController::class, 'sendForApproval'])->name('payables.send_approval');
         Route::post('/{id}/aprovar', [PayableController::class, 'approve'])->name('payables.approve');
         Route::post('/{id}/reprovar', [PayableController::class, 'reject'])->name('payables.reject');
+        Route::post('/{id}/registrar-pagamento', [PayableController::class, 'pay'])->whereNumber('id')->name('payables.pay');
     });
 
     // Financeiro - Borderôs

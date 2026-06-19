@@ -227,8 +227,11 @@ class SolicitacoesListaTest extends DuskTestCase
                     ->visit('/solicitacoes/lista?solicitacao='.$ticketId)
                     ->waitUntilMissing('@tickets-loading', 20);
 
+                // Aguarda o dialog do ticket abrir (PrimeVue Dialog) — pode levar tempo no single-threaded dev server.
+                $browser->waitFor('.p-dialog-mask', 30);
+
                 // Abre a aba "Comentários" (trocarAba('acompanhar')), onde fica o editor.
-                $browser->waitFor('@ticket-tab-comentarios', 20)
+                $browser->waitFor('@ticket-tab-comentarios', 30)
                     ->click('@ticket-tab-comentarios');
 
                 // O editor de comentário só existe na aba de Comentários.

@@ -1,0 +1,368 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.2 Criar migration `create_payable_roles_table`": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875226561
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875338677
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875427857
+      }
+    ],
+    "1.3 Ajustar o model `Payable`": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875226630
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875431929
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875492216
+      }
+    ],
+    "1.4 Criar model `App\\Models\\PayableRole`": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875226680
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875505295
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875577788
+      }
+    ],
+    "2. Permissão de gestão da alçada": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875226730
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875582155
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875638566
+      }
+    ],
+    "3. Service `PayableAlcadaService`": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875226801
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875642585
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875873390
+      }
+    ],
+    "4.1 Criar `PayableAlcadaController` (`index`, `store`, `destroy`)": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875226842
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875877356
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875957431
+      }
+    ],
+    "4.2 Registrar rotas `payables.alcada.*`": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875226881
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875961556
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875966094
+      }
+    ],
+    "4.3 Adicionar item de menu em `MenuCatalog::all()` (grupo Financeiro)": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875226925
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875970421
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875974857
+      }
+    ],
+    "5. Feature tests da alçada e rodar": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875226966
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875979920
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876071702
+      }
+    ],
+    "6.1 Implementar `PayableController@pay`": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875227012
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876076980
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876170001
+      }
+    ],
+    "6.2 Ajustar `PayableController@show`": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875227049
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876174436
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876231759
+      }
+    ],
+    "6.3 Rotas": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875227101
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876236103
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876305715
+      }
+    ],
+    "7. Feature tests do pagamento e rodar": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875227143
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876310891
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876396979
+      }
+    ],
+    "8. Frontend — tela de Alçada (`Pages/Payables/Alcada.vue`)": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875227189
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876401786
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876640059
+      }
+    ],
+    "9. Frontend — registrar pagamento em `Pages/Payables/Show.vue`": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875227256
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876644087
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876733911
+      }
+    ],
+    "10. DemoSeeder (massa local)": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875227294
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876739371
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781877475563
+      }
+    ],
+    "11.1 `tests/Browser/PayableAlcadaTest.php`": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875227341
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781877480874
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781877677374
+      }
+    ],
+    "11.2 `tests/Browser/PayablePagamentoTest.php`": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875227380
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781877682192
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781877926795
+      }
+    ],
+    "12. Suíte inteira verde": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875227425
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781877932311
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781878821205
+      }
+    ],
+    "1.1 Criar migration `add_payment_fields_to_payables`": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875237196
+      },
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875333762
+      }
+    ],
+    "1. Fundação de dados (migrations + models)": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875577819
+      }
+    ],
+    "4. Backend da gestão de alçada (controller + rotas + menu)": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781875974911
+      }
+    ],
+    "6. Backend de registrar pagamento (controller + rota)": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781876305754
+      }
+    ],
+    "11. Dusk (browser real) e rodar": [
+      {
+        "executionId": "7d1daded-98e6-4409-a6c2-4b5b3977b8a7",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781877926841
+      }
+    ]
+  }
+}

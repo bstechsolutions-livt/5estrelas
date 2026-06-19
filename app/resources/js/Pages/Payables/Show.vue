@@ -1,11 +1,17 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { router, useForm, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import FileUpload from 'primevue/fileupload'
+import Dialog from 'primevue/dialog'
+import Select from 'primevue/select'
+import DatePicker from 'primevue/datepicker'
+import Toast from 'primevue/toast'
+import { useToast } from 'primevue/usetoast'
+import BottomSheet from '@/Components/Mobile/BottomSheet.vue'
 import { useDevice } from '@/composables/useDevice'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 
@@ -13,15 +19,53 @@ const props = defineProps({
     payable: Object,
     statusLabels: Object,
     statusColors: Object,
+    canPay: { type: Boolean, default: false },
+    paymentMethods: { type: Object, default: () => ({}) },
+    pagadorConfigured: { type: Boolean, default: true },
 })
 
 const { isMobile } = useDevice()
 const page = usePage()
 const authUser = page.props.auth?.user
+const toast = useToast()
 
 const commentForm = useForm({ body: '' })
 const showRejectDialog = ref(false)
 const rejectForm = useForm({ reason: '' })
+
+// ── Registrar pagamento ──
+const showPayment = ref(false)
+const maxPaymentDate = new Date()
+const paymentForm = useForm({ paid_at: new Date(), payment_method: null, file: null })
+const paymentMethodOptions = computed(() => Object.keys(props.paymentMethods || {}))
+
+function pad(n) { return String(n).padStart(2, '0') }
+function toYmd(d) {
+    if (!d) return null
+    const dt = d instanceof Date ? d : new Date(d)
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
+}
+
+function onSelectComprovante(e) {
+    paymentForm.file = e.files?.[0] || null
+}
+
+function submitPayment() {
+    paymentForm
+        .transform((data) => ({ ...data, paid_at: toYmd(data.paid_at) }))
+        .post(`/financeiro/contas-pagar/${props.payable.id}/registrar-pagamento`, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => { showPayment.value = false; paymentForm.reset() },
+        })
+}
+
+watch(() => page.props.flash?.success, (msg) => {
+    if (msg) toast.add({ severity: 'success', summary: 'Pronto', detail: msg, life: 3000 })
+})
+watch(() => page.props.flash?.error, (msg) => {
+    if (msg) toast.add({ severity: 'error', summary: 'Erro', detail: msg, life: 5000 })
+})
 
 function submitComment() {
     commentForm.post(`/financeiro/contas-pagar/${props.payable.id}/comentarios`, {
@@ -78,6 +122,14 @@ const inBordero = !!props.payable.bordero_id
 const canSendIndividual = canPrepare && !inBordero
 const canApprove = props.payable.status === 'aguardando_aprovacao' && !inBordero
 
+// Sidebar de ações aparece quando há qualquer ação/condição lateral a mostrar.
+const showSidebar = computed(() =>
+    canSendIndividual || canApprove || inBordero || showRejectDialog.value ||
+    props.canPay || props.payable.status === 'pago' ||
+    (props.payable.status === 'aprovado' && !props.pagadorConfigured) ||
+    !!(props.payable.preparer || props.payable.approver || props.payable.approved_at)
+)
+
 function goBack() {
     window.history.back()
 }
@@ -95,6 +147,7 @@ function isImage(doc) {
 
 <template>
     <component :is="isMobile ? AppLayoutMobile : AppLayout" :title="isMobile ? 'Detalhe' : undefined" :show-back="isMobile">
+        <Toast />
         <div :class="isMobile ? 'px-4 py-3 pb-20' : 'max-w-5xl mx-auto'">
             <!-- Header -->
             <div class="flex items-start justify-between mb-6">
@@ -115,9 +168,9 @@ function isImage(doc) {
                 <p class="text-xl font-bold text-gray-800">{{ formatMoney(payable.amount) }}</p>
             </div>
 
-            <div :class="isMobile ? 'space-y-4' : (canSendIndividual || canApprove || inBordero) ? 'grid grid-cols-3 gap-6' : ''">
+            <div :class="isMobile ? 'space-y-4' : (showSidebar) ? 'grid grid-cols-3 gap-6' : ''">
                 <!-- Coluna principal -->
-                <div :class="isMobile ? '' : (canSendIndividual || canApprove || inBordero) ? 'col-span-2 space-y-4' : 'space-y-4'">
+                <div :class="isMobile ? '' : (showSidebar) ? 'col-span-2 space-y-4' : 'space-y-4'">
                     <!-- Info -->
                     <div class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Informações</h3>
@@ -198,7 +251,7 @@ function isImage(doc) {
                 </div>
 
                 <!-- Sidebar de ações -->
-                <div v-if="canSendIndividual || canApprove || inBordero" class="space-y-4">
+                <div v-if="showSidebar" class="space-y-4">
                     <!-- Aviso: está em borderô -->
                     <div v-if="inBordero" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
                         <h3 class="text-sm font-semibold text-amber-700 mb-1 flex items-center gap-2">
@@ -233,6 +286,26 @@ function isImage(doc) {
                         </div>
                     </div>
 
+                    <!-- Ação: registrar pagamento (governada pela alçada) -->
+                    <div v-if="canPay" class="bg-white rounded-xl border border-gray-100 p-4">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Pagamento</h3>
+                        <Button label="Registrar pagamento" icon="pi pi-dollar" severity="success" class="w-full" dusk="open-payment" @click="showPayment = true" />
+                    </div>
+
+                    <!-- Hint: alçada de pagamento não configurada -->
+                    <div v-else-if="payable.status === 'aprovado' && !pagadorConfigured" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <h3 class="text-sm font-semibold text-amber-700 mb-1 flex items-center gap-2"><i class="pi pi-exclamation-triangle"></i> Alçada não configurada</h3>
+                        <p class="text-xs text-amber-600">Defina um pagador na alçada do Contas a Pagar para registrar pagamentos.</p>
+                    </div>
+
+                    <!-- Pagamento registrado (read-only) -->
+                    <div v-if="payable.status === 'pago'" class="bg-white rounded-xl border border-gray-100 p-4 text-sm" dusk="payment-info">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Pagamento</h3>
+                        <div class="mb-2"><p class="text-xs text-gray-500">Data</p><p class="text-gray-800">{{ formatDate(payable.paid_at) }}</p></div>
+                        <div v-if="payable.payment_method" class="mb-2"><p class="text-xs text-gray-500">Forma</p><p class="text-gray-800">{{ payable.payment_method }}</p></div>
+                        <div v-if="payable.payer"><p class="text-xs text-gray-500">Pago por</p><p class="text-gray-800">{{ payable.payer.name }}</p></div>
+                    </div>
+
                     <!-- Info lateral -->
                     <div v-if="payable.preparer || payable.approver || payable.approved_at" class="bg-white rounded-xl border border-gray-100 p-4 text-sm">
                         <div v-if="payable.preparer" class="mb-2">
@@ -251,5 +324,49 @@ function isImage(doc) {
                 </div>
             </div>
         </div>
+        <!-- Registrar pagamento — Dialog no desktop -->
+        <Dialog v-if="!isMobile" v-model:visible="showPayment" modal header="Registrar pagamento" :style="{ width: '420px' }">
+            <div class="space-y-4 pt-1">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Data do pagamento *</label>
+                    <DatePicker v-model="paymentForm.paid_at" date-format="dd/mm/yy" :max-date="maxPaymentDate" class="w-full" input-id="payment-date" dusk="payment-date" />
+                    <p v-if="paymentForm.errors.paid_at" class="text-xs text-red-500 mt-1">{{ paymentForm.errors.paid_at }}</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Forma de pagamento</label>
+                    <Select v-model="paymentForm.payment_method" :options="paymentMethodOptions" placeholder="Selecione (opcional)" show-clear class="w-full" dusk="payment-method" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Comprovante</label>
+                    <FileUpload mode="basic" :auto="false" choose-label="Anexar comprovante" :max-file-size="10485760" @select="onSelectComprovante" class="w-full" dusk="payment-file" />
+                    <p class="text-[11px] text-gray-400 mt-1">Opcional. Tamanho máximo: 10 MB.</p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Cancelar" severity="secondary" text @click="showPayment = false" />
+                <Button label="Confirmar pagamento" icon="pi pi-check" severity="success" :loading="paymentForm.processing" dusk="confirm-payment" @click="submitPayment" />
+            </template>
+        </Dialog>
+
+        <!-- Registrar pagamento — Bottom sheet no mobile -->
+        <BottomSheet v-else v-model="showPayment" title="Registrar pagamento">
+            <div class="space-y-4" dusk="payment-sheet">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Data do pagamento *</label>
+                    <DatePicker v-model="paymentForm.paid_at" date-format="dd/mm/yy" :max-date="maxPaymentDate" class="w-full" input-id="payment-date-m" dusk="payment-date" />
+                    <p v-if="paymentForm.errors.paid_at" class="text-xs text-red-500 mt-1">{{ paymentForm.errors.paid_at }}</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Forma de pagamento</label>
+                    <Select v-model="paymentForm.payment_method" :options="paymentMethodOptions" placeholder="Selecione (opcional)" show-clear class="w-full" dusk="payment-method" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Comprovante</label>
+                    <FileUpload mode="basic" :auto="false" choose-label="Anexar comprovante" :max-file-size="10485760" @select="onSelectComprovante" class="w-full" dusk="payment-file" />
+                    <p class="text-[11px] text-gray-400 mt-1">Opcional. Tamanho máximo: 10 MB.</p>
+                </div>
+                <Button label="Confirmar pagamento" icon="pi pi-check" severity="success" class="w-full" :loading="paymentForm.processing" dusk="confirm-payment" @click="submitPayment" />
+            </div>
+        </BottomSheet>
     </component>
 </template>

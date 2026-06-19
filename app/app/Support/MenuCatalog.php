@@ -56,6 +56,7 @@ class MenuCatalog
             // Financeiro
             ['key' => 'contas_pagar', 'label' => 'Contas a Pagar', 'icon' => 'pi pi-wallet', 'href' => '/financeiro/contas-pagar', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
             ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
+            ['key' => 'contas_pagar_alcada', 'label' => 'Alçada (Contas a Pagar)', 'icon' => 'pi pi-sitemap', 'href' => '/financeiro/contas-pagar/alcada', 'permission' => 'financeiro.contas_pagar.alcada_gerenciar', 'group' => 'Financeiro'],
 
             // Tickets (portado da Biglar)
             ['key' => 'sol_nova', 'label' => 'Novo Ticket', 'icon' => 'pi pi-plus-circle', 'href' => '/solicitacoes/nova', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
