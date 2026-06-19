@@ -2,6 +2,7 @@
 
 namespace Tests\Browser;
 
+use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Solicitacao;
 use App\Models\SolicitacaoAssunto;
@@ -68,6 +69,19 @@ class SolicitacoesListaTest extends DuskTestCase
         $bruno = $this->bruno();
         $sufixo = strtoupper(substr(uniqid(), -6));
 
+        // Limpa departamentos órfãos de execuções anteriores que falharam antes do cleanup.
+        // Sem isso, o departamento do teste pode não ser o primeiro da lista (departamentos[0]).
+        $oldDepts = Department::where('name', 'like', 'AAA Dusk Tickets QA %')->pluck('id');
+        if ($oldDepts->isNotEmpty()) {
+            $oldAssuntos = SolicitacaoAssunto::whereIn('department_id', $oldDepts)->pluck('id');
+            $oldTickets = Solicitacao::whereIn('assunto_id', $oldAssuntos)->pluck('id');
+            SolicitacaoCom::whereIn('solicitacao_id', $oldTickets)->forceDelete();
+            SolicitacaoMov::whereIn('solicitacao_id', $oldTickets)->delete();
+            Solicitacao::whereIn('assunto_id', $oldAssuntos)->delete();
+            SolicitacaoAssunto::whereIn('department_id', $oldDepts)->delete();
+            Department::whereIn('id', $oldDepts)->delete();
+        }
+
         $dept = Department::create([
             'name' => 'AAA Dusk Tickets QA '.$sufixo,
             'is_active' => true,
@@ -76,7 +90,13 @@ class SolicitacoesListaTest extends DuskTestCase
         $assuntoPend = $this->novoAssunto($dept->id, 'Pend Assunto '.$sufixo);
         $assuntoAtend = $this->novoAssunto($dept->id, 'Atend Assunto '.$sufixo);
 
-        $filialId = \App\Models\Branch::query()->value('id');
+        // Garante que existe pelo menos uma filial ativa (necessária para os tickets).
+        $branch = Branch::firstOrCreate(
+            ['code' => 'DUSK'],
+            ['name' => 'Filial Dusk QA', 'is_active' => true, 'cnpj' => '00000000000000']
+        );
+
+        $filialId = $branch->id;
 
         $base = [
             'departamento_responsavel' => $dept->name,
@@ -127,9 +147,9 @@ class SolicitacoesListaTest extends DuskTestCase
      * Usa textContent (não getText do Selenium) para enxergar conteúdo fora da viewport,
      * e escopa na tabela para ignorar ocorrências em filtros/labels.
      */
-    private function esperarTexto(Browser $browser, string $texto, int $seconds = 30): void
+    private function esperarTexto(Browser $browser, string $texto, int $seconds = 60): void
     {
-        $browser->waitUsing($seconds, 200, function () use ($browser, $texto) {
+        $browser->waitUsing($seconds, 300, function () use ($browser, $texto) {
             return (bool) $browser->driver->executeScript(
                 'return (document.querySelector(".p-datatable-tbody")?.textContent || "").includes(arguments[0]);',
                 [$texto]
@@ -138,9 +158,9 @@ class SolicitacoesListaTest extends DuskTestCase
     }
 
     /** Espera até que o corpo da DataTable NÃO contenha mais o texto. */
-    private function esperarTextoSumir(Browser $browser, string $texto, int $seconds = 30): void
+    private function esperarTextoSumir(Browser $browser, string $texto, int $seconds = 60): void
     {
-        $browser->waitUsing($seconds, 200, function () use ($browser, $texto) {
+        $browser->waitUsing($seconds, 300, function () use ($browser, $texto) {
             return ! (bool) $browser->driver->executeScript(
                 'return (document.querySelector(".p-datatable-tbody")?.textContent || "").includes(arguments[0]);',
                 [$texto]
@@ -166,12 +186,13 @@ class SolicitacoesListaTest extends DuskTestCase
             $this->browse(function (Browser $browser) use ($assuntoPend, $assuntoAtend) {
                 $browser->loginAs($this->bruno())
                     ->visit('/solicitacoes/lista')
-                    ->waitUntilMissing('@tickets-loading', 20)
-                    ->waitForText('Atendimento', 10);
+                    ->waitUntilMissing('@tickets-loading', 45)
+                    ->pause(1000)
+                    ->waitForText('Atendimento', 20);
 
                 // A lista carrega já filtrando pelo departamento padrão (o nosso),
                 // então ambos os tickets aparecem (identificados pelo assunto).
-                $this->esperarTexto($browser, $assuntoPend, 30);
+                $this->esperarTexto($browser, $assuntoPend);
                 $this->assertTrue($this->bodyContem($browser, $assuntoPend), 'Ticket pendente deveria aparecer.');
                 $this->assertTrue($this->bodyContem($browser, $assuntoAtend), 'Ticket em atendimento deveria aparecer.');
             });
@@ -190,10 +211,11 @@ class SolicitacoesListaTest extends DuskTestCase
             $this->browse(function (Browser $browser) use ($assuntoPend, $assuntoAtend) {
                 $browser->loginAs($this->bruno())
                     ->visit('/solicitacoes/lista')
-                    ->waitUntilMissing('@tickets-loading', 20)
-                    ->waitForText('Atendimento', 10);
+                    ->waitUntilMissing('@tickets-loading', 45)
+                    ->pause(1000)
+                    ->waitForText('Atendimento', 20);
 
-                $this->esperarTexto($browser, $assuntoPend, 30);
+                $this->esperarTexto($browser, $assuntoPend);
 
                 // Filtra por "Em Atendimento" clicando no card de legenda.
                 $browser->scrollIntoView('@card-em-atendimento')
@@ -201,7 +223,7 @@ class SolicitacoesListaTest extends DuskTestCase
                     ->click('@card-em-atendimento');
 
                 // O ticket pendente some do corpo da tabela e o em atendimento permanece.
-                $this->esperarTextoSumir($browser, $assuntoPend, 30);
+                $this->esperarTextoSumir($browser, $assuntoPend);
                 $this->assertTrue($this->bodyContem($browser, $assuntoAtend), 'Ticket em atendimento deveria permanecer.');
                 $this->assertFalse($this->bodyContem($browser, $assuntoPend), 'Ticket pendente deveria sumir após filtrar.');
             });
@@ -225,13 +247,14 @@ class SolicitacoesListaTest extends DuskTestCase
                 // de clicar numa célula fora da viewport.
                 $browser->loginAs($this->bruno())
                     ->visit('/solicitacoes/lista?solicitacao='.$ticketId)
-                    ->waitUntilMissing('@tickets-loading', 20);
+                    ->waitUntilMissing('@tickets-loading', 45)
+                    ->pause(1000);
 
                 // Aguarda o dialog do ticket abrir (PrimeVue Dialog) — pode levar tempo no single-threaded dev server.
-                $browser->waitFor('.p-dialog-mask', 30);
+                $browser->waitFor('.p-dialog-mask', 45);
 
                 // Abre a aba "Comentários" (trocarAba('acompanhar')), onde fica o editor.
-                $browser->waitFor('@ticket-tab-comentarios', 30)
+                $browser->waitFor('@ticket-tab-comentarios', 45)
                     ->click('@ticket-tab-comentarios');
 
                 // O editor de comentário só existe na aba de Comentários.
@@ -267,7 +290,7 @@ class SolicitacoesListaTest extends DuskTestCase
                 // Aguarda a persistência consultando o banco diretamente (robusto contra a
                 // lentidão do servidor single-threaded de dev). O caminho de escrita é ponta a
                 // ponta via UI: editor Quill → botão enviar → controller → banco.
-                $deadline = microtime(true) + 25;
+                $deadline = microtime(true) + 45;
                 while (microtime(true) < $deadline) {
                     $persistido = SolicitacaoCom::where('solicitacao_id', $ticketId)
                         ->where('comentario', 'like', '%'.$comentarioTexto.'%')
@@ -275,7 +298,7 @@ class SolicitacoesListaTest extends DuskTestCase
                     if ($persistido) {
                         break;
                     }
-                    usleep(300000);
+                    usleep(400000);
                 }
             });
 

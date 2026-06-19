@@ -1,0 +1,230 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Criar migration `add_conciliation_fields_to_payables`": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889832564
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889843000
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889929917
+      }
+    ],
+    "1.2 Ajustar o model `Payable`": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889832614
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889934523
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890043681
+      }
+    ],
+    "2.1 Implementar `PayableController@conciliate`": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889832680
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890049778
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890223795
+      }
+    ],
+    "2.2 Implementar `PayableController@diverge`": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889832716
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890228461
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890233458
+      }
+    ],
+    "2.3 Ajustar `PayableController@show`": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889832748
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890238300
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890243100
+      }
+    ],
+    "2.4 Registrar rotas": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889832783
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890247693
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890252486
+      }
+    ],
+    "3. Feature tests da conciliação e rodar": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889832815
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890258164
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890415724
+      }
+    ],
+    "4. Checkpoint — Backend verde": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889832844
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890420747
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890461832
+      }
+    ],
+    "5. Frontend — conciliação em `Pages/Payables/Show.vue`": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889832875
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890467437
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890636743
+      }
+    ],
+    "6. DemoSeeder (massa local)": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889832933
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890643314
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890958396
+      }
+    ],
+    "7.1 `tests/Browser/PayableConciliacaoTest.php`": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889832994
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890963459
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781891112091
+      }
+    ],
+    "8. Suíte inteira verde": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781889833034
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781891117576
+      },
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781895515653
+      }
+    ],
+    "1. Fundação de dados (migration + ajustes no model)": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890043731
+      }
+    ],
+    "2. Backend — métodos de conciliação e divergência": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781890252542
+      }
+    ],
+    "7. Dusk (browser real) e rodar": [
+      {
+        "executionId": "f4e01744-ab69-48f5-970d-5316246b5532",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1781891112120
+      }
+    ]
+  }
+}

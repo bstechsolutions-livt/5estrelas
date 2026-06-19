@@ -19,6 +19,7 @@ class Payable extends Model
         'status', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id',
         'paid_at', 'payment_method', 'paid_by',
+        'conciliated_at', 'conciliated_by', 'conciliation_notes', 'divergence_reason',
     ];
 
     /** Formas de pagamento aceitas no registro de pagamento (Spec alçada+pagamento). */
@@ -101,6 +102,7 @@ class Payable extends Model
         'branch_id', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'senior_id',
         'paid_at', 'payment_method', 'paid_by',
+        'conciliated_at', 'conciliated_by', 'conciliation_notes', 'divergence_reason',
         'senior_situacao_original', 'senior_missing_at', 'senior_raw',
         'senior_synced_at',
     ];
@@ -123,6 +125,7 @@ class Payable extends Model
             'sent_for_approval_at' => 'datetime',
             'approved_at' => 'datetime',
             'paid_at' => 'date',
+            'conciliated_at' => 'date',
             'senior_missing_at' => 'datetime',
             'senior_synced_at' => 'datetime',
             'senior_raw' => 'array',
@@ -164,6 +167,8 @@ class Payable extends Model
         'aprovado' => 'Aprovado',
         'reprovado' => 'Reprovado',
         'pago' => 'Pago',
+        'conciliado' => 'Conciliado',
+        'divergente' => 'Divergente',
     ];
 
     public const STATUS_COLORS = [
@@ -173,6 +178,8 @@ class Payable extends Model
         'aprovado' => 'success',
         'reprovado' => 'danger',
         'pago' => 'success',
+        'conciliado' => 'success',
+        'divergente' => 'danger',
     ];
 
     public function branch(): BelongsTo
@@ -193,6 +200,11 @@ class Payable extends Model
     public function payer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'paid_by');
+    }
+
+    public function conciliator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'conciliated_by');
     }
 
     public function bordero(): BelongsTo

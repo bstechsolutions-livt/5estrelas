@@ -2,6 +2,7 @@
 
 namespace Tests\Browser;
 
+use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Solicitacao;
 use App\Models\SolicitacaoAssunto;
@@ -40,6 +41,13 @@ class SolicitacoesNovaTest extends DuskTestCase
     private function criarCenario(): array
     {
         $sufixo = strtoupper(substr(uniqid(), -6));
+
+        // Garante que existe pelo menos uma filial ativa (necessária para
+        // props.filiais no frontend e para o campo filial_id do ticket).
+        $branch = Branch::firstOrCreate(
+            ['code' => 'DUSK'],
+            ['name' => 'Filial Dusk QA', 'is_active' => true, 'cnpj' => '00000000000000']
+        );
 
         $dept = Department::create([
             'name' => 'Dusk Nova QA '.$sufixo,
@@ -99,7 +107,7 @@ class SolicitacoesNovaTest extends DuskTestCase
         $this->browse(function (Browser $browser) {
             $browser->loginAs($this->bruno())
                 ->visit('/solicitacoes/nova')
-                ->waitForText('Novo Ticket', 15)
+                ->waitForText('Novo Ticket', 20)
                 ->assertSee('Novo Ticket')
                 // Painel principal do formulário
                 ->assertSee('Dados do Ticket')
@@ -120,8 +128,8 @@ class SolicitacoesNovaTest extends DuskTestCase
             $this->browse(function (Browser $browser) use ($cenario, $titulo, $descricao, &$persistido) {
                 $browser->loginAs($this->bruno())
                     ->visit('/solicitacoes/nova')
-                    ->waitForText('Novo Ticket', 15)
-                    ->waitFor('@nova-departamento', 15);
+                    ->waitForText('Novo Ticket', 20)
+                    ->waitFor('@nova-departamento', 20);
 
                 // Abre o Select de Departamento Responsável e seleciona o departamento do cenário.
                 $browser->click('@nova-departamento')->pause(500);
@@ -131,17 +139,20 @@ class SolicitacoesNovaTest extends DuskTestCase
 
                 // Com um único assunto no departamento, ele é auto-selecionado (watch),
                 // o que faz o formulário de título/descrição aparecer.
-                $browser->waitFor('@nova-titulo', 15)
+                $browser->waitFor('@nova-titulo', 20)
                     ->type('@nova-titulo', $titulo)
-                    ->waitFor('@nova-descricao', 10)
+                    ->waitFor('@nova-descricao', 15)
                     ->type('@nova-descricao', $descricao);
 
                 // Submete o ticket.
-                $browser->click('@nova-submit');
+                $browser->scrollIntoView('@nova-submit')
+                    ->pause(500)
+                    ->click('@nova-submit')
+                    ->pause(2000);
 
                 // Confirma a persistência consultando o banco diretamente (robusto contra a
                 // lentidão do servidor single-threaded de dev e o redirect pós-criação).
-                $deadline = microtime(true) + 25;
+                $deadline = microtime(true) + 45;
                 while (microtime(true) < $deadline) {
                     $persistido = Solicitacao::where('titulo', $titulo)
                         ->where('assunto_id', $cenario['assunto']->id)
@@ -149,7 +160,7 @@ class SolicitacoesNovaTest extends DuskTestCase
                     if ($persistido) {
                         break;
                     }
-                    usleep(300000);
+                    usleep(400000);
                 }
             });
 

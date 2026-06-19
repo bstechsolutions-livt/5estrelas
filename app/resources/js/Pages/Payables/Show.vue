@@ -22,6 +22,8 @@ const props = defineProps({
     canPay: { type: Boolean, default: false },
     paymentMethods: { type: Object, default: () => ({}) },
     pagadorConfigured: { type: Boolean, default: true },
+    canConciliate: { type: Boolean, default: false },
+    conciliadorConfigured: { type: Boolean, default: true },
 })
 
 const { isMobile } = useDevice()
@@ -58,6 +60,25 @@ function submitPayment() {
             preserveScroll: true,
             onSuccess: () => { showPayment.value = false; paymentForm.reset() },
         })
+}
+
+// ── Conciliação bancária ──
+const showConciliation = ref(false)
+const conciliationMode = ref(null) // 'conciliate' or 'diverge'
+const conciliateForm = useForm({ notes: '' })
+const divergeForm = useForm({ reason: '' })
+
+function submitConciliation() {
+    conciliateForm.post(`/financeiro/contas-pagar/${props.payable.id}/conciliar`, {
+        preserveScroll: true,
+        onSuccess: () => { showConciliation.value = false; conciliationMode.value = null; conciliateForm.reset() },
+    })
+}
+function submitDivergence() {
+    divergeForm.post(`/financeiro/contas-pagar/${props.payable.id}/divergencia`, {
+        preserveScroll: true,
+        onSuccess: () => { showConciliation.value = false; conciliationMode.value = null; divergeForm.reset() },
+    })
 }
 
 watch(() => page.props.flash?.success, (msg) => {
@@ -127,6 +148,9 @@ const showSidebar = computed(() =>
     canSendIndividual || canApprove || inBordero || showRejectDialog.value ||
     props.canPay || props.payable.status === 'pago' ||
     (props.payable.status === 'aprovado' && !props.pagadorConfigured) ||
+    props.canConciliate ||
+    props.payable.status === 'conciliado' || props.payable.status === 'divergente' ||
+    (props.payable.status === 'pago' && !props.conciliadorConfigured) ||
     !!(props.payable.preparer || props.payable.approver || props.payable.approved_at)
 )
 
@@ -306,6 +330,34 @@ function isImage(doc) {
                         <div v-if="payable.payer"><p class="text-xs text-gray-500">Pago por</p><p class="text-gray-800">{{ payable.payer.name }}</p></div>
                     </div>
 
+                    <!-- Ação: conciliar (governada pela alçada) -->
+                    <div v-if="canConciliate" class="bg-white rounded-xl border border-gray-100 p-4">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Conciliação</h3>
+                        <Button label="Conciliar" icon="pi pi-check-circle" severity="info" class="w-full" dusk="open-conciliation" @click="showConciliation = true" />
+                    </div>
+
+                    <!-- Hint: alçada de conciliação não configurada -->
+                    <div v-else-if="payable.status === 'pago' && !conciliadorConfigured" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <h3 class="text-sm font-semibold text-amber-700 mb-1 flex items-center gap-2"><i class="pi pi-exclamation-triangle"></i> Alçada não configurada</h3>
+                        <p class="text-xs text-amber-600">Defina um conciliador na alçada do Contas a Pagar para conciliar pagamentos.</p>
+                    </div>
+
+                    <!-- Conciliação read-only -->
+                    <div v-if="payable.status === 'conciliado'" class="bg-white rounded-xl border border-gray-100 p-4 text-sm" dusk="conciliation-info">
+                        <h3 class="text-sm font-semibold text-green-700 mb-2 flex items-center gap-2"><i class="pi pi-check-circle"></i> Conciliação</h3>
+                        <div class="mb-2"><p class="text-xs text-gray-500">Data</p><p class="text-gray-800">{{ formatDate(payable.conciliated_at) }}</p></div>
+                        <div v-if="payable.conciliator" class="mb-2"><p class="text-xs text-gray-500">Conciliado por</p><p class="text-gray-800">{{ payable.conciliator.name }}</p></div>
+                        <div v-if="payable.conciliation_notes"><p class="text-xs text-gray-500">Observação</p><p class="text-gray-800">{{ payable.conciliation_notes }}</p></div>
+                    </div>
+
+                    <!-- Divergência read-only -->
+                    <div v-if="payable.status === 'divergente'" class="bg-red-50 border border-red-200 rounded-xl p-4 text-sm" dusk="divergence-info">
+                        <h3 class="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2"><i class="pi pi-exclamation-circle"></i> Divergência</h3>
+                        <div class="mb-2"><p class="text-xs text-gray-500">Data</p><p class="text-gray-800">{{ formatDate(payable.conciliated_at) }}</p></div>
+                        <div v-if="payable.conciliator" class="mb-2"><p class="text-xs text-gray-500">Registrado por</p><p class="text-gray-800">{{ payable.conciliator.name }}</p></div>
+                        <div><p class="text-xs text-gray-500">Motivo</p><p class="text-red-700">{{ payable.divergence_reason }}</p></div>
+                    </div>
+
                     <!-- Info lateral -->
                     <div v-if="payable.preparer || payable.approver || payable.approved_at" class="bg-white rounded-xl border border-gray-100 p-4 text-sm">
                         <div v-if="payable.preparer" class="mb-2">
@@ -366,6 +418,68 @@ function isImage(doc) {
                     <p class="text-[11px] text-gray-400 mt-1">Opcional. Tamanho máximo: 10 MB.</p>
                 </div>
                 <Button label="Confirmar pagamento" icon="pi pi-check" severity="success" class="w-full" :loading="paymentForm.processing" dusk="confirm-payment" @click="submitPayment" />
+            </div>
+        </BottomSheet>
+
+        <!-- Conciliação — Dialog no desktop -->
+        <Dialog v-if="!isMobile" v-model:visible="showConciliation" modal header="Conciliação Bancária" :style="{ width: '450px' }" @hide="conciliationMode = null">
+            <!-- Mode selection -->
+            <div v-if="!conciliationMode" class="space-y-3">
+                <p class="text-sm text-gray-600 mb-3">Verifique se o pagamento confere com o extrato bancário:</p>
+                <Button label="Conciliar (confere)" icon="pi pi-check" severity="success" class="w-full" dusk="action-conciliate" @click="conciliationMode = 'conciliate'" />
+                <Button label="Registrar divergência" icon="pi pi-times" severity="danger" outlined class="w-full" dusk="action-diverge" @click="conciliationMode = 'diverge'" />
+            </div>
+            <!-- Conciliate form -->
+            <div v-if="conciliationMode === 'conciliate'" class="space-y-4 pt-1">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Observação (opcional)</label>
+                    <Textarea v-model="conciliateForm.notes" placeholder="Ex.: Conferido com extrato Banco X..." rows="3" class="w-full" dusk="conciliation-notes" />
+                </div>
+                <div class="flex gap-2 justify-end">
+                    <Button label="Voltar" severity="secondary" text @click="conciliationMode = null" />
+                    <Button label="Confirmar conciliação" icon="pi pi-check" severity="success" :loading="conciliateForm.processing" dusk="confirm-conciliation" @click="submitConciliation" />
+                </div>
+            </div>
+            <!-- Diverge form -->
+            <div v-if="conciliationMode === 'diverge'" class="space-y-4 pt-1">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Motivo da divergência *</label>
+                    <Textarea v-model="divergeForm.reason" placeholder="Descreva o que não confere (mín. 10 caracteres)..." rows="3" class="w-full" dusk="divergence-reason" />
+                    <p v-if="divergeForm.errors.reason" class="text-xs text-red-500 mt-1">{{ divergeForm.errors.reason }}</p>
+                </div>
+                <div class="flex gap-2 justify-end">
+                    <Button label="Voltar" severity="secondary" text @click="conciliationMode = null" />
+                    <Button label="Confirmar divergência" icon="pi pi-times" severity="danger" :loading="divergeForm.processing" dusk="confirm-divergence" @click="submitDivergence" />
+                </div>
+            </div>
+        </Dialog>
+
+        <!-- Conciliação — Bottom sheet no mobile -->
+        <BottomSheet v-else v-model="showConciliation" title="Conciliação Bancária">
+            <div dusk="conciliation-sheet">
+                <!-- Mode selection -->
+                <div v-if="!conciliationMode" class="space-y-3">
+                    <p class="text-sm text-gray-600 mb-3">Verifique se o pagamento confere com o extrato bancário:</p>
+                    <Button label="Conciliar (confere)" icon="pi pi-check" severity="success" class="w-full" dusk="action-conciliate" @click="conciliationMode = 'conciliate'" />
+                    <Button label="Registrar divergência" icon="pi pi-times" severity="danger" outlined class="w-full" dusk="action-diverge" @click="conciliationMode = 'diverge'" />
+                </div>
+                <!-- Conciliate form -->
+                <div v-if="conciliationMode === 'conciliate'" class="space-y-4 pt-1">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Observação (opcional)</label>
+                        <Textarea v-model="conciliateForm.notes" placeholder="Ex.: Conferido com extrato Banco X..." rows="3" class="w-full" dusk="conciliation-notes" />
+                    </div>
+                    <Button label="Confirmar conciliação" icon="pi pi-check" severity="success" class="w-full" :loading="conciliateForm.processing" dusk="confirm-conciliation" @click="submitConciliation" />
+                </div>
+                <!-- Diverge form -->
+                <div v-if="conciliationMode === 'diverge'" class="space-y-4 pt-1">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Motivo da divergência *</label>
+                        <Textarea v-model="divergeForm.reason" placeholder="Descreva o que não confere (mín. 10 caracteres)..." rows="3" class="w-full" dusk="divergence-reason" />
+                        <p v-if="divergeForm.errors.reason" class="text-xs text-red-500 mt-1">{{ divergeForm.errors.reason }}</p>
+                    </div>
+                    <Button label="Confirmar divergência" icon="pi pi-times" severity="danger" class="w-full" :loading="divergeForm.processing" dusk="confirm-divergence" @click="submitDivergence" />
+                </div>
             </div>
         </BottomSheet>
     </component>

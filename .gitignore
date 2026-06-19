@@ -37,3 +37,4 @@ Thumbs.db
 .codex
 *.log
 infra/vpn/auth.txt
+app/nohup.out
