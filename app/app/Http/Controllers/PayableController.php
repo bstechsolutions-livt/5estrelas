@@ -82,12 +82,14 @@ class PayableController extends Controller
             'preparer:id,name',
             'approver:id,name',
             'payer:id,name',
+            'conciliator:id,name',
             'documents.uploader:id,name',
             'comments.user:id,name,avatar_path',
         ])->findOrFail($id);
 
         $user = request()->user();
         $isPagador = $user ? $alcada->isAssigned($user, 'pagador') : false;
+        $isConciliador = $user ? $alcada->isAssigned($user, 'conciliador') : false;
 
         return Inertia::render('Payables/Show', [
             'payable' => $payable,
@@ -96,6 +98,8 @@ class PayableController extends Controller
             'canPay' => $isPagador && $payable->status === 'aprovado',
             'paymentMethods' => Payable::PAYMENT_METHODS,
             'pagadorConfigured' => $alcada->hasRole('pagador'),
+            'canConciliate' => $isConciliador && $payable->status === 'pago',
+            'conciliadorConfigured' => $alcada->hasRole('conciliador'),
         ]);
     }
 
@@ -347,6 +351,133 @@ class PayableController extends Controller
         }
 
         return back()->with('success', 'Pagamento registrado.');
+    }
+
+    /**
+     * Registra a conciliação de um título PAGO (pago -> conciliado).
+     * Governado pela ALÇADA: só quem está como `conciliador` concilia — nem o curinga '*' fura.
+     */
+    public function conciliate(Request $request, int $id, PayableAlcadaService $alcada)
+    {
+        $payable = Payable::findOrFail($id);
+        $user = $request->user();
+
+        if (! $alcada->isAssigned($user, 'conciliador')) {
+            abort(403, 'Você não está na alçada como conciliador deste módulo.');
+        }
+
+        $data = $request->validate([
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $done = DB::transaction(function () use ($payable, $user, $data) {
+            $fresh = Payable::whereKey($payable->id)->lockForUpdate()->first();
+
+            if ($fresh->status !== 'pago') {
+                return false;
+            }
+
+            $old = $fresh->status;
+            $fresh->update([
+                'status' => 'conciliado',
+                'conciliated_at' => now()->toDateString(),
+                'conciliated_by' => $user->id,
+                'conciliation_notes' => $data['notes'] ?? null,
+            ]);
+
+            PayableComment::create([
+                'payable_id' => $fresh->id,
+                'user_id' => $user->id,
+                'body' => 'Conciliação realizada'
+                    . (($data['notes'] ?? null) ? " — {$data['notes']}" : ''),
+                'type' => 'conciliation',
+            ]);
+
+            AuditLogger::log(
+                event: 'contas_pagar.conciliado',
+                module: 'financeiro.contas_pagar',
+                description: "Título {$fresh->title_number} conciliado (R$ {$fresh->amount})",
+                auditable: $fresh,
+                oldValues: ['status' => $old],
+                newValues: [
+                    'status' => 'conciliado',
+                    'conciliated_at' => now()->toDateString(),
+                    'conciliated_by' => $user->id,
+                    'conciliation_notes' => $data['notes'] ?? null,
+                ],
+            );
+
+            return true;
+        });
+
+        if (! $done) {
+            return back()->with('error', 'Este título não está apto a ser conciliado.');
+        }
+
+        return back()->with('success', 'Conciliação registrada.');
+    }
+
+    /**
+     * Registra divergência de um título PAGO (pago -> divergente).
+     * Governado pela ALÇADA: só quem está como `conciliador` registra divergência — nem o curinga '*' fura.
+     */
+    public function diverge(Request $request, int $id, PayableAlcadaService $alcada)
+    {
+        $payable = Payable::findOrFail($id);
+        $user = $request->user();
+
+        if (! $alcada->isAssigned($user, 'conciliador')) {
+            abort(403, 'Você não está na alçada como conciliador deste módulo.');
+        }
+
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:1000'],
+        ]);
+
+        $done = DB::transaction(function () use ($payable, $user, $data) {
+            $fresh = Payable::whereKey($payable->id)->lockForUpdate()->first();
+
+            if ($fresh->status !== 'pago') {
+                return false;
+            }
+
+            $old = $fresh->status;
+            $fresh->update([
+                'status' => 'divergente',
+                'conciliated_at' => now()->toDateString(),
+                'conciliated_by' => $user->id,
+                'divergence_reason' => $data['reason'],
+            ]);
+
+            PayableComment::create([
+                'payable_id' => $fresh->id,
+                'user_id' => $user->id,
+                'body' => "Divergência registrada — {$data['reason']}",
+                'type' => 'divergence',
+            ]);
+
+            AuditLogger::log(
+                event: 'contas_pagar.divergente',
+                module: 'financeiro.contas_pagar',
+                description: "Título {$fresh->title_number} marcado como divergente: {$data['reason']}",
+                auditable: $fresh,
+                oldValues: ['status' => $old],
+                newValues: [
+                    'status' => 'divergente',
+                    'conciliated_at' => now()->toDateString(),
+                    'conciliated_by' => $user->id,
+                    'divergence_reason' => $data['reason'],
+                ],
+            );
+
+            return true;
+        });
+
+        if (! $done) {
+            return back()->with('error', 'Este título não está apto para registro de divergência.');
+        }
+
+        return back()->with('success', 'Divergência registrada.');
     }
 
     public function removeDocument(int $payableId, int $docId)

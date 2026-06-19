@@ -103,6 +103,7 @@ class PayableSeeder extends Seeder
         $this->seedBorderos();
 
         $this->ensureAprovadosEPagos();
+        $this->ensureConciliadosEDivergentes();
         $this->seedAlcada();
     }
 
@@ -282,8 +283,72 @@ class PayableSeeder extends Seeder
     }
 
     /**
+     * Garante massa para a Spec Conciliação: títulos `conciliado` (com campos
+     * preenchidos) e ao menos 1 `divergente` (com motivo preenchido).
+     */
+    private function ensureConciliadosEDivergentes(): void
+    {
+        $conciliador = User::where('email', 'bruno@bstechsolutions.com')->first()
+            ?? User::where('email', 'admin@5estrelas.com.br')->first()
+            ?? User::first();
+
+        if (!$conciliador) {
+            $this->command->warn('  ! Nenhum usuário encontrado para criar títulos conciliados.');
+            return;
+        }
+
+        $formas = array_keys(Payable::PAYMENT_METHODS);
+
+        // 3 títulos conciliados (com conciliated_at, conciliated_by, conciliation_notes)
+        $notesPool = [
+            'Pagamento confirmado no extrato Itaú — ref. TED dia ' . now()->subDays(3)->format('d/m'),
+            'Valor confere com boleto liquidado no Bradesco.',
+            'Conciliação OK — PIX identificado no extrato.',
+        ];
+
+        Payable::whereNull('bordero_id')
+            ->whereNotIn('status', ['pago', 'conciliado', 'divergente'])
+            ->inRandomOrder()->limit(3)->get()
+            ->each(function (Payable $p, int $idx) use ($conciliador, $formas, $notesPool) {
+                $p->update([
+                    'status' => 'conciliado',
+                    'prepared_by' => $conciliador->id,
+                    'approved_by' => $conciliador->id,
+                    'approved_at' => now()->subDays(random_int(10, 20)),
+                    'paid_at' => now()->subDays(random_int(5, 9))->toDateString(),
+                    'payment_method' => $formas[array_rand($formas)],
+                    'paid_by' => $conciliador->id,
+                    'conciliated_at' => now()->subDays(random_int(1, 4))->toDateString(),
+                    'conciliated_by' => $conciliador->id,
+                    'conciliation_notes' => $notesPool[$idx] ?? $notesPool[0],
+                ]);
+            });
+
+        // 1 título divergente (com divergence_reason)
+        Payable::whereNull('bordero_id')
+            ->whereNotIn('status', ['pago', 'conciliado', 'divergente'])
+            ->inRandomOrder()->limit(1)->get()
+            ->each(function (Payable $p) use ($conciliador, $formas) {
+                $p->update([
+                    'status' => 'divergente',
+                    'prepared_by' => $conciliador->id,
+                    'approved_by' => $conciliador->id,
+                    'approved_at' => now()->subDays(random_int(10, 20)),
+                    'paid_at' => now()->subDays(random_int(5, 9))->toDateString(),
+                    'payment_method' => $formas[array_rand($formas)],
+                    'paid_by' => $conciliador->id,
+                    'conciliated_at' => now()->subDays(random_int(1, 3))->toDateString(),
+                    'conciliated_by' => $conciliador->id,
+                    'divergence_reason' => 'Valor pago (R$ ' . number_format($p->amount + 150, 2, ',', '.') . ') não confere com o extrato bancário. Diferença de R$ 150,00 a maior no débito — possível cobrança de tarifa não prevista.',
+                ]);
+            });
+
+        $this->command->info('✅ Massa Conciliação: 3 conciliados + 1 divergente criados.');
+    }
+
+    /**
      * Configura a Alçada do Contas a Pagar: pelo menos um responsável por papel.
-     * bruno@bstechsolutions.com entra como pagador (necessário para os testes Dusk).
+     * bruno@bstechsolutions.com entra como pagador E conciliador (necessário para os testes Dusk).
      */
     private function seedAlcada(): void
     {
@@ -294,15 +359,18 @@ class PayableSeeder extends Seeder
             ->inRandomOrder()->limit(2)->get();
 
         $pagadores = collect([$bruno, $admin])->filter()->unique('id')->values();
-        $conciliador = $admin ?? $bruno ?? User::first();
         $assinante = $outros->first() ?? $admin ?? $bruno ?? User::first();
 
         foreach ($pagadores as $u) {
             PayableRole::firstOrCreate(['role' => 'pagador', 'user_id' => $u->id]);
         }
-        if ($conciliador) {
-            PayableRole::firstOrCreate(['role' => 'conciliador', 'user_id' => $conciliador->id]);
+
+        // Conciliador: bruno DEVE ser conciliador (req 9.1 — testes Dusk); admin também, se existir.
+        $conciliadores = collect([$bruno, $admin])->filter()->unique('id')->values();
+        foreach ($conciliadores as $u) {
+            PayableRole::firstOrCreate(['role' => 'conciliador', 'user_id' => $u->id]);
         }
+
         if ($assinante) {
             PayableRole::firstOrCreate(['role' => 'assinante', 'user_id' => $assinante->id]);
         }
