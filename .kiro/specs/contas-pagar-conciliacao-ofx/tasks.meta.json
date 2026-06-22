@@ -1,0 +1,349 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Criar migration `create_bank_statement_imports_table` com todos os campos definidos no design (user_id FK, bank_name, bank_id, account_number, branch_number, file_name, file_path, period_start, period_end, balance, status, transaction_count, matched_count, error_message, timestamps, indexes)": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128663896
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128677178
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128814054
+      }
+    ],
+    "1.2 Criar migration `create_bank_transactions_table` com todos os campos (import_id FK cascade, fitid, date, amount, type, description, memo, check_number, matched_payable_id FK nullable, match_status, match_confidence, raw_data jsonb, timestamps, indexes)": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664030
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128819588
+      }
+    ],
+    "1.3 Criar model `App\\Models\\BankStatementImport` com fillable, casts, relações (user, transactions), trait Auditable": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664077
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128820830
+      }
+    ],
+    "1.4 Criar model `App\\Models\\BankTransaction` com fillable, casts, relações (import, matchedPayable)": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664119
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128822004
+      }
+    ],
+    "1.5 Rodar `php artisan migrate` e verificar tabelas criadas": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664143
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128822991
+      }
+    ],
+    "2.1 Criar DTOs: `App\\Services\\Ofx\\OfxParseResult`, `App\\Services\\Ofx\\OfxMeta`, `App\\Services\\Ofx\\OfxTransaction` e `App\\Services\\Ofx\\OfxParseException`": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664169
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128830217
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129076804
+      }
+    ],
+    "2.2 Implementar `App\\Services\\OfxParserService` com os métodos: `parse()`, `parseHeader()`, `extractTagValue()`, `parseAmount()`, `parseDate()`, `parseAccountInfo()`, `parseTransactions()`, `parseBalance()`": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664194
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129078202
+      }
+    ],
+    "2.3 Copiar os 4 arquivos OFX reais para `tests/fixtures/ofx/` como fixtures de teste (bb.ofx, santander.ofx, brb.ofx, banrisul.ofx)": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664221
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129079779
+      }
+    ],
+    "2.5 Escrever feature tests do parser com os 4 arquivos reais (BB, Santander, BRB, Banrisul)": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664264
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129081220
+      }
+    ],
+    "3. Checkpoint — Parser testado isoladamente": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664290
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129082425
+      }
+    ],
+    "4.1 Implementar `App\\Services\\BankMatchingService` com: `run(importId)`, `findCandidates(BankTransaction)`, `calculateConfidence(txDate, paidAt)`": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664313
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129089523
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129672438
+      }
+    ],
+    "4.3 Escrever feature tests do matching: match high/medium/low, no match, crédito unmatched, payable já conciliado excluído, múltiplos candidatos ordenados, duplicidade detectada": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664335
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129674229
+      }
+    ],
+    "5.1 Implementar `App\\Services\\BatchConciliationService` com: `execute(importId, user)`": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664359
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129675010
+      }
+    ],
+    "5.3 Escrever feature tests do batch: lote completo, payable que mudou status (skip), sem aceitos (erro), audit log criado, comments criados, matched_count atualizado": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664384
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129676641
+      }
+    ],
+    "6. Checkpoint — Services testados": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664410
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129677809
+      }
+    ],
+    "7.1 Criar `App\\Http\\Controllers\\BankConciliationController` com todos os métodos: `index`, `show`, `upload`, `accept`, `reject`, `link`, `batchConciliate`, `destroy`, `searchPayables`": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664436
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129687929
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782130064486
+      }
+    ],
+    "7.2 Registrar rotas em `routes/web.php` dentro do grupo middleware `financeiro.contas_pagar.visualizar`": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664465
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782130065530
+      }
+    ],
+    "7.3 Adicionar item \"Conciliação Bancária\" no menu sidebar (grupo Financeiro)": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664508
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782130066813
+      }
+    ],
+    "7.4 Escrever feature tests do controller: upload OK, upload 403, upload inválido, accept, reject, link, batch, delete, search-payables, visualização sem conciliador (read-only)": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664537
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782130068615
+      }
+    ],
+    "8. Checkpoint — Backend completo": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664571
+      },
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782130069687
+      }
+    ],
+    "9.1 Criar `resources/js/Pages/BankConciliation/Index.vue` com versões desktop e mobile": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664597
+      }
+    ],
+    "9.2 Criar `resources/js/Pages/BankConciliation/Show.vue` com versões desktop e mobile": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664625
+      }
+    ],
+    "9.3 Adicionar busca global (`SearchController`) para `BankStatementImport` — pesquisar por banco ou conta": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664651
+      }
+    ],
+    "10.1 Estender `DemoSeeder` (ou criar `BankConciliationSeeder` chamado pelo Demo) com:": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664678
+      }
+    ],
+    "11. Checkpoint — Frontend + Seeder": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664703
+      }
+    ],
+    "12.1 Criar `tests/Browser/BankConciliationTest.php` com cenários:": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664733
+      }
+    ],
+    "13. Checkpoint final — Suíte completa": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128664777
+      }
+    ],
+    "1. Migrations e Models": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782128823026
+      }
+    ],
+    "2. OFX Parser Service": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129081274
+      }
+    ],
+    "4. Matching Service": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129674308
+      }
+    ],
+    "5. Batch Conciliation Service": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782129676710
+      }
+    ],
+    "7. Controller e Rotas": [
+      {
+        "executionId": "235390c7-4d67-4d5e-a398-db97db0b1849",
+        "chatSessionId": "sess_968ae6bd-885d-49f4-8673-cea13a4c9057",
+        "timestamp": 1782130068647
+      }
+    ]
+  }
+}

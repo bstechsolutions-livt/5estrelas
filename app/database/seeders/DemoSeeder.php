@@ -99,6 +99,10 @@ class DemoSeeder extends Seeder
         $this->command->info('Criando títulos a pagar (Contas a Pagar)...');
         $this->call(PayableSeeder::class);
 
+        // 8. Criar importações OFX demo (conciliação bancária) — spec contas-pagar-conciliacao-ofx
+        $this->command->info('Criando importações OFX demo (Conciliação Bancária)...');
+        $this->call(BankConciliationSeeder::class);
+
         // Limpa autenticação
         auth()->logout();
 

@@ -1,0 +1,68 @@
+OFXHEADER:100
+DATA:OFXSGML
+VERSION:102
+SECURITY:NONE
+ENCODING:USASCII
+CHARSET:1252
+COMPRESSION:NONE
+OLDFILEUID:NONE
+NEWFILEUID:NONE
+<OFX>
+    <SIGNONMSGSRSV1>
+        <SONRS>
+            <STATUS>
+                <CODE>0
+                <SEVERITY>INFO
+            </STATUS>
+            <DTSERVER>20260619070809[-3:GMT]
+            <LANGUAGE>ENG
+            <FI>
+                <ORG>SANTANDER
+                <FID>SANTANDER
+            </FI>
+        </SONRS>
+    </SIGNONMSGSRSV1>
+    <BANKMSGSRSV1>
+        <STMTTRNRS>
+            <TRNUID>1
+            <STATUS>
+                <CODE>0
+                <SEVERITY>INFO
+            </STATUS>
+            <STMTRS>
+                <CURDEF>BRL
+                <BANKACCTFROM>
+                    <BANKID>033
+                    <ACCTID>2269130023875
+                    <ACCTTYPE>CHECKING
+                </BANKACCTFROM>
+                <BANKTRANLIST>
+                    <DTSTART>20260618000000[-3:GMT]
+                    <DTEND>20260618000000[-3:GMT]
+                    <STMTTRN>
+                        <TRNTYPE>CREDIT
+                        <DTPOSTED>20260618000000[-3:GMT]
+                        <TRNAMT>17964,26
+                        <FITID>2269130023875202606190708090
+                        <CHECKNUM>00000000
+                        <PAYEEID>0
+                        <MEMO>TED RECEBIDA                       07947821000189
+                    </STMTTRN>
+                    <STMTTRN>
+                        <TRNTYPE>DEBIT
+                        <DTPOSTED>20260618000000[-3:GMT]
+                        <TRNAMT>-17964,26
+                        <FITID>2269130023875202606190708091
+                        <CHECKNUM>00000000
+                        <PAYEEID>0
+                        <MEMO>APLICACAO CONTAMAX
+                    </STMTTRN>
+                </BANKTRANLIST>
+                <LEDGERBAL>
+                    <BALAMT>0,00
+                    <DTASOF>20260619070809[-3:GMT]
+                </LEDGERBAL>
+            </STMTRS>
+        </STMTTRNRS>
+    </BANKMSGSRSV1>
+</OFX>
