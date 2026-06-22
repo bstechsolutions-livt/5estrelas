@@ -278,6 +278,29 @@ class SearchController extends Controller
             }
         }
 
+        // Importações OFX (Conciliação Bancária)
+        if ($user->hasPermission('financeiro.contas_pagar.visualizar')) {
+            $ofxImports = \App\Models\BankStatementImport::query()
+                ->where(function ($qq) use ($q) {
+                    $qq->where('bank_name', 'ilike', "%{$q}%")
+                        ->orWhere('account_number', 'ilike', "%{$q}%");
+                })
+                ->orderByDesc('created_at')
+                ->limit(5)
+                ->get(['id', 'bank_name', 'account_number', 'created_at'])
+                ->map(fn ($i) => [
+                    'id' => $i->id,
+                    'title' => "Importação OFX: {$i->bank_name} - {$i->account_number}",
+                    'subtitle' => 'Conciliação Bancária · ' . ($i->created_at ? $i->created_at->format('d/m/Y') : ''),
+                    'icon' => 'pi pi-file-import',
+                    'href' => "/financeiro/contas-pagar/conciliacao/{$i->id}",
+                ]);
+
+            if ($ofxImports->isNotEmpty()) {
+                $groups[] = ['label' => 'Importações OFX', 'items' => $ofxImports];
+            }
+        }
+
         // Solicitações
         if ($user->hasPermission('solicitacoes.visualizar')) {
             $solicitacoes = \App\Models\Solicitacao::query()

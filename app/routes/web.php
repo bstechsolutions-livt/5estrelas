@@ -8,6 +8,7 @@ use App\Http\Controllers\BackupController;
 use App\Http\Controllers\BorderoController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\BankConciliationController;
 use App\Http\Controllers\PayableController;
 use App\Http\Controllers\PayableAlcadaController;
 use App\Http\Controllers\DepartmentController;
@@ -151,6 +152,19 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [PayableAlcadaController::class, 'index'])->name('payables.alcada.index');
         Route::post('/', [PayableAlcadaController::class, 'store'])->name('payables.alcada.store');
         Route::delete('/{role}/{userId}', [PayableAlcadaController::class, 'destroy'])->whereNumber('userId')->name('payables.alcada.destroy');
+    });
+
+    // Financeiro - Conciliação Bancária (OFX) — ANTES do grupo genérico /financeiro/contas-pagar
+    Route::prefix('financeiro/contas-pagar/conciliacao')->middleware('permission:financeiro.contas_pagar.visualizar')->group(function () {
+        Route::get('/', [BankConciliationController::class, 'index'])->name('bank-conciliation.index');
+        Route::get('/search-payables', [BankConciliationController::class, 'searchPayables'])->name('bank-conciliation.search-payables');
+        Route::get('/{importId}', [BankConciliationController::class, 'show'])->whereNumber('importId')->name('bank-conciliation.show');
+        Route::post('/upload', [BankConciliationController::class, 'upload'])->name('bank-conciliation.upload');
+        Route::post('/transactions/{id}/accept', [BankConciliationController::class, 'accept'])->whereNumber('id')->name('bank-conciliation.accept');
+        Route::post('/transactions/{id}/reject', [BankConciliationController::class, 'reject'])->whereNumber('id')->name('bank-conciliation.reject');
+        Route::post('/transactions/{id}/link', [BankConciliationController::class, 'link'])->whereNumber('id')->name('bank-conciliation.link');
+        Route::post('/{importId}/batch-conciliate', [BankConciliationController::class, 'batchConciliate'])->whereNumber('importId')->name('bank-conciliation.batch');
+        Route::delete('/{importId}', [BankConciliationController::class, 'destroy'])->whereNumber('importId')->name('bank-conciliation.destroy');
     });
 
     // Financeiro - Contas a Pagar
