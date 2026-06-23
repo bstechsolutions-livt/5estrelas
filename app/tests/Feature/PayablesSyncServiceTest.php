@@ -33,15 +33,25 @@ class PayablesSyncServiceTest extends TestCase
 
     private function service(array $titulos): PayablesSyncService
     {
+        // Faixa de varredura mínima cobrindo os codFor usados pelos títulos de teste.
+        config([
+            'senior.cod_emps' => [1],
+            'senior.cod_for_start' => 1000,
+            'senior.cod_for_end' => 1001,
+        ]);
+
         $fake = new class($titulos) extends SeniorCpClient {
             public function __construct(private array $fakeTitulos)
             {
                 parent::__construct(config('senior'));
             }
 
-            public function consultarTitulosAbertos(?Carbon $vctIni, ?Carbon $vctFim): array
+            public function consultarTitulosPorFornecedor(int $codEmp, int $codFor, ?Carbon $vctIni, ?Carbon $vctFim): array
             {
-                return $this->fakeTitulos;
+                return array_values(array_filter(
+                    $this->fakeTitulos,
+                    fn ($t) => (int) ($t['codEmp'] ?? 0) === $codEmp && (int) ($t['codFor'] ?? 0) === $codFor,
+                ));
             }
         };
 
@@ -50,13 +60,20 @@ class PayablesSyncServiceTest extends TestCase
 
     private function serviceQueFalha(): PayablesSyncService
     {
+        config([
+            'senior.cod_emps' => [1],
+            'senior.cod_for_start' => 1000,
+            'senior.cod_for_end' => 1002,
+            'senior.sweep_max_transport_failures' => 3,
+        ]);
+
         $fake = new class extends SeniorCpClient {
             public function __construct()
             {
                 parent::__construct(config('senior'));
             }
 
-            public function consultarTitulosAbertos(?Carbon $vctIni, ?Carbon $vctFim): array
+            public function consultarTitulosPorFornecedor(int $codEmp, int $codFor, ?Carbon $vctIni, ?Carbon $vctFim): array
             {
                 throw new SeniorException('indisponível', SeniorException::KIND_UNAVAILABLE);
             }
@@ -207,5 +224,45 @@ class PayablesSyncServiceTest extends TestCase
         $this->assertNotNull($run->finished_at);
         $this->assertEquals(1, $run->inserted_count);
         $this->assertDatabaseHas('audit_logs', ['event' => 'contas_pagar.sync.concluido']);
+    }
+
+    // ─── Varredura por fornecedor com resposta REAL da Senior (req 1, 2) ────────
+
+    public function test_varredura_por_fornecedor_upserta_titulos_reais(): void
+    {
+        config([
+            'senior.enabled' => true,
+            'senior.cod_emps' => [3],
+            'senior.cod_for_start' => 1,
+            'senior.cod_for_end' => 3,
+        ]);
+
+        // Parseia a resposta real da Senior (codEmp 3, codFor 1 → 2 títulos).
+        $xml = file_get_contents(base_path('tests/fixtures/senior/titulos-abertos-emp3-for1.xml'));
+        $titulosReais = (new SeniorCpClient(config('senior')))->parseResponse($xml)['titulos'];
+
+        $fake = new class($titulosReais) extends SeniorCpClient {
+            public function __construct(private array $titulos)
+            {
+                parent::__construct(config('senior'));
+            }
+
+            public function consultarTitulosPorFornecedor(int $codEmp, int $codFor, ?Carbon $vctIni, ?Carbon $vctFim): array
+            {
+                // Apenas codEmp 3 / codFor 1 tem títulos; o resto da varredura vem vazio.
+                return ($codEmp === 3 && $codFor === 1) ? $this->titulos : [];
+            }
+        };
+
+        $run = (new PayablesSyncService($fake, new PayableMapper(), new StatusMapper()))
+            ->run(PayableSyncRun::MODE_FULL);
+
+        $this->assertEquals(PayableSyncRun::STATUS_SUCCESS, $run->status);
+        $this->assertEquals(2, $run->inserted_count);
+        $this->assertEquals(2, Payable::count());
+        $this->assertDatabaseHas('payables', ['title_number' => '48388378', 'senior_id' => '3-1-48388378-01-1']);
+        $this->assertDatabaseHas('payables', ['title_number' => '5080 05/05']);
+        // sitTit=AB não está no mapa → cai em pendente (req 8.4).
+        $this->assertEquals('pendente', Payable::where('title_number', '48388378')->first()->status);
     }
 }

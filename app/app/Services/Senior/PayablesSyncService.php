@@ -75,7 +75,7 @@ class PayablesSyncService
         ]);
 
         try {
-            $titulos = $this->client->consultarTitulosAbertos($vctIni, $vctFim);
+            $titulos = $this->collectTitulos($vctIni, $vctFim);
         } catch (SeniorException $e) {
             // req 2.3 / 9.4: falha de comunicação não altera dados; registra erro truncado.
             $run->update([
@@ -135,6 +135,83 @@ class PayablesSyncService
         }
 
         return $run->fresh();
+    }
+
+    /**
+     * Varre as empresas (cod_emps) × fornecedores (cod_for_start..cod_for_end) e
+     * coleta os títulos abertos de cada (codEmp, codFor). codFor é OBRIGATÓRIO no
+     * contrato real da Senior, por isso a consulta é por fornecedor.
+     *
+     * - Erro de NEGÓCIO num codFor específico (ex.: fornecedor inexistente) é
+     *   ignorado e a varredura continua.
+     * - Falha de TRANSPORTE (timeout/indisponível) repetida aborta a execução
+     *   inteira (relança SeniorException → run() marca FAILED, sem tocar nos dados).
+     */
+    private function collectTitulos(?Carbon $vctIni, ?Carbon $vctFim): array
+    {
+        $codEmps = config('senior.cod_emps');
+        if (empty($codEmps)) {
+            $codEmps = [(int) config('senior.cod_emp', 1)];
+        }
+        $forStart = (int) config('senior.cod_for_start', 1);
+        $forEnd = (int) config('senior.cod_for_end', 9999);
+        $delayMs = (int) config('senior.sweep_delay_ms', 0);
+        $maxTransport = max(1, (int) config('senior.sweep_max_transport_failures', 3));
+
+        $all = [];
+        $consecutiveTransport = 0;
+
+        foreach ($codEmps as $codEmp) {
+            for ($codFor = $forStart; $codFor <= $forEnd; $codFor++) {
+                try {
+                    $titulos = $this->client->consultarTitulosPorFornecedor((int) $codEmp, $codFor, $vctIni, $vctFim);
+                    $consecutiveTransport = 0;
+                    foreach ($titulos as $t) {
+                        $all[] = $t;
+                    }
+                } catch (SeniorException $e) {
+                    if ($e->isTransient()) {
+                        // Falha de transporte: o callOnce já tentou novamente (backoff).
+                        $consecutiveTransport++;
+                        Log::warning('[senior-cp] falha de transporte na varredura', [
+                            'codEmp' => $codEmp, 'codFor' => $codFor,
+                            'consecutivas' => $consecutiveTransport, 'erro' => $e->getMessage(),
+                        ]);
+                        if ($consecutiveTransport >= $maxTransport) {
+                            throw $e; // aborta o sync inteiro
+                        }
+                    } else {
+                        // Erro de negócio para um codFor: ignora e segue a varredura.
+                        $consecutiveTransport = 0;
+                        Log::debug('[senior-cp] codFor com erro de negócio, ignorado na varredura', [
+                            'codEmp' => $codEmp, 'codFor' => $codFor, 'erro' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                if ($delayMs > 0) {
+                    usleep($delayMs * 1000);
+                }
+            }
+        }
+
+        return $this->dedupTitulos($all);
+    }
+
+    /** Remove títulos duplicados pela Business_Key. */
+    private function dedupTitulos(array $titulos): array
+    {
+        $seen = [];
+        $out = [];
+        foreach ($titulos as $t) {
+            $key = $this->mapper->businessKey($t) ?? json_encode($t);
+            if (!isset($seen[$key])) {
+                $seen[$key] = true;
+                $out[] = $t;
+            }
+        }
+
+        return $out;
     }
 
     /** Janela de vencimento [ini, fim] conforme o modo (req 5). */
