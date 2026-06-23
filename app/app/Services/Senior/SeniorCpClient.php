@@ -11,8 +11,14 @@ use Illuminate\Support\Facades\Http;
  *
  * Apenas operações de consulta (req 1.5). A montagem do envelope (buildEnvelope)
  * e o parse da resposta (parseResponse) são públicos para teste unitário com
- * fixtures, sem rede. A chamada real (consultarTitulosAbertos) usa HTTP com
- * timeout + retry + paginação por janela de vencimento.
+ * fixtures, sem rede. A chamada real (consultarTitulos) usa HTTP com timeout +
+ * retry + paginação por janela de vencimento.
+ *
+ * CONTRATO REAL validado em produção (22-23/06/2026):
+ *  - codFor é OBRIGATÓRIO; consultarTitulos() consulta um único (codEmp, codFor).
+ *  - Datas no formato dd/MM/yyyy (ISO é rejeitado).
+ *  - tipoRetorno=1 = sucesso; qualquer outro valor (0, 2, -1) ou erroExecucao
+ *    preenchido = erro de negócio.
  */
 class SeniorCpClient
 {
@@ -93,6 +99,14 @@ XML;
      * Faz o parse da resposta SOAP em ['titulos' => [...]].
      * Detecta erro de negócio (tipoRetorno/erroExecucao/mensagemRetorno) e lança
      * SeniorException de negócio (req 1.7).
+     *
+     * CONTRATO REAL (validado em produção 22-23/06/2026):
+     *  - `tipoRetorno = 1` = sucesso ("Processado com sucesso.").
+     *  - `tipoRetorno = 2` = erro de validação de negócio (mensagem em mensagemRetorno).
+     *  - `tipoRetorno = 0` / `-1` = erro (ex.: web service não parametrizado; sigla
+     *    não cadastrada com a mensagem em <erros><mensagemErro>).
+     *  - `erroExecucao` preenchido (texto) também indica erro; o `<erroExecucao nil="true"/>`
+     *    das respostas de sucesso é ignorado.
      */
     public function parseResponse(string $xml): array
     {
@@ -105,18 +119,48 @@ XML;
         $arr = json_decode(json_encode($sx), true) ?: [];
         $flat = $this->findResultNode($arr);
 
-        // Erro de negócio retornado pela Senior (req 1.7).
         $tipoRetorno = $flat['tipoRetorno'] ?? null;
         $erroExecucao = $flat['erroExecucao'] ?? null;
-        $isErro = ($tipoRetorno !== null && !in_array(strtolower((string) $tipoRetorno), ['0', 'ok', 'sucesso', 'success'], true))
-            || ($erroExecucao !== null && trim((string) $erroExecucao) !== '' && $erroExecucao !== []);
-        if ($isErro) {
-            $msg = trim((string) ($flat['mensagemRetorno'] ?? $erroExecucao ?? 'Erro retornado pela Senior'));
 
-            throw new SeniorException($msg !== '' ? $msg : 'Erro retornado pela Senior', SeniorException::KIND_BUSINESS);
+        // erroExecucao com conteúdo textual = erro de execução. O <erroExecucao nil="true"/>
+        // de uma resposta de sucesso vira um array (só atributos) e é ignorado aqui.
+        $temErroExec = $erroExecucao !== null && !is_array($erroExecucao) && trim((string) $erroExecucao) !== '';
+
+        // Sucesso real: tipoRetorno == 1 e sem erroExecucao preenchido (req 1.7).
+        $sucesso = ((string) ($tipoRetorno ?? '') === '1') && !$temErroExec;
+        if (!$sucesso) {
+            throw new SeniorException($this->errorMessage($flat, $erroExecucao), SeniorException::KIND_BUSINESS);
         }
 
         return ['titulos' => $this->extractTitulos($flat)];
+    }
+
+    /**
+     * Extrai a mensagem de erro mais específica da resposta da Senior.
+     * Prioridade: <erros><mensagemErro> aninhado > erroExecucao textual > mensagemRetorno.
+     */
+    private function errorMessage(array $flat, mixed $erroExecucao): string
+    {
+        if (isset($flat['erros']) && is_array($flat['erros'])) {
+            $msgErro = $flat['erros']['mensagemErro'] ?? null;
+            if (is_array($msgErro)) {
+                $msgErro = implode('; ', array_map('strval', $msgErro));
+            }
+            if ($msgErro !== null && trim((string) $msgErro) !== '') {
+                return trim((string) $msgErro);
+            }
+        }
+
+        if ($erroExecucao !== null && !is_array($erroExecucao) && trim((string) $erroExecucao) !== '') {
+            return trim((string) $erroExecucao);
+        }
+
+        $msgRet = $flat['mensagemRetorno'] ?? null;
+        if ($msgRet !== null && !is_array($msgRet) && trim((string) $msgRet) !== '') {
+            return trim((string) $msgRet);
+        }
+
+        return 'Erro retornado pela Senior';
     }
 
     /** Normaliza os títulos e seus rateios para arrays associativos. */
@@ -151,10 +195,13 @@ XML;
 
     private function stripNamespaces(string $xml): string
     {
-        // Remove prefixos de namespace dos elementos para simplificar o parse.
-        $xml = preg_replace('/(<\/?)[A-Za-z0-9_]+:/', '$1', $xml);
-
-        return preg_replace('/\sxmlns(:[A-Za-z0-9_]+)?="[^"]*"/', '', $xml) ?? $xml;
+        // 1) Remove as declarações de namespace (xmlns e xmlns:prefixo).
+        $xml = preg_replace('/\sxmlns(:[A-Za-z0-9_]+)?="[^"]*"/', '', $xml) ?? $xml;
+        // 2) Remove o prefixo de namespace dos elementos (<ns2:Foo> -> <Foo>).
+        $xml = preg_replace('/(<\/?)[A-Za-z0-9_]+:/', '$1', $xml) ?? $xml;
+        // 3) Remove o prefixo de namespace dos atributos (xsi:nil="true" -> nil="true").
+        //    Sem isso, o atributo referencia um prefixo já removido e o parser falha.
+        return preg_replace('/\s[A-Za-z0-9_]+:([A-Za-z0-9_]+=)/', ' $1', $xml) ?? $xml;
     }
 
     private function findResultNode(array $arr): array
@@ -187,13 +234,14 @@ XML;
     {
         $params = [
             'codEmp' => $this->config['cod_emp'] ?? 1,
-            'retRat' => 'S', // retorna rateios aninhados
+            'retRat' => $this->config['ret_rat'] ?? 'S', // 'S' retorna rateios aninhados
         ];
+        // CONTRATO REAL: datas no formato dd/MM/yyyy (ISO yyyy-MM-dd é rejeitado).
         if ($vctIni) {
-            $params['vctIni'] = $vctIni->format('Y-m-d');
+            $params['vctIni'] = $vctIni->format('d/m/Y');
         }
         if ($vctFim) {
-            $params['vctFim'] = $vctFim->format('Y-m-d');
+            $params['vctFim'] = $vctFim->format('d/m/Y');
         }
 
         $titulos = $this->callOnce($params);
@@ -209,6 +257,35 @@ XML;
         }
 
         return $titulos;
+    }
+
+    /**
+     * Consulta os títulos abertos de UM fornecedor (codFor) numa empresa (codEmp),
+     * na janela [$vctIni, $vctFim]. codFor é OBRIGATÓRIO no contrato real da Senior,
+     * por isso o Payables_Sync varre codFor por empresa chamando este método.
+     *
+     * CONTRATO REAL (validado em produção 22-23/06/2026):
+     *  - params: codEmp + codFor + retRat (+ janela vctIni/vctFim em dd/MM/yyyy).
+     *  - sucesso sem títulos (fornecedor sem títulos em aberto) retorna [] sem erro.
+     *
+     * @return array lista de títulos (cada um com 'rateios')
+     */
+    public function consultarTitulosPorFornecedor(int $codEmp, int $codFor, ?Carbon $vctIni, ?Carbon $vctFim): array
+    {
+        $params = [
+            'codEmp' => $codEmp,
+            'codFor' => $codFor,
+            'retRat' => $this->config['ret_rat'] ?? 'N',
+        ];
+        // CONTRATO REAL: datas no formato dd/MM/yyyy (ISO yyyy-MM-dd é rejeitado).
+        if ($vctIni) {
+            $params['vctIni'] = $vctIni->format('d/m/Y');
+        }
+        if ($vctFim) {
+            $params['vctFim'] = $vctFim->format('d/m/Y');
+        }
+
+        return $this->callOnce($params);
     }
 
     /** Uma chamada HTTP com timeout + retry (backoff 2/4/8s). */

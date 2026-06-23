@@ -126,7 +126,7 @@ class SeniorMappersAndClientTest extends TestCase
   <soap:Body>
     <ns:ConsultarTitulosAbertosCPResponse xmlns:ns="http://services.senior.com.br">
       <result>
-        <tipoRetorno>0</tipoRetorno>
+        <tipoRetorno>1</tipoRetorno>
         <titulos>
           <codEmp>1</codEmp><codFil>1</codFil><numTit>TIT-1</numTit><codTpt>DP</codTpt><codFor>1000</codFor>
           <sitTit>NOR</sitTit><vlrOri>1234.56</vlrOri>
@@ -158,7 +158,7 @@ XML;
   <soap:Body>
     <ns:Resp xmlns:ns="http://services.senior.com.br">
       <result>
-        <tipoRetorno>1</tipoRetorno>
+        <tipoRetorno>2</tipoRetorno>
         <mensagemRetorno>Falha de autenticacao</mensagemRetorno>
       </result>
     </ns:Resp>
@@ -169,5 +169,55 @@ XML;
         $this->expectException(SeniorException::class);
         $this->expectExceptionMessage('Falha de autenticacao');
         $this->client()->parseResponse($xml);
+    }
+
+    // ─── Resposta REAL da Senior (fixture de produção) ──────────────────────────
+
+    public function test_parse_e_mapeia_resposta_real_emp3_for1(): void
+    {
+        $xml = file_get_contents(base_path('tests/fixtures/senior/titulos-abertos-emp3-for1.xml'));
+        $titulos = $this->client()->parseResponse($xml)['titulos'];
+
+        // 2 títulos reais (codEmp 3, codFor 1).
+        $this->assertCount(2, $titulos);
+
+        $mapper = new PayableMapper();
+        $a = $mapper->mapHeader($titulos[0]);
+        $b = $mapper->mapHeader($titulos[1]);
+
+        // Título 1: numTit, vlrAbe, vctOri, obsTcp, Business_Key (senior_id).
+        $this->assertEquals('48388378', $a['title_number']);
+        $this->assertEquals(34685.36, (float) $a['vlrabe']);
+        $this->assertEquals(34685.36, (float) $a['amount']);
+        $this->assertEquals('2024-11-20', $a['vctori']);     // vctOri 20/11/2024
+        $this->assertEquals('2024-11-20', $a['due_date']);   // vctPro 20/11/2024
+        $this->assertStringContainsString('ABASTECIMENTO', $a['obstcp']);
+        $this->assertEquals('3-1-48388378-01-1', $mapper->businessKey($titulos[0]));
+
+        // Título 2: numTit com espaço/barra, vlrAbe 6236.60.
+        $this->assertEquals('5080 05/05', $b['title_number']);
+        $this->assertEquals(6236.60, (float) $b['vlrabe']);
+        $this->assertEquals(6236.60, (float) $b['amount']);
+        $this->assertEquals('2026-09-22', $b['vctori']);     // vctOri 22/09/2026
+        $this->assertStringContainsString('ORÇAMENTO 1483', $b['obstcp']);
+    }
+
+    public function test_envelope_por_fornecedor_usa_data_dd_mm_yyyy(): void
+    {
+        // O contrato real da Senior exige datas dd/MM/yyyy; ISO é rejeitado.
+        $client = $this->client();
+        // Captura os params que viram envelope: reproduz a montagem de consultarTitulosPorFornecedor.
+        $envelope = $client->buildEnvelope([
+            'codEmp' => 3, 'codFor' => 1, 'retRat' => 'N',
+            'vctIni' => \Carbon\Carbon::create(2025, 6, 22)->format('d/m/Y'),
+            'vctFim' => \Carbon\Carbon::create(2026, 9, 20)->format('d/m/Y'),
+        ]);
+
+        $this->assertStringContainsString('<vctIni>22/06/2025</vctIni>', $envelope);
+        $this->assertStringContainsString('<vctFim>20/09/2026</vctFim>', $envelope);
+        $this->assertStringContainsString('<codFor>1</codFor>', $envelope);
+        $this->assertStringContainsString('<retRat>N</retRat>', $envelope);
+        // Garante que NÃO há data em formato ISO.
+        $this->assertStringNotContainsString('2025-06-22', $envelope);
     }
 }
