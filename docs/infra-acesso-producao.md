@@ -78,6 +78,20 @@ ssh easytech@192.168.254.80
 - **Senha**: `UE2emkL1uANFetmQl3W1EAgc` (rotacionada em 28/05/2026, original do e-mail invalidada)
 - **Privilégios**: sudo/root liberado
 
+## Acessos Senior (UI)
+
+Acesso à interface gráfica do Senior (web/HTML5). É **distinto** do usuário técnico de webservices `5estrelas.integracao` (esse fica em [`.kiro/steering/integracao-senior.md`](../.kiro/steering/integracao-senior.md)). Fornecidos pelo Luan em 23/06/2026.
+
+- **Plataforma Senior (Sirius S2 GW02)** — login da plataforma cloud
+  - URL: `https://sirius-s2.seniorcloud.com.br/`
+  - Login: `estre.estre.modern`
+  - Senha: `Senhateste1!`
+- **ERP Gestão Empresarial** — login interno do ERP
+  - Login: `bruno.easy`
+  - Senha inicial: `123456` (TEMPORÁRIA — troca obrigatória no primeiro acesso; atualizar aqui com a nova após trocar)
+
+> Detalhes completos (usuário do Luan, base de produção, empresas operacionais) em [`.kiro/steering/integracao-senior.md`](../.kiro/steering/integracao-senior.md).
+
 ## Responsabilidade
 
 Conforme combinado com o cliente: quaisquer alterações, instalações, configurações ou ações executadas dentro da VM passam a ser de responsabilidade da BS Tech / Easy Tech (usuários autorizados).
