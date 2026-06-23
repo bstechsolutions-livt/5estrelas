@@ -202,6 +202,25 @@ XML;
         $this->assertStringContainsString('ORÇAMENTO 1483', $b['obstcp']);
     }
 
+    public function test_parse_resposta_real_de_erro_com_tiporetorno_nil(): void
+    {
+        // CONTRATO REAL: fornecedor inexistente/sem títulos numa empresa retorna
+        // <erroExecucao>Não foi possível executar o serviço solicitado.</erroExecucao>
+        // com <tipoRetorno xsi:nil="true"/> (elemento vazio → [] no json_decode).
+        // Antes do fix isso estourava "Array to string conversion"; agora deve virar
+        // SeniorException de NEGÓCIO (não-transitória) para a varredura seguir adiante.
+        $xml = file_get_contents(base_path('tests/fixtures/senior/erro-fornecedor-inexistente-emp2-for1.xml'));
+
+        try {
+            $this->client()->parseResponse($xml);
+            $this->fail('Esperava SeniorException de negócio.');
+        } catch (SeniorException $e) {
+            $this->assertEquals(SeniorException::KIND_BUSINESS, $e->kind);
+            $this->assertFalse($e->isTransient(), 'erro de negócio não pode abortar a varredura');
+            $this->assertStringContainsString('Não foi possível executar', $e->getMessage());
+        }
+    }
+
     public function test_envelope_por_fornecedor_usa_data_dd_mm_yyyy(): void
     {
         // O contrato real da Senior exige datas dd/MM/yyyy; ISO é rejeitado.
