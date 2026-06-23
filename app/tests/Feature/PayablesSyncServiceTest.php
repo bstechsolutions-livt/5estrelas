@@ -265,4 +265,43 @@ class PayablesSyncServiceTest extends TestCase
         // sitTit=AB não está no mapa → cai em pendente (req 8.4).
         $this->assertEquals('pendente', Payable::where('title_number', '48388378')->first()->status);
     }
+
+    public function test_varredura_continua_apos_erro_de_negocio_por_fornecedor(): void
+    {
+        // CONTRATO REAL: codFor inexistente retorna erro de negócio (não-transitório).
+        // A varredura deve IGNORAR esse codFor e seguir, gravando os títulos do codFor válido.
+        config([
+            'senior.enabled' => true,
+            'senior.cod_emps' => [3],
+            'senior.cod_for_start' => 1,
+            'senior.cod_for_end' => 5,
+        ]);
+
+        $xml = file_get_contents(base_path('tests/fixtures/senior/titulos-abertos-emp3-for1.xml'));
+        $titulosReais = (new SeniorCpClient(config('senior')))->parseResponse($xml)['titulos'];
+
+        $fake = new class($titulosReais) extends SeniorCpClient {
+            public function __construct(private array $titulos)
+            {
+                parent::__construct(config('senior'));
+            }
+
+            public function consultarTitulosPorFornecedor(int $codEmp, int $codFor, ?Carbon $vctIni, ?Carbon $vctFim): array
+            {
+                if ($codFor === 3) {
+                    return $this->titulos; // único fornecedor com títulos
+                }
+                // Demais fornecedores: erro de negócio (fornecedor inexistente).
+                throw new SeniorException('Não foi possível executar o serviço solicitado.', SeniorException::KIND_BUSINESS);
+            }
+        };
+
+        $run = (new PayablesSyncService($fake, new PayableMapper(), new StatusMapper()))
+            ->run(PayableSyncRun::MODE_FULL);
+
+        // Erros de negócio não abortam: o sync conclui com sucesso e grava os 2 títulos válidos.
+        $this->assertEquals(PayableSyncRun::STATUS_SUCCESS, $run->status);
+        $this->assertEquals(2, $run->inserted_count);
+        $this->assertEquals(2, Payable::count());
+    }
 }

@@ -119,7 +119,12 @@ XML;
         $arr = json_decode(json_encode($sx), true) ?: [];
         $flat = $this->findResultNode($arr);
 
-        $tipoRetorno = $flat['tipoRetorno'] ?? null;
+        // Elemento vazio/nulo (<tag xsi:nil="true"/> ou <tag/>) é decodificado como []
+        // pelo json_encode(SimpleXML). Normaliza para null para não quebrar o cast (string).
+        // CONTRATO REAL: fornecedor inexistente/sem serviço retorna
+        // <erroExecucao>Não foi possível executar o serviço solicitado.</erroExecucao>
+        // com <tipoRetorno xsi:nil="true"/> — antes isso estourava "Array to string conversion".
+        $tipoRetorno = $this->scalarOrNull($flat['tipoRetorno'] ?? null);
         $erroExecucao = $flat['erroExecucao'] ?? null;
 
         // erroExecucao com conteúdo textual = erro de execução. O <erroExecucao nil="true"/>
@@ -133,6 +138,15 @@ XML;
         }
 
         return ['titulos' => $this->extractTitulos($flat)];
+    }
+
+    /**
+     * Elemento XML vazio ou com xsi:nil="true" vira [] no json_encode(SimpleXML).
+     * Normaliza array (nil/vazio) para null; mantém escalares como estão.
+     */
+    private function scalarOrNull(mixed $v): mixed
+    {
+        return is_array($v) ? null : $v;
     }
 
     /**
