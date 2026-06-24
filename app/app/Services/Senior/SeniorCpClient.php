@@ -181,7 +181,12 @@ XML;
     private function extractTitulos(array $flat): array
     {
         $raw = $flat['titulos'] ?? $flat['titulo'] ?? [];
-        if (!is_array($raw)) {
+        if (!is_array($raw) || $raw === []) {
+            return [];
+        }
+        // Guarda contra falso-positivo: se $raw não tem campos de título (numTit/codEmp),
+        // é um nó residual do parse, não um título real.
+        if (!isset($raw[0]) && !isset($raw['numTit']) && !isset($raw['codEmp'])) {
             return [];
         }
         // Um único título vem como assoc; vários vêm como lista.
