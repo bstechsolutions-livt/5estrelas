@@ -24,6 +24,9 @@ const props = defineProps({
     pagadorConfigured: { type: Boolean, default: true },
     canConciliate: { type: Boolean, default: false },
     conciliadorConfigured: { type: Boolean, default: true },
+    approvalSteps: { type: Array, default: () => [] },
+    currentStep: { type: Object, default: null },
+    canApproveStep: { type: Boolean, default: false },
 })
 
 const { isMobile } = useDevice()
@@ -291,8 +294,38 @@ function isImage(doc) {
                         <Button label="Enviar para Aprovação" icon="pi pi-send" class="w-full" @click="sendForApproval" />
                     </div>
 
-                    <!-- Ações do aprovador -->
-                    <div v-if="canApprove" class="bg-white rounded-xl border border-gray-100 p-4">
+                    <!-- Ações do aprovador (workflow multinível) -->
+                    <div v-if="payable.status === 'aguardando_aprovacao' && approvalSteps?.length" class="bg-white rounded-xl border border-gray-100 p-4">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Fluxo de Aprovação</h3>
+                        <!-- Stepper visual -->
+                        <div class="space-y-2 mb-4">
+                            <div v-for="step in approvalSteps" :key="step.id" class="flex items-start gap-2">
+                                <div class="mt-0.5">
+                                    <i v-if="step.status === 'aprovado'" class="pi pi-check-circle text-green-500 text-sm"></i>
+                                    <i v-else-if="step.status === 'reprovado'" class="pi pi-times-circle text-red-500 text-sm"></i>
+                                    <i v-else-if="currentStep?.id === step.id" class="pi pi-circle-fill text-blue-500 text-sm"></i>
+                                    <i v-else class="pi pi-circle text-gray-300 text-sm"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-medium" :class="step.status === 'aprovado' ? 'text-green-700' : step.status === 'reprovado' ? 'text-red-700' : currentStep?.id === step.id ? 'text-blue-700' : 'text-gray-500'">
+                                        {{ step.assignee?.name || step.level_name }}
+                                    </p>
+                                    <p v-if="step.resolver" class="text-[10px] text-gray-400">
+                                        {{ step.status === 'aprovado' ? 'Aprovado' : 'Reprovado' }} por {{ step.resolver.name }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Botões de ação se o usuário pode aprovar o step atual -->
+                        <div v-if="canApproveStep" class="space-y-2">
+                            <p class="text-xs text-blue-600 font-medium mb-2">Sua vez: {{ currentStep?.level_name }}</p>
+                            <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="approve" />
+                            <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="showRejectDialog = true" />
+                        </div>
+                    </div>
+
+                    <!-- Aprovação antiga (fallback se não tem steps) -->
+                    <div v-else-if="canApprove && !approvalSteps?.length" class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Aprovação</h3>
                         <div class="space-y-2">
                             <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="approve" />

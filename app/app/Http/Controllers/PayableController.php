@@ -6,7 +6,9 @@ use App\Models\Branch;
 use App\Models\Payable;
 use App\Models\PayableComment;
 use App\Models\PayableDocument;
+use App\Models\ApprovalStep;
 use App\Services\AuditLogger;
+use App\Services\ApprovalWorkflowService;
 use App\Services\PayableAlcadaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -91,6 +93,18 @@ class PayableController extends Controller
         $isPagador = $user ? $alcada->isAssigned($user, 'pagador') : false;
         $isConciliador = $user ? $alcada->isAssigned($user, 'conciliador') : false;
 
+        // Approval steps (workflow multinível)
+        $approvalSteps = ApprovalStep::where('payable_id', $id)
+            ->with(['assignee:id,name', 'resolver:id,name'])
+            ->orderBy('order')
+            ->get();
+
+        $workflow = app(ApprovalWorkflowService::class);
+        $currentStep = $workflow->currentStep($payable);
+        $canApproveStep = $currentStep && (
+            $currentStep->assigned_to === $user?->id || $user?->hasPermission('*')
+        );
+
         return Inertia::render('Payables/Show', [
             'payable' => $payable,
             'statusLabels' => Payable::STATUS_LABELS,
@@ -100,6 +114,9 @@ class PayableController extends Controller
             'pagadorConfigured' => $alcada->hasRole('pagador'),
             'canConciliate' => $isConciliador && $payable->status === 'pago',
             'conciliadorConfigured' => $alcada->hasRole('conciliador'),
+            'approvalSteps' => $approvalSteps,
+            'currentStep' => $currentStep,
+            'canApproveStep' => $canApproveStep,
         ]);
     }
 
@@ -175,27 +192,10 @@ class PayableController extends Controller
             return back()->with('error', 'Este título não pode ser enviado para aprovação.');
         }
 
-        $payable->update([
-            'status' => 'aguardando_aprovacao',
-            'prepared_by' => $payable->prepared_by ?? $request->user()->id,
-            'sent_for_approval_at' => now(),
-        ]);
+        $workflow = app(ApprovalWorkflowService::class);
+        $workflow->sendForApproval($payable, $request->user());
 
-        PayableComment::create([
-            'payable_id' => $payable->id,
-            'user_id' => $request->user()->id,
-            'body' => 'Enviou para aprovação',
-            'type' => 'status_change',
-        ]);
-
-        AuditLogger::log(
-            event: 'contas_pagar.enviado_aprovacao',
-            module: 'financeiro.contas_pagar',
-            description: "Título {$payable->title_number} enviado para aprovação (R$ {$payable->amount})",
-            auditable: $payable,
-        );
-
-        return back()->with('success', 'Enviado para aprovação.');
+        return back()->with('success', 'Enviado para aprovação multinível.');
     }
 
     public function approve(Request $request, int $id)
@@ -206,27 +206,14 @@ class PayableController extends Controller
             return back()->with('error', 'Este título não está aguardando aprovação.');
         }
 
-        $payable->update([
-            'status' => 'aprovado',
-            'approved_by' => $request->user()->id,
-            'approved_at' => now(),
-        ]);
+        $workflow = app(ApprovalWorkflowService::class);
+        $result = $workflow->approve($payable, $request->user(), $request->input('comment'));
 
-        PayableComment::create([
-            'payable_id' => $payable->id,
-            'user_id' => $request->user()->id,
-            'body' => $request->input('comment', 'Aprovado'),
-            'type' => 'approval',
-        ]);
+        if (!$result['success']) {
+            return back()->with('error', $result['error']);
+        }
 
-        AuditLogger::log(
-            event: 'contas_pagar.aprovado',
-            module: 'financeiro.contas_pagar',
-            description: "Título {$payable->title_number} aprovado (R$ {$payable->amount})",
-            auditable: $payable,
-        );
-
-        return back()->with('success', 'Título aprovado.');
+        return back()->with('success', $result['message']);
     }
 
     public function reject(Request $request, int $id)
@@ -241,27 +228,14 @@ class PayableController extends Controller
             'reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        $payable->update([
-            'status' => 'reprovado',
-            'approved_by' => $request->user()->id,
-            'rejection_reason' => $data['reason'],
-        ]);
+        $workflow = app(ApprovalWorkflowService::class);
+        $result = $workflow->reject($payable, $request->user(), $data['reason']);
 
-        PayableComment::create([
-            'payable_id' => $payable->id,
-            'user_id' => $request->user()->id,
-            'body' => "Reprovado: {$data['reason']}",
-            'type' => 'rejection',
-        ]);
+        if (!$result['success']) {
+            return back()->with('error', $result['error']);
+        }
 
-        AuditLogger::log(
-            event: 'contas_pagar.reprovado',
-            module: 'financeiro.contas_pagar',
-            description: "Título {$payable->title_number} reprovado: {$data['reason']}",
-            auditable: $payable,
-        );
-
-        return back()->with('success', 'Título reprovado.');
+        return back()->with('success', $result['message']);
     }
 
     /**
