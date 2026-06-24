@@ -144,7 +144,7 @@ const canPrepare = ['pendente', 'em_preparacao', 'reprovado'].includes(props.pay
 // Se está num borderô, não pode enviar individual — o borderô controla o envio
 const inBordero = !!props.payable.bordero_id
 const canSendIndividual = canPrepare && !inBordero
-const canApprove = props.payable.status === 'aguardando_aprovacao' && !inBordero
+const canApprove = props.payable.status === 'aguardando_aprovacao' && !inBordero && !props.approvalSteps?.length
 
 // Sidebar de ações aparece quando há qualquer ação/condição lateral a mostrar.
 const showSidebar = computed(() =>
