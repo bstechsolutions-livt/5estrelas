@@ -76,8 +76,10 @@ class PayablesSyncService
 
         try {
             $titulos = $this->collectTitulos($vctIni, $vctFim);
-        } catch (SeniorException $e) {
+        } catch (\Throwable $e) {
             // req 2.3 / 9.4: falha de comunicação não altera dados; registra erro truncado.
+            // Captura \Throwable (não só SeniorException) para que um erro inesperado
+            // NÃO deixe a execução presa em RUNNING e bloqueie os próximos syncs (concorrência).
             $run->update([
                 'status' => PayableSyncRun::STATUS_FAILED,
                 'finished_at' => now(),
