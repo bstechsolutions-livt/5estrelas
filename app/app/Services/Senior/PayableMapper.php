@@ -55,6 +55,8 @@ class PayableMapper
         $out['issue_date'] = $this->convert($titulo['datEmi'] ?? null, 'date');
         $out['supplier_name'] = $this->supplierName($titulo);
         $out['supplier_cnpj'] = isset($titulo['docIdeFav']) ? (string) $titulo['docIdeFav'] : null;
+ $out["description"] = isset($titulo["obsTcp"]) ? (string) $titulo["obsTcp"] : null;
+ $out["category"] = isset($titulo["codTns"]) ? "Transação " . $titulo["codTns"] : null;
 
         // Metadados de origem.
         $out['senior_situacao_original'] = isset($titulo['sitTit']) ? (string) $titulo['sitTit'] : null;
