@@ -169,6 +169,7 @@ class Payable extends Model
         'pago' => 'Pago',
         'conciliado' => 'Conciliado',
         'divergente' => 'Divergente',
+        'encerrado' => 'Encerrado',
     ];
 
     public const STATUS_COLORS = [
@@ -180,6 +181,7 @@ class Payable extends Model
         'pago' => 'success',
         'conciliado' => 'success',
         'divergente' => 'danger',
+        'encerrado' => 'info',
     ];
 
     public function branch(): BelongsTo

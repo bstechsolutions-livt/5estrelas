@@ -114,6 +114,7 @@ class PayableController extends Controller
             'pagadorConfigured' => $alcada->hasRole('pagador'),
             'canConciliate' => $isConciliador && $payable->status === 'pago',
             'conciliadorConfigured' => $alcada->hasRole('conciliador'),
+            'canFinalSign' => $alcada->isAssigned($user, 'assinante') && $payable->status === 'conciliado',
             'approvalSteps' => $approvalSteps,
             'currentStep' => $currentStep,
             'canApproveStep' => $canApproveStep,
@@ -472,6 +473,45 @@ class PayableController extends Controller
         $doc->delete();
 
         return back();
+    }
+
+    /**
+     * 2ª assinatura do presidente — encerra o ciclo após conciliação (Fluxo v3.0 passo 8).
+     * Só o presidente (ou substituto configurado) pode executar.
+     */
+    public function finalSign(Request $request, int $id, PayableAlcadaService $alcada)
+    {
+        $payable = Payable::findOrFail($id);
+        $user = $request->user();
+
+        // Só quem está na alçada como 'assinante' pode dar a 2ª assinatura
+        if (!$alcada->isAssigned($user, 'assinante')) {
+            abort(403, 'Você não está na alçada como assinante (2ª assinatura).');
+        }
+
+        if ($payable->status !== 'conciliado') {
+            return back()->with('error', 'Este título precisa estar conciliado para encerrar.');
+        }
+
+        $payable->update(['status' => 'encerrado']);
+
+        PayableComment::create([
+            'payable_id' => $payable->id,
+            'user_id' => $user->id,
+            'body' => '2ª assinatura — ciclo encerrado pela Presidência',
+            'type' => 'approval',
+        ]);
+
+        AuditLogger::log(
+            event: 'contas_pagar.encerrado',
+            module: 'financeiro.contas_pagar',
+            description: "Título {$payable->title_number} encerrado (2ª assinatura: {$user->name})",
+            auditable: $payable,
+            oldValues: ['status' => 'conciliado'],
+            newValues: ['status' => 'encerrado'],
+        );
+
+        return back()->with('success', 'Ciclo encerrado (2ª assinatura).');
     }
 
     /**

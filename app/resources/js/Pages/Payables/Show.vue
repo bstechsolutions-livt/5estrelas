@@ -27,6 +27,7 @@ const props = defineProps({
     approvalSteps: { type: Array, default: () => [] },
     currentStep: { type: Object, default: null },
     canApproveStep: { type: Boolean, default: false },
+    canFinalSign: { type: Boolean, default: false },
     mentionableUsers: { type: Array, default: () => [] },
     departments: { type: Array, default: () => [] },
 })
@@ -497,6 +498,19 @@ function isImage(doc) {
                         <div class="mb-2"><p class="text-xs text-gray-500">Data</p><p class="text-gray-800">{{ formatDate(payable.conciliated_at) }}</p></div>
                         <div v-if="payable.conciliator" class="mb-2"><p class="text-xs text-gray-500">Registrado por</p><p class="text-gray-800">{{ payable.conciliator.name }}</p></div>
                         <div><p class="text-xs text-gray-500">Motivo</p><p class="text-red-700">{{ payable.divergence_reason }}</p></div>
+                    </div>
+
+                    <!-- 2ª Assinatura do Presidente (encerramento) -->
+                    <div v-if="canFinalSign" class="bg-white rounded-xl border border-gray-100 p-4">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3">2ª Assinatura (Encerramento)</h3>
+                        <p class="text-xs text-gray-500 mb-3">Título conciliado aguardando validação final da Presidência.</p>
+                        <Button label="Encerrar ciclo" icon="pi pi-check-circle" severity="success" class="w-full" @click="router.post(`/financeiro/contas-pagar/${payable.id}/encerrar`, {}, { preserveScroll: true })" />
+                    </div>
+
+                    <!-- Status encerrado read-only -->
+                    <div v-if="payable.status === 'encerrado'" class="bg-green-50 border border-green-200 rounded-xl p-4 text-sm">
+                        <h3 class="text-sm font-semibold text-green-700 mb-1 flex items-center gap-2"><i class="pi pi-verified"></i> Ciclo encerrado</h3>
+                        <p class="text-xs text-green-600">Título finalizado com 2ª assinatura da Presidência.</p>
                     </div>
 
                     <!-- Info lateral -->

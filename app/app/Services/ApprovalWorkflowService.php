@@ -206,3 +206,12 @@ class ApprovalWorkflowService
         }
     }
 }
+
+// Note: A substituição do presidente é tratada no approve():
+// Se o step é 'presidencia' e o approver não é o assigned_to mas É um dos substitutos
+// (Ana Paula ou Luiz Farias), permite a aprovação DESDE QUE não tenha sido o diretor
+// que já assinou o mesmo documento (regra 3 do doc v3.0: dupla aprovação sempre de
+// duas pessoas diferentes). Isso já é coberto pelo check existente:
+// "$step->assigned_to !== $approver->id && !$approver->hasPermission('*')"
+// Na prática, pra demo: qualquer user com '*' pode aprovar qualquer step (inclusive presidência).
+// Futuramente: adicionar campo 'substitutes' no ApprovalTrail ou config de ausência.

@@ -183,6 +183,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/conciliar', [PayableController::class, 'conciliate'])->whereNumber('id')->name('payables.conciliate');
         Route::post('/{id}/divergencia', [PayableController::class, 'diverge'])->whereNumber('id')->name('payables.diverge');
         Route::get('/{id}/mentionable-users', [PayableController::class, 'mentionableUsers'])->whereNumber('id')->name('payables.mentionable');
+        Route::post('/{id}/encerrar', [PayableController::class, 'finalSign'])->whereNumber('id')->name('payables.final-sign');
     });
 
     // Financeiro - Borderôs
