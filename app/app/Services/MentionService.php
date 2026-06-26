@@ -127,7 +127,7 @@ class MentionService
 
         // Dispara evento pro WebSocket (sino em tempo real)
         if (class_exists(NotificationCreated::class)) {
-            event(new NotificationCreated($notification));
+            try { event(new NotificationCreated($notification)); } catch (\Throwable $e) {}
         }
     }
 }
