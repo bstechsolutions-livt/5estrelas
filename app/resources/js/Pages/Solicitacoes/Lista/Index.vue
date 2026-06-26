@@ -386,6 +386,7 @@ watch(
 )
 
 onMounted(async () => {
+ try {
   // ✅ Buscar filiais PRIMEIRO para poder deserializar o filtro corretamente
   await buscarFiliais()
 
@@ -444,7 +445,7 @@ onMounted(async () => {
   iniciarReverbListener()
 
   // ✅ Finalizar loading inicial após carregar tudo
-  loadingInicial.value = false
+ } catch (e) { console.error("[Solicitacoes] Erro ao carregar:", e); } finally { loadingInicial.value = false; }
 })
 
 // ✅ Verifica se a ticket recebida via Reverb corresponde aos filtros ativos
