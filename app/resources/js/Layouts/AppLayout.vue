@@ -137,7 +137,28 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
 
                 <!-- Menu -->
                 <nav class="flex-1 py-2 px-3 space-y-1 overflow-y-auto">
-                    <template v-for="entry in menuGrouped" :key="entry.key || entry.label">
+                    <!-- Resultados de busca (flat) -->
+                    <template v-if="searchQuery">
+                        <button
+                            v-for="item in filteredMenuItems"
+                            :key="item.href"
+                            @click="navigate(item.href)"
+                            :class="[
+                                'sidebar-menu-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm',
+                                isActive(item.href) ? 'sidebar-menu-active border-l-2' : ''
+                            ]"
+                            :style="isActive(item.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
+                        >
+                            <i :class="[item.icon, 'text-base']"></i>
+                            <span>{{ item.label }}</span>
+                        </button>
+                        <p v-if="filteredMenuItems.length === 0" class="text-xs text-center py-4" :style="{ color: 'var(--app-secondary-text-muted)' }">
+                            Nenhum resultado encontrado
+                        </p>
+                    </template>
+
+                    <!-- Menu agrupado normal -->
+                    <template v-else v-for="entry in menuGrouped" :key="entry.key || entry.label">
                         <!-- Item raiz (sem grupo) -->
                         <button
                             v-if="entry.type === 'item'"
@@ -223,7 +244,28 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
                     </div>
 
                     <nav class="flex-1 py-2 px-3 space-y-1 overflow-y-auto">
-                        <template v-for="entry in menuGrouped" :key="entry.key || entry.label">
+                        <!-- Resultados de busca (flat) -->
+                        <template v-if="searchQuery">
+                            <button
+                                v-for="item in filteredMenuItems"
+                                :key="item.href"
+                                @click="navigate(item.href)"
+                                :class="[
+                                    'sidebar-menu-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm',
+                                    isActive(item.href) ? 'sidebar-menu-active border-l-2' : ''
+                                ]"
+                                :style="isActive(item.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
+                            >
+                                <i :class="[item.icon, 'text-base']"></i>
+                                <span>{{ item.label }}</span>
+                            </button>
+                            <p v-if="filteredMenuItems.length === 0" class="text-xs text-center py-4" :style="{ color: 'var(--app-secondary-text-muted)' }">
+                                Nenhum resultado encontrado
+                            </p>
+                        </template>
+
+                        <!-- Menu agrupado normal -->
+                        <template v-else v-for="entry in menuGrouped" :key="entry.key || entry.label">
                             <button
                                 v-if="entry.type === 'item'"
                                 @click="navigate(entry.href)"
