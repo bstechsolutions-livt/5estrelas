@@ -4,37 +4,26 @@ namespace App\Services;
 
 use App\Models\ApprovalStep;
 use App\Models\ApprovalTrail;
+use App\Models\Department;
+use App\Models\Notification;
 use App\Models\Payable;
 use App\Models\PayableComment;
 use App\Models\User;
+use App\Events\NotificationCreated;
 use Illuminate\Support\Facades\DB;
 
-/**
- * Motor de workflow de aprovação multinível (Fluxo v3.0).
- *
- * - sendForApproval: cria os steps baseado na trilha da área do payable
- * - approve: avança pro próximo nível ou finaliza
- * - reject: reprova e volta ao departamento
- * - currentStep: retorna o step pendente atual
- * - myPendingApprovals: lista os payables aguardando aprovação do usuário
- */
 class ApprovalWorkflowService
 {
-    /**
-     * Envia um payable para aprovação, criando os steps da trilha.
-     */
     public function sendForApproval(Payable $payable, User $sender, ?string $area = null): void
     {
         $area = $area ?? $this->detectArea($payable);
         $trail = ApprovalTrail::trailFor($area);
 
         if ($trail->isEmpty()) {
-            // Fallback: trilha genérica (departamento → financeiro → presidência)
             $trail = ApprovalTrail::trailFor('matriz');
         }
 
-        DB::transaction(function () use ($payable, $sender, $trail) {
-            // Remove steps antigos (caso de reenvio após reprovação)
+        DB::transaction(function () use ($payable, $sender, $trail, $area) {
             ApprovalStep::where('payable_id', $payable->id)->delete();
 
             foreach ($trail as $level) {
@@ -56,7 +45,7 @@ class ApprovalWorkflowService
             PayableComment::create([
                 'payable_id' => $payable->id,
                 'user_id' => $sender->id,
-                'body' => 'Enviou para aprovação (fluxo: ' . (ApprovalTrail::AREAS[$this->detectArea($payable)] ?? 'padrão') . ')',
+                'body' => 'Enviou para aprovação (fluxo: ' . (ApprovalTrail::AREAS[$area] ?? 'padrão') . ')',
                 'type' => 'status_change',
             ]);
 
@@ -66,12 +55,15 @@ class ApprovalWorkflowService
                 description: "Título {$payable->title_number} enviado para aprovação multinível",
                 auditable: $payable,
             );
+
+            // Notifica o primeiro aprovador
+            $firstStep = ApprovalStep::where('payable_id', $payable->id)->orderBy('order')->first();
+            if ($firstStep && $firstStep->assigned_to) {
+                $this->notifyApprover($firstStep, $payable, $sender);
+            }
         });
     }
 
-    /**
-     * Aprova o step atual. Se for o último, marca o payable como aprovado.
-     */
     public function approve(Payable $payable, User $approver, ?string $comment = null): array
     {
         $step = $this->currentStep($payable);
@@ -79,7 +71,6 @@ class ApprovalWorkflowService
             return ['success' => false, 'error' => 'Nenhuma etapa pendente.'];
         }
 
-        // Verifica se o approver é o assignee (ou tem permissão wildcard pra demo)
         if ($step->assigned_to && $step->assigned_to !== $approver->id && !$approver->hasPermission('*')) {
             return ['success' => false, 'error' => 'Você não é o aprovador desta etapa.'];
         }
@@ -99,10 +90,8 @@ class ApprovalWorkflowService
             'type' => 'approval',
         ]);
 
-        // Verifica se era o último step
         $nextStep = $this->currentStep($payable);
         if (!$nextStep) {
-            // Fluxo completo — payable aprovado
             $payable->update([
                 'status' => 'aprovado',
                 'approved_by' => $approver->id,
@@ -119,12 +108,14 @@ class ApprovalWorkflowService
             return ['success' => true, 'finished' => true, 'message' => 'Aprovação final concluída. Título liberado para pagamento.'];
         }
 
+        // Notifica o próximo aprovador
+        if ($nextStep->assigned_to) {
+            $this->notifyApprover($nextStep, $payable, $approver);
+        }
+
         return ['success' => true, 'finished' => false, 'next_level' => $nextStep->level_name, 'message' => 'Aprovado. Próximo nível: ' . (ApprovalStep::LEVEL_LABELS[$nextStep->level_name] ?? $nextStep->level_name)];
     }
 
-    /**
-     * Reprova o step atual. O payable volta a reprovado.
-     */
     public function reject(Payable $payable, User $rejector, string $reason): array
     {
         $step = $this->currentStep($payable);
@@ -162,9 +153,6 @@ class ApprovalWorkflowService
         return ['success' => true, 'message' => 'Título reprovado.'];
     }
 
-    /**
-     * Retorna o step pendente atual (o primeiro não resolvido em ordem).
-     */
     public function currentStep(Payable $payable): ?ApprovalStep
     {
         return ApprovalStep::where('payable_id', $payable->id)
@@ -173,9 +161,6 @@ class ApprovalWorkflowService
             ->first();
     }
 
-    /**
-     * Lista payables com step pendente atribuído ao usuário.
-     */
     public function myPendingApprovals(User $user): \Illuminate\Database\Eloquent\Collection
     {
         $payableIds = ApprovalStep::where('assigned_to', $user->id)
@@ -190,13 +175,34 @@ class ApprovalWorkflowService
             ->get();
     }
 
-    /**
-     * Detecta a área do payable (baseado em branch/category/descrição).
-     * Por enquanto usa 'matriz' como default — futuramente vincula ao departamento.
-     */
     private function detectArea(Payable $payable): string
     {
-        // TODO: Vincular payable a uma área real (via branch ou campo 'area')
+        if ($payable->department_id) {
+            $dept = Department::find($payable->department_id);
+            if ($dept && $dept->area_key) {
+                return $dept->area_key;
+            }
+        }
         return 'matriz';
+    }
+
+    private function notifyApprover(ApprovalStep $step, Payable $payable, User $sender): void
+    {
+        $notification = Notification::create([
+            'user_id' => $step->assigned_to,
+            'title' => 'Aprovação pendente',
+            'body' => "Título {$payable->title_number} (R$ " . number_format($payable->amount, 2, ',', '.') . ") aguarda sua aprovação na etapa: " . (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name),
+            'type' => 'approval_pending',
+            'link' => "/financeiro/contas-pagar/{$payable->id}",
+            'data' => [
+                'payable_id' => $payable->id,
+                'step_id' => $step->id,
+                'level' => $step->level_name,
+            ],
+        ]);
+
+        if (class_exists(NotificationCreated::class)) {
+            event(new NotificationCreated($notification));
+        }
     }
 }

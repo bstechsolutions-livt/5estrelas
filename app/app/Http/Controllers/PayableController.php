@@ -118,6 +118,7 @@ class PayableController extends Controller
             'currentStep' => $currentStep,
             'canApproveStep' => $canApproveStep,
             'mentionableUsers' => app(\App\Services\MentionService::class)->mentionableUsers($user, $id),
+            'departments' => \App\Models\Department::where('is_active', true)->orderBy('name')->get(['id', 'name', 'area_key']),
         ]);
     }
 
@@ -194,6 +195,12 @@ class PayableController extends Controller
 
         if (!in_array($payable->status, ['pendente', 'em_preparacao', 'reprovado'])) {
             return back()->with('error', 'Este título não pode ser enviado para aprovação.');
+        }
+
+        // Se informou o departamento de origem, vincula ao título
+        if ($request->filled('department_id')) {
+            $payable->update(['department_id' => $request->department_id]);
+            $payable->refresh();
         }
 
         $workflow = app(ApprovalWorkflowService::class);

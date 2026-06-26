@@ -28,6 +28,7 @@ const props = defineProps({
     currentStep: { type: Object, default: null },
     canApproveStep: { type: Boolean, default: false },
     mentionableUsers: { type: Array, default: () => [] },
+    departments: { type: Array, default: () => [] },
 })
 
 const { isMobile } = useDevice()
@@ -175,10 +176,6 @@ function removeDoc(docId) {
     router.delete(`/financeiro/contas-pagar/${props.payable.id}/documentos/${docId}`, { preserveScroll: true })
 }
 
-function sendForApproval() {
-    router.post(`/financeiro/contas-pagar/${props.payable.id}/enviar-aprovacao`, {}, { preserveScroll: true })
-}
-
 function approve() {
     router.post(`/financeiro/contas-pagar/${props.payable.id}/aprovar`, {}, { preserveScroll: true })
 }
@@ -213,6 +210,16 @@ const canPrepare = ['pendente', 'em_preparacao', 'reprovado'].includes(props.pay
 const inBordero = !!props.payable.bordero_id
 const canSendIndividual = canPrepare && !inBordero
 const canApprove = props.payable.status === 'aguardando_aprovacao' && !inBordero && !props.approvalSteps?.length
+
+// Departamento de origem (seletor ao enviar pra aprovação)
+const showDeptSelect = ref(false)
+const selectedDeptId = ref(props.payable.department_id || null)
+
+function sendForApproval() {
+    router.post(`/financeiro/contas-pagar/${props.payable.id}/enviar-aprovacao`, {
+        department_id: selectedDeptId.value,
+    }, { preserveScroll: true })
+}
 
 // Sidebar de ações aparece quando há qualquer ação/condição lateral a mostrar.
 const showSidebar = computed(() =>
@@ -382,7 +389,17 @@ function isImage(doc) {
                     <!-- Ações do preparador (só se NÃO está em borderô) -->
                     <div v-if="canSendIndividual" class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Ações</h3>
-                        <Button label="Enviar para Aprovação" icon="pi pi-send" class="w-full" @click="sendForApproval" />
+                        <div v-if="!showDeptSelect" class="space-y-2">
+                            <Button label="Enviar para Aprovação" icon="pi pi-send" class="w-full" @click="showDeptSelect = true" />
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Departamento de origem *</label>
+                                <Select v-model="selectedDeptId" :options="departments" optionLabel="name" optionValue="id" placeholder="Selecione o departamento..." class="w-full" filter />
+                            </div>
+                            <Button label="Confirmar envio" icon="pi pi-send" class="w-full" :disabled="!selectedDeptId" @click="sendForApproval" />
+                            <Button label="Cancelar" severity="secondary" text class="w-full" @click="showDeptSelect = false" />
+                        </div>
                     </div>
 
                     <!-- Ações do aprovador (workflow multinível) -->
