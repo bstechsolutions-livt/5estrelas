@@ -54,7 +54,7 @@ class MenuCatalog
             ['key' => 'contratos_equipamentos', 'label' => 'Equipamentos', 'icon' => 'pi pi-box', 'href' => '/pagina/gestao-contratos/equipamentos', 'permission' => 'contratos.visualizar', 'group' => 'Contratos'],
 
             // Financeiro
- ["key" => "financeiro_pendencias", "label" => "Minhas Pendências", "icon" => "pi pi-clock", "href" => "/financeiro/pendencias", "permission" => "financeiro.contas_pagar.visualizar", "group" => "Financeiro"],
+ ["key" => "financeiro_pendencias", "label" => "Minhas Dependências", "icon" => "pi pi-clock", "href" => "/financeiro/pendencias", "permission" => "financeiro.contas_pagar.visualizar", "group" => "Financeiro"],
             ['key' => 'contas_pagar', 'label' => 'Contas a Pagar', 'icon' => 'pi pi-wallet', 'href' => '/financeiro/contas-pagar', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
             ['key' => 'contas_pagar_conciliacao', 'label' => 'Conciliação Bancária', 'icon' => 'pi pi-file-import', 'href' => '/financeiro/contas-pagar/conciliacao', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
             ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],

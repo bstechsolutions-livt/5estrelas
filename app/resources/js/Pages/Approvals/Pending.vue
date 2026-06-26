@@ -30,7 +30,7 @@ function goToPayable(id) {
         <div :class="isMobile ? 'px-4 py-3 pb-20' : 'max-w-4xl mx-auto'">
             <div class="mb-6">
                 <h1 :class="isMobile ? 'text-lg font-bold text-gray-800' : 'text-2xl font-bold text-gray-800'">
-                    Minhas Pendências de Aprovação
+                    Minhas Dependências
                 </h1>
                 <p class="text-sm text-gray-500 mt-1">
                     Títulos aguardando sua aprovação no fluxo do Contas a Pagar.
