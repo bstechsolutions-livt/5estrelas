@@ -393,6 +393,21 @@ class PayableController extends Controller
                 ],
             );
 
+
+ // Cria step automatico de 2a assinatura (presidencia) pos-conciliacao
+ $assinante = \App\Models\PayableRole::where("role", "assinante")->first();
+ if ($assinante) {
+ \App\Models\ApprovalStep::create([
+ "payable_id" => $fresh->id, "order" => 99, "level_name" => "presidencia_2",
+ "status" => "pendente", "assigned_to" => $assinante->user_id,
+ ]);
+ \App\Models\Notification::create([
+ "user_id" => $assinante->user_id, "title" => "2a assinatura pendente",
+ "body" => "Titulo {$fresh->title_number} conciliado - aguarda encerramento",
+ "type" => "approval_pending", "link" => "/financeiro/contas-pagar/{$fresh->id}",
+ "data" => ["payable_id" => $fresh->id],
+ ]);
+ }
             return true;
         });
 
