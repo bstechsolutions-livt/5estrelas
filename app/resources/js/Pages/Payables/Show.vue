@@ -42,10 +42,14 @@ const rejectForm = useForm({ reason: '' })
 // ── @Mention autocomplete ──
 const mentionQuery = ref('')
 const mentionActive = ref(false)
+const mentionedUsers = ref([]) // lista de {id, name} já mencionados
 const mentionResults = computed(() => {
     if (!mentionQuery.value || !mentionActive.value) return []
     const q = mentionQuery.value.toLowerCase()
-    return (props.mentionableUsers || []).filter(u => u.name.toLowerCase().includes(q)).slice(0, 8)
+    const alreadyIds = new Set(mentionedUsers.value.map(u => u.id))
+    return (props.mentionableUsers || [])
+        .filter(u => u.name.toLowerCase().includes(q) && !alreadyIds.has(u.id))
+        .slice(0, 8)
 })
 const commentInput = ref(null)
 
@@ -64,15 +68,43 @@ function onCommentInput(e) {
 }
 
 function insertMention(user) {
+    // Remove o @query do texto
     const val = commentForm.body
     const atIdx = val.lastIndexOf('@' + mentionQuery.value)
     if (atIdx >= 0) {
         const before = val.substring(0, atIdx)
         const after = val.substring(atIdx + 1 + mentionQuery.value.length)
-        commentForm.body = before + `@[${user.name}](id:${user.id})` + after + ' '
+        commentForm.body = (before + after).trim()
+    }
+    // Adiciona ao array de mencionados (badge)
+    if (!mentionedUsers.value.find(u => u.id === user.id)) {
+        mentionedUsers.value.push({ id: user.id, name: user.name })
     }
     mentionActive.value = false
     mentionQuery.value = ''
+}
+
+function removeMention(userId) {
+    mentionedUsers.value = mentionedUsers.value.filter(u => u.id !== userId)
+}
+
+function submitComment() {
+    // Monta o body incluindo as menções no formato @[Nome](id:N) no final
+    let body = commentForm.body.trim()
+    if (mentionedUsers.value.length > 0) {
+        const mentionTags = mentionedUsers.value.map(u => `@[${u.name}](id:${u.id})`).join(' ')
+        body = body ? `${body} ${mentionTags}` : mentionTags
+    }
+    if (!body) return
+
+    const form = useForm({ body })
+    form.post(`/financeiro/contas-pagar/${props.payable.id}/comentarios`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            commentForm.reset()
+            mentionedUsers.value = []
+        },
+    })
 }
 
 // ── Registrar pagamento ──
@@ -127,13 +159,6 @@ watch(() => page.props.flash?.success, (msg) => {
 watch(() => page.props.flash?.error, (msg) => {
     if (msg) toast.add({ severity: 'error', summary: 'Erro', detail: msg, life: 5000 })
 })
-
-function submitComment() {
-    commentForm.post(`/financeiro/contas-pagar/${props.payable.id}/comentarios`, {
-        preserveScroll: true,
-        onSuccess: () => commentForm.reset(),
-    })
-}
 
 function uploadDoc(event) {
     const file = event.files?.[0]
@@ -307,7 +332,16 @@ function isImage(doc) {
                         </div>
 
                         <!-- Form de comentário com @mention -->
-                        <form v-if="canPrepare || canApprove || canApproveStep || true" @submit.prevent="submitComment" class="relative">
+                        <form @submit.prevent="submitComment" class="relative">
+                            <!-- Badges dos mencionados -->
+                            <div v-if="mentionedUsers.length" class="flex flex-wrap gap-1.5 mb-2">
+                                <span v-for="u in mentionedUsers" :key="u.id" class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                                    @{{ u.name }}
+                                    <button type="button" @click="removeMention(u.id)" class="text-blue-500 hover:text-blue-800 ml-0.5 cursor-pointer">
+                                        <i class="pi pi-times text-[9px]"></i>
+                                    </button>
+                                </span>
+                            </div>
                             <div class="flex gap-2">
                                 <div class="flex-1 relative">
                                     <Textarea v-model="commentForm.body" placeholder="Escreva um comentário... Use @ para mencionar" rows="2" class="w-full" @input="onCommentInput" ref="commentInput" />
@@ -322,7 +356,7 @@ function isImage(doc) {
                                         </div>
                                     </div>
                                 </div>
-                                <Button type="submit" icon="pi pi-send" :loading="commentForm.processing" :disabled="!commentForm.body.trim()" />
+                                <Button type="submit" icon="pi pi-send" :loading="commentForm.processing" :disabled="!commentForm.body.trim() && !mentionedUsers.length" />
                             </div>
                             <p class="text-[10px] text-gray-400 mt-1">Use <strong>@nome</strong> para mencionar alguém e notificá-lo.</p>
                         </form>
