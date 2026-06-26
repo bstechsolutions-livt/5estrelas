@@ -150,6 +150,8 @@ Route::middleware('auth')->group(function () {
     // Financeiro - Contas a Pagar - Alçada (gestão de quem paga/concilia/assina)
  // Minhas Pendências de Aprovação (Financeiro)
  Route::get("financeiro/pendencias", [\App\Http\Controllers\ApprovalPendingController::class, "index"])->name("approval-pending.index");
+ Route::get("financeiro/fluxos-aprovacao", [\App\Http\Controllers\ApprovalFlowConfigController::class, "index"])->middleware("permission:financeiro.workflows.configurar")->name("approval-flow-config.index");
+ Route::post("financeiro/fluxos-aprovacao", [\App\Http\Controllers\ApprovalFlowConfigController::class, "update"])->middleware("permission:financeiro.workflows.configurar")->name("approval-flow-config.update");
     Route::prefix('financeiro/contas-pagar/alcada')->middleware('permission:financeiro.contas_pagar.alcada_gerenciar')->group(function () {
         Route::get('/', [PayableAlcadaController::class, 'index'])->name('payables.alcada.index');
         Route::post('/', [PayableAlcadaController::class, 'store'])->name('payables.alcada.store');
