@@ -117,6 +117,7 @@ class PayableController extends Controller
             'approvalSteps' => $approvalSteps,
             'currentStep' => $currentStep,
             'canApproveStep' => $canApproveStep,
+            'mentionableUsers' => app(\App\Services\MentionService::class)->mentionableUsers($user, $id),
         ]);
     }
 
@@ -134,6 +135,9 @@ class PayableController extends Controller
             'body' => $data['body'],
             'type' => 'comment',
         ]);
+
+        // Processa @menções (notificação + visibilidade)
+        app(\App\Services\MentionService::class)->processComment($comment);
 
         // Se estava pendente, marca como em preparação
         if ($payable->status === 'pendente') {
@@ -461,5 +465,16 @@ class PayableController extends Controller
         $doc->delete();
 
         return back();
+    }
+
+    /**
+     * Lista usuários mencionáveis em comentários deste payable (pra autocomplete @mention).
+     */
+    public function mentionableUsers(Request $request, int $id)
+    {
+        $mentionService = app(\App\Services\MentionService::class);
+        $users = $mentionService->mentionableUsers($request->user(), $id);
+
+        return response()->json($users);
     }
 }

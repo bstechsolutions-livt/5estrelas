@@ -27,6 +27,7 @@ const props = defineProps({
     approvalSteps: { type: Array, default: () => [] },
     currentStep: { type: Object, default: null },
     canApproveStep: { type: Boolean, default: false },
+    mentionableUsers: { type: Array, default: () => [] },
 })
 
 const { isMobile } = useDevice()
@@ -37,6 +38,42 @@ const toast = useToast()
 const commentForm = useForm({ body: '' })
 const showRejectDialog = ref(false)
 const rejectForm = useForm({ reason: '' })
+
+// ── @Mention autocomplete ──
+const mentionQuery = ref('')
+const mentionActive = ref(false)
+const mentionResults = computed(() => {
+    if (!mentionQuery.value || !mentionActive.value) return []
+    const q = mentionQuery.value.toLowerCase()
+    return (props.mentionableUsers || []).filter(u => u.name.toLowerCase().includes(q)).slice(0, 8)
+})
+const commentInput = ref(null)
+
+function onCommentInput(e) {
+    const val = commentForm.body
+    const cursorPos = e.target?.selectionStart || val.length
+    const textBefore = val.substring(0, cursorPos)
+    const atMatch = textBefore.match(/@([^\s@]*)$/)
+    if (atMatch) {
+        mentionQuery.value = atMatch[1]
+        mentionActive.value = true
+    } else {
+        mentionActive.value = false
+        mentionQuery.value = ''
+    }
+}
+
+function insertMention(user) {
+    const val = commentForm.body
+    const atIdx = val.lastIndexOf('@' + mentionQuery.value)
+    if (atIdx >= 0) {
+        const before = val.substring(0, atIdx)
+        const after = val.substring(atIdx + 1 + mentionQuery.value.length)
+        commentForm.body = before + `@[${user.name}](id:${user.id})` + after + ' '
+    }
+    mentionActive.value = false
+    mentionQuery.value = ''
+}
 
 // ── Registrar pagamento ──
 const showPayment = ref(false)
@@ -269,10 +306,25 @@ function isImage(doc) {
                             <p v-if="!payable.comments?.length" class="text-sm text-gray-400">Nenhuma atividade.</p>
                         </div>
 
-                        <!-- Form de comentário -->
-                        <form v-if="canPrepare || canApprove" @submit.prevent="submitComment" class="flex gap-2">
-                            <Textarea v-model="commentForm.body" placeholder="Escreva um comentário..." rows="2" class="flex-1" />
-                            <Button type="submit" icon="pi pi-send" :loading="commentForm.processing" :disabled="!commentForm.body.trim()" />
+                        <!-- Form de comentário com @mention -->
+                        <form v-if="canPrepare || canApprove || canApproveStep || true" @submit.prevent="submitComment" class="relative">
+                            <div class="flex gap-2">
+                                <div class="flex-1 relative">
+                                    <Textarea v-model="commentForm.body" placeholder="Escreva um comentário... Use @ para mencionar" rows="2" class="w-full" @input="onCommentInput" ref="commentInput" />
+                                    <!-- @Mention autocomplete popup -->
+                                    <div v-if="mentionActive && mentionResults.length" class="absolute bottom-full left-0 mb-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-50">
+                                        <div v-for="u in mentionResults" :key="u.id" @click="insertMention(u)" class="px-3 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2">
+                                            <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-600">{{ u.name.charAt(0) }}</div>
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-800">{{ u.name }}</p>
+                                                <p class="text-[10px] text-gray-400">{{ u.email }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <Button type="submit" icon="pi pi-send" :loading="commentForm.processing" :disabled="!commentForm.body.trim()" />
+                            </div>
+                            <p class="text-[10px] text-gray-400 mt-1">Use <strong>@nome</strong> para mencionar alguém e notificá-lo.</p>
                         </form>
                     </div>
                 </div>
