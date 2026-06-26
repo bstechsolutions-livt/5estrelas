@@ -13,6 +13,12 @@ const props = defineProps({
 const configOpen = ref(false)
 
 const selectedKeys = ref([])
+const shortcutSearch = ref("")
+const filteredMenuOptions = computed(() => {
+ if (!shortcutSearch.value) return props.menuOptions
+ const q = shortcutSearch.value.toLowerCase()
+ return props.menuOptions.filter(o => o.label.toLowerCase().includes(q))
+})
 
 function openConfig() {
     selectedKeys.value = props.shortcuts.map(s => s.key)
@@ -81,10 +87,18 @@ function navigate(href) {
         </p>
 
         <Dialog v-model:visible="configOpen" modal header="Configurar atalhos" :style="{ width: '480px', maxWidth: '95vw' }">
-            <p class="text-sm text-gray-500 mb-4">Selecione quais atalhos você quer ver no painel.</p>
-            <div class="space-y-2 max-h-96 overflow-y-auto">
+            <p class="text-sm text-gray-500 mb-3">Selecione quais atalhos você quer ver no painel.</p>
+            <input
+                v-model="shortcutSearch"
+                type="text"
+                placeholder="Buscar atalho..."
+                class="w-full px-3 py-2 mb-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                ref="shortcutSearchInput"
+                autofocus
+            />
+            <div class="space-y-2 max-h-80 overflow-y-auto">
                 <label
-                    v-for="opt in menuOptions"
+                    v-for="opt in filteredMenuOptions"
                     :key="opt.key"
                     class="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer"
                 >
@@ -96,6 +110,7 @@ function navigate(href) {
                     <i :class="[opt.icon, 'text-gray-500']"></i>
                     <span class="text-sm text-gray-700">{{ opt.label }}</span>
                 </label>
+                <p v-if="filteredMenuOptions.length === 0" class="text-sm text-gray-400 text-center py-4">Nenhum atalho encontrado.</p>
             </div>
             <div class="flex justify-end gap-2 mt-5">
                 <Button label="Cancelar" severity="secondary" outlined @click="configOpen = false" />
