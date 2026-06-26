@@ -193,6 +193,12 @@ function reject() {
 function formatMoney(val) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
 }
+
+function formatCommentBody(body) {
+    if (!body) return ''
+    // Transforma @[Nome](id:N) em badge inline
+    return body.replace(/@\[([^\]]+)\]\((?:id:)?\d+\)/g, '<span class="inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">@$1</span>')
+}
 function formatDate(d) {
     if (!d) return '—'
     return new Date(d).toLocaleDateString('pt-BR')
@@ -323,8 +329,7 @@ function isImage(doc) {
                                         <span class="font-medium text-gray-700">{{ c.user?.name || 'Sistema' }}</span>
                                         · {{ formatDateTime(c.created_at) }}
                                     </p>
-                                    <p :class="['text-sm mt-0.5', c.type === 'rejection' ? 'text-red-600' : c.type === 'approval' ? 'text-green-600' : 'text-gray-700']">
-                                        {{ c.body }}
+                                    <p :class="['text-sm mt-0.5', c.type === 'rejection' ? 'text-red-600' : c.type === 'approval' ? 'text-green-600' : 'text-gray-700']" v-html="formatCommentBody(c.body)">
                                     </p>
                                 </div>
                             </div>
