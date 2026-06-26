@@ -357,7 +357,7 @@ async function filtrarStatus() {
     <!-- Loading Overlay -->
     <div
       v-if="loading"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm"
+      class="flex items-center justify-center py-32"
     >
       <div class="flex flex-col items-center gap-4">
         <div class="relative">
