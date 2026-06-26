@@ -28,5 +28,7 @@ class ApprovalTrail extends Model
         'licitacao' => 'Licitação',
         'dp_rh' => 'DP / RH',
         'juridico' => 'Jurídico',
+        'baluarte' => 'Baluarte (Matriz + Comercial)',
+        'multi_star' => 'Multi / Star (pré-aprovação Luiz Farias)',
     ];
 }

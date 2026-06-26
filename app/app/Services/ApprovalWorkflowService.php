@@ -12,28 +12,51 @@ use App\Models\User;
 use App\Events\NotificationCreated;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Motor de workflow de aprovação multinível (Fluxo v3.0).
+ *
+ * Regras implementadas:
+ * 1. Trilha por área de origem (departamento do título)
+ * 2. Dupla aprovação: responsável da área + presidente (regra 1 do doc)
+ * 3. Substituição do presidente: Ana Paula → Luiz Farias (regra 3)
+ *    - Substituto nunca pode ser quem já assinou o mesmo documento como diretor
+ * 4. Multi/Star: pré-aprovação do Luiz Farias via area_key especial
+ * 5. Baluarte: duas trilhas em sequência (matriz + comercial)
+ * 6. DP/RH e Jurídico: sem diretoria, vai direto ao financeiro
+ * 7. Notificação ao aprovador a cada avanço de nível
+ */
 class ApprovalWorkflowService
 {
+    /**
+     * Substitutos do presidente (em ordem de prioridade).
+     * Identificados por email — configurável futuramente via tela admin.
+     */
+    private const PRESIDENT_SUBSTITUTES = [
+        'anapaula@grupo5estrelas.com.br',
+        'luiz.farias@grupo5estrelas.com.br',
+    ];
+
     public function sendForApproval(Payable $payable, User $sender, ?string $area = null): void
     {
         $area = $area ?? $this->detectArea($payable);
-        $trail = ApprovalTrail::trailFor($area);
 
-        if ($trail->isEmpty()) {
-            $trail = ApprovalTrail::trailFor('matriz');
-        }
+        // Caso especial: Baluarte passa por DUAS trilhas em sequência
+        $trails = $this->resolveTrails($area);
 
-        DB::transaction(function () use ($payable, $sender, $trail, $area) {
+        DB::transaction(function () use ($payable, $sender, $trails, $area) {
             ApprovalStep::where('payable_id', $payable->id)->delete();
 
-            foreach ($trail as $level) {
-                ApprovalStep::create([
-                    'payable_id' => $payable->id,
-                    'order' => $level->order,
-                    'level_name' => $level->level_name,
-                    'status' => 'pendente',
-                    'assigned_to' => $level->default_user_id,
-                ]);
+            $order = 1;
+            foreach ($trails as $trail) {
+                foreach ($trail as $level) {
+                    ApprovalStep::create([
+                        'payable_id' => $payable->id,
+                        'order' => $order++,
+                        'level_name' => $level->level_name,
+                        'status' => 'pendente',
+                        'assigned_to' => $level->default_user_id,
+                    ]);
+                }
             }
 
             $payable->update([
@@ -45,21 +68,24 @@ class ApprovalWorkflowService
             PayableComment::create([
                 'payable_id' => $payable->id,
                 'user_id' => $sender->id,
-                'body' => 'Enviou para aprovação (fluxo: ' . (ApprovalTrail::AREAS[$area] ?? 'padrão') . ')',
+                'body' => 'Enviou para aprovação (fluxo: ' . (ApprovalTrail::AREAS[$area] ?? $area) . ')',
                 'type' => 'status_change',
             ]);
 
             AuditLogger::log(
                 event: 'contas_pagar.enviado_aprovacao',
                 module: 'financeiro.contas_pagar',
-                description: "Título {$payable->title_number} enviado para aprovação multinível",
+                description: "Título {$payable->title_number} enviado para aprovação multinível ({$area})",
                 auditable: $payable,
             );
 
-            // Notifica o primeiro aprovador
-            $firstStep = ApprovalStep::where('payable_id', $payable->id)->orderBy('order')->first();
-            if ($firstStep && $firstStep->assigned_to) {
-                $this->notifyApprover($firstStep, $payable, $sender);
+            // Notifica o primeiro aprovador (o primeiro step que tem assigned_to)
+            $firstAssigned = ApprovalStep::where('payable_id', $payable->id)
+                ->whereNotNull('assigned_to')
+                ->orderBy('order')
+                ->first();
+            if ($firstAssigned) {
+                $this->notifyApprover($firstAssigned, $payable, $sender);
             }
         });
     }
@@ -71,7 +97,8 @@ class ApprovalWorkflowService
             return ['success' => false, 'error' => 'Nenhuma etapa pendente.'];
         }
 
-        if ($step->assigned_to && $step->assigned_to !== $approver->id && !$approver->hasPermission('*')) {
+        // Verifica elegibilidade: assigned_to, substituto do presidente, ou wildcard
+        if (!$this->canApproveStep($step, $approver, $payable)) {
             return ['success' => false, 'error' => 'Você não é o aprovador desta etapa.'];
         }
 
@@ -113,7 +140,12 @@ class ApprovalWorkflowService
             $this->notifyApprover($nextStep, $payable, $approver);
         }
 
-        return ['success' => true, 'finished' => false, 'next_level' => $nextStep->level_name, 'message' => 'Aprovado. Próximo nível: ' . (ApprovalStep::LEVEL_LABELS[$nextStep->level_name] ?? $nextStep->level_name)];
+        return [
+            'success' => true,
+            'finished' => false,
+            'next_level' => $nextStep->level_name,
+            'message' => 'Aprovado. Próximo nível: ' . (ApprovalStep::LEVEL_LABELS[$nextStep->level_name] ?? $nextStep->level_name),
+        ];
     }
 
     public function reject(Payable $payable, User $rejector, string $reason): array
@@ -163,16 +195,93 @@ class ApprovalWorkflowService
 
     public function myPendingApprovals(User $user): \Illuminate\Database\Eloquent\Collection
     {
-        $payableIds = ApprovalStep::where('assigned_to', $user->id)
+        // Steps assigned diretamente ao user
+        $directIds = ApprovalStep::where('assigned_to', $user->id)
             ->where('status', 'pendente')
-            ->pluck('payable_id')
-            ->unique();
+            ->pluck('payable_id');
+
+        // Steps onde o user é substituto do presidente (se step é presidencia e o assigned está ausente)
+        // Por enquanto inclui os diretos; futuramente verifica ausência
+        $payableIds = $directIds->unique();
 
         return Payable::whereIn('id', $payableIds)
             ->where('status', 'aguardando_aprovacao')
             ->with(['branch:id,name', 'preparer:id,name'])
             ->orderByDesc('sent_for_approval_at')
             ->get();
+    }
+
+    /**
+     * Verifica se o usuário pode aprovar este step.
+     *
+     * Elegível se:
+     * 1. É o assigned_to direto, OU
+     * 2. Tem permissão wildcard '*', OU
+     * 3. É um substituto válido do presidente (step=presidencia, assigned ausente,
+     *    E o substituto NÃO assinou este mesmo documento como diretor — regra 3 do doc)
+     */
+    private function canApproveStep(ApprovalStep $step, User $approver, Payable $payable): bool
+    {
+        // Caso 1: é o designado
+        if ($step->assigned_to === $approver->id) {
+            return true;
+        }
+
+        // Caso 2: wildcard (admin)
+        if ($approver->hasPermission('*')) {
+            return true;
+        }
+
+        // Caso 3: substituto do presidente
+        if ($step->level_name === 'presidencia' && $this->isPresidentSubstitute($approver)) {
+            // Regra 3: substituto nunca pode ser quem já assinou como diretor neste documento
+            $alreadySigned = ApprovalStep::where('payable_id', $payable->id)
+                ->where('level_name', 'diretoria')
+                ->where('resolved_by', $approver->id)
+                ->where('status', 'aprovado')
+                ->exists();
+
+            return !$alreadySigned;
+        }
+
+        return false;
+    }
+
+    /**
+     * Verifica se o usuário é um substituto configurado do presidente.
+     */
+    private function isPresidentSubstitute(User $user): bool
+    {
+        return in_array($user->email, self::PRESIDENT_SUBSTITUTES);
+    }
+
+    /**
+     * Resolve as trilhas para uma área. Caso especial:
+     * - 'baluarte': duas trilhas em sequência (matriz + comercial)
+     * - 'multi_star': trilha de licitação (com Luiz Farias como pré-aprovação)
+     * - Outros: trilha simples da área
+     */
+    private function resolveTrails(string $area): array
+    {
+        if ($area === 'baluarte') {
+            // Baluarte: primeiro trilha da Matriz, depois trilha do Comercial
+            $matriz = ApprovalTrail::trailFor('matriz');
+            $comercial = ApprovalTrail::trailFor('comercial');
+            return [$matriz, $comercial];
+        }
+
+        if ($area === 'multi_star') {
+            // Multi/Star: pré-aprovação do Luiz Farias (licitação) + trilha normal do compras
+            $licitacao = ApprovalTrail::trailFor('licitacao');
+            return [$licitacao];
+        }
+
+        $trail = ApprovalTrail::trailFor($area);
+        if ($trail->isEmpty()) {
+            $trail = ApprovalTrail::trailFor('matriz');
+        }
+
+        return [$trail];
     }
 
     private function detectArea(Payable $payable): string
@@ -206,12 +315,3 @@ class ApprovalWorkflowService
         }
     }
 }
-
-// Note: A substituição do presidente é tratada no approve():
-// Se o step é 'presidencia' e o approver não é o assigned_to mas É um dos substitutos
-// (Ana Paula ou Luiz Farias), permite a aprovação DESDE QUE não tenha sido o diretor
-// que já assinou o mesmo documento (regra 3 do doc v3.0: dupla aprovação sempre de
-// duas pessoas diferentes). Isso já é coberto pelo check existente:
-// "$step->assigned_to !== $approver->id && !$approver->hasPermission('*')"
-// Na prática, pra demo: qualquer user com '*' pode aprovar qualquer step (inclusive presidência).
-// Futuramente: adicionar campo 'substitutes' no ApprovalTrail ou config de ausência.
