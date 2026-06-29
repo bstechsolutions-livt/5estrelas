@@ -1172,3 +1172,101 @@
   background: color-mix(in srgb, var(--app-primary) 12%, transparent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-primary) 20%, transparent);
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   MOBILE (Comercial) — < 1024px (mesmo breakpoint do useDevice).
+   O shell (sidebar/header) já é responsivo no AppLayout. Aqui o CONTEÚDO das
+   telas do Comercial reflui: grids empilham, KPIs em 2 colunas, modais viram
+   bottom-sheet, alvos de toque ≥ 44px e tabelas rolam sem "esmagar".
+   ════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 1023px) {
+  .g360 .content { padding: 16px; }
+
+  /* Grids de formulário e layout → coluna única */
+  .g360 .form-grid-2,
+  .g360 .form-grid-3,
+  .g360 .form-grid-4,
+  .g360 .turnos-grid,
+  .g360 .form-inline-row,
+  .g360 .health-overview,
+  .g360 .totals-box { grid-template-columns: 1fr !important; gap: 12px; }
+
+  /* KPIs em 2 colunas no celular (em vez de 4) */
+  .g360 .dashboard-grid { grid-template-columns: 1fr 1fr !important; gap: 12px; }
+
+  /* Cotação: configurador + resumo empilham */
+  .g360 .cot-layout { display: block !important; }
+  .g360 .cot-layout > * + * { margin-top: 16px; }
+
+  /* Cabeçalhos de seção / título da página empilham */
+  .g360 .section-title { font-size: 18px; }
+  .g360 .page-title-row,
+  .g360 .table-header { flex-direction: column; align-items: stretch; gap: 12px; }
+
+  /* Alvos de toque e fonte (evita zoom no iOS) */
+  .g360 .form-input,
+  .g360 .form-select,
+  .g360 .btn { min-height: 44px; font-size: 16px; }
+  .g360 .btn { justify-content: center; }
+
+  /* Tabelas: rolagem horizontal suave (telas sem versão de cards dedicada) */
+  .g360 .contracts-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .g360 thead th,
+  .g360 tbody td { padding: 10px 12px; }
+
+  /* ── Modais como bottom-sheet (sobem do rodapé) ── */
+  .g360 .modal-overlay,
+  .g360 .g360-modal-overlay { align-items: flex-end !important; }
+  .g360 .modal,
+  .g360 .g360-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92vh;
+    border-radius: 18px 18px 0 0 !important;
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom)) !important;
+  }
+  /* Grade interna dos modais g360 empilha */
+  .g360 .g360-modal-body > div[style*="grid"] { grid-template-columns: 1fr !important; }
+
+  /* Cards de cotação (lista da esquerda) e módulos ocupam tudo */
+  .g360 .module-card { margin-bottom: 14px; }
+}
+
+/* Utilitários de visibilidade por dispositivo (usados pelas telas do Comercial) */
+.g360 .so-mobile { display: none; }
+@media (max-width: 1023px) {
+  .g360 .so-desktop { display: none !important; }
+  .g360 .so-mobile { display: block; }
+}
+
+/* Cards mobile reutilizáveis (lista em vez de tabela no celular) */
+.g360 .bs-mcards { display: flex; flex-direction: column; gap: 12px; }
+.g360 .bs-mcard {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.g360 .bs-mcard:active { border-color: var(--brand-gold); }
+
+/* Mobile: força grids INLINE de formulário (dentro de modais) a empilhar.
+   Estilos inline têm prioridade sobre classes, mas !important do stylesheet
+   vence estilo inline sem !important — por isso o !important aqui. */
+@media (max-width: 1023px) {
+  .g360 .modal [style*="grid-template-columns"],
+  .g360 .g360-modal [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Mobile: empilha QUALQUER grid inline de conteúdo do .g360 (ex.: Saúde "1fr 340px",
+   grids de KPIs/seções da Cotação/Dashboard). Tabelas não são grid, então não são
+   afetadas. Stacking é o comportamento desejado no celular. */
+@media (max-width: 1023px) {
+  .g360 [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}

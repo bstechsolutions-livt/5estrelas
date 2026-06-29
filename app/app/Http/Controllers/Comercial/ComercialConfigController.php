@@ -7,6 +7,7 @@ use App\Models\Comercial\Categoria;
 use App\Models\Comercial\Cct;
 use App\Models\Comercial\Encargo;
 use App\Models\Comercial\Escala;
+use App\Models\Comercial\Filial;
 use App\Models\Comercial\Indice;
 use App\Models\Comercial\Insumo;
 use Illuminate\Http\Request;
@@ -34,6 +35,7 @@ class ComercialConfigController extends Controller
             'indices' => Indice::orderBy('chave')->get(),
             'encargos' => Encargo::orderBy('ordem')->get(),
             'insumos' => Insumo::orderBy('ordem')->get(),
+            'filiais' => Filial::orderBy('ordem')->orderBy('nome')->get(),
         ]);
     }
 
@@ -298,5 +300,55 @@ class ComercialConfigController extends Controller
             'encargos' => Encargo::orderBy('ordem')->get(),
             'total' => Encargo::totalGeral(),
         ]);
+    }
+
+    // ─── Filiais / Empresas do grupo (espelhadas da Senior) ──────────────────
+    // A fonte da verdade é a Senior (cad_filial). Não há criação/exclusão manual:
+    // sincroniza-se da Senior e edita-se apenas os campos de apresentação local
+    // (tipo/tag) e o flag de exibição (ativo).
+
+    /** Dispara a sincronização das filiais com a Senior (read-only). */
+    public function sincronizarFiliais()
+    {
+        $r = \App\Services\Senior\FiliaisSyncService::make()->run('manual');
+
+        $mensagem = match ($r['status']) {
+            'success' => "Sincronizado: {$r['inserted']} inseridas, {$r['updated']} atualizadas.",
+            'skipped' => 'Integração Senior desabilitada — exibindo as empresas já cadastradas.',
+            default => 'Falha ao sincronizar: ' . ($r['message'] ?? 'erro desconhecido'),
+        };
+
+        return response()->json([
+            'sucesso' => $r['status'] !== 'failed',
+            'status' => $r['status'],
+            'mensagem' => $mensagem,
+            'filiais' => Filial::orderBy('ordem')->orderBy('nome')->get(),
+        ]);
+    }
+
+    /** Edita apenas os campos de apresentação local (tipo, tag, ativo). */
+    public function updateFilial(Request $request, $id)
+    {
+        $filial = Filial::findOrFail($id);
+
+        $data = $request->validate([
+            'tag' => 'nullable|string|max:50',
+            'tipo' => ['nullable', 'in:'.implode(',', Filial::tiposValidos())],
+            'ativo' => 'boolean',
+            'ordem' => 'nullable|integer',
+        ]);
+
+        $filial->update($data);
+
+        return response()->json(['sucesso' => true, 'dados' => $filial]);
+    }
+
+    /** Ativa/desativa a exibição da filial nos seletores do Comercial. */
+    public function toggleFilial($id)
+    {
+        $filial = Filial::findOrFail($id);
+        $filial->update(['ativo' => ! $filial->ativo]);
+
+        return response()->json(['sucesso' => true, 'dados' => $filial]);
     }
 }

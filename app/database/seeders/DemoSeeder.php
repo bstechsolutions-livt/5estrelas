@@ -92,6 +92,11 @@ class DemoSeeder extends Seeder
 
         // 4 + 5 + 6. Propostas, clientes e faturamento — MASSA REAL do protótipo
         // (HISTORICO_INICIAL Nº 100–131 + SEED_CLIENTES + seed de faturamento 2025/2026).
+        // Config/Valores (CCTs, categorias, escalas, índices, encargos, insumos e
+        // FILIAIS) primeiro — necessários para Cotação/Propostas e idempotentes.
+        $this->command->info('Semeando configuração do Comercial (CCTs, escalas, filiais)...');
+        $this->call(ComercialConfigSeeder::class);
+
         $this->command->info('Importando propostas, clientes e faturamento reais do Comercial...');
         $this->call(ComercialRealSeeder::class);
 

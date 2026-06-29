@@ -5,7 +5,12 @@ import { router } from "@inertiajs/vue3"
 import axios from "axios"
 import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
+import SearchSelect from "@/Components/Comercial/SearchSelect.vue"
+import { UF_OPTIONS } from "@/Components/Comercial/ufs.js"
+import { useDevice } from "@/composables/useDevice"
 import "@/../css/comercial-g360.css"
+
+const { isMobile } = useDevice()
 
 const props = defineProps({
   clientes: Array,
@@ -170,8 +175,8 @@ function badgeClass(situacao) {
 
         <!-- Filtros -->
         <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px">
-          <input type="text" class="form-input" v-model="busca" placeholder="Buscar cliente..." style="max-width:320px">
-          <select class="form-input" v-model="filtroSituacao" style="max-width:180px">
+          <input type="text" class="form-input" dusk="cliente-filtro-busca" v-model="busca" placeholder="Buscar cliente..." style="max-width:320px">
+          <select class="form-input" dusk="cliente-filtro-situacao" v-model="filtroSituacao" style="max-width:180px">
             <option value="">Todas as situações</option>
             <option v-for="(label, key) in situacaoLabels" :key="key" :value="key">{{ label }}</option>
           </select>
@@ -180,8 +185,8 @@ function badgeClass(situacao) {
           </span>
         </div>
 
-        <!-- Tabela -->
-        <div class="contracts-table-wrap">
+        <!-- Tabela (desktop) -->
+        <div v-if="!isMobile" class="contracts-table-wrap">
           <table>
             <thead>
               <tr>
@@ -206,8 +211,8 @@ function badgeClass(situacao) {
                 <td><span class="badge" :class="badgeClass(cli.situacao)">{{ situacaoLabels[cli.situacao] || cli.situacao }}</span></td>
                 <td @click.stop>
                   <div style="display:flex;gap:6px">
-                    <button @click="abrirEditar(cli)" style="background:transparent;border:1px solid var(--brand-border-soft);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer;font-family:inherit">Editar</button>
-                    <button @click="excluir(cli)" style="background:transparent;border:1px solid var(--brand-border-soft);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--red);cursor:pointer;font-family:inherit">Excluir</button>
+                    <button :dusk="'cliente-editar-' + cli.id" @click="abrirEditar(cli)" style="background:transparent;border:1px solid var(--brand-border-soft);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer;font-family:inherit">Editar</button>
+                    <button :dusk="'cliente-excluir-' + cli.id" @click="excluir(cli)" style="background:transparent;border:1px solid var(--brand-border-soft);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--red);cursor:pointer;font-family:inherit">Excluir</button>
                   </div>
                 </td>
               </tr>
@@ -218,6 +223,31 @@ function badgeClass(situacao) {
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Cards (mobile) -->
+        <div v-else class="bs-mcards" dusk="cliente-cards">
+          <div v-for="cli in listaFiltrada" :key="cli.id" class="bs-mcard" :dusk="'cliente-card-' + cli.id" @click="verDetalhe(cli)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+              <div style="min-width:0">
+                <div style="font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ cli.nome }}</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:2px">{{ cli.contato_nome || '—' }} · {{ [cli.cidade, cli.uf].filter(Boolean).join('/') || '—' }}</div>
+              </div>
+              <span class="badge" :class="badgeClass(cli.situacao)" style="flex-shrink:0">{{ situacaoLabels[cli.situacao] || cli.situacao }}</span>
+            </div>
+            <div style="display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--text-secondary)">
+              <span>Mensal <b style="color:var(--brand-gold)">{{ fmtK(cli.valor_mensal) }}</b></span>
+              <span>Postos <b>{{ cli.total_postos }}</b></span>
+              <span>Propostas <b>{{ cli.propostas_count }}</b></span>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px" @click.stop>
+              <button :dusk="'cliente-editar-' + cli.id" @click="abrirEditar(cli)" class="btn btn-ghost" style="flex:1;font-size:13px">Editar</button>
+              <button :dusk="'cliente-excluir-' + cli.id" @click="excluir(cli)" class="btn btn-ghost" style="flex:1;font-size:13px;color:var(--red)">Excluir</button>
+            </div>
+          </div>
+          <div v-if="listaFiltrada.length === 0" style="text-align:center;padding:40px;color:var(--text-muted)">
+            Nenhum cliente encontrado
+          </div>
         </div>
       </div>
 
@@ -246,7 +276,13 @@ function badgeClass(situacao) {
               </div>
               <div class="form-group">
                 <label class="form-label">UF</label>
-                <input type="text" class="form-input" v-model="form.uf" placeholder="UF" maxlength="2" style="text-transform:uppercase">
+                <SearchSelect
+                  v-model="form.uf"
+                  :options="UF_OPTIONS"
+                  placeholder="UF..."
+                  dusk="input-cliente-uf"
+                  option-dusk-prefix="cliente-uf-opt"
+                />
               </div>
               <div class="form-group">
                 <label class="form-label">Contato Principal</label>

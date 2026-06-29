@@ -6,6 +6,7 @@ use App\Models\Comercial\Categoria;
 use App\Models\Comercial\Cct;
 use App\Models\Comercial\Encargo;
 use App\Models\Comercial\Escala;
+use App\Models\Comercial\Filial;
 use App\Models\Comercial\Indice;
 use App\Models\Comercial\Insumo;
 use Illuminate\Database\Seeder;
@@ -96,6 +97,50 @@ class ComercialConfigSeeder extends Seeder
         $this->seedCcts();
         $this->seedEncargos();
         $this->seedInsumos();
+        $this->seedFiliais();
+    }
+
+    /**
+     * Filiais / Empresas do grupo — ESPELHADAS da Senior (mapa F000EMP, codEmp).
+     * Fonte da verdade é a Senior; este seed reflete as empresas reais já
+     * confirmadas (codEmp 2..12) enquanto o web service cad_filial não está
+     * liberado. O sync `senior:sync-filiais` atualiza/completa quando disponível.
+     * Idempotente por cod_emp (senior_id = "codEmp-1").
+     */
+    private function seedFiliais(): void
+    {
+        // [cod_emp, razão social (nome), fantasia, tipo, cnpj(null até sync)]
+        // Ramos: segurança/vigilância (2,9,10,11) = 'seguranca'; demais = 'apoio'.
+        $rows = [
+            [2, '5 ESTRELAS SISTEMA DE SEGURANCA LTDA', '5 ESTRELAS', 'seguranca'],
+            [3, '5 ESTRELAS SERVICOS DE APOIO ADMINISTRATIVO LTDA', 'SERV APOIO', 'apoio'],
+            [4, 'ARI CONSTRUTORA E ADMINISTRADORA LTDA', 'ARI ADM', 'apoio'],
+            [5, '5 ESTRELAS REFEICOES COLETIVAS', 'REFEICOES', 'apoio'],
+            [6, '5 ESTRELAS SERVICOS ESPECIALIZADOS', 'SRV ESPEC', 'apoio'],
+            [7, 'BEST SERVICE - ADMINISTRACAO E EVENTOS EMPRESARIAIS LTDA', 'BEST', 'apoio'],
+            [8, 'SS SERVICOS DE MANUTENCAO E LIMPEZA LTDA', 'SS SRV', 'apoio'],
+            [9, 'BALUARTE VIGILANCIA PATRIMONIAL LTDA', 'BALUARTE', 'seguranca'],
+            [10, 'MULTI SEGURANCA ELETRONICA E PATRIMONIAL LTDA', 'MULTI', 'seguranca'],
+            [11, 'STAR SEGURANCA ELETRONICA LTDA', 'STAR', 'seguranca'],
+            [12, 'LSR INCORPORADORA, CONSTRUTORA E IMOBILIARIA EIRELI', 'LSR', 'apoio'],
+        ];
+        $ordem = 0;
+        foreach ($rows as $r) {
+            [$codEmp, $nome, $fantasia, $tipo] = $r;
+            Filial::updateOrCreate(
+                ['senior_id' => $codEmp . '-1'],
+                [
+                    'cod_emp' => $codEmp,
+                    'cod_fil' => 1,
+                    'nome' => $nome,
+                    'fantasia' => $fantasia,
+                    'tag' => $fantasia,
+                    'tipo' => $tipo,
+                    'ativo' => true,
+                    'ordem' => $ordem++,
+                ],
+            );
+        }
     }
 
     /** Insumos globais (12 itens) — defaults do protótipo. */

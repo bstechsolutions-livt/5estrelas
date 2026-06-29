@@ -144,7 +144,7 @@ class ComercialCotacaoTest extends TestCase
             ->getJson('/comercial/cotacao/dados');
 
         $response->assertOk()
-            ->assertJsonStructure(['ccts', 'escalas', 'categorias', 'indices']);
+            ->assertJsonStructure(['ccts', 'escalas', 'categorias', 'indices', 'filiais', 'clientes']);
 
         // Os registros semeados precisam vir no JSON.
         $this->assertCount(1, $response->json('ccts'));
@@ -154,6 +154,9 @@ class ComercialCotacaoTest extends TestCase
         $this->assertSame('Vigilante', $response->json('categorias.0.nome'));
         // indices é mapa chave => valor.
         $this->assertArrayHasKey('encargos', $response->json('indices'));
+        // filiais e clientes (parametrizados) também são expostos para os comboboxes.
+        $this->assertIsArray($response->json('filiais'));
+        $this->assertIsArray($response->json('clientes'));
     }
 
     public function test_dados_omite_registros_inativos(): void

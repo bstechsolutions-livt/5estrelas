@@ -18,6 +18,7 @@ import axios from "axios"
 import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
 import * as XLSX from "xlsx"
+import SearchSelect from "@/Components/Comercial/SearchSelect.vue"
 import "@/../css/comercial-g360.css"
 
 const toast = useToast()
@@ -95,14 +96,17 @@ const props = defineProps({
 })
 
 // ─── Identificação da proposta ──────────────────────────────────────────────────
-const empresas = [
-  { value: "seg-df", label: "Segurança — Sede DF", uf: "df" },
-  { value: "seg-go", label: "Segurança — Filial GO", uf: "go" },
-  { value: "seg-mt", label: "Segurança — Filial MT", uf: "mt" },
-  { value: "seg-mg", label: "Segurança — Filial MG", uf: "mg" },
-  { value: "seg-sp", label: "Segurança — Filial SP", uf: "sp" },
-  { value: "apoio-df", label: "Apoio Administrativo — DF", uf: "df" },
-]
+// Filiais e clientes vêm parametrizados do backend (/cotacao/dados) — antes eram
+// um array fixo no front. CCT também passa a sugerir os CCTs cadastrados.
+const filiais = ref([])
+const clientesLista = ref([])
+const cctOptions = computed(() =>
+  ccts.value.map((c) => ({
+    value: c.nome,
+    label: c.nome,
+    sub: [c.ano_base, c.sindicato].filter(Boolean).join(" · ") || (c.uf ? String(c.uf).toUpperCase() : null),
+  })),
+)
 const ident = reactive({
   numProposta: "Nº 132", // TODO: numeração automática real virá da Spec 3 (Propostas)
   data: new Date().toISOString().slice(0, 10),
@@ -993,8 +997,13 @@ function importarPlanilha(ev) {
         if (g("periodicidade")) ident.periodicidade = g("periodicidade")
         if (/^\d{4}-\d{2}-\d{2}/.test(g("data"))) ident.data = g("data").slice(0, 10)
         if (g("empresa")) {
-          const emp = empresas.find((x) => x.label === g("empresa") || x.value === g("empresa"))
-          if (emp) ident.empresa = emp.value
+          // Filiais/empresas vêm da Senior (objetos {cod_emp, nome, fantasia}).
+          // Casa por nome/fantasia/cod_emp; se não encontrar, mantém o valor cru.
+          const v = g("empresa")
+          const emp = filiais.value.find(
+            (x) => x.nome === v || x.fantasia === v || String(x.cod_emp) === String(v),
+          )
+          ident.empresa = emp ? String(emp.cod_emp) : v
         }
         if (g("modelo")) modelo.value = /in\s*0?5/i.test(g("modelo")) ? "in05" : "5estrelas"
       }
@@ -1018,6 +1027,8 @@ async function carregar() {
     escalas.value = data.escalas || []
     categorias.value = data.categorias || []
     indices.value = data.indices || {}
+    filiais.value = data.filiais || []
+    clientesLista.value = data.clientes || []
     // Defaults: Vigilante + escala 24h (func_por_posto 4), como no protótipo
     catSel.value = categorias.value.find((c) => /vigilante/i.test(c.nome)) || categorias.value[0] || null
     escSel.value = escalas.value.find((e) => (e.nome || "").includes("24")) || escalas.value[0] || null
@@ -1122,19 +1133,43 @@ function hidratarProposta(p) {
                   </div>
                   <div class="form-group" style="grid-column:span 2">
                     <label class="form-label">Cliente</label>
-                    <input type="text" class="form-input" id="cliente" dusk="cot-cliente" v-model="ident.cliente" placeholder="Nome do cliente">
+                    <SearchSelect
+                      v-model="ident.cliente"
+                      :options="clientesLista"
+                      option-value="nome"
+                      option-label="nome"
+                      option-sub="cidade"
+                      allow-free
+                      placeholder="Buscar ou digitar cliente..."
+                      dusk="cot-cliente"
+                      option-dusk-prefix="cot-cliente-opt"
+                    />
                   </div>
                 </div>
                 <div class="form-grid-3">
                   <div class="form-group">
                     <label class="form-label">Empresa / CNPJ</label>
-                    <select class="form-select" id="cotacao-empresa" v-model="ident.empresa">
-                      <option v-for="e in empresas" :key="e.value" :value="e.value">{{ e.label }}</option>
-                    </select>
+                    <SearchSelect
+                      v-model="ident.empresa"
+                      :options="filiais"
+                      option-value="codigo"
+                      option-label="label"
+                      option-sub="nome"
+                      placeholder="Selecionar empresa..."
+                      dusk="cot-empresa"
+                      option-dusk-prefix="cot-empresa-opt"
+                    />
                   </div>
                   <div class="form-group">
                     <label class="form-label">CCT Vigente</label>
-                    <input type="text" class="form-input" id="cct" v-model="ident.cct" placeholder="2024/2025">
+                    <SearchSelect
+                      v-model="ident.cct"
+                      :options="cctOptions"
+                      allow-free
+                      placeholder="Buscar CCT ou digitar período..."
+                      dusk="cot-cct"
+                      option-dusk-prefix="cot-cct-opt"
+                    />
                   </div>
                   <div class="form-group">
                     <label class="form-label">Modelo de Planilha</label>

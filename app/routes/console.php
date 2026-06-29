@@ -29,4 +29,9 @@ if (config('senior.enabled', false)) {
     Schedule::command('senior:sync-payables --scheduled')
         ->cron($cron)
         ->withoutOverlapping(); // req 6.4: sem execução concorrente
+
+    // Sync de filiais/empresas (cad_filial) — muda pouco, roda 1x/dia de madrugada.
+    Schedule::command('senior:sync-filiais --scheduled')
+        ->dailyAt('03:20')
+        ->withoutOverlapping();
 }

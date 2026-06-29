@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Comercial;
 use App\Http\Controllers\Controller;
 use App\Models\Comercial\Categoria;
 use App\Models\Comercial\Cct;
+use App\Models\Comercial\Cliente;
 use App\Models\Comercial\Escala;
+use App\Models\Comercial\Filial;
 use App\Models\Comercial\Indice;
 use App\Models\Comercial\Proposta;
 use App\Services\Comercial\ComposicaoCustoService;
@@ -59,6 +61,8 @@ class ComercialCotacaoController extends Controller
             'escalas' => Escala::where('ativo', true)->orderBy('nome')->get(),
             'categorias' => Categoria::where('ativo', true)->orderBy('nome')->get(),
             'indices' => $indices,
+            'filiais' => Filial::where('ativo', true)->orderBy('ordem')->orderBy('nome')->get(),
+            'clientes' => Cliente::orderBy('nome')->get(['id', 'nome', 'situacao', 'cidade', 'uf']),
         ]);
     }
 

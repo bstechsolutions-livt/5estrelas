@@ -139,6 +139,8 @@ class ComercialPropostaTest extends TestCase
                 ->where('propostas.0.cliente', 'Condomínio Aurora')
                 ->where('propostas.0.situacao', 'EM ANÁLISE')
                 ->has('situacaoLabels')
+                ->has('filiais')
+                ->has('clientes')
         );
     }
 

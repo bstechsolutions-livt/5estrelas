@@ -2,6 +2,7 @@
 
 namespace Tests\Browser;
 
+use App\Models\Comercial\Cliente;
 use App\Models\Comercial\Proposta;
 use App\Models\User;
 use Laravel\Dusk\Browser;
@@ -96,6 +97,43 @@ class ComercialPropostaTest extends DuskTestCase
         Proposta::where('cliente', $cliente)->delete();
     }
 
+    public function test_modal_seleciona_empresa_filial_e_cliente(): void
+    {
+        $nome = 'Cliente Busca Prop '.uniqid();
+        Cliente::where('nome', 'like', 'Cliente Busca Prop%')->delete();
+        Proposta::where('cliente', 'like', 'Cliente Busca Prop%')->delete();
+        $cli = Cliente::create(['nome' => $nome, 'situacao' => 'ativo', 'cidade' => 'Goiânia', 'uf' => 'GO']);
+
+        $this->browse(function (Browser $browser) use ($nome) {
+            $browser->loginAs($this->bruno())
+                ->visit('/comercial/propostas')
+                ->waitForText('Controle de Propostas', 10)
+                ->click('@prop-nova')
+                ->waitForText('Nova Entrada de Proposta', 5)
+                // Empresa: combobox parametrizado da Senior → seleciona codEmp=3 (Serv Apoio)
+                ->click('@prop-form-empresa')
+                ->waitFor('@prop-form-empresa-opt-3', 6)
+                ->click('@prop-form-empresa-opt-3')
+                ->assertInputValue('@prop-form-empresa', 'SERV APOIO')
+                // Cliente: busca sugestão do cadastro
+                ->type('@prop-form-cliente', 'Cliente Busca Prop')
+                ->waitFor('.bs-ss-option', 6)
+                ->click('.bs-ss-option')
+                ->assertInputValue('@prop-form-cliente', $nome)
+                ->type('@prop-form-valor', '4321')
+                ->click('@prop-salvar')
+                ->waitForText('Proposta registrada', 10);
+        });
+
+        $this->assertDatabaseHas('bs_comercial_propostas', [
+            'cliente' => $nome,
+            'empresa' => '3',
+        ]);
+
+        Proposta::where('cliente', $nome)->delete();
+        $cli->delete();
+    }
+
     public function test_editar_proposta_atualiza(): void
     {
         $nomeNovo = 'Cliente Editado Dusk '.uniqid();
@@ -109,7 +147,7 @@ class ComercialPropostaTest extends DuskTestCase
                 ->click('@prop-editar-'.$proposta->id)
                 ->waitForText('Editar Proposta', 5)
                 ->waitFor('@prop-form-cliente', 5)
-                ->clear('@prop-form-cliente')
+                ->click('@prop-form-cliente-clear')
                 ->type('@prop-form-cliente', $nomeNovo)
                 ->click('@prop-salvar')
                 ->waitForText('Proposta atualizada', 10)

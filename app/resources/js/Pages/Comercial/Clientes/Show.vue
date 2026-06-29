@@ -5,6 +5,8 @@ import { router } from "@inertiajs/vue3"
 import axios from "axios"
 import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
+import SearchSelect from "@/Components/Comercial/SearchSelect.vue"
+import { UF_OPTIONS } from "@/Components/Comercial/ufs.js"
 import "@/../css/comercial-g360.css"
 
 const props = defineProps({
@@ -414,7 +416,13 @@ function voltar() {
               </div>
               <div class="form-group">
                 <label class="form-label">UF</label>
-                <input type="text" class="form-input" v-model="formEditar.uf" placeholder="UF" maxlength="2" style="text-transform:uppercase">
+                <SearchSelect
+                  v-model="formEditar.uf"
+                  :options="UF_OPTIONS"
+                  placeholder="UF..."
+                  dusk="cliente-edit-uf"
+                  option-dusk-prefix="cliente-edit-uf-opt"
+                />
               </div>
               <div class="form-group">
                 <label class="form-label">Contato Principal</label>

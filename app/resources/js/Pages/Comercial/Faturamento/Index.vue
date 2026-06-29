@@ -5,6 +5,7 @@ import axios from "axios"
 import * as XLSX from "xlsx"
 import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
+import SearchSelect from "@/Components/Comercial/SearchSelect.vue"
 import "@/../css/comercial-g360.css"
 
 const props = defineProps({
@@ -25,6 +26,7 @@ const anoAtivo = ref(2025)
 const faturamento = ref({ 2025: { locais: [] }, 2026: { locais: [] } })
 const salvando = ref(false)
 const novoLocalNome = ref("")
+const novoLocalClienteId = ref(null)
 const showNovoLocal = ref(false)
 
 // ─── Inicialização ──────────────────────────────────────────
@@ -177,7 +179,13 @@ async function salvar() {
 
 function abrirNovoLocal() {
   novoLocalNome.value = ''
+  novoLocalClienteId.value = null
   showNovoLocal.value = true
+}
+
+// Ao escolher um cliente do cadastro, vincula o id (mantém o nome como local).
+function onSelecionarClienteLocal(cli) {
+  novoLocalClienteId.value = cli?.id ?? null
 }
 
 // ─── Exportar Excel (mesmo formato do Importar — round-trip) ─
@@ -301,9 +309,10 @@ async function criarLocal() {
     const { data } = await axios.post('/comercial/faturamento/local', {
       ano,
       local_nome: novoLocalNome.value.trim(),
+      cliente_id: novoLocalClienteId.value,
     })
     if (data.sucesso) {
-      const novaLinha = { id: data.id, local_nome: novoLocalNome.value.trim(), cliente_id: null }
+      const novaLinha = { id: data.id, local_nome: novoLocalNome.value.trim(), cliente_id: novoLocalClienteId.value }
       MESES.forEach(m => { novaLinha[m] = 0 })
       novaLinha.total = 0
 
@@ -554,8 +563,22 @@ const anoAtual = new Date().getFullYear()
           </div>
           <div class="g360-modal-body">
             <div class="form-group">
-              <label class="form-label">Nome do local / contrato</label>
-              <input class="form-input" type="text" dusk="input-novo-local" v-model="novoLocalNome" placeholder="Ex: Hospital São Lucas — Vigilância" @keyup.enter="criarLocal">
+              <label class="form-label">Local / contrato</label>
+              <SearchSelect
+                v-model="novoLocalNome"
+                :options="clientes || []"
+                option-value="nome"
+                option-label="nome"
+                option-sub="cidade"
+                allow-free
+                placeholder="Buscar cliente ou digitar local..."
+                dusk="input-novo-local"
+                option-dusk-prefix="fat-local-opt"
+                @select="onSelecionarClienteLocal"
+              />
+              <span style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                Selecione um cliente cadastrado para vincular o faturamento, ou digite um nome livre.
+              </span>
             </div>
           </div>
           <div class="g360-modal-footer">

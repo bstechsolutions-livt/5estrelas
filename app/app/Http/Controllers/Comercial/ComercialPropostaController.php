@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Comercial;
 
 use App\Http\Controllers\Controller;
+use App\Models\Comercial\Cliente;
+use App\Models\Comercial\Filial;
 use App\Models\Comercial\Proposta;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,6 +22,8 @@ class ComercialPropostaController extends Controller
         return Inertia::render('Comercial/Propostas/Index', [
             'propostas' => $this->lista(),
             'situacaoLabels' => Proposta::SITUACAO_LABELS,
+            'filiais' => Filial::where('ativo', true)->orderBy('ordem')->orderBy('nome')->get(),
+            'clientes' => Cliente::orderBy('nome')->get(['id', 'nome', 'situacao', 'cidade', 'uf']),
         ]);
     }
 
