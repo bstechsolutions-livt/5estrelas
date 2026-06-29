@@ -10,6 +10,7 @@ import { router } from "@inertiajs/vue3"
 import axios from "axios"
 import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
+import SearchSelect from "@/Components/Comercial/SearchSelect.vue"
 import "@/../css/comercial-g360.css"
 
 const props = defineProps({
@@ -32,9 +33,10 @@ const fmtPct = (v) => v != null ? Number(v).toFixed(2) + "%" : "—"
 // ─── Seleção de cliente ───────────────────────────────────────────────────────
 const clienteSelecionado = ref(props.clienteAtivo?.id || "")
 
-function navCliente() {
-  if (clienteSelecionado.value) {
-    router.get(`/comercial/saude?cliente=${clienteSelecionado.value}`)
+function navCliente(val) {
+  const id = val != null && val !== '' ? val : clienteSelecionado.value
+  if (id) {
+    router.get(`/comercial/saude?cliente=${id}`)
   }
 }
 
@@ -223,16 +225,20 @@ const scoreDash = computed(() => (score.value / 100) * circumference)
             <div class="section-desc">Score de saúde financeira, composição e evolução dos contratos</div>
           </div>
           <div style="display:flex;gap:10px;align-items:center">
-            <select
-              v-model="clienteSelecionado"
-              class="form-select"
-              dusk="saude-select-cliente"
-              @change="navCliente"
-              style="width:280px"
-            >
-              <option value="">Selecione um contrato...</option>
-              <option v-for="c in clientes" :key="c.id" :value="c.id">{{ c.nome }}</option>
-            </select>
+            <div style="width:280px">
+              <SearchSelect
+                v-model="clienteSelecionado"
+                :options="clientes"
+                option-value="id"
+                option-label="nome"
+                option-sub="cidade"
+                :clearable="false"
+                placeholder="Selecione um contrato..."
+                dusk="saude-select-cliente"
+                option-dusk-prefix="saude-cli-opt"
+                @change="navCliente"
+              />
+            </div>
           </div>
         </div>
 

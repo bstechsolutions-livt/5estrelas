@@ -4,6 +4,8 @@ import { onMounted, ref, computed } from "vue"
 import axios from "axios"
 import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
+import SearchSelect from "@/Components/Comercial/SearchSelect.vue"
+import { UF_OPTIONS } from "@/Components/Comercial/ufs.js"
 import "@/../css/comercial-g360.css"
 
 const toast = useToast()
@@ -23,12 +25,13 @@ const ufNomes = {
 }
 
 // ─── Estado ──────────────────────────────────────────
-const aba = ref("cct")            // cct | taxas | insumos
+const aba = ref("cct")            // cct | taxas | insumos | filiais
 const estadoUf = ref("")
 const ccts = ref([])
 const indices = ref([])
 const encargos = ref([])
 const insumos = ref([])
+const filiais = ref([])
 const cctAtiva = ref(null)
 const encargosAberto = ref(false)
 
@@ -122,6 +125,7 @@ async function carregar() {
     indices.value = data.indices || []
     encargos.value = data.encargos || []
     insumos.value = data.insumos || []
+    filiais.value = data.filiais || []
     // Selecionar primeiro estado se necessário (normalizado em minúsculas,
     // pois toda a filtragem por UF compara em minúsculas — dados podem vir
     // com UF em maiúsculas/minúsculas misturadas).
@@ -132,6 +136,66 @@ async function carregar() {
   } catch (e) { fail("Falha ao carregar dados") }
 }
 onMounted(carregar)
+
+// ─── Filiais / Empresas (espelhadas da Senior) ───────────────────────────────
+// A fonte é a Senior (cad_filial). Aqui só sincronizamos, ligamos/desligamos a
+// exibição e ajustamos a apresentação local (tipo/tag). Sem criar/excluir manual.
+const TIPO_FILIAL_OPTIONS = [
+  { value: "seguranca", label: "Segurança" },
+  { value: "apoio", label: "Apoio / Serviços" },
+]
+const modalFilial = ref(false)
+const editFilialId = ref(null)
+const salvandoFilial = ref(false)
+const sincronizandoFiliais = ref(false)
+const filialForm = ref({ tipo: "seguranca", tag: "" })
+
+const tipoFilialLabel = (t) => (t === "apoio" ? "Apoio / Serviços" : "Segurança")
+
+function abrirEditarFilial(f) {
+  editFilialId.value = f.id
+  filialForm.value = { tipo: f.tipo || "seguranca", tag: f.tag || "" }
+  modalFilial.value = true
+}
+
+async function salvarFilial() {
+  salvandoFilial.value = true
+  try {
+    const { data } = await axios.put(`/comercial/configuracoes/filiais/${editFilialId.value}`, filialForm.value)
+    const i = filiais.value.findIndex((x) => x.id === editFilialId.value)
+    if (i !== -1) filiais.value[i] = data.dados
+    ok("Filial atualizada")
+    modalFilial.value = false
+  } catch (e) {
+    fail("Não foi possível salvar a filial")
+  } finally {
+    salvandoFilial.value = false
+  }
+}
+
+async function toggleFilial(f) {
+  try {
+    const { data } = await axios.patch(`/comercial/configuracoes/filiais/${f.id}/toggle`)
+    const i = filiais.value.findIndex((x) => x.id === f.id)
+    if (i !== -1) filiais.value[i] = data.dados
+    ok(data.dados.ativo ? "Filial ativada" : "Filial desativada")
+  } catch (e) {
+    fail("Não foi possível alterar a filial")
+  }
+}
+
+async function sincronizarFiliais() {
+  sincronizandoFiliais.value = true
+  try {
+    const { data } = await axios.post("/comercial/configuracoes/filiais/sincronizar")
+    if (Array.isArray(data.filiais)) filiais.value = data.filiais
+    ;(data.sucesso ? ok : fail)(data.mensagem || "Sincronização concluída")
+  } catch (e) {
+    fail("Falha ao sincronizar com a Senior")
+  } finally {
+    sincronizandoFiliais.value = false
+  }
+}
 
 function abrirCard(c) { cctAtiva.value = c }
 function fecharPainel() { cctAtiva.value = null }
@@ -244,9 +308,10 @@ async function criarServico() {
 
         <!-- Abas internas -->
         <div style="display:flex;gap:0;border-bottom:2px solid var(--brand-border-soft);margin-bottom:28px">
-          <button class="indices-tab" :class="{ active: aba === 'cct' }" @click="aba = 'cct'">Convenções Coletivas</button>
-          <button class="indices-tab" :class="{ active: aba === 'taxas' }" @click="aba = 'taxas'">Taxas</button>
-          <button class="indices-tab" :class="{ active: aba === 'insumos' }" @click="aba = 'insumos'">Insumos</button>
+          <button class="indices-tab" dusk="cfg-tab-cct" :class="{ active: aba === 'cct' }" @click="aba = 'cct'">Convenções Coletivas</button>
+          <button class="indices-tab" dusk="cfg-tab-taxas" :class="{ active: aba === 'taxas' }" @click="aba = 'taxas'">Taxas</button>
+          <button class="indices-tab" dusk="cfg-tab-insumos" :class="{ active: aba === 'insumos' }" @click="aba = 'insumos'">Insumos</button>
+          <button class="indices-tab" dusk="cfg-tab-filiais" :class="{ active: aba === 'filiais' }" @click="aba = 'filiais'">Filiais</button>
         </div>
 
         <!-- ABA: CONVENÇÕES COLETIVAS -->
@@ -449,6 +514,77 @@ async function criarServico() {
               <div style="font-family:Syne,sans-serif;font-weight:800;font-size:22px;color:var(--brand-gold)">{{ fmt(insTotal) }}</div>
             </div>
             <button @click="salvarInsumos" class="btn btn-sm" style="background:var(--brand-gold);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;padding:6px 16px">Salvar Insumos</button>
+          </div>
+        </div>
+
+        <!-- ABA: FILIAIS -->
+        <div v-show="aba === 'filiais'">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px;flex-wrap:wrap">
+            <p style="font-size:12px;color:var(--text-muted);margin:0">
+              Empresas/filiais do grupo, sincronizadas da <strong>Senior</strong>. Classificação (tipo/sigla) e exibição são ajustáveis aqui.
+            </p>
+            <button class="btn btn-gold" dusk="cfg-filial-sincronizar" :disabled="sincronizandoFiliais" @click="sincronizarFiliais">
+              {{ sincronizandoFiliais ? 'Sincronizando...' : '↻ Sincronizar com Senior' }}
+            </button>
+          </div>
+          <div class="contracts-table-wrap">
+            <table>
+              <thead>
+                <tr><th>Cód.</th><th>Empresa</th><th>Sigla</th><th>Tipo</th><th>CNPJ</th><th>UF</th><th>Exibir</th><th style="text-align:right">Ações</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="f in filiais" :key="f.id" :dusk="'cfg-filial-row-' + f.id">
+                  <td style="font-weight:700;color:var(--text-muted)">{{ f.cod_emp ?? '—' }}</td>
+                  <td style="font-weight:600">{{ f.nome }}</td>
+                  <td>{{ f.tag || '—' }}</td>
+                  <td>{{ tipoFilialLabel(f.tipo) }}</td>
+                  <td style="font-size:12px;color:var(--text-secondary)">{{ f.cnpj || '—' }}</td>
+                  <td>{{ f.uf || '—' }}</td>
+                  <td>
+                    <button :dusk="'cfg-filial-toggle-' + f.id" @click="toggleFilial(f)"
+                      :style="{ background: f.ativo ? 'color-mix(in srgb, var(--green) 16%, transparent)' : 'rgba(0,0,0,0.06)', color: f.ativo ? 'var(--green)' : 'var(--text-muted)' }"
+                      style="border:none;border-radius:99px;padding:3px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">
+                      {{ f.ativo ? 'Ativa' : 'Inativa' }}
+                    </button>
+                  </td>
+                  <td style="text-align:right">
+                    <button :dusk="'cfg-filial-editar-' + f.id" @click="abrirEditarFilial(f)" style="background:transparent;border:1px solid var(--brand-border-soft);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer;font-family:inherit">Editar</button>
+                  </td>
+                </tr>
+                <tr v-if="!filiais.length">
+                  <td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Nenhuma empresa sincronizada</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ Modal: Filial (apresentação local) ══════ -->
+      <div v-if="modalFilial" class="g360-modal-overlay" @click.self="modalFilial = false">
+        <div class="g360-modal">
+          <div class="g360-modal-header">
+            <span>Editar Empresa (apresentação)</span>
+            <button class="g360-modal-close" @click="modalFilial = false">✕</button>
+          </div>
+          <div class="g360-modal-body" style="flex-direction:column">
+            <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">
+              Nome, CNPJ e código vêm da Senior e não são editáveis aqui. Ajuste apenas a classificação e a sigla de exibição.
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div class="form-group">
+                <label class="form-label">Tipo</label>
+                <SearchSelect v-model="filialForm.tipo" :options="TIPO_FILIAL_OPTIONS" :clearable="false" dusk="cfg-filial-tipo" option-dusk-prefix="cfg-filial-tipo-opt" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Sigla (badge)</label>
+                <input type="text" class="form-input" dusk="cfg-filial-tag" v-model="filialForm.tag" placeholder="Ex: 5 ESTRELAS">
+              </div>
+            </div>
+          </div>
+          <div class="g360-modal-footer">
+            <button class="btn btn-ghost" @click="modalFilial = false">Cancelar</button>
+            <button class="btn btn-gold" dusk="cfg-filial-salvar" :disabled="salvandoFilial" @click="salvarFilial">{{ salvandoFilial ? 'Salvando...' : 'Salvar' }}</button>
           </div>
         </div>
       </div>

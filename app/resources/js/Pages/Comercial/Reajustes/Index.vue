@@ -12,6 +12,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayo
 import { ref, computed, reactive } from "vue"
 import { router } from "@inertiajs/vue3"
 import axios from "axios"
+import { useDevice } from "@/composables/useDevice"
 import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
 import { swalConfirm } from "@/utils/globalFunctions"
@@ -28,6 +29,14 @@ const ok = (m) => toast.add({ severity: "success", summary: "Pronto", detail: m,
 const fail = (m) => toast.add({ severity: "error", summary: "Erro", detail: m, life: 4000 })
 
 const STATUS = ["pendente", "calculado", "enviado", "aprovado", "recusado"]
+const { isMobile } = useDevice()
+// Tipos de índice de reajuste (valores de domínio fixos, centralizados aqui).
+const TIPOS_INDICE = [
+  { value: "inpc", label: "INPC" },
+  { value: "ipca", label: "IPCA" },
+  { value: "cct", label: "Dissídio / CCT" },
+  { value: "manual", label: "Percentual Manual" },
+]
 const sitClass = (s) => ({
   aprovado: "badge-green", recusado: "badge-red", enviado: "badge-gold",
   calculado: "badge-blue", pendente: "badge-orange",
@@ -320,7 +329,7 @@ async function salvarEditar() {
               Nenhum reajuste no filtro atual
             </div>
 
-            <div class="contracts-table-wrap" v-else style="overflow-x:auto">
+            <div class="contracts-table-wrap" v-else-if="!isMobile" style="overflow-x:auto">
               <table style="width:100%;border-collapse:collapse;min-width:820px">
                 <thead>
                   <tr>
@@ -358,6 +367,27 @@ async function salvarEditar() {
                   </tr>
                 </tbody>
               </table>
+            </div>
+
+            <!-- Cards (mobile) -->
+            <div v-else class="bs-mcards">
+              <div v-for="r in grupo.itens" :key="r.id" class="bs-mcard" :dusk="'raj-row-' + r.id" style="cursor:default">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                  <div style="font-weight:600;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="r.cliente_nome">{{ r.cliente_nome }}</div>
+                  <span class="badge" :class="sitClass(r.status)" style="flex-shrink:0">{{ statusLabels[r.status] || r.status }}</span>
+                </div>
+                <div style="display:flex;gap:14px;margin-top:10px;font-size:12px;color:var(--text-secondary);flex-wrap:wrap">
+                  <span><b style="color:var(--brand-gold)">{{ Number(r.pct).toFixed(2) }}%</b></span>
+                  <span>{{ fmt(r.valor_atual) }} → <b>{{ fmt(r.novo_valor) }}</b></span>
+                  <span style="color:var(--green)">+{{ fmt(r.impacto_mensal) }}</span>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:12px">
+                  <button @click="verDetalhe(r)" class="btn btn-ghost" :dusk="'raj-detalhe-' + r.id" style="flex:1;font-size:12px">Itens</button>
+                  <button @click="abrirEditar(r)" class="btn btn-ghost" :dusk="'raj-editar-' + r.id" style="flex:1;font-size:12px">Editar</button>
+                  <button @click="alterarStatus(r)" class="btn btn-ghost" :dusk="'raj-status-' + r.id" style="flex:1;font-size:12px">Status</button>
+                  <button @click="excluir(r)" class="btn btn-ghost" :dusk="'raj-excluir-' + r.id" style="flex:1;font-size:12px;color:var(--red)">Excluir</button>
+                </div>
+              </div>
             </div>
           </div>
         </template>
@@ -438,9 +468,8 @@ async function salvarEditar() {
           <div class="modal-title">Editar Reajuste</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
             <div class="form-group"><label class="form-label">Tipo de Índice</label>
-              <select v-model="editForm.tipo" class="form-select">
-                <option value="inpc">INPC</option><option value="ipca">IPCA</option>
-                <option value="cct">Dissídio / CCT</option><option value="manual">Percentual Manual</option>
+              <select v-model="editForm.tipo" class="form-select" dusk="raj-edit-tipo">
+                <option v-for="t in TIPOS_INDICE" :key="t.value" :value="t.value">{{ t.label }}</option>
               </select>
             </div>
             <div class="form-group"><label class="form-label">Percentual (%)</label>

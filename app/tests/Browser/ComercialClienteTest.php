@@ -77,6 +77,37 @@ class ComercialClienteTest extends DuskTestCase
         Cliente::where('nome', $nome)->delete();
     }
 
+    public function test_novo_cliente_com_uf_selecionada(): void
+    {
+        $nome = 'Cliente UF Dusk '.uniqid();
+        Cliente::where('nome', 'like', 'Cliente UF Dusk%')->delete();
+
+        $this->browse(function (Browser $browser) use ($nome) {
+            $browser->loginAs($this->bruno())
+                ->visit('/comercial/clientes')
+                ->waitForText('Clientes / Contratos', 10)
+                ->click('@btn-novo-cliente')
+                ->waitForText('Novo Cliente', 5)
+                ->waitFor('@input-cliente-nome', 5)
+                ->type('@input-cliente-nome', $nome)
+                // UF agora é um Select com busca (antes era texto livre)
+                ->click('@input-cliente-uf')
+                ->type('@input-cliente-uf', 'São')
+                ->waitFor('@cliente-uf-opt-SP', 6)
+                ->click('@cliente-uf-opt-SP')
+                ->assertInputValue('@input-cliente-uf', 'SP — São Paulo')
+                ->click('@btn-salvar-cliente')
+                ->waitForText('Cliente cadastrado', 10);
+        });
+
+        $this->assertDatabaseHas('bs_comercial_clientes', [
+            'nome' => $nome,
+            'uf' => 'SP',
+        ]);
+
+        Cliente::where('nome', $nome)->delete();
+    }
+
     public function test_clicar_cliente_abre_detalhe(): void
     {
         $nome = 'Cliente Dusk Detalhe '.uniqid();

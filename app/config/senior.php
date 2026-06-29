@@ -32,6 +32,14 @@ return [
     // Servlet SOAP do serviço de Contas a Pagar (sapiens_Sync + nome do serviço).
     'cp_service' => 'sapiens_Synccom_senior_g5_co_mfi_cpa_titulos',
 
+    // Servlet SOAP do serviço de Cadastro de Filial (cad_filial / ConsultarGeral).
+    // Usado pelo senior:sync-filiais para espelhar as empresas/filiais do grupo.
+    'filial_service' => 'sapiens_Synccom_senior_g5_co_cad_filial',
+
+    // Sigla do "Sistema Integrado" registrada no Senior (identificadorSistema),
+    // exigida pelos serviços de cadastro (filial/fornecedor). Confirmada: EASYTECH.
+    'identificador_sistema' => env('SENIOR_IDENTIFICADOR_SISTEMA', 'EASYTECH'),
+
     'credentials' => [
         'user' => env('SENIOR_USER', '5estrelas.integracao'),
         'password' => env('SENIOR_PASSWORD', ''),

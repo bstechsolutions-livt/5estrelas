@@ -358,6 +358,11 @@ Route::middleware('auth')->group(function () {
 
                 // Insumos (global)
                 Route::post('insumos', [ComercialConfigController::class, 'salvarInsumos'])->name('insumos.salvar');
+
+                // Filiais / Empresas (espelhadas da Senior — sem criação/exclusão manual)
+                Route::post('filiais/sincronizar', [ComercialConfigController::class, 'sincronizarFiliais'])->name('filiais.sincronizar');
+                Route::put('filiais/{id}', [ComercialConfigController::class, 'updateFilial'])->name('filiais.update');
+                Route::patch('filiais/{id}/toggle', [ComercialConfigController::class, 'toggleFilial'])->name('filiais.toggle');
             });
         });
 

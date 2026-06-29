@@ -77,6 +77,7 @@ class ComercialFaturamentoController extends Controller
         $data = $request->validate([
             'ano' => 'required|integer|min:2020|max:2099',
             'local_nome' => 'required|string|max:255',
+            'cliente_id' => 'nullable|integer|exists:bs_comercial_clientes,id',
         ]);
 
         // Verifica se já existe
@@ -91,6 +92,7 @@ class ComercialFaturamentoController extends Controller
         $faturamento = Faturamento::create([
             'ano' => $data['ano'],
             'local_nome' => $data['local_nome'],
+            'cliente_id' => $data['cliente_id'] ?? null,
         ]);
 
         return response()->json(['sucesso' => true, 'id' => $faturamento->id]);

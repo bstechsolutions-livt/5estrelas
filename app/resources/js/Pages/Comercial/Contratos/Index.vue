@@ -6,7 +6,10 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout/AuthenticatedLayout.vue"
 import { computed } from "vue"
 import { router } from "@inertiajs/vue3"
+import { useDevice } from "@/composables/useDevice"
 import "@/../css/comercial-g360.css"
+
+const { isMobile } = useDevice()
 
 const props = defineProps({
   contratos: { type: Array, default: () => [] },
@@ -34,8 +37,8 @@ const totalMensal = computed(() => props.contratos.reduce((s, c) => s + (c.custo
           <button class="btn btn-gold" @click="router.visit('/comercial/cotacao')">+ Nova Proposta</button>
         </div>
 
-        <!-- Tabela -->
-        <div class="contracts-table-wrap" style="overflow-x:auto">
+        <!-- Tabela (desktop) -->
+        <div v-if="!isMobile" class="contracts-table-wrap" style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;min-width:900px">
             <thead>
               <tr>
@@ -77,6 +80,31 @@ const totalMensal = computed(() => props.contratos.reduce((s, c) => s + (c.custo
               </tr>
             </tfoot>
           </table>
+        </div>
+
+        <!-- Cards (mobile) -->
+        <div v-else class="bs-mcards" dusk="contrato-cards">
+          <div v-for="c in contratos" :key="c.id" class="bs-mcard" :dusk="'contrato-' + c.id"
+               @click="router.visit('/comercial/clientes/' + c.id)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+              <div style="min-width:0">
+                <div style="font-weight:700;font-size:14px">{{ c.numero }}</div>
+                <div style="font-size:13px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="c.cliente">{{ c.cliente }}</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:2px">{{ c.servico }}</div>
+              </div>
+              <span class="badge badge-green" style="flex-shrink:0">Ativo</span>
+            </div>
+            <div style="display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--text-secondary)">
+              <span>Postos <b>{{ c.postos || '—' }}</b></span>
+              <span>Func. <b>{{ c.funcionarios || '—' }}</b></span>
+              <span style="margin-left:auto;font-weight:700;color:var(--brand-gold)">{{ fmt(c.custo_mensal) }}</span>
+            </div>
+          </div>
+          <div v-if="!contratos.length" style="text-align:center;padding:40px;color:var(--text-muted)">Nenhum contrato ativo cadastrado</div>
+          <div v-if="contratos.length" class="bs-mcard" style="cursor:default;background:rgba(184,146,42,0.05)">
+            <div style="display:flex;justify-content:space-between;font-weight:700"><span>TOTAL</span><span style="color:var(--brand-gold);font-family:'Syne',sans-serif">{{ fmt(totalMensal) }}</span></div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">{{ totalPostos }} postos · {{ totalFunc }} func.</div>
+          </div>
         </div>
       </div>
     </div>

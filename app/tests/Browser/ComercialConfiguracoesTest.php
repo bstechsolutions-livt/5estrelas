@@ -2,6 +2,7 @@
 
 namespace Tests\Browser;
 
+use App\Models\Comercial\Filial;
 use App\Models\User;
 use Laravel\Dusk\Browser;
 use Tests\DuskTestCase;
@@ -155,5 +156,66 @@ class ComercialConfiguracoesTest extends DuskTestCase
                 ->waitForText('Taxas salvas', 10)
                 ->assertSee('Taxas salvas');
         });
+    }
+
+    public function test_aba_filiais_lista_e_sincroniza(): void
+    {
+        // O seed popula as empresas reais da Senior (codEmp 2..12). A aba lista
+        // essas empresas e o botão Sincronizar dispara o sync (skip em local).
+        $this->browse(function (Browser $browser) {
+            $browser->loginAs($this->bruno())
+                ->visit('/comercial/configuracoes')
+                ->waitForText('Índices', 10)
+                ->click('@cfg-tab-filiais')
+                ->waitForText('5 ESTRELAS SISTEMA DE SEGURANCA LTDA', 8)
+                ->assertSee('Sincronizar com Senior')
+                ->click('@cfg-filial-sincronizar')
+                // Local com integração desabilitada → mensagem informativa.
+                ->waitForText('exibindo as empresas', 10);
+        });
+    }
+
+    public function test_toggle_filial_ativa_desativa(): void
+    {
+        $f = Filial::create(['senior_id' => 'dusk-'.uniqid(), 'cod_emp' => 901, 'nome' => 'Filial Toggle Dusk', 'tipo' => 'seguranca', 'tag' => 'TGL', 'ativo' => true, 'ordem' => 99]);
+
+        $this->browse(function (Browser $browser) use ($f) {
+            $browser->loginAs($this->bruno())
+                ->visit('/comercial/configuracoes')
+                ->waitForText('Índices', 10)
+                ->click('@cfg-tab-filiais')
+                ->waitFor('@cfg-filial-toggle-'.$f->id, 8)
+                ->click('@cfg-filial-toggle-'.$f->id)
+                ->waitForText('Filial desativada', 10);
+        });
+
+        $this->assertDatabaseHas('bs_comercial_filiais', ['id' => $f->id, 'ativo' => false]);
+
+        $f->delete();
+    }
+
+    public function test_edita_apresentacao_da_filial(): void
+    {
+        $f = Filial::create(['senior_id' => 'dusk-'.uniqid(), 'cod_emp' => 902, 'nome' => 'Filial Edit Dusk', 'tipo' => 'seguranca', 'tag' => 'OLD', 'ativo' => true, 'ordem' => 99]);
+
+        $this->browse(function (Browser $browser) use ($f) {
+            $browser->loginAs($this->bruno())
+                ->visit('/comercial/configuracoes')
+                ->waitForText('Índices', 10)
+                ->click('@cfg-tab-filiais')
+                ->waitFor('@cfg-filial-editar-'.$f->id, 8)
+                ->click('@cfg-filial-editar-'.$f->id)
+                ->waitForText('Editar Empresa', 5)
+                // Tipo → Apoio
+                ->click('@cfg-filial-tipo')
+                ->waitFor('@cfg-filial-tipo-opt-apoio', 5)
+                ->click('@cfg-filial-tipo-opt-apoio')
+                ->click('@cfg-filial-salvar')
+                ->waitForText('Filial atualizada', 10);
+        });
+
+        $this->assertDatabaseHas('bs_comercial_filiais', ['id' => $f->id, 'tipo' => 'apoio']);
+
+        $f->delete();
     }
 }

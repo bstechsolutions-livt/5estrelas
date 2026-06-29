@@ -21,13 +21,20 @@ import Toast from "primevue/toast"
 import { useToast } from "primevue/usetoast"
 import * as XLSX from "xlsx"
 import { swalConfirm } from "@/utils/globalFunctions"
+import SearchSelect from "@/Components/Comercial/SearchSelect.vue"
+import { useDevice } from "@/composables/useDevice"
 import "@/../css/comercial-g360.css"
+
+const { isMobile } = useDevice()
 
 const props = defineProps({
   // Lista de propostas já mapeada pelo backend (ver ComercialPropostaController::lista()).
   propostas: { type: Array, default: () => [] },
-  // Rótulos de situação (apenas informativo; os valores do filtro são fixos do protótipo).
+  // Rótulos de situação (valor armazenado → label). Alimentam filtro e modais.
   situacaoLabels: { type: Object, default: () => ({}) },
+  // Filiais parametrizadas (antes era array fixo no front) e clientes cadastrados.
+  filiais: { type: Array, default: () => [] },
+  clientes: { type: Array, default: () => [] },
 })
 
 const toast = useToast()
@@ -35,30 +42,22 @@ const ok = (m) => toast.add({ severity: "success", summary: "Pronto", detail: m,
 const warn = (m) => toast.add({ severity: "warn", summary: "Atenção", detail: m, life: 3000 })
 const fail = (m) => toast.add({ severity: "error", summary: "Erro", detail: m, life: 4000 })
 
-// ─── Estrutura do Grupo 5 Estrelas (do protótipo) ──────────────────────────────
-const GRUPO_EMPRESAS = [
-  { id: "seg-df", short: "Segurança — Sede DF", tag: "SEG·DF", tipo: "seguranca", uf: "DF" },
-  { id: "seg-go", short: "Segurança — Filial GO", tag: "SEG·GO", tipo: "seguranca", uf: "GO" },
-  { id: "seg-mt", short: "Segurança — Filial MT", tag: "SEG·MT", tipo: "seguranca", uf: "MT" },
-  { id: "seg-mg", short: "Segurança — Filial MG", tag: "SEG·MG", tipo: "seguranca", uf: "MG" },
-  { id: "seg-sp", short: "Segurança — Filial SP", tag: "SEG·SP", tipo: "seguranca", uf: "SP" },
-  { id: "apoio-df", short: "Apoio Administrativo — DF", tag: "APOIO·DF", tipo: "apoio", uf: "DF" },
-  { id: "apoio-go", short: "Apoio Administrativo — GO", tag: "APOIO·GO", tipo: "apoio", uf: "GO" },
-  { id: "apoio-sp", short: "Apoio Administrativo — SP", tag: "APOIO·SP", tipo: "apoio", uf: "SP" },
-]
+// ─── Empresas/Filiais (parametrizadas via props.filiais, vindas da Senior) ───────
+// Mapa de valores LEGADOS (protótipo/slug) → cod_emp da empresa Senior, para
+// exibir corretamente propostas antigas. Novas propostas já salvam cod_emp.
 const EMPRESA_LEGACY_MAP = {
-  "MATRIZ": "seg-df", "FILIAL - GO": "seg-go", "FILIAL - MG": "seg-mg",
-  "APOIO - DF": "apoio-df", "APOIO - GO": "apoio-go", "APOIO - SP": "apoio-sp",
-  "APOIO - MG": "seg-mg", "APOIO - MT": "seg-mt",
-  "MATRIZ APOIO - DF": "seg-df", "MATRIZ E APOIO - DF": "seg-df",
+  "seg-df": 2, "seg-go": 2, "seg-mt": 2, "seg-mg": 2, "seg-sp": 2,
+  "apoio-df": 3, "apoio-go": 3, "apoio-sp": 3,
+  "MATRIZ": 2, "FILIAL - GO": 2, "FILIAL - MG": 2, "MATRIZ APOIO - DF": 2, "MATRIZ E APOIO - DF": 2,
+  "APOIO - DF": 3, "APOIO - GO": 3, "APOIO - SP": 3, "APOIO - MG": 3, "APOIO - MT": 3,
 }
-function getEmpresa(idOrLegado) {
-  if (!idOrLegado) return GRUPO_EMPRESAS[0]
-  const direct = GRUPO_EMPRESAS.find((e) => e.id === idOrLegado)
-  if (direct) return direct
-  const mapped = EMPRESA_LEGACY_MAP[idOrLegado]
-  if (mapped) return GRUPO_EMPRESAS.find((e) => e.id === mapped) || GRUPO_EMPRESAS[0]
-  return GRUPO_EMPRESAS[0]
+// Resolve a empresa (cod_emp atual ou valor legado) para os dados de exibição.
+function getEmpresa(val) {
+  const codEmp = EMPRESA_LEGACY_MAP[val] ?? val
+  const f = props.filiais.find((x) => String(x.cod_emp) === String(codEmp))
+  if (f) return { id: String(f.cod_emp), nome: f.label || f.nome, tag: f.tag || f.fantasia || f.nome, tipo: f.tipo }
+  // Valor desconhecido/legado sem empresa cadastrada: exibe o próprio valor.
+  return { id: String(val ?? ""), nome: val || "—", tag: val || "—", tipo: "seguranca" }
 }
 // Estilo do badge de empresa (white-label: dourado → var(--app-primary)).
 function empresaBadgeStyle(idOrLegado) {
@@ -87,8 +86,11 @@ const fmtKpi = (v) =>
     ? "R$ " + (v / 1e6).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) + "M"
     : "R$ " + (v / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 0 }) + "k"
 
-// ─── Situações (do protótipo) ───────────────────────────────────────────────────
-const SITUACOES = ["EM ANÁLISE", "APROVADO", "REPROVADO", "ESTIMATIVA", "REDUÇÃO"]
+// ─── Situações (parametrizadas: chaves de situacaoLabels = valores armazenados) ───
+const SITUACOES = computed(() => {
+  const keys = Object.keys(props.situacaoLabels || {})
+  return keys.length ? keys : ["EM ANÁLISE", "APROVADO", "REPROVADO", "ESTIMATIVA", "REDUÇÃO"]
+})
 // Slug estável p/ seletores Dusk (sem acento/espaço): "EM ANÁLISE" → "em-analise".
 const sitSlug = (s) =>
   String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "-")
@@ -137,8 +139,10 @@ const listaFiltrada = computed(() => {
       !fEmpresa.value ||
       (() => {
         const emp = p.empresa || ""
-        if (fEmpresa.value === "seg") return emp.startsWith("seg")
-        return emp === fEmpresa.value || getEmpresa(emp).id === fEmpresa.value
+        // Agregados por tipo (seguranca/apoio) usam a classificação da empresa.
+        if (fEmpresa.value === "seg") return getEmpresa(emp).tipo === "seguranca"
+        if (fEmpresa.value === "apoio") return getEmpresa(emp).tipo === "apoio"
+        return String(emp) === String(fEmpresa.value) || String(getEmpresa(emp).id) === String(fEmpresa.value)
       })()
     return matchBusca && matchSit && matchEmp
   })
@@ -456,23 +460,13 @@ function exportarPropostas() {
           <input v-model="fBusca" type="text" class="form-input" dusk="prop-filtro-busca" placeholder="Buscar cliente, nº proposta, serviço..." style="width:280px;max-width:100%">
           <select v-model="fSituacao" class="form-select" dusk="prop-filtro-situacao" style="width:160px">
             <option value="">Todas as situações</option>
-            <option value="EM ANÁLISE">Em Análise</option>
-            <option value="APROVADO">Aprovado</option>
-            <option value="REPROVADO">Reprovado</option>
-            <option value="ESTIMATIVA">Estimativa</option>
-            <option value="REDUÇÃO">Redução</option>
+            <option v-for="(label, key) in situacaoLabels" :key="key" :value="key">{{ label }}</option>
           </select>
-          <select v-model="fEmpresa" class="form-select" style="width:200px">
+          <select v-model="fEmpresa" class="form-select" dusk="prop-filtro-empresa" style="width:200px">
             <option value="">Todas as empresas</option>
             <option value="seg">Segurança (todas)</option>
-            <option value="seg-df">Segurança — Sede DF</option>
-            <option value="seg-go">Segurança — Filial GO</option>
-            <option value="seg-mt">Segurança — Filial MT</option>
-            <option value="seg-mg">Segurança — Filial MG</option>
-            <option value="seg-sp">Segurança — Filial SP</option>
-            <option value="apoio-df">Apoio Administrativo — DF</option>
-            <option value="apoio-go">Apoio Administrativo — GO</option>
-            <option value="apoio-sp">Apoio Administrativo — SP</option>
+            <option value="apoio">Apoio / Serviços (todas)</option>
+            <option v-for="f in filiais" :key="f.cod_emp" :value="String(f.cod_emp)">{{ f.label }}</option>
           </select>
           <button class="btn btn-ghost" dusk="prop-limpar-filtros" @click="limparFiltros()" style="font-size:12px">Limpar filtros</button>
           <span style="margin-left:auto;font-size:12px;color:var(--text-muted)">
@@ -480,8 +474,8 @@ function exportarPropostas() {
           </span>
         </div>
 
-        <!-- ── Tabela ── -->
-        <div class="contracts-table-wrap" style="overflow-x:auto">
+        <!-- ── Tabela (desktop) ── -->
+        <div v-if="!isMobile" class="contracts-table-wrap" style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;min-width:1100px">
             <thead>
               <tr>
@@ -555,6 +549,34 @@ function exportarPropostas() {
             </tbody>
           </table>
         </div>
+
+        <!-- ── Cards (mobile) ── -->
+        <div v-else class="bs-mcards" dusk="prop-cards">
+          <div v-if="listaFiltrada.length === 0" style="text-align:center;padding:40px 20px;color:var(--text-muted)">
+            {{ props.propostas.length === 0 ? "Nenhuma proposta cadastrada" : "Nenhuma proposta encontrada" }}
+          </div>
+          <div v-for="p in listaFiltrada" :key="p.id" class="bs-mcard"
+               :dusk="p.da_cotacao ? 'prop-abrir-' + p.id : 'prop-card-' + p.id"
+               :style="p.da_cotacao ? 'border-left:3px solid var(--brand-gold)' : ''"
+               @click="abrirNaCotacao(p)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+              <div style="min-width:0">
+                <div style="font-weight:700;font-size:14px">{{ p.numero || "—" }}<span v-if="p.empresa" :style="empresaBadgeStyle(p.empresa)" style="border-radius:99px;font-weight:700;font-size:9px;padding:1px 7px;margin-left:8px">{{ getEmpresa(p.empresa).tag }}</span></div>
+                <div style="font-size:13px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="p.cliente || ''">{{ p.cliente || "—" }}</div>
+              </div>
+              <span class="badge" :class="sitClass(p.situacao)" style="flex-shrink:0">{{ p.situacao || "EM ANÁLISE" }}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px;color:var(--text-secondary)">
+              <span style="font-weight:700;font-family:'Syne',sans-serif;color:var(--text-primary)">{{ fmtVal(p.valor) }}</span>
+              <span>{{ fmtData(p.data_proposta) }}</span>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px" @click.stop>
+              <button @click="editarProposta(p)" class="btn btn-ghost" :dusk="'prop-editar-' + p.id" style="flex:1;font-size:13px">Editar</button>
+              <button @click="alterarSituacao(p)" class="btn btn-ghost" :dusk="'prop-situacao-' + p.id" style="flex:1;font-size:13px">Situação</button>
+              <button @click="excluirProposta(p)" class="btn btn-ghost" :dusk="'prop-excluir-' + p.id" style="flex:1;font-size:13px;color:var(--red)">Excluir</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ── Modal: entrada manual / edição ── -->
@@ -564,20 +586,39 @@ function exportarPropostas() {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
             <div class="form-group"><label class="form-label">Nº Proposta</label><input v-model="form.numero" type="text" class="form-input" dusk="prop-form-numero" placeholder="Nº 132 (auto se vazio)"></div>
             <div class="form-group"><label class="form-label">Revisão</label><input v-model="form.revisao" type="text" class="form-input" placeholder="N/A ou Rev.01"></div>
-            <div class="form-group" style="grid-column:span 2"><label class="form-label">Cliente</label><input v-model="form.cliente" type="text" class="form-input" dusk="prop-form-cliente"></div>
+            <div class="form-group" style="grid-column:span 2"><label class="form-label">Cliente</label>
+              <SearchSelect
+                v-model="form.cliente"
+                :options="clientes"
+                option-value="nome"
+                option-label="nome"
+                option-sub="cidade"
+                allow-free
+                placeholder="Buscar ou digitar cliente..."
+                dusk="prop-form-cliente"
+                option-dusk-prefix="prop-form-cliente-opt"
+              />
+            </div>
             <div class="form-group"><label class="form-label">Serviços</label><input v-model="form.servicos" type="text" class="form-input" placeholder="Vigilância, Portaria..."></div>
             <div class="form-group"><label class="form-label">Empresa</label>
-              <select v-model="form.empresa" class="form-select">
-                <option v-for="e in GRUPO_EMPRESAS" :key="e.id" :value="e.id">{{ e.short }}</option>
-              </select>
+              <SearchSelect
+                v-model="form.empresa"
+                :options="filiais"
+                option-value="codigo"
+                option-label="label"
+                option-sub="nome"
+                placeholder="Selecionar empresa..."
+                dusk="prop-form-empresa"
+                option-dusk-prefix="prop-form-empresa-opt"
+              />
             </div>
             <div class="form-group"><label class="form-label">Valor (R$)</label><input v-model="form.valor" type="number" step="0.01" class="form-input" dusk="prop-form-valor"></div>
             <div class="form-group"><label class="form-label">Tipo de Posto</label><input v-model="form.posto" type="text" class="form-input" placeholder="VIG 24H, PORT 12H..."></div>
             <div class="form-group"><label class="form-label">Contato de Envio</label><input v-model="form.contato" type="text" class="form-input"></div>
             <div class="form-group"><label class="form-label">Data de Envio</label><input v-model="form.data_proposta" type="date" class="form-input"></div>
             <div class="form-group"><label class="form-label">Situação</label>
-              <select v-model="form.situacao" class="form-select">
-                <option v-for="s in SITUACOES" :key="s" :value="s">{{ s }}</option>
+              <select v-model="form.situacao" class="form-select" dusk="prop-form-situacao">
+                <option v-for="s in SITUACOES" :key="s" :value="s">{{ situacaoLabels[s] || s }}</option>
               </select>
             </div>
             <div class="form-group"><label class="form-label">Valor Aprovado (R$)</label><input v-model="form.valor_aprovado" type="number" step="0.01" class="form-input"></div>

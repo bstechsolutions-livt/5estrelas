@@ -2,6 +2,7 @@
 
 namespace Tests\Browser;
 
+use App\Models\Comercial\Cliente;
 use App\Models\Comercial\Faturamento;
 use App\Models\User;
 use Laravel\Dusk\Browser;
@@ -76,6 +77,40 @@ class ComercialFaturamentoTest extends DuskTestCase
         ]);
 
         Faturamento::where('local_nome', $nome)->delete();
+    }
+
+    public function test_adicionar_local_vinculando_cliente(): void
+    {
+        $cliNome = 'Cliente Fat Vinc '.uniqid();
+        Cliente::where('nome', 'like', 'Cliente Fat Vinc%')->delete();
+        Faturamento::where('local_nome', 'like', 'Cliente Fat Vinc%')->delete();
+        $cli = Cliente::create(['nome' => $cliNome, 'situacao' => 'ativo', 'cidade' => 'Brasília', 'uf' => 'DF']);
+
+        $this->browse(function (Browser $browser) use ($cliNome) {
+            $browser->loginAs($this->bruno())
+                ->visit('/comercial/faturamento')
+                ->waitForText('Faturamento', 10)
+                ->click('@btn-adicionar-local')
+                ->waitForText('Adicionar Local', 5)
+                ->waitFor('@input-novo-local', 5)
+                // Busca o cliente cadastrado e seleciona a sugestão (vincula cliente_id)
+                ->type('@input-novo-local', 'Cliente Fat Vinc')
+                ->waitFor('.bs-ss-option', 6)
+                ->click('.bs-ss-option')
+                ->assertInputValue('@input-novo-local', $cliNome)
+                ->press('Adicionar')
+                ->waitForText($cliNome, 5);
+        });
+
+        $clienteId = Cliente::where('nome', $cliNome)->value('id');
+        $this->assertDatabaseHas('bs_comercial_faturamento', [
+            'ano' => 2025,
+            'local_nome' => $cliNome,
+            'cliente_id' => $clienteId,
+        ]);
+
+        Faturamento::where('local_nome', $cliNome)->delete();
+        Cliente::where('nome', $cliNome)->delete();
     }
 
     public function test_troca_aba_comparativo(): void

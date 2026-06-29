@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Comercial\Cliente;
 use App\Models\Comercial\Faturamento;
 use App\Models\Permission;
 use App\Models\User;
@@ -93,6 +94,38 @@ class ComercialFaturamentoTest extends TestCase
             'ano' => 2025,
             'local_nome' => 'Hospital São Lucas — Vigilância',
         ]);
+    }
+
+    public function test_adicionar_local_vincula_cliente(): void
+    {
+        $cli = Cliente::create(['nome' => 'Cliente Vinc Fat', 'situacao' => 'ativo']);
+
+        $this->actingAs($this->user)
+            ->postJson('/comercial/faturamento/local', [
+                'ano' => 2025,
+                'local_nome' => 'Cliente Vinc Fat',
+                'cliente_id' => $cli->id,
+            ])
+            ->assertOk()
+            ->assertJson(['sucesso' => true]);
+
+        $this->assertDatabaseHas('bs_comercial_faturamento', [
+            'ano' => 2025,
+            'local_nome' => 'Cliente Vinc Fat',
+            'cliente_id' => $cli->id,
+        ]);
+    }
+
+    public function test_adicionar_local_rejeita_cliente_inexistente(): void
+    {
+        $this->actingAs($this->user)
+            ->postJson('/comercial/faturamento/local', [
+                'ano' => 2025,
+                'local_nome' => 'Local X',
+                'cliente_id' => 999999,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['cliente_id']);
     }
 
     public function test_adicionar_local_duplicado_rejeita(): void

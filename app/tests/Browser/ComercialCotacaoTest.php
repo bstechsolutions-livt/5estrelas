@@ -2,6 +2,7 @@
 
 namespace Tests\Browser;
 
+use App\Models\Comercial\Cliente;
 use App\Models\Comercial\Proposta;
 use App\Models\User;
 use Laravel\Dusk\Browser;
@@ -44,6 +45,32 @@ class ComercialCotacaoTest extends DuskTestCase
                 ->assertSee('Importar Planilha')
                 ->assertSee('Salvar Proposta');
         });
+    }
+
+    public function test_identificacao_busca_empresa_e_cliente(): void
+    {
+        $nome = 'Cliente Busca Dusk '.uniqid();
+        Cliente::where('nome', 'like', 'Cliente Busca Dusk%')->delete();
+        $cli = Cliente::create(['nome' => $nome, 'situacao' => 'ativo', 'cidade' => 'Brasília', 'uf' => 'DF']);
+
+        $this->browse(function (Browser $browser) use ($nome) {
+            $browser->loginAs($this->bruno())
+                ->visit('/comercial/cotacao')
+                ->waitForText('Nova Cotação de Custos', 10)
+                ->pause(900) // aguarda /cotacao/dados (filiais + clientes)
+                // Empresa: combobox parametrizado da Senior → seleciona a empresa codEmp=2
+                ->click('@cot-empresa')
+                ->waitFor('@cot-empresa-opt-2', 6)
+                ->click('@cot-empresa-opt-2')
+                ->assertInputValue('@cot-empresa', '5 ESTRELAS')
+                // Cliente: digita parte do nome e seleciona a sugestão do cadastro
+                ->type('@cot-cliente', 'Cliente Busca Dusk')
+                ->waitFor('.bs-ss-option', 6)
+                ->click('.bs-ss-option')
+                ->assertInputValue('@cot-cliente', $nome);
+        });
+
+        $cli->delete();
     }
 
     public function test_seleciona_categoria_e_escala_atualiza_preview(): void
@@ -145,7 +172,7 @@ class ComercialCotacaoTest extends DuskTestCase
             $browser->loginAs($this->bruno())
                 ->visit('/comercial/cotacao')
                 ->waitForText('Nova Cotação de Custos', 10)
-                ->type('#cliente', $cliente)
+                ->type('@cot-cliente', $cliente)
                 ->pause(1800) // aguarda o recálculo (debounce + backend)
                 // Adiciona um posto ao resumo (pré-requisito para salvar)
                 ->click('@btn-adicionar-posto')
