@@ -248,6 +248,7 @@ const currentTotal = computed(() => {
             <button v-for="p in payables.data" :key="p.id" @click="onCardTap(p)"
                 :class="['w-full bg-white rounded-xl border p-3 text-left active:bg-gray-50 transition-colors',
                     selectionMode && isSelected(p.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200']">
+                <p v-if="p.empresa_nome" class="text-[11px] font-semibold text-blue-600 truncate mb-0.5" dusk="m-empresa">{{ p.empresa_nome }}</p>
                 <div class="flex items-start justify-between gap-2 mb-1">
                     <div class="flex items-center gap-2 flex-1 min-w-0">
                         <i v-if="selectionMode" :class="['pi', isSelected(p.id) ? 'pi-check-circle text-blue-600' : 'pi-circle text-gray-300']"></i>
@@ -259,6 +260,7 @@ const currentTotal = computed(() => {
                     <span class="text-sm font-semibold text-gray-700">{{ formatMoney(p.amount) }}</span>
                     <span class="text-xs text-gray-400">Venc: {{ formatDate(p.due_date) }}</span>
                 </div>
+                <p v-if="p.description" class="text-[11px] text-gray-500 truncate mt-1">{{ p.description }}</p>
                 <p v-if="p.title_number" class="text-[11px] text-gray-400 mt-1">{{ p.title_number }} · {{ p.branch?.name || '' }}</p>
                 <span v-if="p.bordero" class="inline-block mt-1 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
                     {{ p.bordero.number }}

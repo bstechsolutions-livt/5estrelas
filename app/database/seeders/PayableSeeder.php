@@ -56,7 +56,10 @@ class PayableSeeder extends Seeder
 
             // Campos de origem Senior (Apêndice A.2) — todos não nulos (req 12.1),
             // com as chaves de negócio derivadas do índice para unicidade (req 12.3).
-            $codEmp = (int) config('senior.cod_emp', 1);
+            // Varia entre as empresas operacionais reais (codEmp 2..12) para a coluna
+            // "Empresa" aparecer preenchida no demo (resolve nome via bs_comercial_filiais).
+            $empresasOp = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+            $codEmp = $empresasOp[array_rand($empresasOp)];
             $codFil = $branches ? random_int(1, max(1, count($branches))) : 1;
             $numTit = 'TIT-' . str_pad($i + 1, 4, '0', STR_PAD_LEFT);
             $codTpt = 'DP';

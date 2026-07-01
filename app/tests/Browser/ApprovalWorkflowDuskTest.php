@@ -93,6 +93,15 @@ class ApprovalWorkflowDuskTest extends DuskTestCase
     {
         $this->setupTrail();
         $p = $this->makePayable('pendente');
+        // A1: aprovar exige ao menos 1 documento anexado.
+        \App\Models\PayableDocument::create([
+            'payable_id' => $p->id,
+            'uploaded_by' => $this->bruno()->id,
+            'name' => 'doc-wf.pdf',
+            'path' => 'payables/docs/doc-wf.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 1024,
+        ]);
         $workflow = new ApprovalWorkflowService();
         $workflow->sendForApproval($p, $this->bruno(), 'matriz');
 
@@ -105,6 +114,7 @@ class ApprovalWorkflowDuskTest extends DuskTestCase
         });
 
         $this->assertGreaterThanOrEqual(1, ApprovalStep::where('payable_id', $p->id)->where('status', 'aprovado')->count());
+        \App\Models\PayableDocument::where("payable_id", $p->id)->delete();
         \App\Models\ApprovalStep::where("payable_id", $p->id)->delete();
         $p->delete();
     }

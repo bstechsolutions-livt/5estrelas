@@ -28,6 +28,7 @@ const props = defineProps({
     currentStep: { type: Object, default: null },
     canApproveStep: { type: Boolean, default: false },
     canFinalSign: { type: Boolean, default: false },
+    canEditDueDate: { type: Boolean, default: false },
     mentionableUsers: { type: Array, default: () => [] },
     departments: { type: Array, default: () => [] },
 })
@@ -212,6 +213,9 @@ const inBordero = !!props.payable.bordero_id
 const canSendIndividual = canPrepare && !inBordero
 const canApprove = props.payable.status === 'aguardando_aprovacao' && !inBordero && !props.approvalSteps?.length
 
+// Trava (feedback do cliente): não envia pra aprovação sem ao menos 1 documento.
+const hasDocuments = computed(() => (props.payable.documents?.length || 0) > 0)
+
 // Departamento de origem (seletor ao enviar pra aprovação)
 const showDeptSelect = ref(false)
 const selectedDeptId = ref(props.payable.department_id || null)
@@ -246,6 +250,29 @@ function formatSize(bytes) {
 function isImage(doc) {
     return doc.mime_type?.startsWith('image/')
 }
+
+// ── A2: visualizador de anexo inline (feedback do cliente: abrir na mesma
+// página, não em outra aba, com opção de voltar). ──
+const viewerDoc = ref(null)
+const showViewer = computed({
+    get: () => !!viewerDoc.value,
+    set: (v) => { if (!v) viewerDoc.value = null },
+})
+function openViewer(doc) { viewerDoc.value = doc }
+function closeViewer() { viewerDoc.value = null }
+function isPdf(doc) { return doc?.mime_type === 'application/pdf' }
+
+// ── A4: edição de vencimento (restrita ao financeiro) ──
+const showDueDate = ref(false)
+const dueDateForm = useForm({ due_date: props.payable.due_date ? new Date(props.payable.due_date) : new Date() })
+function submitDueDate() {
+    dueDateForm
+        .transform((data) => ({ due_date: toYmd(data.due_date) }))
+        .post(`/financeiro/contas-pagar/${props.payable.id}/vencimento`, {
+            preserveScroll: true,
+            onSuccess: () => { showDueDate.value = false },
+        })
+}
 </script>
 
 <template>
@@ -266,6 +293,10 @@ function isImage(doc) {
                     </div>
                     <p class="text-sm text-gray-500 mt-1">
                         Título: {{ payable.title_number || '—' }} · Vencimento: {{ formatDate(payable.due_date) }}
+                        <button v-if="canEditDueDate" @click="showDueDate = true" dusk="btn-edit-due-date"
+                            class="ml-1 text-blue-600 hover:text-blue-800 cursor-pointer align-middle" title="Alterar vencimento (financeiro)">
+                            <i class="pi pi-pencil text-xs"></i>
+                        </button>
                     </p>
                 </div>
                 <p class="text-xl font-bold text-gray-800">{{ formatMoney(payable.amount) }}</p>
@@ -278,6 +309,7 @@ function isImage(doc) {
                     <div class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Informações</h3>
                         <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div><p class="text-xs text-gray-500">Empresa</p><p class="text-gray-800">{{ payable.empresa_nome || '—' }}</p></div>
                             <div><p class="text-xs text-gray-500">Filial</p><p class="text-gray-800">{{ payable.branch?.name || '—' }}</p></div>
                             <div><p class="text-xs text-gray-500">Categoria</p><p class="text-gray-800">{{ payable.category || '—' }}</p></div>
                             <div><p class="text-xs text-gray-500">Emissão</p><p class="text-gray-800">{{ formatDate(payable.issue_date) }}</p></div>
@@ -292,19 +324,19 @@ function isImage(doc) {
                         <div v-if="payable.documents?.length" class="space-y-2 mb-3">
                             <div v-for="doc in payable.documents" :key="doc.id"
                                 class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                                <a :href="doc.url" target="_blank" rel="noopener"
-                                    class="flex items-center gap-2 min-w-0 flex-1 group">
+                                <button type="button" @click="openViewer(doc)" dusk="doc-open"
+                                    class="flex items-center gap-2 min-w-0 flex-1 group text-left cursor-pointer bg-transparent border-0 p-0">
                                     <i :class="['pi', isImage(doc) ? 'pi-image' : doc.mime_type === 'application/pdf' ? 'pi-file-pdf' : 'pi-file', 'text-gray-400']"></i>
                                     <div class="min-w-0">
                                         <p class="text-sm text-gray-800 truncate group-hover:text-blue-600 group-hover:underline">{{ doc.name }}</p>
                                         <p class="text-[11px] text-gray-400">{{ formatSize(doc.size) }} · {{ doc.uploader?.name }}</p>
                                     </div>
-                                </a>
+                                </button>
                                 <div class="flex items-center gap-1 flex-shrink-0">
-                                    <a :href="doc.url" target="_blank" rel="noopener"
-                                        class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer" title="Visualizar">
+                                    <button type="button" @click="openViewer(doc)"
+                                        class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer bg-transparent border-0" title="Visualizar">
                                         <i class="pi pi-eye"></i>
-                                    </a>
+                                    </button>
                                     <a :href="doc.url" :download="doc.name"
                                         class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer" title="Baixar">
                                         <i class="pi pi-download"></i>
@@ -391,7 +423,10 @@ function isImage(doc) {
                     <div v-if="canSendIndividual" class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Ações</h3>
                         <div v-if="!showDeptSelect" class="space-y-2">
-                            <Button label="Enviar para Aprovação" icon="pi pi-send" class="w-full" @click="showDeptSelect = true" />
+                            <Button label="Enviar para Aprovação" icon="pi pi-send" class="w-full" dusk="btn-send-approval" :disabled="!hasDocuments" @click="showDeptSelect = true" />
+                            <p v-if="!hasDocuments" dusk="no-docs-hint" class="text-[11px] text-amber-600 text-center flex items-center justify-center gap-1">
+                                <i class="pi pi-exclamation-triangle text-[10px]"></i> Anexe ao menos um documento para enviar.
+                            </p>
                         </div>
                         <div v-else class="space-y-3">
                             <div>
@@ -637,5 +672,47 @@ function isImage(doc) {
                 </div>
             </div>
         </BottomSheet>
+
+        <!-- A2: Visualizador de anexo inline (abre na mesma página, com opção de voltar) -->
+        <Dialog v-model:visible="showViewer" modal :header="viewerDoc?.name || 'Documento'"
+            :style="{ width: '92vw', maxWidth: '1100px' }" :dismissable-mask="true">
+            <div dusk="doc-viewer" class="min-h-[50vh]">
+                <template v-if="viewerDoc">
+                    <iframe v-if="isPdf(viewerDoc)" :src="viewerDoc.url" class="w-full h-[75vh] border-0 rounded" title="Visualização do documento"></iframe>
+                    <div v-else-if="isImage(viewerDoc)" class="flex items-center justify-center bg-gray-50 rounded p-2">
+                        <img :src="viewerDoc.url" :alt="viewerDoc.name" class="max-w-full max-h-[75vh] object-contain" />
+                    </div>
+                    <div v-else class="flex flex-col items-center justify-center text-center py-16 text-gray-500">
+                        <i class="pi pi-file text-5xl mb-4 text-gray-300"></i>
+                        <p class="mb-4">Pré-visualização não disponível para este tipo de arquivo.</p>
+                        <a :href="viewerDoc.url" :download="viewerDoc.name" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">
+                            <i class="pi pi-download"></i> Baixar arquivo
+                        </a>
+                    </div>
+                </template>
+            </div>
+            <template #footer>
+                <Button label="Voltar" icon="pi pi-arrow-left" severity="secondary" text dusk="doc-viewer-close" @click="closeViewer" />
+                <a v-if="viewerDoc" :href="viewerDoc.url" :download="viewerDoc.name" class="inline-flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:underline">
+                    <i class="pi pi-download"></i> Baixar
+                </a>
+            </template>
+        </Dialog>
+
+        <!-- A4: Editar vencimento (restrito ao financeiro) -->
+        <Dialog v-model:visible="showDueDate" modal header="Alterar vencimento" :style="{ width: '380px' }">
+            <div class="space-y-3" dusk="due-date-dialog">
+                <p class="text-xs text-gray-500">Apenas o departamento financeiro pode alterar o vencimento de um título.</p>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Novo vencimento</label>
+                    <DatePicker v-model="dueDateForm.due_date" date-format="dd/mm/yy" class="w-full" input-id="due-date-input" dusk="due-date-input" />
+                    <p v-if="dueDateForm.errors.due_date" class="text-xs text-red-500 mt-1">{{ dueDateForm.errors.due_date }}</p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Cancelar" severity="secondary" text @click="showDueDate = false" />
+                <Button label="Salvar" icon="pi pi-check" :loading="dueDateForm.processing" dusk="confirm-due-date" @click="submitDueDate" />
+            </template>
+        </Dialog>
     </component>
 </template>

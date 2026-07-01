@@ -303,9 +303,19 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span @click="goShow(data.id)">{{ data.title_number }}</span>
                         </template>
                     </Column>
+                    <Column header="Empresa" style="min-width: 140px" dusk="col-empresa">
+                        <template #body="{ data }">
+                            <span class="text-sm text-gray-700 truncate block max-w-[160px]" :title="data.empresa_nome" @click="goShow(data.id)">{{ data.empresa_nome || '—' }}</span>
+                        </template>
+                    </Column>
                     <Column field="supplier_name" header="Fornecedor" style="min-width: 200px">
                         <template #body="{ data }">
                             <span @click="goShow(data.id)">{{ data.supplier_name }}</span>
+                        </template>
+                    </Column>
+                    <Column field="description" header="Descrição" style="min-width: 200px">
+                        <template #body="{ data }">
+                            <span class="text-xs text-gray-600 truncate block max-w-[220px]" :title="data.description" @click="goShow(data.id)">{{ data.description || '—' }}</span>
                         </template>
                     </Column>
                     <Column field="amount" header="Valor" style="width: 140px; white-space: nowrap">

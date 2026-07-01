@@ -12,6 +12,35 @@ class Payable extends Model
     use Auditable;
 
     /**
+     * A4 (feedback do cliente): lançamento manual criado sem vencimento recebe
+     * vencimento automático de 72h (3 dias), empurrando para o próximo dia útil
+     * se cair em fim de semana. Títulos vindos da Senior (com senior_id) mantêm
+     * o vencimento real (vctOri/vctPro) — a regra NÃO se aplica a eles.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (Payable $payable) {
+            if (empty($payable->due_date) && empty($payable->senior_id)) {
+                $payable->due_date = self::defaultDueDate();
+            }
+        });
+    }
+
+    /** Vencimento default = data base + 3 dias corridos, rolando p/ dia útil. */
+    public static function defaultDueDate($from = null): \Illuminate\Support\Carbon
+    {
+        $date = ($from ? \Illuminate\Support\Carbon::parse($from) : \Illuminate\Support\Carbon::now())
+            ->startOfDay()
+            ->addDays(3);
+
+        while ($date->isWeekend()) {
+            $date->addDay();
+        }
+
+        return $date;
+    }
+
+    /**
      * Campos de WORKFLOW interno do 5estrelas. NÃO são sobrescritos pela
      * sincronização com a Senior (ver Payables_Sync / requirement 4 e 8).
      */
@@ -233,5 +262,37 @@ class Payable extends Model
     public function isMissingInSenior(): bool
     {
         return $this->senior_missing_at !== null;
+    }
+
+    /**
+     * A3 (feedback do cliente): a tela principal mostra a EMPRESA por NOME,
+     * nunca por código. O nome vem da tabela de filiais/empresas espelhada da
+     * Senior (bs_comercial_filiais), resolvida pelo codEmp do título.
+     *
+     * Resolve em LOTE (uma query só) e injeta o atributo `empresa_nome` em cada
+     * título, evitando N+1 na listagem. Preferimos fantasia; cai pra razão social.
+     *
+     * @param iterable<Payable> $payables
+     */
+    public static function attachEmpresaNome(iterable $payables): void
+    {
+        $items = collect($payables);
+
+        $codEmps = $items
+            ->map(fn (Payable $p) => $p->codemp)
+            ->filter(fn ($c) => $c !== null)
+            ->unique()
+            ->values();
+
+        $map = $codEmps->isEmpty()
+            ? collect()
+            : \App\Models\Comercial\Filial::whereIn('cod_emp', $codEmps)
+                ->get(['cod_emp', 'nome', 'fantasia'])
+                ->groupBy('cod_emp')
+                ->map(fn ($grupo) => $grupo->first()->fantasia ?: $grupo->first()->nome);
+
+        foreach ($items as $p) {
+            $p->setAttribute('empresa_nome', $p->codemp ? ($map[$p->codemp] ?? null) : null);
+        }
     }
 }

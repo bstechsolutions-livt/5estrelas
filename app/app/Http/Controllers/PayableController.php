@@ -54,6 +54,9 @@ class PayableController extends Controller
 
         $payables = $query->paginate($request->input('per_page', 20))->withQueryString();
 
+        // A3: resolve o NOME da empresa (nunca código) para cada título da página.
+        Payable::attachEmpresaNome($payables->getCollection());
+
         if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
             return response()->json($payables);
         }
@@ -93,6 +96,9 @@ class PayableController extends Controller
         $isPagador = $user ? $alcada->isAssigned($user, 'pagador') : false;
         $isConciliador = $user ? $alcada->isAssigned($user, 'conciliador') : false;
 
+        // A3: nome da empresa (nunca código) também no detalhe.
+        Payable::attachEmpresaNome([$payable]);
+
         // Approval steps (workflow multinível)
         $approvalSteps = ApprovalStep::where('payable_id', $id)
             ->with(['assignee:id,name', 'resolver:id,name'])
@@ -115,6 +121,7 @@ class PayableController extends Controller
             'canConciliate' => $isConciliador && $payable->status === 'pago',
             'conciliadorConfigured' => $alcada->hasRole('conciliador'),
             'canFinalSign' => $alcada->isAssigned($user, 'assinante') && $payable->status === 'conciliado',
+            'canEditDueDate' => $user?->hasPermission('financeiro.contas_pagar.editar_vencimento') ?? false,
             'approvalSteps' => $approvalSteps,
             'currentStep' => $currentStep,
             'canApproveStep' => $canApproveStep,
@@ -198,6 +205,13 @@ class PayableController extends Controller
             return back()->with('error', 'Este título não pode ser enviado para aprovação.');
         }
 
+        // Trava (feedback do cliente): não pode ir pra aprovação sem NENHUM documento
+        // anexado (nota fiscal, boleto, relatório ou comprovante). Nem todo título tem
+        // tudo, mas não pode ser aprovado "sem nada".
+        if ($payable->documents()->count() === 0) {
+            return back()->with('error', 'Anexe ao menos um documento (nota fiscal, boleto, relatório ou comprovante) antes de enviar para aprovação.');
+        }
+
         // Se informou o departamento de origem, vincula ao título
         if ($request->filled('department_id')) {
             $payable->update(['department_id' => $request->department_id]);
@@ -216,6 +230,12 @@ class PayableController extends Controller
 
         if ($payable->status !== 'aguardando_aprovacao') {
             return back()->with('error', 'Este título não está aguardando aprovação.');
+        }
+
+        // Trava (feedback do cliente): não é possível aprovar um título sem documentos.
+        // Guarda defensiva — um documento pode ter sido removido depois do envio.
+        if ($payable->documents()->count() === 0) {
+            return back()->with('error', 'Não é possível aprovar um título sem documentos anexados.');
         }
 
         $workflow = app(ApprovalWorkflowService::class);
@@ -479,6 +499,48 @@ class PayableController extends Controller
         }
 
         return back()->with('success', 'Divergência registrada.');
+    }
+
+    /**
+     * A4: altera o vencimento de um título. Restrito ao FINANCEIRO
+     * (permissão `financeiro.contas_pagar.editar_vencimento`; curinga `*` concede).
+     */
+    public function updateDueDate(Request $request, int $id)
+    {
+        $payable = Payable::findOrFail($id);
+        $user = $request->user();
+
+        if (! $user?->hasPermission('financeiro.contas_pagar.editar_vencimento')) {
+            abort(403, 'Apenas o financeiro pode alterar o vencimento.');
+        }
+
+        $data = $request->validate([
+            'due_date' => ['required', 'date'],
+        ]);
+
+        $old = $payable->due_date?->toDateString();
+        $novo = Carbon::parse($data['due_date'])->toDateString();
+        $payable->update(['due_date' => $novo]);
+
+        PayableComment::create([
+            'payable_id' => $payable->id,
+            'user_id' => $user->id,
+            'body' => 'Vencimento alterado de '
+                . ($old ? Carbon::parse($old)->format('d/m/Y') : '—')
+                . ' para ' . Carbon::parse($novo)->format('d/m/Y'),
+            'type' => 'status_change',
+        ]);
+
+        AuditLogger::log(
+            event: 'contas_pagar.vencimento_alterado',
+            module: 'financeiro.contas_pagar',
+            description: "Vencimento do título {$payable->title_number} alterado para " . Carbon::parse($novo)->format('d/m/Y'),
+            auditable: $payable,
+            oldValues: ['due_date' => $old],
+            newValues: ['due_date' => $novo],
+        );
+
+        return back()->with('success', 'Vencimento atualizado.');
     }
 
     public function removeDocument(int $payableId, int $docId)

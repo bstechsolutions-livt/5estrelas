@@ -178,6 +178,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/comentarios', [PayableController::class, 'addComment'])->name('payables.comment');
         Route::post('/{id}/documentos', [PayableController::class, 'addDocument'])->name('payables.document');
         Route::delete('/{payableId}/documentos/{docId}', [PayableController::class, 'removeDocument'])->name('payables.document.remove');
+        Route::post('/{id}/vencimento', [PayableController::class, 'updateDueDate'])->whereNumber('id')->name('payables.due_date');
         Route::post('/{id}/enviar-aprovacao', [PayableController::class, 'sendForApproval'])->name('payables.send_approval');
         Route::post('/{id}/aprovar', [PayableController::class, 'approve'])->name('payables.approve');
         Route::post('/{id}/reprovar', [PayableController::class, 'reject'])->name('payables.reject');
