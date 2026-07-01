@@ -48,4 +48,26 @@ class PayableEmpresaColunaTest extends DuskTestCase
 
         $p->delete();
     }
+
+    public function test_listagem_nao_tem_scroll_horizontal(): void
+    {
+        $this->browse(function (Browser $browser) {
+            $browser->loginAs($this->bruno())
+                ->resize(1280, 800)
+                ->visit('/financeiro/contas-pagar?status=pendente')
+                ->waitForText('Contas a Pagar', 10)
+                ->pause(400);
+
+            // A tabela (table-layout: fixed; width:100%) não pode exceder o container.
+            $m = $browser->script(
+                'var t=document.querySelector("table"); if(!t) return {no:1};'
+                . ' var p=t.parentElement; var cs=getComputedStyle(t);'
+                . ' return {tsw:t.scrollWidth, tow:t.offsetWidth, pcw:p.clientWidth, psw:p.scrollWidth, tl:cs.tableLayout, tw:cs.width, pcls:p.className};'
+            )[0];
+            $this->assertTrue(
+                ($m['tsw'] ?? 99999) <= ($m['pcw'] ?? 0) + 2,
+                'Layout: ' . json_encode($m)
+            );
+        });
+    }
 }

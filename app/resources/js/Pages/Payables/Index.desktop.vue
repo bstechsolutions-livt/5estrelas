@@ -286,63 +286,59 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
 
             <!-- Tabela -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                <DataTable :value="payables.data" striped-rows class="cursor-pointer"
+                <DataTable :value="payables.data" striped-rows class="cursor-pointer w-full"
+                    table-style="table-layout: fixed; width: 100%"
                     :lazy="true" :paginator="true" :rows="payables.per_page" :total-records="payables.total"
                     :first="(payables.current_page - 1) * payables.per_page"
                     @page="onPage"
                     paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
                     :rows-per-page-options="[20, 50, 100]"
                 >
-                    <Column v-if="canSelect" header="" style="width: 48px">
+                    <Column v-if="canSelect" header="" style="width: 3%">
                         <template #body="{ data }">
                             <input type="checkbox" :checked="isSelected(data.id)" @click.stop="toggleSelect(data.id)" class="w-4 h-4 cursor-pointer" />
                         </template>
                     </Column>
-                    <Column field="title_number" header="Nº" style="width: 90px; white-space: nowrap">
+                    <Column field="title_number" header="Nº" style="width: 9%">
                         <template #body="{ data }">
-                            <span @click="goShow(data.id)">{{ data.title_number }}</span>
+                            <span class="truncate block" :title="data.title_number" @click="goShow(data.id)">{{ data.title_number }}</span>
                         </template>
                     </Column>
-                    <Column header="Empresa" style="min-width: 140px" dusk="col-empresa">
+                    <Column header="Empresa" style="width: 14%" dusk="col-empresa">
                         <template #body="{ data }">
-                            <span class="text-sm text-gray-700 truncate block max-w-[160px]" :title="data.empresa_nome" @click="goShow(data.id)">{{ data.empresa_nome || '—' }}</span>
+                            <span class="text-sm text-gray-700 truncate block" :title="data.empresa_nome" @click="goShow(data.id)">{{ data.empresa_nome || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="supplier_name" header="Fornecedor" style="min-width: 200px">
+                    <Column field="supplier_name" header="Fornecedor" style="width: 22%">
                         <template #body="{ data }">
-                            <span @click="goShow(data.id)">{{ data.supplier_name }}</span>
+                            <span class="truncate block" :title="data.supplier_name" @click="goShow(data.id)">{{ data.supplier_name }}</span>
                         </template>
                     </Column>
-                    <Column field="description" header="Descrição" style="min-width: 200px">
+                    <Column field="description" header="Descrição" style="width: 18%">
                         <template #body="{ data }">
-                            <span class="text-xs text-gray-600 truncate block max-w-[220px]" :title="data.description" @click="goShow(data.id)">{{ data.description || '—' }}</span>
+                            <span class="text-xs text-gray-600 truncate block" :title="data.description" @click="goShow(data.id)">{{ data.description || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="amount" header="Valor" style="width: 140px; white-space: nowrap">
+                    <Column field="amount" header="Valor" style="width: 12%">
                         <template #body="{ data }">
-                            <span class="font-semibold" @click="goShow(data.id)">{{ formatMoney(data.amount) }}</span>
+                            <span class="font-semibold truncate block" @click="goShow(data.id)">{{ formatMoney(data.amount) }}</span>
                         </template>
                     </Column>
-                    <Column field="due_date" header="Vencimento" style="width: 110px; white-space: nowrap">
+                    <Column field="due_date" header="Vencimento" style="width: 10%">
                         <template #body="{ data }">
-                            <span @click="goShow(data.id)">{{ formatDate(data.due_date) }}</span>
+                            <span class="truncate block" @click="goShow(data.id)">{{ formatDate(data.due_date) }}</span>
                         </template>
                     </Column>
-                    <Column header="Filial" style="width: 180px">
-                        <template #body="{ data }">
-                            <span class="text-xs text-gray-600 truncate block max-w-[160px]" :title="data.branch?.name" @click="goShow(data.id)">{{ data.branch?.name || '—' }}</span>
-                        </template>
-                    </Column>
-                    <Column header="Borderô" style="width: 110px">
+                    <Column header="Borderô" style="width: 9%">
                         <template #body="{ data }">
                             <button v-if="data.bordero" @click.stop="router.visit(`/financeiro/borderos/${data.bordero.id}`)"
-                                class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded hover:bg-blue-100 cursor-pointer">
+                                class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded hover:bg-blue-100 cursor-pointer truncate max-w-full">
                                 {{ data.bordero.number }}
                             </button>
                             <span v-else class="text-xs text-gray-300" @click="goShow(data.id)">—</span>
                         </template>
                     </Column>
-                    <Column field="status" header="Status" style="width: 150px; white-space: nowrap">
+                    <Column field="status" header="Status" style="width: 15%">
                         <template #body="{ data }">
                             <Tag :value="statusOptions[data.status]" :severity="statusSeverity[data.status]" />
                         </template>
@@ -355,3 +351,17 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+/* Garante que a tabela nunca gere scroll horizontal: clipa o que passar da
+   célula e deixa a tag de status quebrar linha em vez de transbordar. */
+:deep(.p-datatable-tbody > tr > td),
+:deep(.p-datatable-thead > tr > th) {
+    overflow: hidden;
+}
+:deep(.p-datatable-tbody .p-tag),
+:deep(.p-datatable-tbody .p-tag-label) {
+    white-space: normal;
+    text-align: left;
+}
+</style>
