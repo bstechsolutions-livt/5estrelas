@@ -165,6 +165,7 @@ class PayableController extends Controller
 
         $request->validate([
             'file' => ['required', 'file', 'max:10240'], // 10MB
+            'type' => ['nullable', Rule::in(array_keys(PayableDocument::TYPES))],
         ]);
 
         $file = $request->file('file');
@@ -174,6 +175,7 @@ class PayableController extends Controller
             'payable_id' => $payable->id,
             'uploaded_by' => $request->user()->id,
             'name' => $file->getClientOriginalName(),
+            'doc_type' => $request->input('type', 'outro'),
             'path' => $path,
             'mime_type' => $file->getMimeType(),
             'size' => $file->getSize(),
@@ -316,6 +318,7 @@ class PayableController extends Controller
                     'payable_id' => $fresh->id,
                     'uploaded_by' => $user->id,
                     'name' => $file->getClientOriginalName(),
+                    'doc_type' => 'comprovacao',
                     'path' => $path,
                     'mime_type' => $file->getMimeType(),
                     'size' => $file->getSize(),

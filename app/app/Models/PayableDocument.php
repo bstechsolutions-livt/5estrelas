@@ -8,9 +8,21 @@ use Illuminate\Support\Facades\Storage;
 
 class PayableDocument extends Model
 {
-    protected $fillable = ['payable_id', 'uploaded_by', 'name', 'path', 'mime_type', 'size'];
+    protected $fillable = ['payable_id', 'uploaded_by', 'name', 'doc_type', 'path', 'mime_type', 'size'];
 
     protected $appends = ['url'];
+
+    /**
+     * Tipos de documento do contas a pagar (feedback do cliente).
+     * Nem todo título tem todos; a trava de aprovação exige apenas ≥ 1 no total.
+     */
+    public const TYPES = [
+        'nota_fiscal' => 'Nota Fiscal',
+        'boleto' => 'Boleto',
+        'relatorio' => 'Relatório',
+        'comprovacao' => 'Comprovação',
+        'outro' => 'Outro',
+    ];
 
     public function payable(): BelongsTo
     {

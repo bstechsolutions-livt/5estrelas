@@ -163,15 +163,33 @@ watch(() => page.props.flash?.error, (msg) => {
     if (msg) toast.add({ severity: 'error', summary: 'Erro', detail: msg, life: 5000 })
 })
 
-function uploadDoc(event) {
+function uploadDoc(event, type = 'outro') {
     const file = event.files?.[0]
     if (!file) return
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('type', type)
     router.post(`/financeiro/contas-pagar/${props.payable.id}/documentos`, formData, {
         preserveScroll: true,
         forceFormData: true,
     })
+}
+
+// Tipos de documento (feedback do cliente): lista separada por tipo.
+const DOC_TYPES = [
+    { key: 'nota_fiscal', label: 'Notas Fiscais', icon: 'pi-file-edit' },
+    { key: 'boleto', label: 'Boletos', icon: 'pi-money-bill' },
+    { key: 'relatorio', label: 'Relatórios', icon: 'pi-chart-bar' },
+    { key: 'comprovacao', label: 'Comprovações', icon: 'pi-check-circle' },
+    { key: 'outro', label: 'Outros', icon: 'pi-file' },
+]
+const KNOWN_DOC_TYPES = ['nota_fiscal', 'boleto', 'relatorio', 'comprovacao']
+function docsByType(typeKey) {
+    const docs = props.payable.documents || []
+    if (typeKey === 'outro') {
+        return docs.filter(d => !d.doc_type || !KNOWN_DOC_TYPES.includes(d.doc_type))
+    }
+    return docs.filter(d => d.doc_type === typeKey)
 }
 
 function removeDoc(docId) {
@@ -321,39 +339,47 @@ function submitDueDate() {
                     <!-- Documentos -->
                     <div class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Documentos ({{ payable.documents?.length || 0 }})</h3>
-                        <div v-if="payable.documents?.length" class="space-y-2 mb-3">
-                            <div v-for="doc in payable.documents" :key="doc.id"
-                                class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                                <button type="button" @click="openViewer(doc)" dusk="doc-open"
-                                    class="flex items-center gap-2 min-w-0 flex-1 group text-left cursor-pointer bg-transparent border-0 p-0">
-                                    <i :class="['pi', isImage(doc) ? 'pi-image' : doc.mime_type === 'application/pdf' ? 'pi-file-pdf' : 'pi-file', 'text-gray-400']"></i>
-                                    <div class="min-w-0">
-                                        <p class="text-sm text-gray-800 truncate group-hover:text-blue-600 group-hover:underline">{{ doc.name }}</p>
-                                        <p class="text-[11px] text-gray-400">{{ formatSize(doc.size) }} · {{ doc.uploader?.name }}</p>
+                        <p v-if="!payable.documents?.length" class="text-sm text-gray-400 mb-4">Nenhum documento anexado.</p>
+                        <div class="space-y-3">
+                            <div v-for="t in DOC_TYPES" :key="t.key" v-show="canPrepare || docsByType(t.key).length"
+                                :dusk="`doc-section-${t.key}`" class="border border-gray-100 rounded-lg p-3">
+                                <h4 class="text-xs font-semibold text-gray-600 flex items-center gap-1.5 mb-2">
+                                    <i :class="['pi', t.icon, 'text-gray-400']"></i> {{ t.label }}
+                                    <span class="text-gray-400 font-normal">({{ docsByType(t.key).length }})</span>
+                                </h4>
+                                <div v-if="docsByType(t.key).length" class="space-y-2 mb-2">
+                                    <div v-for="doc in docsByType(t.key)" :key="doc.id"
+                                        class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                        <button type="button" @click="openViewer(doc)" dusk="doc-open"
+                                            class="flex items-center gap-2 min-w-0 flex-1 group text-left cursor-pointer bg-transparent border-0 p-0">
+                                            <i :class="['pi', isImage(doc) ? 'pi-image' : doc.mime_type === 'application/pdf' ? 'pi-file-pdf' : 'pi-file', 'text-gray-400']"></i>
+                                            <div class="min-w-0">
+                                                <p class="text-sm text-gray-800 truncate group-hover:text-blue-600 group-hover:underline">{{ doc.name }}</p>
+                                                <p class="text-[11px] text-gray-400">{{ formatSize(doc.size) }} · {{ doc.uploader?.name }}</p>
+                                            </div>
+                                        </button>
+                                        <div class="flex items-center gap-1 flex-shrink-0">
+                                            <button type="button" @click="openViewer(doc)"
+                                                class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer bg-transparent border-0" title="Visualizar">
+                                                <i class="pi pi-eye"></i>
+                                            </button>
+                                            <a :href="doc.url" :download="doc.name"
+                                                class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer" title="Baixar">
+                                                <i class="pi pi-download"></i>
+                                            </a>
+                                            <button v-if="canPrepare" @click="removeDoc(doc.id)" class="text-red-400 hover:text-red-600 p-1.5 cursor-pointer" title="Remover">
+                                                <i class="pi pi-trash"></i>
+                                            </button>
+                                        </div>
                                     </div>
-                                </button>
-                                <div class="flex items-center gap-1 flex-shrink-0">
-                                    <button type="button" @click="openViewer(doc)"
-                                        class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer bg-transparent border-0" title="Visualizar">
-                                        <i class="pi pi-eye"></i>
-                                    </button>
-                                    <a :href="doc.url" :download="doc.name"
-                                        class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer" title="Baixar">
-                                        <i class="pi pi-download"></i>
-                                    </a>
-                                    <button v-if="canPrepare" @click="removeDoc(doc.id)" class="text-red-400 hover:text-red-600 p-1.5 cursor-pointer" title="Remover">
-                                        <i class="pi pi-trash"></i>
-                                    </button>
                                 </div>
+                                <p v-else class="text-[11px] text-gray-400 mb-2">Nenhum anexo deste tipo.</p>
+                                <FileUpload v-if="canPrepare" mode="basic" :auto="true" :choose-label="`Anexar ${t.label}`"
+                                    :max-file-size="10485760" @select="(e) => uploadDoc(e, t.key)" class="w-full"
+                                    invalid-file-size-message="O arquivo é muito grande. O tamanho máximo permitido é {1}." />
                             </div>
                         </div>
-                        <div v-else class="text-sm text-gray-400 mb-3">Nenhum documento anexado.</div>
-                        <div v-if="canPrepare">
-                            <FileUpload mode="basic" :auto="true" choose-label="Anexar documento"
-                                :max-file-size="10485760" @select="uploadDoc" class="w-full"
-                                invalid-file-size-message="O arquivo é muito grande. O tamanho máximo permitido é {1}." />
-                            <p class="text-[11px] text-gray-400 mt-1.5 text-center">Tamanho máximo por arquivo: 10 MB.</p>
-                        </div>
+                        <p v-if="canPrepare" class="text-[11px] text-gray-400 mt-2 text-center">Tamanho máximo por arquivo: 10 MB.</p>
                     </div>
 
                     <!-- Timeline/Comentários -->
