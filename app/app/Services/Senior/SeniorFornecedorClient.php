@@ -91,16 +91,41 @@ XML;
         $arr = json_decode(json_encode($sx), true) ?: [];
         $flat = $this->findResultNode($arr);
 
-        $tipoRetorno = is_array($flat['tipoRetorno'] ?? null) ? null : ($flat['tipoRetorno'] ?? null);
+        $tipoRetorno = $this->scalarOrNull($flat['tipoRetorno'] ?? null);
         $erroExecucao = $flat['erroExecucao'] ?? null;
         $temErroExec = $erroExecucao !== null && !is_array($erroExecucao) && trim((string) $erroExecucao) !== '';
+        $msgRetorno = $this->scalarOrNull($flat['mensagemRetorno'] ?? null);
+        $msgSucesso = is_string($msgRetorno) && stripos($msgRetorno, 'sucesso') !== false;
+        $temErroNegocio = $this->hasBusinessError($flat);
 
-        $sucesso = ((string) ($tipoRetorno ?? '') === '1') && !$temErroExec;
+        // cad_fornecedor retorna tipoRetorno=0 com "Processado com sucesso." em consultas OK.
+        $sucesso = !$temErroExec && !$temErroNegocio && (
+            (string) ($tipoRetorno ?? '') === '1'
+            || ((string) ($tipoRetorno ?? '') === '0' && $msgSucesso)
+        );
         if (!$sucesso) {
             throw new SeniorException($this->errorMessage($flat, $erroExecucao), SeniorException::KIND_BUSINESS);
         }
 
         return ['fornecedores' => $this->extractFornecedores($flat)];
+    }
+
+    private function scalarOrNull(mixed $v): mixed
+    {
+        return is_array($v) ? null : $v;
+    }
+
+    private function hasBusinessError(array $flat): bool
+    {
+        if (!isset($flat['erros']) || !is_array($flat['erros'])) {
+            return false;
+        }
+        $msgErro = $flat['erros']['mensagemErro'] ?? null;
+        if (is_array($msgErro)) {
+            $msgErro = implode('; ', array_map('strval', $msgErro));
+        }
+
+        return $msgErro !== null && trim((string) $msgErro) !== '';
     }
 
     private function errorMessage(array $flat, mixed $erroExecucao): string
