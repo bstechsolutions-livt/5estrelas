@@ -48,6 +48,13 @@ function setUserForLevel(levelId, userId) {
     const item = allLevels.value.find(l => l.id === levelId)
     if (item) item.default_user_id = userId
 }
+
+function levelPlaceholder(level) {
+    if (level.department_fallback || level.level_name === 'diretoria' || level.level_name === 'gerencia') {
+        return 'Opcional — vazio pula esta etapa'
+    }
+    return 'Selecione aprovador...'
+}
 </script>
 
 <template>
@@ -116,7 +123,7 @@ function setUserForLevel(levelId, userId) {
                                 :options="users"
                                 optionLabel="name"
                                 optionValue="id"
-                                :placeholder="level.department_fallback ? 'Padrão da área...' : 'Selecione aprovador...'"
+                                :placeholder="levelPlaceholder(level)"
                                 filter
                                 showClear
                                 class="w-64"
