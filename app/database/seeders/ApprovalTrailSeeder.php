@@ -19,7 +19,7 @@ class ApprovalTrailSeeder extends Seeder
         $leonardo = $this->user('Leonardo Prudente', 'leonardo@grupo5estrelas.com.br');
         $dionei = $this->user('Dionei Eurich', 'dionei@grupo5estrelas.com.br');
         $anaPaula = $this->user('Ana Paula', 'anapaula@grupo5estrelas.com.br');
-        $luizFarias = $this->user('Luiz Farias', 'luiz.farias@grupo5estrelas.com.br');
+        $luizFarias = $this->user('Luiz Farias', 'farias@grupo5estrelas.com.br', ['luiz.farias@grupo5estrelas.com.br']);
         $karen = $this->user('Karen', 'karen@grupo5estrelas.com.br');
         $erismar = $this->user('Erismar', 'erismar@grupo5estrelas.com.br');
         $cilas = $this->user('Cilas', 'cilas@grupo5estrelas.com.br');
@@ -106,8 +106,17 @@ class ApprovalTrailSeeder extends Seeder
         }
     }
 
-    private function user(string $name, string $email): ?User
+    private function user(string $name, string $email, array $altEmails = []): ?User
     {
+        $existing = User::whereIn('email', array_merge([$email], $altEmails))
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
         return User::firstOrCreate(
             ['email' => $email],
             ['name' => $name, 'password' => bcrypt('5estrelas2026'), 'is_active' => true]

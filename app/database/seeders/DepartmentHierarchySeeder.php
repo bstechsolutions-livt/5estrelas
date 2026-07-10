@@ -25,7 +25,7 @@ class DepartmentHierarchySeeder extends Seeder
             'matheus' => $this->findUser('matheus.xavier@grupo5estrelas.com.br'),
             'leiliane' => $this->findUser('leiliane@grupo5estrelas.com.br'),
             'leticia' => $this->findUser('leticia@grupo5estrelas.com.br'),
-            'luiz' => $this->findUser('luiz.farias@grupo5estrelas.com.br'),
+            'luiz' => $this->findUser('farias@grupo5estrelas.com.br', 'luiz.farias@grupo5estrelas.com.br'),
             'silene' => $this->findUser('silene@grupo5estrelas.com.br'),
             'alexyxandra' => $this->findUser('alexyxandra@grupo5estrelas.com.br'),
             'dionei' => $this->findUser('dionei@grupo5estrelas.com.br'),
@@ -65,6 +65,8 @@ class DepartmentHierarchySeeder extends Seeder
             );
         }
 
+        $this->consolidateDuplicates($activeSlugs);
+
         $legacyNames = [
             'Matriz / Operações',
             'Modernização / TI',
@@ -80,8 +82,42 @@ class DepartmentHierarchySeeder extends Seeder
         $this->command?->info('✅ Departamentos sincronizados com organograma (' . count($departments) . ' unidades).');
     }
 
-    private function findUser(string $email): ?User
+    /** Migra usuários e desativa slugs legados/duplicados. */
+    private function consolidateDuplicates(array $activeSlugs): void
     {
-        return User::where('email', $email)->where('is_active', true)->first();
+        $canonicalDpRh = Department::where('slug', 'dp_rh')->first();
+
+        foreach (['dprh', 'dp-rh'] as $legacySlug) {
+            $legacy = Department::where('slug', $legacySlug)->first();
+            if (! $legacy || $legacy->slug === 'dp_rh') {
+                continue;
+            }
+            if ($canonicalDpRh) {
+                \App\Models\User::where('department_id', $legacy->id)
+                    ->update(['department_id' => $canonicalDpRh->id]);
+            }
+            $legacy->update(['is_active' => false]);
+        }
+
+        $diretoria = Department::where('slug', 'diretoria')->first();
+        if ($diretoria) {
+            \App\Models\User::where('department_id', $diretoria->id)->update(['department_id' => null]);
+            $diretoria->update(['is_active' => false]);
+        }
+
+        $financeiro = Department::where('slug', 'financeiro')->first();
+        if ($financeiro) {
+            \App\Models\User::where('department_id', $financeiro->id)->update(['department_id' => null]);
+            $financeiro->update(['is_active' => false]);
+        }
+
+        Department::whereNotIn('slug', $activeSlugs)
+            ->whereIn('slug', ['matriz-operacoes', 'modernizacao-ti'])
+            ->update(['is_active' => false]);
+    }
+
+    private function findUser(string ...$emails): ?User
+    {
+        return User::whereIn('email', $emails)->where('is_active', true)->orderBy('id')->first();
     }
 }
