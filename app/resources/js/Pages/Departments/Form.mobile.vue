@@ -1,11 +1,14 @@
 <script setup>
-import { useForm, router } from '@inertiajs/vue3'
+import { useForm } from '@inertiajs/vue3'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import InputText from 'primevue/inputtext'
 import ToggleSwitch from 'primevue/toggleswitch'
+import Select from 'primevue/select'
 
 const props = defineProps({
     department: { type: Object, default: null },
+    approvalAreas: { type: Array, default: () => [] },
+    users: { type: Array, default: () => [] },
 })
 
 const isEdit = !!props.department
@@ -13,6 +16,9 @@ const isEdit = !!props.department
 const form = useForm({
     name: props.department?.name || '',
     is_active: props.department?.is_active ?? true,
+    area_key: props.department?.area_key || null,
+    manager_id: props.department?.manager_id || null,
+    director_id: props.department?.director_id || null,
 })
 
 function submit() {
@@ -36,6 +42,52 @@ function submit() {
             <div class="flex items-center gap-3">
                 <ToggleSwitch v-model="form.is_active" />
                 <span class="text-sm text-gray-700">Ativo</span>
+            </div>
+
+            <div class="border-t border-gray-100 pt-4 space-y-4">
+                <h2 class="text-sm font-semibold text-gray-800">Aprovação financeira</h2>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Área de aprovação</label>
+                    <Select
+                        v-model="form.area_key"
+                        :options="approvalAreas"
+                        optionLabel="label"
+                        optionValue="value"
+                        placeholder="Área do fluxo..."
+                        showClear
+                        filter
+                        class="w-full"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Gestor / Head</label>
+                    <Select
+                        v-model="form.manager_id"
+                        :options="users"
+                        optionLabel="name"
+                        optionValue="id"
+                        placeholder="1ª etapa..."
+                        showClear
+                        filter
+                        class="w-full"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Diretor</label>
+                    <Select
+                        v-model="form.director_id"
+                        :options="users"
+                        optionLabel="name"
+                        optionValue="id"
+                        placeholder="Opcional"
+                        showClear
+                        filter
+                        class="w-full"
+                    />
+                </div>
             </div>
 
             <button

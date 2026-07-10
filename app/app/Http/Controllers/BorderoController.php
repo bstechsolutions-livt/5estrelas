@@ -95,7 +95,7 @@ class BorderoController extends Controller
             'canApproveStep' => $canApproveStep,
             'approvableCount' => $approvableCount,
             'currentStepLabel' => $currentStepLabel,
-            'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name', 'area_key']),
+            'approvalPreview' => $workflow->buildPreviewStepsForSender($user),
         ]);
     }
 
@@ -178,9 +178,11 @@ class BorderoController extends Controller
             return back()->with('error', 'O borderô não possui títulos.');
         }
 
-        $data = $request->validate([
-            'department_id' => ['required', 'integer', 'exists:departments,id'],
-        ]);
+        $workflow = app(ApprovalWorkflowService::class);
+        $preview = $workflow->buildPreviewStepsForSender($request->user());
+        if (! $preview['ok']) {
+            return back()->with('error', $preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
+        }
 
         $withoutDocs = $bordero->payables->filter(fn (Payable $p) => $p->documents()->count() === 0);
         if ($withoutDocs->isNotEmpty()) {
@@ -189,23 +191,23 @@ class BorderoController extends Controller
             return back()->with('error', "Anexe ao menos um documento em cada título antes de enviar. Sem anexo: {$nums}.");
         }
 
-        $workflow = app(ApprovalWorkflowService::class);
+        try {
+            DB::transaction(function () use ($bordero, $request, $workflow) {
+                foreach ($bordero->payables as $payable) {
+                    $workflow->sendForApproval($payable, $request->user());
+                }
 
-        DB::transaction(function () use ($bordero, $request, $workflow, $data) {
-            foreach ($bordero->payables as $payable) {
-                $payable->update(['department_id' => $data['department_id']]);
-                $payable->refresh();
-                $workflow->sendForApproval($payable, $request->user());
-            }
-
-            $bordero->update([
-                'status' => 'aguardando_aprovacao',
-                'sent_for_approval_at' => now(),
-                'rejection_reason' => null,
-                'approved_by' => null,
-                'approved_at' => null,
-            ]);
-        });
+                $bordero->update([
+                    'status' => 'aguardando_aprovacao',
+                    'sent_for_approval_at' => now(),
+                    'rejection_reason' => null,
+                    'approved_by' => null,
+                    'approved_at' => null,
+                ]);
+            });
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         AuditLogger::log(
             event: 'bordero.enviado_aprovacao',

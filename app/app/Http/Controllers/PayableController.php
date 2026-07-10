@@ -133,7 +133,7 @@ class PayableController extends Controller
             'currentStep' => $currentStep,
             'canApproveStep' => $canApproveStep,
             'mentionableUsers' => app(\App\Services\MentionService::class)->mentionableUsers($user, $id),
-            'departments' => \App\Models\Department::where('is_active', true)->orderBy('name')->get(['id', 'name', 'area_key']),
+            'approvalPreview' => $workflow->buildPreviewStepsForSender($user),
         ]);
     }
 
@@ -221,14 +221,17 @@ class PayableController extends Controller
             return back()->with('error', 'Anexe ao menos um documento (nota fiscal, boleto, relatório ou comprovante) antes de enviar para aprovação.');
         }
 
-        // Se informou o departamento de origem, vincula ao título
-        if ($request->filled('department_id')) {
-            $payable->update(['department_id' => $request->department_id]);
-            $payable->refresh();
+        $workflow = app(ApprovalWorkflowService::class);
+        $preview = $workflow->buildPreviewStepsForSender($request->user());
+        if (! $preview['ok']) {
+            return back()->with('error', $preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
         }
 
-        $workflow = app(ApprovalWorkflowService::class);
-        $workflow->sendForApproval($payable, $request->user());
+        try {
+            $workflow->sendForApproval($payable, $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         return back()->with('success', 'Enviado para aprovação multinível.');
     }

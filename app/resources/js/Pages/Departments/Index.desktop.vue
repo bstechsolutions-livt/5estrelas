@@ -11,7 +11,13 @@ import Tag from 'primevue/tag'
 const props = defineProps({
     departments: Object,
     filters: Object,
+    approvalAreas: { type: Object, default: () => ({}) },
 })
+
+function areaLabel(key) {
+    if (!key) return '—'
+    return props.approvalAreas[key] || key
+}
 
 const search = ref(props.filters?.search || '')
 let timer = null
@@ -50,6 +56,16 @@ function confirmDelete(dept) {
             <div class="bg-white rounded-xl shadow-sm border border-gray-100">
                 <DataTable :value="departments.data" striped-rows>
                     <Column field="name" header="Nome" sortable />
+                    <Column header="Área aprovação" style="min-width: 180px">
+                        <template #body="{ data }">
+                            <span class="text-xs text-gray-600">{{ areaLabel(data.area_key) }}</span>
+                        </template>
+                    </Column>
+                    <Column header="Gestor" style="min-width: 140px">
+                        <template #body="{ data }">
+                            <span class="text-xs text-gray-600">{{ data.manager?.name || '—' }}</span>
+                        </template>
+                    </Column>
                     <Column field="users_count" header="Usuários" sortable style="width: 120px" />
                     <Column field="is_active" header="Status" style="width: 100px">
                         <template #body="{ data }">

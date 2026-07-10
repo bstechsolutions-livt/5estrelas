@@ -11,7 +11,7 @@ class Department extends Model
 {
     use Auditable;
 
-    protected $fillable = ['name', 'slug', 'is_active'];
+    protected $fillable = ['name', 'slug', 'is_active', 'area_key', 'manager_id', 'director_id'];
 
     protected $casts = [
         'is_active' => 'boolean',
@@ -49,5 +49,15 @@ class Department extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function manager(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    public function director(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'director_id');
     }
 }

@@ -7,6 +7,7 @@ import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import FileUpload from 'primevue/fileupload'
 import Dialog from 'primevue/dialog'
+import ApprovalFlowPreview from '@/Components/Financeiro/ApprovalFlowPreview.vue'
 import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
 import Toast from 'primevue/toast'
@@ -30,7 +31,7 @@ const props = defineProps({
     canFinalSign: { type: Boolean, default: false },
     canEditDueDate: { type: Boolean, default: false },
     mentionableUsers: { type: Array, default: () => [] },
-    departments: { type: Array, default: () => [] },
+    approvalPreview: { type: Object, default: () => ({ ok: false, errors: [], steps: [] }) },
 })
 
 const { isMobile } = useDevice()
@@ -241,15 +242,14 @@ const wasRejectedBack = computed(() =>
     props.payable.status === 'pendente' && !!props.payable.rejection_reason
 )
 
-// Departamento de origem (seletor ao enviar pra aprovação)
-const showDeptSelect = ref(false)
-const selectedDeptId = ref(props.payable.department_id || null)
-
+// Envio usa o departamento do usuário logado (preview em approvalPreview).
 function sendForApproval() {
-    router.post(`/financeiro/contas-pagar/${props.payable.id}/enviar-aprovacao`, {
-        department_id: selectedDeptId.value,
-    }, { preserveScroll: true })
+    router.post(`/financeiro/contas-pagar/${props.payable.id}/enviar-aprovacao`, {}, { preserveScroll: true })
 }
+
+const canSubmitApproval = computed(() =>
+    props.approvalPreview?.ok && hasDocuments.value
+)
 
 // Sidebar de ações aparece quando há qualquer ação/condição lateral a mostrar.
 const showSidebar = computed(() =>
@@ -486,20 +486,18 @@ function submitDueDate() {
                     <!-- Ações do preparador (só se NÃO está em borderô) -->
                     <div v-if="canSendIndividual" class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Ações</h3>
-                        <div v-if="!showDeptSelect" class="space-y-2">
-                            <Button label="Enviar para Aprovação" icon="pi pi-send" class="w-full" dusk="btn-send-approval" :disabled="!hasDocuments" @click="showDeptSelect = true" />
-                            <p v-if="!hasDocuments" dusk="no-docs-hint" class="text-[11px] text-amber-600 text-center flex items-center justify-center gap-1">
-                                <i class="pi pi-exclamation-triangle text-[10px]"></i> Anexe ao menos um documento para enviar.
-                            </p>
-                        </div>
-                        <div v-else class="space-y-3">
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Departamento de origem *</label>
-                                <Select v-model="selectedDeptId" :options="departments" optionLabel="name" optionValue="id" placeholder="Selecione o departamento..." class="w-full" filter />
-                            </div>
-                            <Button label="Confirmar envio" icon="pi pi-send" class="w-full" :disabled="!selectedDeptId" @click="sendForApproval" />
-                            <Button label="Cancelar" severity="secondary" text class="w-full" @click="showDeptSelect = false" />
-                        </div>
+                        <ApprovalFlowPreview :preview="approvalPreview" class="mb-3" />
+                        <Button
+                            label="Enviar para Aprovação"
+                            icon="pi pi-send"
+                            class="w-full"
+                            dusk="btn-send-approval"
+                            :disabled="!canSubmitApproval"
+                            @click="sendForApproval"
+                        />
+                        <p v-if="!hasDocuments" dusk="no-docs-hint" class="text-[11px] text-amber-600 text-center mt-2 flex items-center justify-center gap-1">
+                            <i class="pi pi-exclamation-triangle text-[10px]"></i> Anexe ao menos um documento para enviar.
+                        </p>
                     </div>
 
                     <!-- Ações do aprovador (workflow multinível) -->

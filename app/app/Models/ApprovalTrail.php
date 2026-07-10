@@ -9,6 +9,13 @@ class ApprovalTrail extends Model
 {
     protected $fillable = ['area', 'order', 'level_name', 'role_label', 'default_user_id'];
 
+    public const LEVELS_FROM_DEPARTMENT = ['departamento', 'diretoria'];
+
+    public static function levelResolvedFromDepartment(string $levelName): bool
+    {
+        return in_array($levelName, self::LEVELS_FROM_DEPARTMENT, true);
+    }
+
     public function defaultUser(): BelongsTo { return $this->belongsTo(User::class, 'default_user_id'); }
 
     /**

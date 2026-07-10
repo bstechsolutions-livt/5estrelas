@@ -6,6 +6,7 @@ import DepartmentsMobile from './Index.mobile.vue'
 defineProps({
     departments: Object,
     filters: Object,
+    approvalAreas: { type: Object, default: () => ({}) },
 })
 
 const { isMobile } = useDevice()

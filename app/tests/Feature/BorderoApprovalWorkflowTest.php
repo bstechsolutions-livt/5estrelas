@@ -22,6 +22,8 @@ class BorderoApprovalWorkflowTest extends TestCase
 
     private User $gerente;
 
+    private User $gestorDept;
+
     private Department $department;
 
     protected function setUp(): void
@@ -29,7 +31,13 @@ class BorderoApprovalWorkflowTest extends TestCase
         parent::setUp();
         Storage::fake('local');
 
-        $this->sender = $this->userWithPerm(['financeiro.contas_pagar.visualizar', 'financeiro.contas_pagar.preparar']);
+        $this->gestorDept = User::factory()->create(['name' => 'Gestor Compras', 'is_active' => true]);
+        $this->gestorDept->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.visualizar'],
+                ['label' => 'Visualizar', 'module' => 'financeiro']
+            )->id
+        );
         $this->gerente = User::factory()->create(['name' => 'Gerente Borderô', 'is_active' => true]);
         $this->gerente->permissions()->attach(
             Permission::firstOrCreate(
@@ -41,7 +49,13 @@ class BorderoApprovalWorkflowTest extends TestCase
             'name' => 'Compras Matriz',
             'is_active' => true,
         ]);
-        $this->department->forceFill(['area_key' => 'matriz'])->save();
+        $this->department->forceFill([
+            'area_key' => 'matriz',
+            'manager_id' => $this->gestorDept->id,
+        ])->save();
+
+        $this->sender = $this->userWithPerm(['financeiro.contas_pagar.visualizar', 'financeiro.contas_pagar.preparar']);
+        $this->sender->forceFill(['department_id' => $this->department->id])->save();
 
         $financeiro = User::factory()->create(['name' => 'Financeiro', 'is_active' => true]);
         $diretor = User::factory()->create(['name' => 'Diretor', 'is_active' => true]);
@@ -118,8 +132,7 @@ class BorderoApprovalWorkflowTest extends TestCase
         $bordero = $this->borderoRascunho([$p1->id, $p2->id]);
 
         $response = $this->actingAs($this->sender)->post(
-            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao",
-            ['department_id' => $this->department->id]
+            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
         );
 
         $response->assertRedirect();
@@ -147,8 +160,7 @@ class BorderoApprovalWorkflowTest extends TestCase
         $bordero = $this->borderoRascunho([$comDoc->id, $semDoc->id]);
 
         $response = $this->actingAs($this->sender)->post(
-            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao",
-            ['department_id' => $this->department->id]
+            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
         );
 
         $response->assertRedirect();
@@ -164,8 +176,7 @@ class BorderoApprovalWorkflowTest extends TestCase
         $bordero = $this->borderoRascunho([$p1->id, $p2->id]);
 
         $this->actingAs($this->sender)->post(
-            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao",
-            ['department_id' => $this->department->id]
+            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
         );
 
         // Usuário com acesso ao módulo, mas que não é o aprovador da etapa atual
@@ -180,9 +191,8 @@ class BorderoApprovalWorkflowTest extends TestCase
         $denied->assertRedirect();
         $denied->assertSessionHas('error');
 
-        // 1ª etapa (departamento, sem assigned): só wildcard/admin
-        $admin = $this->userWithPerm(['*']);
-        $this->actingAs($admin)->post("/financeiro/borderos/{$bordero->id}/aprovar")->assertSessionHas('success');
+        // 1ª etapa (departamento): gestor do departamento
+        $this->actingAs($this->gestorDept)->post("/financeiro/borderos/{$bordero->id}/aprovar")->assertSessionHas('success');
 
         // 2ª etapa (gerência): gerente aprova os dois títulos
         $ok = $this->actingAs($this->gerente)->post("/financeiro/borderos/{$bordero->id}/aprovar");
@@ -204,8 +214,7 @@ class BorderoApprovalWorkflowTest extends TestCase
         $bordero = $this->borderoRascunho([$payable->id]);
 
         $this->actingAs($this->sender)->post(
-            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao",
-            ['department_id' => $this->department->id]
+            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
         );
 
         $admin = $this->userWithPerm(['*']);
@@ -229,8 +238,7 @@ class BorderoApprovalWorkflowTest extends TestCase
         $bordero = $this->borderoRascunho([$p1->id, $p2->id]);
 
         $this->actingAs($this->sender)->post(
-            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao",
-            ['department_id' => $this->department->id]
+            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
         );
 
         $admin = $this->userWithPerm(['*', 'financeiro.contas_pagar.visualizar']);
@@ -250,5 +258,37 @@ class BorderoApprovalWorkflowTest extends TestCase
         $this->assertSame('Documentação incompleta no borderô', $p1->rejection_reason);
         $this->assertSame('rascunho', $bordero->status);
         $this->assertSame('Documentação incompleta no borderô', $bordero->rejection_reason);
+    }
+
+    public function test_enviar_bordero_bloqueia_sem_departamento_no_usuario(): void
+    {
+        $semDept = $this->userWithPerm(['financeiro.contas_pagar.visualizar', 'financeiro.contas_pagar.preparar']);
+        $p1 = $this->payableComDocumento();
+        $bordero = $this->borderoRascunho([$p1->id]);
+
+        $response = $this->actingAs($semDept)->post(
+            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error');
+        $bordero->refresh();
+        $this->assertSame('rascunho', $bordero->status);
+    }
+
+    public function test_enviar_bordero_bloqueia_sem_gestor_no_departamento(): void
+    {
+        $this->department->forceFill(['manager_id' => null])->save();
+        $p1 = $this->payableComDocumento();
+        $bordero = $this->borderoRascunho([$p1->id]);
+
+        $response = $this->actingAs($this->sender)->post(
+            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error');
+        $bordero->refresh();
+        $this->assertSame('rascunho', $bordero->status);
     }
 }

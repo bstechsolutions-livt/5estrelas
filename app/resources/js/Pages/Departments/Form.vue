@@ -5,6 +5,8 @@ import FormMobile from './Form.mobile.vue'
 
 defineProps({
     department: { type: Object, default: null },
+    approvalAreas: { type: Array, default: () => [] },
+    users: { type: Array, default: () => [] },
 })
 
 const { isMobile } = useDevice()

@@ -2,6 +2,7 @@
 
 namespace Tests\Browser;
 
+use App\Models\ApprovalTrail;
 use App\Models\Department;
 use App\Models\Payable;
 use App\Models\PayableDocument;
@@ -13,7 +14,7 @@ use Tests\DuskTestCase;
  * A1 — Documento obrigatório para aprovar (browser).
  *
  * Sem documento: botão "Enviar para Aprovação" desabilitado + aviso visível.
- * Com documento: botão habilitado e clicável (revela seleção de departamento).
+ * Com documento: botão habilitado e preview do fluxo visível.
  */
 class PayableDocumentoObrigatorioTest extends DuskTestCase
 {
@@ -65,9 +66,17 @@ class PayableDocumentoObrigatorioTest extends DuskTestCase
     {
         $p = $this->makePayable();
         $this->addDocument($p);
-        Department::firstOrCreate(
+        $bruno = $this->bruno();
+        $manager = User::factory()->create(['is_active' => true, 'name' => 'Gestor Dusk']);
+        $dept = Department::firstOrCreate(
             ['name' => 'Financeiro Dusk'],
-            ['area_key' => 'matriz', 'is_active' => true]
+            ['is_active' => true]
+        );
+        $dept->forceFill(['area_key' => 'matriz', 'manager_id' => $manager->id])->save();
+        $bruno->forceFill(['department_id' => $dept->id])->save();
+        ApprovalTrail::firstOrCreate(
+            ['area' => 'matriz', 'order' => 1, 'level_name' => 'departamento'],
+            ['role_label' => 'Departamento', 'default_user_id' => null]
         );
 
         $this->browse(function (Browser $browser) use ($p) {
@@ -76,9 +85,8 @@ class PayableDocumentoObrigatorioTest extends DuskTestCase
                 ->waitForText('Fornecedor Dusk Documento', 10)
                 ->waitFor('@btn-send-approval', 10)
                 ->assertMissing('@no-docs-hint')
-                ->click('@btn-send-approval')
-                ->waitForText('Departamento de origem', 10)
-                ->assertSee('Confirmar envio');
+                ->assertEnabled('@btn-send-approval')
+                ->assertSee('Sequência de aprovação');
         });
 
         PayableDocument::where('payable_id', $p->id)->delete();

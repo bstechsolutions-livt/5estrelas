@@ -39,12 +39,30 @@ class ApprovalWorkflowService
 
     public function sendForApproval(Payable $payable, User $sender, ?string $area = null): void
     {
-        $area = $area ?? $this->detectArea($payable);
+        $department = null;
 
-        // Caso especial: Baluarte passa por DUAS trilhas em sequência
+        if ($area === null) {
+            $preview = $this->buildPreviewStepsForSender($sender);
+            if (! $preview['ok']) {
+                throw new \InvalidArgumentException($preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
+            }
+            $area = $preview['area'];
+            $payable->update(['department_id' => $preview['department']['id']]);
+            $payable->refresh();
+            $department = Department::with(['manager:id,name', 'director:id,name'])->find($preview['department']['id']);
+        } else {
+            if ($sender->department_id) {
+                $payable->update(['department_id' => $sender->department_id]);
+                $payable->refresh();
+            }
+            if ($payable->department_id) {
+                $department = Department::with(['manager:id,name', 'director:id,name'])->find($payable->department_id);
+            }
+        }
+
         $trails = $this->resolveTrails($area);
 
-        DB::transaction(function () use ($payable, $sender, $trails, $area) {
+        DB::transaction(function () use ($payable, $sender, $trails, $area, $department) {
             ApprovalStep::where('payable_id', $payable->id)->delete();
 
             $order = 1;
@@ -55,7 +73,7 @@ class ApprovalWorkflowService
                         'order' => $order++,
                         'level_name' => $level->level_name,
                         'status' => 'pendente',
-                        'assigned_to' => $level->default_user_id,
+                        'assigned_to' => $this->resolveAssigneeId($level, $department),
                     ]);
                 }
             }
@@ -325,6 +343,158 @@ class ApprovalWorkflowService
             ->with(['branch:id,name', 'preparer:id,name'])
             ->orderByDesc('sent_for_approval_at')
             ->get();
+    }
+
+    /**
+     * Valida se o remetente pode submeter e monta o preview da trilha de aprovação.
+     *
+     * @return array{
+     *   ok: bool,
+     *   errors: string[],
+     *   department: ?array{id: int, name: string},
+     *   area: ?string,
+     *   area_label: ?string,
+     *   steps: array<int, array{order: int, level_name: string, level_label: string, role_label: string, assignee_id: ?int, assignee_name: ?string, configured: bool}>
+     * }
+     */
+    public function buildPreviewStepsForSender(User $sender): array
+    {
+        $base = $this->validateSenderDepartment($sender);
+        if (! $base['department']) {
+            return [
+                'ok' => false,
+                'errors' => $base['errors'],
+                'department' => null,
+                'area' => null,
+                'area_label' => null,
+                'steps' => [],
+            ];
+        }
+
+        /** @var Department $department */
+        $department = $base['department'];
+        $errors = $base['errors'];
+        $area = $base['area'];
+
+        if (! $area) {
+            return [
+                'ok' => false,
+                'errors' => array_values(array_unique($errors)),
+                'department' => ['id' => $department->id, 'name' => $department->name],
+                'area' => null,
+                'area_label' => null,
+                'steps' => [],
+            ];
+        }
+
+        $steps = [];
+        $order = 1;
+        foreach ($this->resolveTrails($area) as $trail) {
+            foreach ($trail as $level) {
+                $assigneeId = $this->resolveAssigneeId($level, $department);
+                $assigneeName = $assigneeId ? User::whereKey($assigneeId)->value('name') : null;
+                $steps[] = [
+                    'order' => $order++,
+                    'level_name' => $level->level_name,
+                    'level_label' => ApprovalStep::LEVEL_LABELS[$level->level_name] ?? $level->level_name,
+                    'role_label' => $level->role_label,
+                    'assignee_id' => $assigneeId,
+                    'assignee_name' => $assigneeName,
+                    'configured' => $assigneeId !== null,
+                ];
+            }
+        }
+
+        foreach ($steps as $step) {
+            if (! $step['configured']) {
+                $errors[] = "A etapa \"{$step['role_label']}\" não tem aprovador configurado.";
+            }
+        }
+
+        if ($steps === []) {
+            $errors[] = 'Não há etapas de aprovação configuradas para o seu departamento.';
+        }
+
+        $errors = array_values(array_unique($errors));
+
+        return [
+            'ok' => $errors === [],
+            'errors' => $errors,
+            'department' => ['id' => $department->id, 'name' => $department->name],
+            'area' => $area,
+            'area_label' => ApprovalTrail::AREAS[$area] ?? $area,
+            'steps' => $steps,
+        ];
+    }
+
+    /** @return array{errors: string[], department: ?Department, area: ?string} */
+    private function validateSenderDepartment(User $sender): array
+    {
+        $errors = [];
+
+        if (! $sender->department_id) {
+            return [
+                'errors' => ['Seu usuário não está vinculado a um departamento. Solicite ao administrador.'],
+                'department' => null,
+                'area' => null,
+            ];
+        }
+
+        $department = Department::with(['manager:id,name', 'director:id,name'])
+            ->where('is_active', true)
+            ->find($sender->department_id);
+
+        if (! $department) {
+            return [
+                'errors' => ['Departamento do usuário não encontrado ou inativo.'],
+                'department' => null,
+                'area' => null,
+            ];
+        }
+
+        if (! $department->area_key) {
+            $errors[] = "O departamento \"{$department->name}\" não possui área de aprovação configurada.";
+        }
+
+        $area = $department->area_key;
+
+        if ($area && ! $this->areaHasTrail($area)) {
+            $label = ApprovalTrail::AREAS[$area] ?? $area;
+            $errors[] = "Não há fluxo de aprovação configurado para \"{$label}\".";
+        }
+
+        return [
+            'errors' => $errors,
+            'department' => $department,
+            'area' => $area,
+        ];
+    }
+
+    private function areaHasTrail(string $area): bool
+    {
+        if ($area === 'baluarte') {
+            return ApprovalTrail::trailFor('matriz')->isNotEmpty()
+                && ApprovalTrail::trailFor('comercial')->isNotEmpty();
+        }
+
+        if ($area === 'multi_star') {
+            return ApprovalTrail::trailFor('licitacao')->isNotEmpty();
+        }
+
+        return ApprovalTrail::trailFor($area)->isNotEmpty();
+    }
+
+    private function resolveAssigneeId(ApprovalTrail $level, ?Department $department): ?int
+    {
+        if ($level->level_name === 'departamento' && $department?->manager_id) {
+            return $department->manager_id;
+        }
+
+        if ($level->level_name === 'diretoria' && $department?->director_id) {
+            return $department->director_id;
+        }
+
+        return $level->default_user_id;
     }
 
     /**

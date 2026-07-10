@@ -65,6 +65,41 @@ class ApprovalFlowConfigTest extends TestCase
         ]);
     }
 
+    public function test_update_ignores_departamento_level(): void
+    {
+        $admin = $this->adminUser();
+        $gestor = User::factory()->create(['is_active' => true]);
+        $outro = User::factory()->create(['is_active' => true]);
+
+        $deptLevel = ApprovalTrail::create([
+            'area' => 'matriz', 'order' => 1, 'level_name' => 'departamento',
+            'role_label' => 'Departamento', 'default_user_id' => null,
+        ]);
+        $gerencia = ApprovalTrail::create([
+            'area' => 'matriz', 'order' => 2, 'level_name' => 'gerencia',
+            'role_label' => 'Gerência', 'default_user_id' => $gestor->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/financeiro/fluxos-aprovacao', [
+                'levels' => [
+                    ['id' => $deptLevel->id, 'default_user_id' => $outro->id],
+                    ['id' => $gerencia->id, 'default_user_id' => $outro->id],
+                ],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('approval_trails', [
+            'id' => $deptLevel->id,
+            'default_user_id' => null,
+        ]);
+        $this->assertDatabaseHas('approval_trails', [
+            'id' => $gerencia->id,
+            'default_user_id' => $outro->id,
+        ]);
+    }
+
     public function test_update_403_without_permission(): void
     {
         $user = $this->regularUser();

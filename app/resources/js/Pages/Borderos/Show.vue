@@ -6,7 +6,7 @@ import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
-import Select from 'primevue/select'
+import ApprovalFlowPreview from '@/Components/Financeiro/ApprovalFlowPreview.vue'
 import { useDevice } from '@/composables/useDevice'
 
 const props = defineProps({
@@ -17,14 +17,12 @@ const props = defineProps({
     canApproveStep: { type: Boolean, default: false },
     approvableCount: { type: Number, default: 0 },
     currentStepLabel: { type: String, default: null },
-    departments: { type: Array, default: () => [] },
+    approvalPreview: { type: Object, default: () => ({ ok: false, errors: [], steps: [] }) },
 })
 
 const { isMobile } = useDevice()
 const showReject = ref(false)
 const rejectReason = ref('')
-const showDeptSelect = ref(false)
-const selectedDeptId = ref(null)
 
 function goBack() { window.history.back() }
 
@@ -35,13 +33,12 @@ function removePayable(payableId) {
 }
 
 function sendForApproval() {
-    router.post(`/financeiro/borderos/${props.bordero.id}/enviar-aprovacao`, {
-        department_id: selectedDeptId.value,
-    }, {
-        preserveScroll: true,
-        onSuccess: () => { showDeptSelect.value = false },
-    })
+    router.post(`/financeiro/borderos/${props.bordero.id}/enviar-aprovacao`, {}, { preserveScroll: true })
 }
+
+const canSubmitApproval = computed(() =>
+    props.approvalPreview?.ok && allHaveDocuments.value
+)
 
 function approve() {
     router.post(`/financeiro/borderos/${props.bordero.id}/aprovar`, {}, { preserveScroll: true })
@@ -85,7 +82,7 @@ function reloadIfStale() {
     if (!sessionStorage.getItem(key)) return
     sessionStorage.removeItem(key)
     router.reload({
-        only: ['bordero', 'payablesWorkflow', 'canApproveStep', 'approvableCount', 'currentStepLabel'],
+        only: ['bordero', 'payablesWorkflow', 'canApproveStep', 'approvableCount', 'currentStepLabel', 'approvalPreview'],
         preserveScroll: true,
     })
 }
@@ -130,38 +127,19 @@ onMounted(reloadIfStale)
             <!-- Envio para aprovação (mesmo fluxo do título individual) -->
             <div v-if="isDraft" class="bg-white rounded-xl border border-gray-100 p-4 mb-4">
                 <h3 class="text-sm font-semibold text-gray-700 mb-3">Enviar para aprovação</h3>
-                <p class="text-xs text-gray-500 mb-3">Cada título seguirá o fluxo configurado (mesmo do envio individual).</p>
-                <div v-if="!showDeptSelect">
-                    <Button
-                        label="Enviar borderô para aprovação"
-                        icon="pi pi-send"
-                        dusk="btn-bordero-send-approval"
-                        :disabled="!allHaveDocuments"
-                        @click="showDeptSelect = true"
-                    />
-                    <p v-if="!allHaveDocuments" class="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
-                        <i class="pi pi-exclamation-triangle text-[10px]"></i>
-                        Todos os títulos precisam de ao menos um documento anexado.
-                    </p>
-                </div>
-                <div v-else class="space-y-3">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Departamento de origem *</label>
-                        <Select
-                            v-model="selectedDeptId"
-                            :options="departments"
-                            optionLabel="name"
-                            optionValue="id"
-                            placeholder="Selecione o departamento..."
-                            class="w-full"
-                            filter
-                        />
-                    </div>
-                    <div class="flex gap-2">
-                        <Button label="Confirmar envio" icon="pi pi-send" :disabled="!selectedDeptId" @click="sendForApproval" />
-                        <Button label="Cancelar" severity="secondary" outlined @click="showDeptSelect = false" />
-                    </div>
-                </div>
+                <p class="text-xs text-gray-500 mb-3">Cada título seguirá o fluxo do seu departamento (mesmo do envio individual).</p>
+                <ApprovalFlowPreview :preview="approvalPreview" class="mb-3" />
+                <Button
+                    label="Enviar borderô para aprovação"
+                    icon="pi pi-send"
+                    dusk="btn-bordero-send-approval"
+                    :disabled="!canSubmitApproval"
+                    @click="sendForApproval"
+                />
+                <p v-if="!allHaveDocuments" class="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
+                    <i class="pi pi-exclamation-triangle text-[10px]"></i>
+                    Todos os títulos precisam de ao menos um documento anexado.
+                </p>
             </div>
 
             <!-- Ações do aprovador (workflow multinível) -->

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ApprovalTrail;
+use App\Models\Department;
 use App\Models\Payable;
 use App\Models\PayableDocument;
 use App\Models\Permission;
@@ -56,13 +57,24 @@ class PayableDocumentoObrigatorioTest extends TestCase
         ]);
     }
 
-    /** Trilha mínima da matriz (1 nível sem assigned_to) para o envio criar step. */
+    /** Trilha mínima da matriz (1 nível) para o envio criar step. */
     private function seedMatrizTrail(): void
     {
         ApprovalTrail::create([
             'area' => 'matriz', 'order' => 1, 'level_name' => 'departamento',
             'role_label' => 'Departamento', 'default_user_id' => null,
         ]);
+    }
+
+    private function vincularRemetenteAoDepartamento(User $user): Department
+    {
+        $manager = User::factory()->create(['is_active' => true]);
+        $dept = Department::create(['name' => 'Dept Teste Doc', 'is_active' => true]);
+        $dept->forceFill(['area_key' => 'matriz', 'manager_id' => $manager->id])->save();
+        $user->forceFill(['department_id' => $dept->id])->save();
+        $this->seedMatrizTrail();
+
+        return $dept;
     }
 
     private function sendUrl(Payable $p): string
@@ -94,8 +106,8 @@ class PayableDocumentoObrigatorioTest extends TestCase
 
     public function test_envia_para_aprovacao_com_documento(): void
     {
-        $this->seedMatrizTrail();
         $user = $this->activeUser(['*']);
+        $this->vincularRemetenteAoDepartamento($user);
         $payable = $this->makePayable('pendente');
         $this->addDocument($payable, $user);
 
@@ -124,8 +136,8 @@ class PayableDocumentoObrigatorioTest extends TestCase
 
     public function test_aprova_com_documento(): void
     {
-        $this->seedMatrizTrail();
         $user = $this->activeUser(['*']);
+        $this->vincularRemetenteAoDepartamento($user);
         $payable = $this->makePayable('pendente');
         $this->addDocument($payable, $user);
 

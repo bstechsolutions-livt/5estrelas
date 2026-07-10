@@ -1,6 +1,6 @@
 <script setup>
-import { ref, watch } from 'vue'
-import { router, useForm, usePage } from '@inertiajs/vue3'
+import { ref, watch, computed } from 'vue'
+import { useForm, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
@@ -21,10 +21,19 @@ watch(() => page.props.flash, (flash) => {
     if (flash?.error) toast.add({ severity: 'error', summary: 'Erro', detail: flash.error, life: 5000 })
 }, { deep: true })
 
-// Flatten all levels for the form
-const allLevels = ref(
-    props.trails.flatMap(t => t.levels.map(l => ({ id: l.id, default_user_id: l.default_user_id })))
+const editableLevels = computed(() =>
+    props.trails.flatMap(t =>
+        t.levels
+            .filter(l => !l.from_department)
+            .map(l => ({ id: l.id, default_user_id: l.default_user_id }))
+    )
 )
+
+const allLevels = ref(editableLevels.value.map(l => ({ ...l })))
+
+watch(editableLevels, (levels) => {
+    allLevels.value = levels.map(l => ({ ...l }))
+}, { deep: true })
 
 function save() {
     const form = useForm({ levels: allLevels.value })
@@ -48,9 +57,20 @@ function setUserForLevel(levelId, userId) {
             <div class="flex items-center justify-between mb-6">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-800">Configurar Fluxos de Aprovação</h1>
-                    <p class="text-sm text-gray-500 mt-1">Defina quem aprova em cada nível, por área de origem.</p>
+                    <p class="text-sm text-gray-500 mt-1">
+                        Aprovadores fixos por área. Gestor e diretor do departamento são definidos em
+                        <a href="/departamentos" class="text-blue-600 hover:underline">Departamentos</a>.
+                    </p>
                 </div>
                 <Button label="Salvar alterações" icon="pi pi-check" @click="save" />
+            </div>
+
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 text-xs text-blue-800">
+                <p class="font-semibold mb-1">Etapas vindas do departamento de quem envia</p>
+                <ul class="list-disc pl-4 space-y-0.5 text-blue-700">
+                    <li><strong>Departamento (1ª etapa):</strong> gestor cadastrado no departamento do remetente.</li>
+                    <li><strong>Diretoria:</strong> diretor do departamento, se configurado; senão o padrão da área abaixo.</li>
+                </ul>
             </div>
 
             <div class="space-y-6">
@@ -64,15 +84,28 @@ function setUserForLevel(levelId, userId) {
                                 {{ level.order }}
                             </div>
                             <div class="flex-1 min-w-0">
-                                <p class="text-xs text-gray-500">{{ level.role_label }}</p>
+                                <p class="text-xs font-medium text-gray-700">{{ level.role_label }}</p>
+                                <p v-if="level.from_department" class="text-[10px] text-gray-400">Vem do cadastro do departamento</p>
+                                <p v-else-if="level.department_fallback" class="text-[10px] text-gray-400">Padrão quando o dept. não tem diretor</p>
                             </div>
+
+                            <div
+                                v-if="level.from_department"
+                                class="w-64 text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2"
+                                dusk="level-from-department"
+                            >
+                                <i class="pi pi-building text-gray-400 mr-1" />
+                                Gestor do departamento
+                            </div>
+
                             <Select
+                                v-else
                                 :modelValue="getUserForLevel(level.id)"
                                 @update:modelValue="setUserForLevel(level.id, $event)"
                                 :options="users"
                                 optionLabel="name"
                                 optionValue="id"
-                                placeholder="Selecione aprovador..."
+                                :placeholder="level.department_fallback ? 'Padrão da área...' : 'Selecione aprovador...'"
                                 filter
                                 showClear
                                 class="w-64"
