@@ -26,7 +26,8 @@ export const dashboard = ref({
     vencendo_30_dias: 0,
     vencendo_90_dias: 0,
     valor_total_locacao: 0,
-    valor_total_servico: 0
+    valor_total_servico: 0,
+    valor_comprometido_mes: 0
   },
   alvaras: {
     total: 0,
@@ -49,7 +50,15 @@ export async function getDashboard() {
   try {
     const resp = await axios.get("/v2/gestao-contratos/dashboard")
     if (resp.data.sucesso) {
-      dashboard.value.contratos = resp.data.dados.contratos
+      const contratos = resp.data.dados.contratos
+      // Garante números (PostgreSQL/Laravel pode devolver decimais como string)
+      contratos.valor_total_locacao = paraNumero(contratos.valor_total_locacao)
+      contratos.valor_total_servico = paraNumero(contratos.valor_total_servico)
+      contratos.valor_comprometido_mes = paraNumero(
+        contratos.valor_comprometido_mes ??
+          contratos.valor_total_locacao + contratos.valor_total_servico
+      )
+      dashboard.value.contratos = contratos
       dashboard.value.alvaras = resp.data.dados.alvaras
       dashboard.value.equipamentos = resp.data.dados.equipamentos || dashboard.value.equipamentos
       dashboard.value.proximos_vencimentos =
@@ -399,12 +408,21 @@ export async function getFiliais() {
 // ║                         HELPERS                              ║
 // ╚══════════════════════════════════════════════════════════════╝
 
+export function paraNumero(valor) {
+  if (valor === null || valor === undefined || valor === "") return 0
+  const numero = Number(valor)
+  return Number.isNaN(numero) ? 0 : numero
+}
+
 export function formatarMoeda(valor) {
-  if (!valor && valor !== 0) return "-"
+  if (valor === null || valor === undefined || valor === "") return "-"
+  // Coage para número (valores decimais podem chegar como string da API)
+  const numero = Number(valor)
+  if (Number.isNaN(numero)) return "-"
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL"
-  }).format(valor)
+  }).format(numero)
 }
 
 export function formatarData(data) {

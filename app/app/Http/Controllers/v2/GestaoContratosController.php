@@ -32,8 +32,11 @@ class GestaoContratosController extends Controller
       $contratosVencendo90 = BsGestaoContrato::ativos()->vencendoEm(90)->count();
 
       // Valores
-      $valorTotalLocacao = BsGestaoContrato::locacao()->ativos()->sum('valor_mensal');
-      $valorTotalServico = BsGestaoContrato::servico()->ativos()->sum('valor_mensal');
+      // Cast para float: no PostgreSQL, sum() de coluna numeric/decimal retorna string,
+      // o que fazia o frontend concatenar em vez de somar (KPI "Comprometido/mês" = NaN).
+      $valorTotalLocacao = (float) BsGestaoContrato::locacao()->ativos()->sum('valor_mensal');
+      $valorTotalServico = (float) BsGestaoContrato::servico()->ativos()->sum('valor_mensal');
+      $valorComprometidoMes = $valorTotalLocacao + $valorTotalServico;
 
       // Alvarás
       $totalAlvaras = BsGestaoAlvara::vigentes()->count();
@@ -80,6 +83,7 @@ class GestaoContratosController extends Controller
             'vencidos' => $contratosVencidos,
             'valor_total_locacao' => $valorTotalLocacao,
             'valor_total_servico' => $valorTotalServico,
+            'valor_comprometido_mes' => $valorComprometidoMes,
           ],
           'alvaras' => [
             'total' => $totalAlvaras,

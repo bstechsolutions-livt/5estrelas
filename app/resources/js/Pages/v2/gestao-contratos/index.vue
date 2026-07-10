@@ -251,8 +251,8 @@ function getIconCorDiasVencimento(dias) {
           </span>
           <div>
             <p class="text-xs text-gray-500 dark:text-gray-400">Comprometido / mês</p>
-            <p class="text-lg font-bold text-gray-900 dark:text-white">
-              {{ GestaoJs.formatarMoeda((GestaoJs.dashboard.value.contratos.valor_total_locacao || 0) + (GestaoJs.dashboard.value.contratos.valor_total_servico || 0)) }}
+            <p dusk="kpi-comprometido-mes" class="text-lg font-bold text-gray-900 dark:text-white">
+              {{ GestaoJs.formatarMoeda(GestaoJs.dashboard.value.contratos.valor_comprometido_mes) }}
             </p>
           </div>
         </div>
