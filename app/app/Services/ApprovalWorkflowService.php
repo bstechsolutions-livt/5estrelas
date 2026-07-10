@@ -35,6 +35,7 @@ class ApprovalWorkflowService
     private const PRESIDENT_SUBSTITUTES = [
         'anapaula@grupo5estrelas.com.br',
         'luiz.farias@grupo5estrelas.com.br',
+        'farias@grupo5estrelas.com.br',
     ];
 
     public function sendForApproval(Payable $payable, User $sender, ?string $area = null): void
