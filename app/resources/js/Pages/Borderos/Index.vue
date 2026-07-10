@@ -85,12 +85,17 @@ function wasRejectedBack(bordero) {
                 <div v-if="borderos.data.length" class="space-y-2 pb-20">
                     <button v-for="b in borderos.data" :key="b.id" @click="goShow(b.id)"
                         class="w-full bg-white rounded-xl border border-gray-200 p-3 text-left active:bg-gray-50">
-                        <div class="flex items-start justify-between mb-1">
-                            <p class="text-sm font-semibold text-gray-800">{{ b.number }}</p>
-                            <div class="flex items-center gap-1">
-                                <Tag v-if="wasRejectedBack(b)" value="Recusado" severity="danger" class="text-[10px]" />
-                                <Tag :value="statusOptions[b.status]" :severity="statusSeverity[b.status]" class="text-[10px]" />
+                        <div class="flex items-start justify-between gap-2 mb-1">
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-gray-800 whitespace-nowrap">{{ b.number }}</p>
+                                <Tag
+                                    v-if="wasRejectedBack(b)"
+                                    value="Recusado"
+                                    severity="danger"
+                                    class="!text-[9px] !px-1.5 !py-0 mt-1"
+                                />
                             </div>
+                            <Tag :value="statusOptions[b.status]" :severity="statusSeverity[b.status]" class="text-[10px] shrink-0" />
                         </div>
                         <p v-if="wasRejectedBack(b)" class="text-xs text-red-600 mb-1 line-clamp-2">{{ b.rejection_reason }}</p>
                         <p class="text-sm font-bold text-gray-700">{{ formatMoney(b.total_amount) }}</p>
@@ -103,19 +108,28 @@ function wasRejectedBack(bordero) {
             <!-- Desktop: tabela -->
             <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100">
                 <DataTable :value="borderos.data" striped-rows @row-click="(e) => goShow(e.data.id)" class="cursor-pointer">
-                    <Column field="number" header="Número" style="width: 140px">
+                    <Column field="number" header="Número" style="width: 8.5rem; min-width: 8.5rem">
                         <template #body="{ data }">
-                            <div class="flex items-center gap-2">
-                                <span class="font-medium">{{ data.number }}</span>
-                                <Tag v-if="wasRejectedBack(data)" value="Recusado" severity="danger" class="text-[10px]" />
+                            <div class="flex flex-col items-start gap-1 py-0.5">
+                                <span class="font-medium whitespace-nowrap leading-none">{{ data.number }}</span>
+                                <Tag
+                                    v-if="wasRejectedBack(data)"
+                                    value="Recusado"
+                                    severity="danger"
+                                    class="!text-[9px] !px-1.5 !py-0 leading-tight"
+                                />
                             </div>
                         </template>
                     </Column>
                     <Column field="description" header="Descrição">
                         <template #body="{ data }">
-                            <div>
-                                <span>{{ data.description || '—' }}</span>
-                                <p v-if="wasRejectedBack(data)" class="text-xs text-red-600 mt-0.5 line-clamp-1" :title="data.rejection_reason">
+                            <div class="min-w-0">
+                                <span class="text-gray-700">{{ data.description || '—' }}</span>
+                                <p
+                                    v-if="wasRejectedBack(data)"
+                                    class="text-xs text-red-600 mt-1 line-clamp-2"
+                                    :title="data.rejection_reason"
+                                >
                                     {{ data.rejection_reason }}
                                 </p>
                             </div>
