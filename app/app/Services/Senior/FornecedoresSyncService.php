@@ -54,12 +54,10 @@ class FornecedoresSyncService
                             $this->upsert($fornecedor, $inserted, $updated);
                         });
                     }
-                    $count = count($fornecedores);
-                    if ($count < $pageSize) {
+                    if (count($fornecedores) < $pageSize) {
                         break;
                     }
-                    // Senior usa indicePagina como offset 1-based na lista, não número da página.
-                    $indicePagina += $count;
+                    $indicePagina++;
                 } catch (SeniorException $e) {
                     $errors++;
                     Log::warning('[senior-fornecedor] erro na empresa', ['codEmp' => $codEmp, 'erro' => $e->getMessage()]);
