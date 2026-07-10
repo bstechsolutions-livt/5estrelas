@@ -75,6 +75,11 @@ class SeniorFornecedorClient
 XML;
     }
 
+    private function soapNs(): string
+    {
+        return self::SOAP_NS;
+    }
+
     public function parseResponse(string $xml): array
     {
         $clean = $this->stripNamespaces($xml);
