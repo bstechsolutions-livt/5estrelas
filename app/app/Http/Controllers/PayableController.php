@@ -28,6 +28,11 @@ class PayableController extends Controller
         // Sempre filtra por um status (default: pendente). Não existe "ver todos".
         $status = $request->input('status') ?: 'pendente';
         $query->where('status', $status);
+
+        // Título em borderô não aparece nos pendentes — o agrupamento é feito pelo borderô.
+        if ($status === 'pendente') {
+            $query->whereNull('bordero_id');
+        }
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
@@ -61,8 +66,12 @@ class PayableController extends Controller
             return response()->json($payables);
         }
 
-        // Totais por status
+        // Totais por status (pendente em borderô não entra na aba Pendentes)
         $totals = Payable::query()
+            ->where(function ($q) {
+                $q->where('status', '!=', 'pendente')
+                    ->orWhereNull('bordero_id');
+            })
             ->selectRaw("status, count(*) as count, coalesce(sum(amount), 0) as total")
             ->groupBy('status')
             ->get()
