@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Button from 'primevue/button'
@@ -23,18 +23,43 @@ const search = ref(props.filters?.search || '')
 let timer = null
 
 const hoverUsers = ref(null)
-const hoverStyle = ref({ top: '0px', left: '0px' })
+const hoverStyle = ref({ top: '0px', left: '0px', visibility: 'hidden' })
+const popoverRef = ref(null)
 let hideTimer = null
 
-function showUserList(event, dept) {
+async function showUserList(event, dept) {
     if (!dept.users?.length) return
     clearTimeout(hideTimer)
-    const rect = event.currentTarget.getBoundingClientRect()
-    hoverStyle.value = {
-        top: `${rect.bottom + 6}px`,
-        left: `${rect.left}px`,
-    }
+
     hoverUsers.value = dept.users
+    hoverStyle.value = { top: '0px', left: '0px', visibility: 'hidden' }
+
+    await nextTick()
+
+    const anchor = event.currentTarget.getBoundingClientRect()
+    const popover = popoverRef.value
+    const popoverHeight = popover?.offsetHeight ?? 0
+    const popoverWidth = popover?.offsetWidth ?? 0
+    const gap = 6
+    const margin = 8
+
+    let top = anchor.bottom + gap
+    if (top + popoverHeight > window.innerHeight - margin) {
+        top = anchor.top - popoverHeight - gap
+    }
+    top = Math.max(margin, Math.min(top, window.innerHeight - popoverHeight - margin))
+
+    let left = anchor.left
+    if (left + popoverWidth > window.innerWidth - margin) {
+        left = window.innerWidth - popoverWidth - margin
+    }
+    left = Math.max(margin, left)
+
+    hoverStyle.value = {
+        top: `${top}px`,
+        left: `${left}px`,
+        visibility: 'visible',
+    }
 }
 
 function scheduleHideUserList() {
@@ -126,6 +151,7 @@ function confirmDelete(dept) {
         <Teleport to="body">
             <div
                 v-if="hoverUsers?.length"
+                ref="popoverRef"
                 class="fixed z-[9999] min-w-[10rem] max-w-xs max-h-56 overflow-y-auto rounded-lg bg-gray-900 text-white text-xs py-2 px-3 shadow-lg"
                 :style="hoverStyle"
                 @mouseenter="keepUserList"
