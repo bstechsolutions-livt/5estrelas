@@ -56,6 +56,10 @@ function formatDate(d) {
 }
 
 const statusSeverity = { rascunho: 'secondary', aguardando_aprovacao: 'warn', aprovado: 'success', reprovado: 'danger', pago: 'success' }
+
+function wasRejectedBack(bordero) {
+    return bordero.status === 'rascunho' && !!bordero.rejection_reason
+}
 </script>
 
 <template>
@@ -83,8 +87,12 @@ const statusSeverity = { rascunho: 'secondary', aguardando_aprovacao: 'warn', ap
                         class="w-full bg-white rounded-xl border border-gray-200 p-3 text-left active:bg-gray-50">
                         <div class="flex items-start justify-between mb-1">
                             <p class="text-sm font-semibold text-gray-800">{{ b.number }}</p>
-                            <Tag :value="statusOptions[b.status]" :severity="statusSeverity[b.status]" class="text-[10px]" />
+                            <div class="flex items-center gap-1">
+                                <Tag v-if="wasRejectedBack(b)" value="Recusado" severity="danger" class="text-[10px]" />
+                                <Tag :value="statusOptions[b.status]" :severity="statusSeverity[b.status]" class="text-[10px]" />
+                            </div>
                         </div>
+                        <p v-if="wasRejectedBack(b)" class="text-xs text-red-600 mb-1 line-clamp-2">{{ b.rejection_reason }}</p>
                         <p class="text-sm font-bold text-gray-700">{{ formatMoney(b.total_amount) }}</p>
                         <p class="text-xs text-gray-400 mt-0.5">{{ b.items_count }} títulos · {{ formatDate(b.created_at) }}</p>
                     </button>
@@ -95,9 +103,23 @@ const statusSeverity = { rascunho: 'secondary', aguardando_aprovacao: 'warn', ap
             <!-- Desktop: tabela -->
             <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100">
                 <DataTable :value="borderos.data" striped-rows @row-click="(e) => goShow(e.data.id)" class="cursor-pointer">
-                    <Column field="number" header="Número" style="width: 120px" />
+                    <Column field="number" header="Número" style="width: 140px">
+                        <template #body="{ data }">
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium">{{ data.number }}</span>
+                                <Tag v-if="wasRejectedBack(data)" value="Recusado" severity="danger" class="text-[10px]" />
+                            </div>
+                        </template>
+                    </Column>
                     <Column field="description" header="Descrição">
-                        <template #body="{ data }">{{ data.description || '—' }}</template>
+                        <template #body="{ data }">
+                            <div>
+                                <span>{{ data.description || '—' }}</span>
+                                <p v-if="wasRejectedBack(data)" class="text-xs text-red-600 mt-0.5 line-clamp-1" :title="data.rejection_reason">
+                                    {{ data.rejection_reason }}
+                                </p>
+                            </div>
+                        </template>
                     </Column>
                     <Column field="items_count" header="Títulos" style="width: 90px" />
                     <Column field="total_amount" header="Total" style="width: 150px">
