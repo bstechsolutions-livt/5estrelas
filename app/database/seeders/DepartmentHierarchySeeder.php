@@ -67,53 +67,39 @@ class DepartmentHierarchySeeder extends Seeder
 
         $this->consolidateDuplicates($activeSlugs);
 
-        $legacyNames = [
-            'Matriz / Operações',
-            'Modernização / TI',
-            'Financeiro',
-            'Presidência',
-        ];
-
-        $names = array_column($departments, 1);
-
-        Department::whereNull('slug')->whereIn('name', $names)->update(['is_active' => false]);
-        Department::whereIn('name', $legacyNames)->update(['is_active' => false]);
-
         $this->command?->info('✅ Departamentos sincronizados com organograma (' . count($departments) . ' unidades).');
     }
 
-    /** Migra usuários e desativa slugs legados/duplicados. */
+    /** Migra usuários e remove slugs legados/duplicados. */
     private function consolidateDuplicates(array $activeSlugs): void
     {
         $canonicalDpRh = Department::where('slug', 'dp_rh')->first();
 
         foreach (['dprh', 'dp-rh'] as $legacySlug) {
             $legacy = Department::where('slug', $legacySlug)->first();
-            if (! $legacy || $legacy->slug === 'dp_rh') {
+            if (! $legacy) {
                 continue;
             }
-            if ($canonicalDpRh) {
-                \App\Models\User::where('department_id', $legacy->id)
-                    ->update(['department_id' => $canonicalDpRh->id]);
+            $this->purgeLegacyDepartment($legacy, $canonicalDpRh);
+        }
+
+        foreach (['diretoria', 'financeiro', 'matriz-operacoes', 'modernizacao-ti'] as $legacySlug) {
+            $legacy = Department::where('slug', $legacySlug)->first();
+            if ($legacy) {
+                $this->purgeLegacyDepartment($legacy);
             }
-            $legacy->update(['is_active' => false]);
+        }
+    }
+
+    private function purgeLegacyDepartment(Department $legacy, ?Department $migrateTo = null): void
+    {
+        if ($migrateTo) {
+            User::where('department_id', $legacy->id)->update(['department_id' => $migrateTo->id]);
+        } else {
+            User::where('department_id', $legacy->id)->update(['department_id' => null]);
         }
 
-        $diretoria = Department::where('slug', 'diretoria')->first();
-        if ($diretoria) {
-            \App\Models\User::where('department_id', $diretoria->id)->update(['department_id' => null]);
-            $diretoria->update(['is_active' => false]);
-        }
-
-        $financeiro = Department::where('slug', 'financeiro')->first();
-        if ($financeiro) {
-            \App\Models\User::where('department_id', $financeiro->id)->update(['department_id' => null]);
-            $financeiro->update(['is_active' => false]);
-        }
-
-        Department::whereNotIn('slug', $activeSlugs)
-            ->whereIn('slug', ['matriz-operacoes', 'modernizacao-ti'])
-            ->update(['is_active' => false]);
+        $legacy->delete();
     }
 
     private function findUser(string ...$emails): ?User

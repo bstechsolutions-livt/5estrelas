@@ -18,6 +18,12 @@ class DepartmentController extends Controller
             ->withCount('users')
             ->orderBy('name');
 
+        if ($request->boolean('inactive')) {
+            $query->where('is_active', false);
+        } else {
+            $query->where('is_active', true);
+        }
+
         if ($request->filled('search')) {
             $query->where('name', 'ilike', "%{$request->search}%");
         }
@@ -30,7 +36,10 @@ class DepartmentController extends Controller
 
         return Inertia::render('Departments/Index', [
             'departments' => $departments,
-            'filters' => ['search' => $request->search],
+            'filters' => [
+                'search' => $request->search,
+                'inactive' => $request->boolean('inactive'),
+            ],
             'approvalAreas' => ApprovalTrail::AREAS,
         ]);
     }
