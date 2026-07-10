@@ -289,8 +289,9 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             </div>
 
             <!-- Tabela -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 payables-table">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 payables-table overflow-hidden">
                 <DataTable :value="payables.data" striped-rows size="small" class="cursor-pointer w-full"
+                    table-style="table-layout: fixed; width: 100%"
                     :lazy="true" :paginator="true" :rows="payables.per_page" :total-records="payables.total"
                     :first="(payables.current_page - 1) * payables.per_page"
                     @page="onPage"
@@ -302,9 +303,9 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <input type="checkbox" :checked="isSelected(data.id)" @click.stop="toggleSelect(data.id)" class="w-4 h-4 cursor-pointer" />
                         </template>
                     </Column>
-                    <Column field="title_number" header="Nº" style="width: 6.5rem; min-width: 6.5rem">
+                    <Column field="title_number" header="Nº" style="width: 7%">
                         <template #body="{ data }">
-                            <div class="flex flex-col items-start gap-0.5 py-0.5" @click="goShow(data.id)">
+                            <div class="flex flex-col items-start gap-0.5 py-0.5 min-w-0" @click="goShow(data.id)">
                                 <span class="text-xs font-medium whitespace-nowrap leading-none" :title="data.title_number">{{ data.title_number }}</span>
                                 <Tag
                                     v-if="wasRejectedBack(data)"
@@ -315,41 +316,41 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             </div>
                         </template>
                     </Column>
-                    <Column header="Empresa" style="width: 8rem; min-width: 7rem" dusk="col-empresa">
+                    <Column header="Empresa" style="width: 9%" dusk="col-empresa">
                         <template #body="{ data }">
-                            <span class="text-xs text-gray-700 truncate block" :title="data.empresa_nome" @click="goShow(data.id)">{{ data.empresa_nome || '—' }}</span>
+                            <span class="cell-truncate text-xs text-gray-700" :title="data.empresa_nome" @click="goShow(data.id)">{{ data.empresa_nome || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="supplier_name" header="Fornecedor">
+                    <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '26%' : '22%' }">
                         <template #body="{ data }">
-                            <span class="text-xs truncate block" :title="data.supplier_name" @click="goShow(data.id)">{{ data.supplier_name }}</span>
+                            <span class="cell-truncate text-xs" :title="data.supplier_name" @click="goShow(data.id)">{{ data.supplier_name }}</span>
                         </template>
                     </Column>
-                    <Column field="description" header="Descrição" style="width: 11rem; min-width: 9rem">
+                    <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '26%' : '22%' }">
                         <template #body="{ data }">
-                            <span class="text-xs text-gray-600 truncate block" :title="data.description" @click="goShow(data.id)">{{ data.description || '—' }}</span>
+                            <span class="cell-truncate text-xs text-gray-600" :title="data.description" @click="goShow(data.id)">{{ data.description || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="amount" header="Valor" style="width: 6.5rem; min-width: 6.5rem">
+                    <Column field="amount" header="Valor" style="width: 10%">
                         <template #body="{ data }">
                             <span class="text-xs font-semibold whitespace-nowrap" @click="goShow(data.id)">{{ formatMoney(data.amount) }}</span>
                         </template>
                     </Column>
-                    <Column field="due_date" header="Vencimento" style="width: 5.5rem; min-width: 5.5rem">
+                    <Column field="due_date" header="Vencimento" style="width: 8%">
                         <template #body="{ data }">
                             <span class="text-xs whitespace-nowrap" @click="goShow(data.id)">{{ formatDate(data.due_date) }}</span>
                         </template>
                     </Column>
-                    <Column v-if="status !== 'pendente'" header="Borderô" style="width: 6rem; min-width: 6rem">
+                    <Column v-if="status !== 'pendente'" header="Borderô" style="width: 7%">
                         <template #body="{ data }">
                             <button v-if="data.bordero" @click.stop="router.visit(`/financeiro/borderos/${data.bordero.id}`)"
-                                class="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded hover:bg-blue-100 cursor-pointer whitespace-nowrap">
+                                class="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded hover:bg-blue-100 cursor-pointer whitespace-nowrap max-w-full truncate">
                                 {{ data.bordero.number }}
                             </button>
                             <span v-else class="text-xs text-gray-300" @click="goShow(data.id)">—</span>
                         </template>
                     </Column>
-                    <Column field="status" header="Status" style="width: 7.5rem; min-width: 7.5rem">
+                    <Column field="status" header="Status" :style="{ width: status === 'pendente' ? '9%' : '8%' }">
                         <template #body="{ data }">
                             <Tag :value="statusOptions[data.status]" :severity="statusSeverity[data.status]" class="!text-[10px] whitespace-nowrap" />
                         </template>
@@ -364,11 +365,23 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
 </template>
 
 <style scoped>
+.payables-table :deep(.p-datatable-wrapper) {
+    overflow-x: hidden;
+}
 .payables-table :deep(.p-datatable-tbody > tr > td),
 .payables-table :deep(.p-datatable-thead > tr > th) {
     font-size: 0.8125rem;
+    overflow: hidden;
 }
 .payables-table :deep(.p-datatable-tbody .p-tag) {
     white-space: nowrap;
+}
+.cell-truncate {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    min-width: 0;
 }
 </style>
