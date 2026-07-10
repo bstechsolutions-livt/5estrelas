@@ -221,4 +221,34 @@ class BorderoApprovalWorkflowTest extends TestCase
         $this->assertSame('aprovado', $payable->status);
         $this->assertSame('aprovado', $bordero->status);
     }
+
+    public function test_reprovar_bordero_devolve_titulos_para_pendente_e_bordero_para_rascunho(): void
+    {
+        $p1 = $this->payableComDocumento();
+        $p2 = $this->payableComDocumento();
+        $bordero = $this->borderoRascunho([$p1->id, $p2->id]);
+
+        $this->actingAs($this->sender)->post(
+            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao",
+            ['department_id' => $this->department->id]
+        );
+
+        $admin = $this->userWithPerm(['*', 'financeiro.contas_pagar.visualizar']);
+        $response = $this->actingAs($admin)->post("/financeiro/borderos/{$bordero->id}/reprovar", [
+            'reason' => 'Documentação incompleta no borderô',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $p1->refresh();
+        $p2->refresh();
+        $bordero->refresh();
+
+        $this->assertSame('pendente', $p1->status);
+        $this->assertSame('pendente', $p2->status);
+        $this->assertSame('Documentação incompleta no borderô', $p1->rejection_reason);
+        $this->assertSame('rascunho', $bordero->status);
+        $this->assertSame('Documentação incompleta no borderô', $bordero->rejection_reason);
+    }
 }

@@ -91,12 +91,6 @@ class Bordero extends Model
             return;
         }
 
-        if ($payables->contains(fn ($p) => $p->status === 'reprovado')) {
-            $this->update(['status' => 'reprovado']);
-
-            return;
-        }
-
         if ($payables->contains(fn ($p) => $p->status === 'aguardando_aprovacao')) {
             $this->update(['status' => 'aguardando_aprovacao']);
 
@@ -104,8 +98,17 @@ class Bordero extends Model
         }
 
         if ($payables->every(fn ($p) => in_array($p->status, ['pendente', 'em_preparacao'], true))) {
-            $this->update(['status' => 'rascunho']);
+            $this->update([
+                'status' => 'rascunho',
+                'sent_for_approval_at' => null,
+                'approved_at' => null,
+            ]);
         }
+    }
+
+    public function wasRejectedBack(): bool
+    {
+        return $this->status === 'rascunho' && filled($this->rejection_reason);
     }
 
     public static function generateNumber(): string

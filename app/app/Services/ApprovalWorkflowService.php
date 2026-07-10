@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ApprovalStep;
 use App\Models\ApprovalTrail;
+use App\Models\Bordero;
 use App\Models\Department;
 use App\Models\Notification;
 use App\Models\Payable;
@@ -63,6 +64,7 @@ class ApprovalWorkflowService
                 'status' => 'aguardando_aprovacao',
                 'prepared_by' => $payable->prepared_by ?? $sender->id,
                 'sent_for_approval_at' => now(),
+                'rejection_reason' => null,
             ]);
 
             PayableComment::create([
@@ -155,34 +157,65 @@ class ApprovalWorkflowService
             return ['success' => false, 'error' => 'Nenhuma etapa pendente.'];
         }
 
-        $step->update([
-            'status' => 'reprovado',
-            'resolved_by' => $rejector->id,
-            'resolved_at' => now(),
-            'comment' => $reason,
-        ]);
+        $stepLabel = ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name;
 
-        $payable->update([
-            'status' => 'reprovado',
-            'approved_by' => $rejector->id,
-            'rejection_reason' => $reason,
-        ]);
+        DB::transaction(function () use ($payable, $rejector, $reason, $step, $stepLabel) {
+            // Encerra o fluxo atual — na próxima submissão as etapas são recriadas.
+            ApprovalStep::where('payable_id', $payable->id)->delete();
 
-        PayableComment::create([
-            'payable_id' => $payable->id,
-            'user_id' => $rejector->id,
-            'body' => "Reprovado na etapa " . (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name) . ": {$reason}",
-            'type' => 'rejection',
-        ]);
+            $payable->update([
+                'status' => 'pendente',
+                'approved_by' => $rejector->id,
+                'rejection_reason' => $reason,
+                'sent_for_approval_at' => null,
+                'approved_at' => null,
+            ]);
+
+            PayableComment::create([
+                'payable_id' => $payable->id,
+                'user_id' => $rejector->id,
+                'body' => "Reprovado na etapa {$stepLabel} e devolvido para pendente: {$reason}",
+                'type' => 'rejection',
+            ]);
+
+            $this->syncBorderoAfterPayableReject($payable, $rejector, $reason);
+        });
 
         AuditLogger::log(
             event: 'contas_pagar.reprovado',
             module: 'financeiro.contas_pagar',
-            description: "Título {$payable->title_number} reprovado na etapa {$step->level_name}: {$reason}",
+            description: "Título {$payable->title_number} reprovado na etapa {$step->level_name} e devolvido para pendente: {$reason}",
             auditable: $payable,
         );
 
-        return ['success' => true, 'message' => 'Título reprovado.'];
+        return [
+            'success' => true,
+            'message' => 'Título devolvido para pendente. Corrija e reenvie para aprovação.',
+        ];
+    }
+
+    /** Após reprovação, borderô com títulos pendentes volta para rascunho. */
+    private function syncBorderoAfterPayableReject(Payable $payable, User $rejector, string $reason): void
+    {
+        if (! $payable->bordero_id) {
+            return;
+        }
+
+        $bordero = Bordero::find($payable->bordero_id);
+        if (! $bordero) {
+            return;
+        }
+
+        $bordero->syncStatusFromPayables();
+
+        if ($bordero->status === 'rascunho') {
+            $bordero->update([
+                'rejection_reason' => $reason,
+                'approved_by' => $rejector->id,
+                'sent_for_approval_at' => null,
+                'approved_at' => null,
+            ]);
+        }
     }
 
     public function currentStep(Payable $payable): ?ApprovalStep

@@ -264,7 +264,7 @@ class ApprovalWorkflowTest extends TestCase
 
     // ─── Reprovação ──────────────────────────────────────────────────────
 
-    public function test_reject_sets_payable_reprovado(): void
+    public function test_reject_devolve_titulo_para_pendente(): void
     {
         $sender = User::factory()->create(['is_active' => true]);
         $payable = $this->makePayable();
@@ -274,11 +274,31 @@ class ApprovalWorkflowTest extends TestCase
         $result = $this->workflow->reject($payable, $admin, 'Valor não confere com orçamento');
 
         $this->assertTrue($result['success']);
-        $this->assertEquals('reprovado', $payable->fresh()->status);
+        $payable->refresh();
+        $this->assertEquals('pendente', $payable->status);
+        $this->assertEquals('Valor não confere com orçamento', $payable->rejection_reason);
+        $this->assertNull($payable->sent_for_approval_at);
+        $this->assertEquals(0, ApprovalStep::where('payable_id', $payable->id)->count());
         $this->assertDatabaseHas('payable_comments', [
             'payable_id' => $payable->id,
             'type' => 'rejection',
         ]);
+    }
+
+    public function test_reenvio_apos_reprovacao_limpa_motivo(): void
+    {
+        $sender = User::factory()->create(['is_active' => true]);
+        $payable = $this->makePayable();
+        $admin = $this->userWithPerm('*');
+
+        $this->workflow->sendForApproval($payable, $sender, 'matriz');
+        $this->workflow->reject($payable, $admin, 'Falta documento');
+
+        $this->workflow->sendForApproval($payable->fresh(), $sender, 'matriz');
+
+        $payable->refresh();
+        $this->assertEquals('aguardando_aprovacao', $payable->status);
+        $this->assertNull($payable->rejection_reason);
     }
 
     // ─── Notificação ─────────────────────────────────────────────────────

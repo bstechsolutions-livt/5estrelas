@@ -201,6 +201,9 @@ class BorderoController extends Controller
             $bordero->update([
                 'status' => 'aguardando_aprovacao',
                 'sent_for_approval_at' => now(),
+                'rejection_reason' => null,
+                'approved_by' => null,
+                'approved_at' => null,
             ]);
         });
 
@@ -277,13 +280,6 @@ class BorderoController extends Controller
         $bordero->refresh();
         $bordero->load('payables');
         $bordero->syncStatusFromPayables();
-
-        if ($bordero->status === 'reprovado') {
-            $bordero->update([
-                'approved_by' => $request->user()->id,
-                'rejection_reason' => $data['reason'],
-            ]);
-        }
 
         AuditLogger::log(
             event: 'bordero.reprovado',

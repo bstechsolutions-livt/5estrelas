@@ -269,6 +269,12 @@ class Payable extends Model
         return $this->senior_missing_at !== null;
     }
 
+    /** Título foi reprovado no fluxo e devolvido para pendente (aguarda correção). */
+    public function wasRejectedBack(): bool
+    {
+        return $this->status === 'pendente' && filled($this->rejection_reason);
+    }
+
     /**
      * A3 (feedback do cliente): a tela principal mostra a EMPRESA por NOME,
      * nunca por código. O nome vem da tabela de filiais/empresas espelhada da

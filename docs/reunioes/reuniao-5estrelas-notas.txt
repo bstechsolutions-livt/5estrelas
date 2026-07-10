@@ -1,0 +1,36 @@
+Contratos => Aparecendo NaN, no KPI "Comprometido/Mês"
+
+Limpar toda base que for dados mockados, para começar utilizar de fato
+
+mostrar o que foi inputado automatico
+
+
+
+*financeiro  
+  solicitar as informações necessárias a aparecer no contas a pagar
+  contas a pagar, mudar empresa pra pegar o final, conseguir criar apeldo
+  excluir apenas um titulo do bordero
+  tela para ver vários de uma vez, contas a pagar
+  Ficar pendente e alertar quando anexou boleto e não a nota, ou vice versa. 
+  colocar prioridade no pagamento, e incluir sla
+  Dashboard + viseão de autorização
+  puxar plano de contas pagar e receberteste
+  fazer dre por plano de contas
+  Quando reprovar, cancelar tambem na senior
+  Quando aprovar, marcar como pago na senior
+  Liberação de filial diretamente pela intranet
+  Colocar para separar por departamento o contas a pegar, pra saber quem é quem
+  Permitir selecionar vários arquivos ao mesmo tempo, anexos do título
+  Quando reprovar tem que voltar pro pendente  
+  Quando seguiu o fluxo baseado ne quem ta enviando pra aprovação
+  Remover na configuração de alçada, o solicitante, pega do departamento que está configurado de quem solicitou
+  O que já tem bordero, retirar dos pendentes
+  Bordero, não está seguindo o fluxo de aprovação
+  Criar bordero automático, por natureza de gasto
+  Verificar conta banco na conciliação, 
+  Depois de conciliar, marcar na senior que foi conciliado
+  Conciliação com mais de um ofx
+  Conferir conciliação de transferencia
+  
+  
+  * Disponibilizar pré compras

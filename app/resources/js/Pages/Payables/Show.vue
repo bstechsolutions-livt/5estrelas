@@ -237,6 +237,9 @@ const canApprove = props.payable.status === 'aguardando_aprovacao' && !inBordero
 
 // Trava (feedback do cliente): não envia pra aprovação sem ao menos 1 documento.
 const hasDocuments = computed(() => (props.payable.documents?.length || 0) > 0)
+const wasRejectedBack = computed(() =>
+    props.payable.status === 'pendente' && !!props.payable.rejection_reason
+)
 
 // Departamento de origem (seletor ao enviar pra aprovação)
 const showDeptSelect = ref(false)
@@ -341,6 +344,18 @@ function submitDueDate() {
                     </p>
                 </div>
                 <p class="text-xl font-bold text-gray-800">{{ formatMoney(payable.amount) }}</p>
+            </div>
+
+            <div
+                v-if="wasRejectedBack"
+                class="bg-red-50 border border-red-200 rounded-xl p-4 mb-4"
+                dusk="payable-rejection-alert"
+            >
+                <h3 class="text-sm font-semibold text-red-800 mb-1 flex items-center gap-2">
+                    <i class="pi pi-exclamation-triangle"></i>
+                    Título recusado — precisa ser corrigido e reenviado
+                </h3>
+                <p class="text-sm text-red-700">{{ payable.rejection_reason }}</p>
             </div>
 
             <div :class="isMobile ? 'space-y-4' : (showSidebar) ? 'grid grid-cols-3 gap-6' : ''">

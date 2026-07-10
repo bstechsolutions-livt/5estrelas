@@ -113,6 +113,20 @@ onMounted(reloadIfStale)
                 <p class="text-2xl font-bold text-gray-800">{{ formatMoney(bordero.total_amount) }}</p>
             </div>
 
+            <!-- Aviso: reprovado e devolvido para correção -->
+            <div
+                v-if="bordero.rejection_reason && isDraft"
+                class="bg-red-50 border border-red-200 rounded-xl p-4 mb-4"
+                dusk="bordero-rejection-alert"
+            >
+                <h3 class="text-sm font-semibold text-red-800 mb-1 flex items-center gap-2">
+                    <i class="pi pi-exclamation-triangle"></i>
+                    Borderô recusado — precisa ser refeito
+                </h3>
+                <p class="text-sm text-red-700">{{ bordero.rejection_reason }}</p>
+                <p class="text-xs text-red-600 mt-2">Corrija os títulos abaixo e envie novamente para aprovação.</p>
+            </div>
+
             <!-- Envio para aprovação (mesmo fluxo do título individual) -->
             <div v-if="isDraft" class="bg-white rounded-xl border border-gray-100 p-4 mb-4">
                 <h3 class="text-sm font-semibold text-gray-700 mb-3">Enviar para aprovação</h3>
@@ -189,10 +203,20 @@ onMounted(reloadIfStale)
                                 <div class="flex items-center gap-2">
                                     <span class="text-xs font-mono text-gray-400">{{ row.payable.title_number }}</span>
                                     <p class="text-sm font-medium text-gray-800 truncate">{{ row.payable.supplier_name }}</p>
-                                    <Tag :value="row.payable.status" severity="secondary" class="text-[10px]" />
+                                    <Tag
+                                        v-if="row.payable.rejection_reason"
+                                        value="Recusado"
+                                        severity="danger"
+                                        class="text-[10px]"
+                                        v-tooltip.top="row.payable.rejection_reason"
+                                    />
+                                    <Tag v-else :value="row.payable.status" severity="secondary" class="text-[10px]" />
                                     <i v-if="row.payable.documents_count" class="pi pi-paperclip text-gray-300 text-xs" />
                                 </div>
                                 <p class="text-xs text-gray-500">Venc: {{ formatDate(row.payable.due_date) }} · {{ row.payable.branch?.name || '' }}</p>
+                                <p v-if="row.payable.rejection_reason" class="text-xs text-red-600 mt-1 line-clamp-2">
+                                    {{ row.payable.rejection_reason }}
+                                </p>
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="text-sm font-semibold text-gray-700">{{ formatMoney(row.payable.amount) }}</span>
