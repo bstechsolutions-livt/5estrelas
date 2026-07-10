@@ -14,8 +14,12 @@ class DepartmentController extends Controller
     public function index(Request $request)
     {
         $query = Department::query()
-            ->with(['manager:id,name', 'director:id,name'])
-            ->withCount('users')
+            ->with([
+                'manager:id,name',
+                'director:id,name',
+                'users' => fn ($q) => $q->where('is_active', true)->orderBy('name')->select('id', 'name', 'department_id'),
+            ])
+            ->withCount(['users' => fn ($q) => $q->where('is_active', true)])
             ->orderBy('name');
 
         if ($request->boolean('inactive')) {

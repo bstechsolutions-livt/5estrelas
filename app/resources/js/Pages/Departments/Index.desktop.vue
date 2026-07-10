@@ -22,6 +22,31 @@ function areaLabel(key) {
 const search = ref(props.filters?.search || '')
 let timer = null
 
+const hoverUsers = ref(null)
+const hoverStyle = ref({ top: '0px', left: '0px' })
+let hideTimer = null
+
+function showUserList(event, dept) {
+    if (!dept.users?.length) return
+    clearTimeout(hideTimer)
+    const rect = event.currentTarget.getBoundingClientRect()
+    hoverStyle.value = {
+        top: `${rect.bottom + 6}px`,
+        left: `${rect.left}px`,
+    }
+    hoverUsers.value = dept.users
+}
+
+function scheduleHideUserList() {
+    hideTimer = setTimeout(() => {
+        hoverUsers.value = null
+    }, 120)
+}
+
+function keepUserList() {
+    clearTimeout(hideTimer)
+}
+
 watch(search, (val) => {
     clearTimeout(timer)
     timer = setTimeout(() => {
@@ -66,7 +91,18 @@ function confirmDelete(dept) {
                             <span class="text-xs text-gray-600">{{ data.manager?.name || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="users_count" header="Usuários" sortable style="width: 120px" />
+                    <Column header="Usuários" sortable style="width: 120px">
+                        <template #body="{ data }">
+                            <span
+                                class="inline-block min-w-[1.5rem]"
+                                :class="data.users_count ? 'cursor-default border-b border-dotted border-gray-400 text-gray-800' : 'text-gray-400'"
+                                @mouseenter="showUserList($event, data)"
+                                @mouseleave="scheduleHideUserList"
+                            >
+                                {{ data.users_count }}
+                            </span>
+                        </template>
+                    </Column>
                     <Column field="is_active" header="Status" style="width: 100px">
                         <template #body="{ data }">
                             <Tag :value="data.is_active ? 'Ativo' : 'Inativo'" :severity="data.is_active ? 'success' : 'secondary'" />
@@ -86,5 +122,19 @@ function confirmDelete(dept) {
                 </DataTable>
             </div>
         </div>
+
+        <Teleport to="body">
+            <div
+                v-if="hoverUsers?.length"
+                class="fixed z-[9999] min-w-[10rem] max-w-xs max-h-56 overflow-y-auto rounded-lg bg-gray-900 text-white text-xs py-2 px-3 shadow-lg"
+                :style="hoverStyle"
+                @mouseenter="keepUserList"
+                @mouseleave="scheduleHideUserList"
+            >
+                <p v-for="user in hoverUsers" :key="user.id" class="leading-5 py-0.5">
+                    {{ user.name }}
+                </p>
+            </div>
+        </Teleport>
     </AppLayout>
 </template>

@@ -79,6 +79,12 @@ function confirmDelete() {
 
         <!-- Bottom sheet ações -->
         <BottomSheet v-model="actionsOpen" :title="selected?.name || ''">
+            <div v-if="selected?.users?.length" class="mb-3 px-1">
+                <p class="text-xs font-medium text-gray-500 mb-1">Usuários ({{ selected.users.length }})</p>
+                <p v-for="user in selected.users" :key="user.id" class="text-sm text-gray-700 leading-6">
+                    {{ user.name }}
+                </p>
+            </div>
             <div class="space-y-1">
                 <button @click="goEdit(selected?.id); actionsOpen = false" class="w-full flex items-center gap-3 p-3 rounded-lg active:bg-gray-100 text-left">
                     <i class="pi pi-pencil text-gray-500"></i>
