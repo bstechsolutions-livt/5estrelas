@@ -23,7 +23,6 @@ const statusList = [
     { label: 'Rascunho', value: 'rascunho' },
     { label: 'Aguardando Aprovação', value: 'aguardando_aprovacao' },
     { label: 'Aprovados', value: 'aprovado' },
-    { label: 'Reprovados', value: 'reprovado' },
     { label: 'Pagos', value: 'pago' },
 ]
 
@@ -35,12 +34,20 @@ function filterStatus(s) {
 }
 
 onMounted(() => {
+    if (status.value === 'reprovado') {
+        status.value = 'rascunho'
+        localStorage.setItem(STORAGE_KEY, 'rascunho')
+        router.get('/financeiro/borderos', { status: 'rascunho' }, { preserveState: true, replace: true })
+        return
+    }
+
     // Visita "limpa" (sem query): restaura último status usado
     if (!window.location.search) {
         const cached = localStorage.getItem(STORAGE_KEY)
-        if (cached && cached !== (props.filters?.status || 'aguardando_aprovacao')) {
-            status.value = cached
-            router.get('/financeiro/borderos', { status: cached }, { preserveState: true, replace: true })
+        const normalized = cached === 'reprovado' ? 'rascunho' : cached
+        if (normalized && normalized !== (props.filters?.status || 'aguardando_aprovacao')) {
+            status.value = normalized
+            router.get('/financeiro/borderos', { status: normalized }, { preserveState: true, replace: true })
         }
     }
 })

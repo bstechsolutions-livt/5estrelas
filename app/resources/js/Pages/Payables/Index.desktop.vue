@@ -34,7 +34,6 @@ const statusList = [
     { label: 'Em Preparação', value: 'em_preparacao', color: 'blue' },
     { label: 'Aguardando Aprovação', value: 'aguardando_aprovacao', color: 'orange' },
     { label: 'Aprovados', value: 'aprovado', color: 'green' },
-    { label: 'Reprovados', value: 'reprovado', color: 'red' },
     { label: 'Pagos', value: 'pago', color: 'emerald' },
 ]
 
@@ -113,13 +112,19 @@ function onPage(event) {
 
 // Restaura scroll ao voltar do detalhe + filtros do cache em visita "limpa"
 onMounted(() => {
+    if (status.value === 'reprovado') {
+        status.value = 'pendente'
+        applyFilters()
+        return
+    }
+
     // Sem query string na URL = chegou pelo menu. Restaura último filtro usado.
     if (!window.location.search) {
         const cached = localStorage.getItem(STORAGE_KEY)
         if (cached) {
             try {
                 const f = JSON.parse(cached)
-                status.value = f.status || 'pendente'
+                status.value = f.status === 'reprovado' ? 'pendente' : (f.status || 'pendente')
                 search.value = f.search || ''
                 branchId.value = f.branch_id || null
                 amountMin.value = f.amount_min ? Number(f.amount_min) : null

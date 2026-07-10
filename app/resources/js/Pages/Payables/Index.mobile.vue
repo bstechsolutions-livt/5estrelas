@@ -32,7 +32,6 @@ const statusList = [
     { label: 'Preparação', value: 'em_preparacao' },
     { label: 'Aprovação', value: 'aguardando_aprovacao' },
     { label: 'Aprovados', value: 'aprovado' },
-    { label: 'Reprovados', value: 'reprovado' },
     { label: 'Pagos', value: 'pago' },
 ]
 
@@ -81,13 +80,19 @@ function selectStatus(s) {
 
 // Restaura último filtro usado em visita "limpa" (sem query string)
 onMounted(() => {
+    if (status.value === 'reprovado') {
+        status.value = 'pendente'
+        applyFilters()
+        return
+    }
+
     if (!window.location.search) {
         const cached = localStorage.getItem(STORAGE_KEY)
         if (cached) {
             try {
                 const f = JSON.parse(cached)
                 restoring = true
-                status.value = f.status || 'pendente'
+                status.value = f.status === 'reprovado' ? 'pendente' : (f.status || 'pendente')
                 search.value = f.search || ''
                 branchId.value = f.branch_id || null
                 amountMin.value = f.amount_min ? Number(f.amount_min) : null
