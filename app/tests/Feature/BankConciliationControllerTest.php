@@ -17,7 +17,7 @@ class BankConciliationControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function activeUser(array $keys = ['financeiro.contas_pagar.visualizar']): User
+    private function activeUser(array $keys = ['financeiro.contas_pagar.visualizar', 'financeiro.conciliacao.visualizar']): User
     {
         $user = User::factory()->create(['is_active' => true]);
         foreach ($keys as $key) {

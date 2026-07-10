@@ -38,6 +38,12 @@ class BorderoApprovalWorkflowTest extends TestCase
                 ['label' => 'Visualizar', 'module' => 'financeiro']
             )->id
         );
+        $this->gestorDept->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.borderos.visualizar'],
+                ['label' => 'Borderôs', 'module' => 'financeiro']
+            )->id
+        );
         $this->gerente = User::factory()->create(['name' => 'Gerente Borderô', 'is_active' => true]);
         $this->gerente->permissions()->attach(
             Permission::firstOrCreate(
@@ -54,7 +60,11 @@ class BorderoApprovalWorkflowTest extends TestCase
             'manager_id' => $this->gestorDept->id,
         ])->save();
 
-        $this->sender = $this->userWithPerm(['financeiro.contas_pagar.visualizar', 'financeiro.contas_pagar.preparar']);
+        $this->sender = $this->userWithPerm([
+            'financeiro.contas_pagar.visualizar',
+            'financeiro.contas_pagar.preparar',
+            'financeiro.borderos.visualizar',
+        ]);
         $this->sender->forceFill(['department_id' => $this->department->id])->save();
 
         $financeiro = User::factory()->create(['name' => 'Financeiro', 'is_active' => true]);
@@ -187,6 +197,12 @@ class BorderoApprovalWorkflowTest extends TestCase
                 ['label' => 'Visualizar', 'module' => 'financeiro']
             )->id
         );
+        $outro->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.borderos.visualizar'],
+                ['label' => 'Borderôs', 'module' => 'financeiro']
+            )->id
+        );
         $denied = $this->actingAs($outro)->post("/financeiro/borderos/{$bordero->id}/aprovar");
         $denied->assertRedirect();
         $denied->assertSessionHas('error');
@@ -201,6 +217,12 @@ class BorderoApprovalWorkflowTest extends TestCase
             Permission::firstOrCreate(
                 ['key' => 'financeiro.contas_pagar.visualizar'],
                 ['label' => 'Visualizar', 'module' => 'financeiro']
+            )->id
+        );
+        $diretor->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.borderos.visualizar'],
+                ['label' => 'Borderôs', 'module' => 'financeiro']
             )->id
         );
         $this->actingAs($diretor)->post("/financeiro/borderos/{$bordero->id}/aprovar")->assertSessionHas('success');
@@ -268,7 +290,11 @@ class BorderoApprovalWorkflowTest extends TestCase
 
     public function test_enviar_bordero_bloqueia_sem_departamento_no_usuario(): void
     {
-        $semDept = $this->userWithPerm(['financeiro.contas_pagar.visualizar', 'financeiro.contas_pagar.preparar']);
+        $semDept = $this->userWithPerm([
+            'financeiro.contas_pagar.visualizar',
+            'financeiro.contas_pagar.preparar',
+            'financeiro.borderos.visualizar',
+        ]);
         $p1 = $this->payableComDocumento();
         $bordero = $this->borderoRascunho([$p1->id]);
 

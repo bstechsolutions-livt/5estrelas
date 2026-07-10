@@ -159,7 +159,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Financeiro - Conciliação Bancária (OFX) — ANTES do grupo genérico /financeiro/contas-pagar
-    Route::prefix('financeiro/contas-pagar/conciliacao')->middleware('permission:financeiro.contas_pagar.visualizar')->group(function () {
+    Route::prefix('financeiro/contas-pagar/conciliacao')->middleware('permission:financeiro.conciliacao.visualizar')->group(function () {
         Route::get('/', [BankConciliationController::class, 'index'])->name('bank-conciliation.index');
         Route::get('/search-payables', [BankConciliationController::class, 'searchPayables'])->name('bank-conciliation.search-payables');
         Route::get('/{importId}', [BankConciliationController::class, 'show'])->whereNumber('importId')->name('bank-conciliation.show');
@@ -190,7 +190,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Financeiro - Borderôs
-    Route::prefix('financeiro/borderos')->middleware('permission:financeiro.contas_pagar.visualizar')->group(function () {
+    Route::prefix('financeiro/borderos')->middleware('permission:financeiro.borderos.visualizar')->group(function () {
         Route::get('/', [BorderoController::class, 'index'])->name('borderos.index');
         Route::post('/', [BorderoController::class, 'store'])->name('borderos.store');
         Route::get('/{id}', [BorderoController::class, 'show'])->name('borderos.show');

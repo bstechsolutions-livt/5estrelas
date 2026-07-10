@@ -3,6 +3,7 @@ import { ref, watch, computed, onMounted } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import BottomSheet from '@/Components/Mobile/BottomSheet.vue'
+import { useAuth } from '@/composables/useAuth'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
@@ -15,6 +16,9 @@ const props = defineProps({
     branches: Array,
     statusOptions: Object,
 })
+
+const { can } = useAuth()
+const canBorderos = computed(() => can('financeiro.borderos.visualizar'))
 
 const STORAGE_KEY = 'payables_filters_mobile'
 
@@ -143,6 +147,7 @@ function goShow(id) {
 // Seleção pra criar borderô (mobile)
 const selectableStatuses = ['pendente', 'em_preparacao', 'reprovado']
 const canSelect = computed(() => selectableStatuses.includes(status.value))
+const canSelectBordero = computed(() => canSelect.value && canBorderos.value)
 const selectionMode = ref(false)
 const selected = ref([])
 const createSheetOpen = ref(false)
@@ -243,7 +248,7 @@ const currentTotal = computed(() => {
                     {{ activeFilterCount }}
                 </span>
             </button>
-            <button v-if="canSelect" @click="toggleSelectionMode"
+            <button v-if="canSelectBordero" @click="toggleSelectionMode"
                 :class="['w-11 h-11 rounded-lg border flex items-center justify-center',
                     selectionMode ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-300 text-gray-600']">
                 <i class="pi pi-check-square"></i>

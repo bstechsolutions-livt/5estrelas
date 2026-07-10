@@ -2,6 +2,7 @@
 import { ref, watch, computed, onMounted } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import { useAuth } from '@/composables/useAuth'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
@@ -18,6 +19,9 @@ const props = defineProps({
     branches: Array,
     statusOptions: Object,
 })
+
+const { can } = useAuth()
+const canBorderos = computed(() => can('financeiro.borderos.visualizar'))
 
 const STORAGE_KEY = 'payables_filters'
 
@@ -164,6 +168,7 @@ const selected = ref([])
 // Só pode selecionar títulos que estão livres pra agrupar
 const selectableStatuses = ['pendente', 'em_preparacao', 'reprovado']
 const canSelect = computed(() => selectableStatuses.includes(status.value))
+const canSelectBordero = computed(() => canSelect.value && canBorderos.value)
 
 function toggleSelect(id) {
     const i = selected.value.indexOf(id)
@@ -284,7 +289,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             </div>
 
             <!-- Barra de seleção pra borderô -->
-            <div v-if="canSelect && selected.length > 0" class="bg-blue-600 text-white rounded-xl p-3 mb-4 flex items-center justify-between">
+            <div v-if="canSelectBordero && selected.length > 0" class="bg-blue-600 text-white rounded-xl p-3 mb-4 flex items-center justify-between">
                 <span class="text-sm font-medium">{{ selected.length }} título(s) selecionado(s)</span>
                 <div class="flex items-center gap-2">
                     <InputText v-model="createBorderoForm.description" placeholder="Descrição do borderô (opcional)" class="w-72" />
@@ -303,7 +308,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
                     :rows-per-page-options="[20, 50, 100]"
                 >
-                    <Column v-if="canSelect" header="" style="width: 2.5rem">
+                    <Column v-if="canSelectBordero" header="" style="width: 2.5rem">
                         <template #body="{ data }">
                             <input type="checkbox" :checked="isSelected(data.id)" @click.stop="toggleSelect(data.id)" class="w-4 h-4 cursor-pointer" />
                         </template>
@@ -346,7 +351,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span class="text-xs whitespace-nowrap" @click="goShow(data.id)">{{ formatDate(data.due_date) }}</span>
                         </template>
                     </Column>
-                    <Column v-if="status !== 'pendente'" header="Borderô" style="width: 7%">
+                    <Column v-if="status !== 'pendente' && canBorderos" header="Borderô" style="width: 7%">
                         <template #body="{ data }">
                             <button v-if="data.bordero" @click.stop="router.visit(`/financeiro/borderos/${data.bordero.id}`)"
                                 class="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded hover:bg-blue-100 cursor-pointer whitespace-nowrap max-w-full truncate">

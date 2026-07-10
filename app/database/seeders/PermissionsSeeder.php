@@ -42,6 +42,8 @@ class PermissionsSeeder extends Seeder
             ['key' => 'financeiro.contas_pagar.aprovar', 'label' => 'Aprovar contas a pagar', 'module' => 'financeiro'],
             ['key' => 'financeiro.contas_pagar.alcada_gerenciar', 'label' => 'Gerenciar alçada do contas a pagar', 'module' => 'financeiro'],
             ['key' => 'financeiro.contas_pagar.editar_vencimento', 'label' => 'Editar vencimento de contas a pagar (financeiro)', 'module' => 'financeiro'],
+            ['key' => 'financeiro.borderos.visualizar', 'label' => 'Ver borderôs', 'module' => 'financeiro'],
+            ['key' => 'financeiro.conciliacao.visualizar', 'label' => 'Ver conciliação bancária', 'module' => 'financeiro'],
 
             // Backups
             ['key' => 'backups.gerenciar', 'label' => 'Gerenciar backups', 'module' => 'backups'],
