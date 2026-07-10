@@ -200,18 +200,20 @@ onMounted(reloadIfStale)
                             @click="openPayable(row.payable.id)"
                         >
                             <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs font-mono text-gray-400">{{ row.payable.title_number }}</span>
-                                    <p class="text-sm font-medium text-gray-800 truncate">{{ row.payable.supplier_name }}</p>
+                                <div class="flex flex-col items-start gap-0.5">
+                                    <span class="text-xs font-mono text-gray-600 whitespace-nowrap">{{ row.payable.title_number }}</span>
+                                    <p class="text-sm font-medium text-gray-800 truncate w-full">{{ row.payable.supplier_name }}</p>
                                     <Tag
                                         v-if="row.payable.rejection_reason"
                                         value="Recusado"
                                         severity="danger"
-                                        class="text-[10px]"
+                                        class="!text-[9px] !px-1.5 !py-0"
                                         v-tooltip.top="row.payable.rejection_reason"
                                     />
-                                    <Tag v-else :value="row.payable.status" severity="secondary" class="text-[10px]" />
-                                    <i v-if="row.payable.documents_count" class="pi pi-paperclip text-gray-300 text-xs" />
+                                    <Tag v-else :value="row.payable.status" severity="secondary" class="!text-[9px]" />
+                                    <span v-if="row.payable.documents_count" class="inline-flex items-center gap-1 text-gray-300 text-xs">
+                                        <i class="pi pi-paperclip" />
+                                    </span>
                                 </div>
                                 <p class="text-xs text-gray-500">Venc: {{ formatDate(row.payable.due_date) }} · {{ row.payable.branch?.name || '' }}</p>
                                 <p v-if="row.payable.rejection_reason" class="text-xs text-red-600 mt-1 line-clamp-2">

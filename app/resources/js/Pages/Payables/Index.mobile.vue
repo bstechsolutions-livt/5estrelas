@@ -182,6 +182,10 @@ function formatDate(d) {
     return new Date(d).toLocaleDateString('pt-BR')
 }
 
+function wasRejectedBack(payable) {
+    return payable.status === 'pendente' && !!payable.rejection_reason
+}
+
 const statusSeverity = { pendente: 'warn', em_preparacao: 'info', aguardando_aprovacao: 'warn', aprovado: 'success', reprovado: 'danger', pago: 'success' }
 
 const currentTotal = computed(() => {
@@ -261,8 +265,17 @@ const currentTotal = computed(() => {
                     <span class="text-xs text-gray-400">Venc: {{ formatDate(p.due_date) }}</span>
                 </div>
                 <p v-if="p.description" class="text-[11px] text-gray-500 truncate mt-1">{{ p.description }}</p>
-                <p v-if="p.title_number" class="text-[11px] text-gray-400 mt-1">{{ p.title_number }} · {{ p.branch?.name || '' }}</p>
-                <span v-if="p.bordero" class="inline-block mt-1 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                <p v-if="p.title_number" class="text-[11px] text-gray-500 mt-1 flex items-center gap-1.5">
+                    <span class="whitespace-nowrap">{{ p.title_number }}</span>
+                    <span v-if="p.branch?.name" class="text-gray-400">· {{ p.branch.name }}</span>
+                </p>
+                <Tag
+                    v-if="wasRejectedBack(p)"
+                    value="Recusado"
+                    severity="danger"
+                    class="!text-[9px] !px-1.5 !py-0 mt-1"
+                />
+                <span v-if="status !== 'pendente' && p.bordero" class="inline-block mt-1 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
                     {{ p.bordero.number }}
                 </span>
             </button>
