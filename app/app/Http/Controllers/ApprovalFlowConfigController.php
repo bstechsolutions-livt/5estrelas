@@ -32,6 +32,7 @@ class ApprovalFlowConfigController extends Controller
                     'default_user_name' => $l->defaultUser?->name,
                     'from_department' => $l->level_name === 'departamento',
                     'department_fallback' => $l->level_name === 'diretoria',
+                    'from_finance_department' => $l->level_name === 'financeiro',
                 ])->values(),
             ])->values();
 
@@ -54,7 +55,7 @@ class ApprovalFlowConfigController extends Controller
 
         foreach ($data['levels'] as $level) {
             $trail = ApprovalTrail::find($level['id']);
-            if (! $trail || $trail->level_name === 'departamento') {
+            if (! $trail || in_array($trail->level_name, ['departamento', 'financeiro'], true)) {
                 continue;
             }
 

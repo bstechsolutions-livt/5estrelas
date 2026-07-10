@@ -24,7 +24,7 @@ watch(() => page.props.flash, (flash) => {
 const editableLevels = computed(() =>
     props.trails.flatMap(t =>
         t.levels
-            .filter(l => !l.from_department)
+            .filter(l => !l.from_department && !l.from_finance_department)
             .map(l => ({ id: l.id, default_user_id: l.default_user_id }))
     )
 )
@@ -70,6 +70,7 @@ function setUserForLevel(levelId, userId) {
                 <ul class="list-disc pl-4 space-y-0.5 text-blue-700">
                     <li><strong>Departamento (1ª etapa):</strong> gestor cadastrado no departamento do remetente.</li>
                     <li><strong>Diretoria:</strong> diretor do departamento, se configurado; senão o padrão da área abaixo.</li>
+                    <li><strong>Financeiro (auditoria):</strong> qualquer usuário vinculado ao departamento <a href="/departamentos" class="underline">Financeiro</a>.</li>
                 </ul>
             </div>
 
@@ -96,6 +97,15 @@ function setUserForLevel(levelId, userId) {
                             >
                                 <i class="pi pi-building text-gray-400 mr-1" />
                                 Gestor do departamento
+                            </div>
+
+                            <div
+                                v-else-if="level.from_finance_department"
+                                class="w-64 text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2"
+                                dusk="level-from-finance-department"
+                            >
+                                <i class="pi pi-building text-gray-400 mr-1" />
+                                Equipe do dept. Financeiro
                             </div>
 
                             <Select

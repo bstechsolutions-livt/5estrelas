@@ -330,16 +330,27 @@ class ApprovalWorkflowService
 
     public function myPendingApprovals(User $user): \Illuminate\Database\Eloquent\Collection
     {
-        // Steps assigned diretamente ao user
-        $directIds = ApprovalStep::where('assigned_to', $user->id)
+        $payableIds = ApprovalStep::where('assigned_to', $user->id)
             ->where('status', 'pendente')
             ->pluck('payable_id');
 
-        // Steps onde o user é substituto do presidente (se step é presidencia e o assigned está ausente)
-        // Por enquanto inclui os diretos; futuramente verifica ausência
-        $payableIds = $directIds->unique();
+        if ($this->userBelongsToFinanceDepartment($user)) {
+            $financePayables = ApprovalStep::where('level_name', 'financeiro')
+                ->where('status', 'pendente')
+                ->pluck('payable_id');
+            $payableIds = $payableIds->merge($financePayables);
+        }
 
-        return Payable::whereIn('id', $payableIds)
+        if ($user->hasPermission('*') === false) {
+            $presidencyIds = ApprovalStep::where('level_name', 'presidencia')
+                ->where('status', 'pendente')
+                ->pluck('payable_id');
+            if ($presidencyIds->isNotEmpty() && $this->isPresidentSubstitute($user)) {
+                $payableIds = $payableIds->merge($presidencyIds);
+            }
+        }
+
+        return Payable::whereIn('id', $payableIds->unique())
             ->where('status', 'aguardando_aprovacao')
             ->with(['branch:id,name', 'preparer:id,name'])
             ->orderByDesc('sent_for_approval_at')
@@ -394,8 +405,11 @@ class ApprovalWorkflowService
             $level = $item['level'];
             $trailArea = $item['trail_area'];
             $assigneeId = $this->resolveAssigneeId($level, $department, $trailArea);
-            $assigneeName = $assigneeId ? User::whereKey($assigneeId)->value('name') : null;
+            $assigneeName = $this->resolveAssigneeName($level, $assigneeId);
             $roleLabel = $this->effectiveRoleLabel($level, $department, $trailArea);
+            $configured = $level->level_name === 'financeiro'
+                ? (Department::financeApprovers()->exists() || $assigneeId !== null)
+                : $assigneeId !== null;
             $steps[] = [
                 'order' => $order++,
                 'level_name' => $level->level_name,
@@ -403,7 +417,7 @@ class ApprovalWorkflowService
                 'role_label' => $roleLabel,
                 'assignee_id' => $assigneeId,
                 'assignee_name' => $assigneeName,
-                'configured' => $assigneeId !== null,
+                'configured' => $configured,
             ];
         }
 
@@ -505,6 +519,14 @@ class ApprovalWorkflowService
             return $department->director_id;
         }
 
+        if ($level->level_name === 'financeiro') {
+            if (Department::financeApprovers()->exists()) {
+                return null;
+            }
+
+            return $level->default_user_id;
+        }
+
         return $level->default_user_id;
     }
 
@@ -542,6 +564,26 @@ class ApprovalWorkflowService
         return $level->role_label;
     }
 
+    private function resolveAssigneeName(ApprovalTrail $level, ?int $assigneeId): ?string
+    {
+        if ($level->level_name === 'financeiro') {
+            if (Department::financeApprovers()->exists()) {
+                $count = Department::financeApprovers()->count();
+
+                return "Equipe Financeiro ({$count})";
+            }
+        }
+
+        return $assigneeId ? User::whereKey($assigneeId)->value('name') : null;
+    }
+
+    private function userBelongsToFinanceDepartment(User $user): bool
+    {
+        $financeId = Department::financeDepartmentId();
+
+        return $financeId && $user->department_id === $financeId;
+    }
+
     /**
      * Verifica se o usuário pode aprovar este step.
      *
@@ -560,6 +602,11 @@ class ApprovalWorkflowService
 
         // Caso 2: wildcard (admin)
         if ($approver->hasPermission('*')) {
+            return true;
+        }
+
+        // Etapa financeiro: qualquer integrante do departamento Financeiro
+        if ($step->level_name === 'financeiro' && $this->userBelongsToFinanceDepartment($approver)) {
             return true;
         }
 
@@ -628,24 +675,37 @@ class ApprovalWorkflowService
 
     private function notifyApprover(ApprovalStep $step, Payable $payable, User $sender): void
     {
-        $notification = Notification::create([
-            'user_id' => $step->assigned_to,
-            'title' => 'Aprovação pendente',
-            'body' => "Título {$payable->title_number} (R$ " . number_format($payable->amount, 2, ',', '.') . ") aguarda sua aprovação na etapa: " . (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name),
-            'type' => 'approval_pending',
-            'link' => "/financeiro/contas-pagar/{$payable->id}",
-            'data' => [
-                'payable_id' => $payable->id,
-                'step_id' => $step->id,
-                'level' => $step->level_name,
-            ],
-        ]);
+        $recipients = collect();
 
-        if (class_exists(NotificationCreated::class)) {
-            try {
-                event(new NotificationCreated($notification));
-            } catch (\Throwable $e) {
-                // Broadcast pode falhar se Reverb não estiver rodando (ambiente de teste)
+        if ($step->level_name === 'financeiro') {
+            $recipients = Department::financeApprovers()->pluck('id');
+            if ($recipients->isEmpty() && $step->assigned_to) {
+                $recipients = collect([$step->assigned_to]);
+            }
+        } elseif ($step->assigned_to) {
+            $recipients = collect([$step->assigned_to]);
+        }
+
+        foreach ($recipients as $userId) {
+            $notification = Notification::create([
+                'user_id' => $userId,
+                'title' => 'Aprovação pendente',
+                'body' => "Título {$payable->title_number} (R$ " . number_format($payable->amount, 2, ',', '.') . ") aguarda sua aprovação na etapa: " . (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name),
+                'type' => 'approval_pending',
+                'link' => "/financeiro/contas-pagar/{$payable->id}",
+                'data' => [
+                    'payable_id' => $payable->id,
+                    'step_id' => $step->id,
+                    'level' => $step->level_name,
+                ],
+            ]);
+
+            if (class_exists(NotificationCreated::class)) {
+                try {
+                    event(new NotificationCreated($notification));
+                } catch (\Throwable $e) {
+                    // Broadcast pode falhar se Reverb não estiver rodando (ambiente de teste)
+                }
             }
         }
     }

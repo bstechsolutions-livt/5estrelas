@@ -11,6 +11,8 @@ class Department extends Model
 {
     use Auditable;
 
+    public const FINANCE_SLUG = 'financeiro';
+
     protected $fillable = ['name', 'slug', 'is_active', 'area_key', 'manager_id', 'director_id'];
 
     protected $casts = [
@@ -59,5 +61,19 @@ class Department extends Model
     public function director(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'director_id');
+    }
+
+    public static function financeDepartmentId(): ?int
+    {
+        return static::where('slug', self::FINANCE_SLUG)->where('is_active', true)->value('id');
+    }
+
+    public static function financeApprovers(): \Illuminate\Database\Eloquent\Builder
+    {
+        $financeId = self::financeDepartmentId();
+
+        return User::query()
+            ->where('is_active', true)
+            ->when($financeId, fn ($q) => $q->where('department_id', $financeId), fn ($q) => $q->whereRaw('1 = 0'));
     }
 }
