@@ -7,78 +7,81 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * Configura os departamentos com hierarquia conforme Fluxo de Aprovação v3.0.
- * Vincula gestores e diretores conforme o documento.
+ * Departamentos + gestor/diretor conforme organograma de aprovação v3.0.
+ *
+ * Gestor (manager_id) = 1ª aprovação (gerência/head da área).
+ * Diretor (director_id) = etapa diretoria (quando existe na trilha).
  */
 class DepartmentHierarchySeeder extends Seeder
 {
+    /** @var array<string, User|null> */
+    private array $users = [];
+
     public function run(): void
     {
-        $users = [
-            'erismar' => User::where('email', 'erismar@grupo5estrelas.com.br')->first(),
-            'dionei' => User::where('email', 'dionei@grupo5estrelas.com.br')->first(),
-            'leiliane' => User::where('email', 'leiliane@grupo5estrelas.com.br')->first(),
-            'ana_paula' => User::where('email', 'anapaula@grupo5estrelas.com.br')->first(),
-            'leticia' => User::where('email', 'leticia@grupo5estrelas.com.br')->first(),
-            'luiz' => User::where('email', 'luiz.farias@grupo5estrelas.com.br')->first(),
-            'silene' => User::where('email', 'silene@grupo5estrelas.com.br')->first(),
-            'alexyxandra' => User::where('email', 'alexyxandra@grupo5estrelas.com.br')->first(),
-            'karen' => User::where('email', 'karen@grupo5estrelas.com.br')->first(),
-            'leonardo' => User::where('email', 'leonardo@grupo5estrelas.com.br')->first(),
-            'matheus' => User::where('email', 'like', '%matheus%grupo5estrelas%')->first(),
+        $this->users = [
+            'erismar' => $this->findUser('erismar@grupo5estrelas.com.br'),
+            'cilas' => $this->findUser('cilas@grupo5estrelas.com.br'),
+            'matheus' => $this->findUser('matheus.xavier@grupo5estrelas.com.br'),
+            'leiliane' => $this->findUser('leiliane@grupo5estrelas.com.br'),
+            'leticia' => $this->findUser('leticia@grupo5estrelas.com.br'),
+            'luiz' => $this->findUser('luiz.farias@grupo5estrelas.com.br'),
+            'silene' => $this->findUser('silene@grupo5estrelas.com.br'),
+            'alexyxandra' => $this->findUser('alexyxandra@grupo5estrelas.com.br'),
+            'dionei' => $this->findUser('dionei@grupo5estrelas.com.br'),
+            'ana_paula' => $this->findUser('anapaula@grupo5estrelas.com.br'),
         ];
 
-        $depts = [
-            // área_key, nome, gestor, diretor
-            ['matriz', 'Matriz / Operações', 'erismar', 'dionei'],
-            ['matriz', 'Filiais', 'erismar', 'dionei'],
-            ['matriz', 'Compras', 'matheus', 'dionei'],
-            ['matriz', 'Modernização / TI', 'matheus', 'dionei'],
-            ['comercial', 'Comercial', 'leiliane', 'ana_paula'],
-            ['comercial', 'Faturamento', 'leiliane', 'ana_paula'],
-            ['comercial', 'Marketing', 'leiliane', 'ana_paula'],
-            ['licitacao', 'Licitação', 'leticia', 'luiz'],
-            ['dp_rh', 'DP / RH', 'silene', null], // sem diretoria
-            ['juridico', 'Jurídico', 'alexyxandra', null], // sem diretoria
-            ['financeiro', 'Financeiro', 'karen', 'dionei'],
-            ['presidencia', 'Presidência', 'leonardo', null],
+        $departments = [
+            // slug, nome, area_key, gestor, diretor
+            ['matriz', 'Matriz', 'matriz', 'erismar', 'dionei'],
+            ['filiais', 'Filiais', 'filiais', 'cilas', 'dionei'],
+            ['compras', 'Compras', 'compras', 'erismar', 'dionei'],
+            ['modernizacao', 'Modernização', 'modernizacao', 'matheus', 'dionei'],
+            ['comercial', 'Comercial', 'comercial', 'leiliane', 'ana_paula'],
+            ['faturamento', 'Faturamento', 'comercial', 'leiliane', 'ana_paula'],
+            ['marketing', 'Marketing', 'comercial', 'leiliane', 'ana_paula'],
+            ['licitacao', 'Licitação', 'licitacao', 'leticia', 'luiz'],
+            ['dp_rh', 'DP / RH', 'dp_rh', 'silene', null],
+            ['juridico', 'Jurídico', 'juridico', 'alexyxandra', null],
+            ['multi', 'Multi', 'multi_star', 'luiz', null],
+            ['star', 'Star', 'multi_star', 'luiz', null],
+            ['baluarte', 'Baluarte', 'baluarte', 'erismar', 'ana_paula'],
         ];
 
-        foreach ($depts as [$areaKey, $nome, $managerKey, $directorKey]) {
-            $dept = Department::updateOrCreate(
-                ['name' => $nome],
+        $activeSlugs = [];
+
+        foreach ($departments as [$slug, $name, $areaKey, $managerKey, $directorKey]) {
+            $activeSlugs[] = $slug;
+            Department::updateOrCreate(
+                ['slug' => $slug],
                 [
+                    'name' => $name,
                     'is_active' => true,
                     'area_key' => $areaKey,
-                    'manager_id' => $users[$managerKey]?->id ?? null,
-                    'director_id' => $directorKey ? ($users[$directorKey]?->id ?? null) : null,
+                    'manager_id' => $this->users[$managerKey]?->id,
+                    'director_id' => $directorKey ? $this->users[$directorKey]?->id : null,
                 ]
             );
         }
 
-        // Vincula usuários aos seus departamentos
-        $assignments = [
-            'erismar' => 'Matriz / Operações',
-            'dionei' => 'Matriz / Operações',
-            'leiliane' => 'Comercial',
-            'ana_paula' => 'Comercial',
-            'leticia' => 'Licitação',
-            'luiz' => 'Licitação',
-            'silene' => 'DP / RH',
-            'alexyxandra' => 'Jurídico',
-            'karen' => 'Financeiro',
-            'leonardo' => 'Presidência',
-            'matheus' => 'Compras',
+        $legacyNames = [
+            'Matriz / Operações',
+            'Modernização / TI',
+            'Financeiro',
+            'Presidência',
         ];
 
-        foreach ($assignments as $key => $deptName) {
-            $user = $users[$key] ?? null;
-            $dept = Department::where('name', $deptName)->first();
-            if ($user && $dept) {
-                $user->update(['department_id' => $dept->id]);
-            }
-        }
+        $names = array_column($departments, 1);
 
-        $this->command->info('✅ Departamentos + hierarquia configurados (12 depts, gestores e diretores vinculados).');
+        Department::whereNull('slug')->whereIn('name', $names)->update(['is_active' => false]);
+        Department::whereIn('name', $legacyNames)->update(['is_active' => false]);
+
+        $this->command?->info('✅ Departamentos sincronizados com organograma (' . count($departments) . ' unidades).');
+    }
+
+    private function findUser(string $email): ?User
+    {
+        return User::where('email', $email)->where('is_active', true)->first();
     }
 }

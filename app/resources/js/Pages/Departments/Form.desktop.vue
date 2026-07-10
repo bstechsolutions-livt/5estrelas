@@ -54,7 +54,7 @@ function submit() {
                     <div>
                         <h2 class="text-sm font-semibold text-gray-800">Aprovação financeira</h2>
                         <p class="text-xs text-gray-500 mt-1">
-                            Define o fluxo e os aprovadores da 1ª etapa (gestor) e da diretoria, conforme quem envia o título.
+                            Gestor = 1ª aprovação (gerência). Diretor = etapa diretoria. Configure conforme o organograma.
                         </p>
                     </div>
 
@@ -74,18 +74,18 @@ function submit() {
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Gestor / Head (1ª etapa)</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Gerência / Head (1ª aprovação)</label>
                         <Select
                             v-model="form.manager_id"
                             :options="users"
                             optionLabel="name"
                             optionValue="id"
-                            placeholder="Quem aprova como departamento..."
+                            placeholder="Quem aprova primeiro nesta área..."
                             showClear
                             filter
                             class="w-full"
                         />
-                        <small class="text-gray-400 text-xs mt-1 block">Obrigatório para enviar títulos deste departamento.</small>
+                        <small class="text-gray-400 text-xs mt-1 block">Ex.: Erismar (Compras/Matriz), Cilas (Filiais), Leiliane (Comercial).</small>
                         <small v-if="form.errors.manager_id" class="text-red-500 text-xs mt-1 block">{{ form.errors.manager_id }}</small>
                     </div>
 

@@ -30,7 +30,10 @@ class ApprovalTrail extends Model
      * Áreas disponíveis (conforme documento v3.0).
      */
     public const AREAS = [
-        'matriz' => 'Matriz / Filiais / Compras / Modernização',
+        'matriz' => 'Matriz',
+        'filiais' => 'Filiais',
+        'compras' => 'Compras',
+        'modernizacao' => 'Modernização',
         'comercial' => 'Comercial / Faturamento / Marketing',
         'licitacao' => 'Licitação',
         'dp_rh' => 'DP / RH',

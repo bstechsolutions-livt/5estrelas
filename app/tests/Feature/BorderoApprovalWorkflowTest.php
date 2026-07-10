@@ -194,10 +194,16 @@ class BorderoApprovalWorkflowTest extends TestCase
         // 1ª etapa (departamento): gestor do departamento
         $this->actingAs($this->gestorDept)->post("/financeiro/borderos/{$bordero->id}/aprovar")->assertSessionHas('success');
 
-        // 2ª etapa (gerência): gerente aprova os dois títulos
-        $ok = $this->actingAs($this->gerente)->post("/financeiro/borderos/{$bordero->id}/aprovar");
-        $ok->assertRedirect();
-        $ok->assertSessionHas('success');
+        // 2ª etapa: diretoria (gerência já absorvida na 1ª)
+        $diretorId = ApprovalTrail::where('area', 'matriz')->where('level_name', 'diretoria')->value('default_user_id');
+        $diretor = User::find($diretorId);
+        $diretor->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.visualizar'],
+                ['label' => 'Visualizar', 'module' => 'financeiro']
+            )->id
+        );
+        $this->actingAs($diretor)->post("/financeiro/borderos/{$bordero->id}/aprovar")->assertSessionHas('success');
 
         $p1->refresh();
         $p2->refresh();
@@ -219,7 +225,7 @@ class BorderoApprovalWorkflowTest extends TestCase
 
         $admin = $this->userWithPerm(['*']);
 
-        for ($i = 0; $i < 5; $i++) {
+        for ($i = 0; $i < 4; $i++) {
             $response = $this->actingAs($admin)->post("/financeiro/borderos/{$bordero->id}/aprovar");
             $response->assertRedirect();
             $response->assertSessionHas('success');
@@ -279,6 +285,7 @@ class BorderoApprovalWorkflowTest extends TestCase
     public function test_enviar_bordero_bloqueia_sem_gestor_no_departamento(): void
     {
         $this->department->forceFill(['manager_id' => null])->save();
+        ApprovalTrail::where('area', 'matriz')->where('level_name', 'gerencia')->delete();
         $p1 = $this->payableComDocumento();
         $bordero = $this->borderoRascunho([$p1->id]);
 

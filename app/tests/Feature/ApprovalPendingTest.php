@@ -39,7 +39,8 @@ class ApprovalPendingTest extends TestCase
         $approver->permissions()->attach(
             Permission::firstOrCreate(['key' => 'financeiro.contas_pagar.visualizar'], ['label' => 'CP', 'module' => 'financeiro'])->id
         );
-        ApprovalTrail::create(['area' => 'matriz', 'order' => 1, 'level_name' => 'gerencia', 'role_label' => 'G', 'default_user_id' => $approver->id]);
+        ApprovalTrail::create(['area' => 'matriz', 'order' => 1, 'level_name' => 'departamento', 'role_label' => 'Departamento', 'default_user_id' => null]);
+        ApprovalTrail::create(['area' => 'matriz', 'order' => 2, 'level_name' => 'gerencia', 'role_label' => 'G', 'default_user_id' => $approver->id]);
 
         $payable = Payable::create([
             'title_number' => 'P-1', 'supplier_name' => 'F', 'amount' => 100,

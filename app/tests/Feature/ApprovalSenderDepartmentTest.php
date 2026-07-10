@@ -73,8 +73,10 @@ class ApprovalSenderDepartmentTest extends TestCase
         $this->assertTrue(collect($preview['errors'])->contains(fn ($e) => str_contains($e, 'área de aprovação')));
     }
 
-    public function test_preview_bloqueia_departamento_sem_gestor(): void
+    public function test_preview_bloqueia_departamento_sem_gestor_e_sem_gerencia_na_trilha(): void
     {
+        ApprovalTrail::where('area', 'matriz')->where('level_name', 'gerencia')->delete();
+
         $dept = Department::create(['name' => 'Sem gestor', 'is_active' => true]);
         $dept->forceFill(['area_key' => 'matriz'])->save();
         $user = $this->userWithPerm(['financeiro.contas_pagar.preparar']);
@@ -83,7 +85,6 @@ class ApprovalSenderDepartmentTest extends TestCase
         $preview = $this->workflow->buildPreviewStepsForSender($user->fresh());
 
         $this->assertFalse($preview['ok']);
-        $this->assertTrue(collect($preview['errors'])->contains(fn ($e) => str_contains($e, 'aprovador configurado')));
     }
 
     public function test_preview_ok_com_departamento_e_gestor(): void

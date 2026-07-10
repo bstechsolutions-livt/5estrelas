@@ -99,7 +99,7 @@ class ApprovalWorkflowTest extends TestCase
         $this->workflow->sendForApproval($payable, $sender, 'matriz');
 
         $this->assertEquals('aguardando_aprovacao', $payable->fresh()->status);
-        $this->assertEquals(5, ApprovalStep::where('payable_id', $payable->id)->count());
+        $this->assertEquals(4, ApprovalStep::where('payable_id', $payable->id)->count());
     }
 
     public function test_dp_rh_trail_has_no_diretoria(): void
@@ -110,7 +110,7 @@ class ApprovalWorkflowTest extends TestCase
         $this->workflow->sendForApproval($payable, $sender, 'dp_rh');
 
         $steps = ApprovalStep::where('payable_id', $payable->id)->orderBy('order')->get();
-        $this->assertEquals(4, $steps->count()); // sem diretoria
+        $this->assertEquals(3, $steps->count()); // sem diretoria nem gerência duplicada
         $this->assertFalse($steps->pluck('level_name')->contains('diretoria'));
     }
 
@@ -121,9 +121,9 @@ class ApprovalWorkflowTest extends TestCase
 
         $this->workflow->sendForApproval($payable, $sender, 'baluarte');
 
-        // Baluarte = matriz (5) + comercial (5) = 10 steps
+        // Baluarte = matriz (4) + comercial (4) = 8 steps
         $steps = ApprovalStep::where('payable_id', $payable->id)->count();
-        $this->assertEquals(10, $steps);
+        $this->assertEquals(8, $steps);
     }
 
     public function test_detects_area_from_department(): void
@@ -136,7 +136,7 @@ class ApprovalWorkflowTest extends TestCase
         $this->workflow->sendForApproval($payable, $sender, 'dp_rh');
 
         $steps = ApprovalStep::where('payable_id', $payable->id)->orderBy('order')->get();
-        $this->assertEquals(4, $steps->count());
+        $this->assertEquals(3, $steps->count());
         $this->assertFalse($steps->pluck('level_name')->contains('diretoria'));
     }
 
@@ -148,17 +148,16 @@ class ApprovalWorkflowTest extends TestCase
         $payable = $this->makePayable();
         $this->workflow->sendForApproval($payable, $sender, 'matriz');
 
-        // Pega o first step (departamento — assigned_to = null) e aprova
+        // 1ª etapa absorve gerência → próximo é diretoria
         $step = $this->workflow->currentStep($payable);
         $this->assertEquals('departamento', $step->level_name);
 
-        // Aprovar com wildcard
-        $admin = $this->userWithPerm('*');
-        $result = $this->workflow->approve($payable, $admin);
+        $gerente = User::find($step->assigned_to);
+        $result = $this->workflow->approve($payable, $gerente);
 
         $this->assertTrue($result['success']);
         $this->assertFalse($result['finished']);
-        $this->assertEquals('gerencia', $result['next_level']);
+        $this->assertEquals('diretoria', $result['next_level']);
     }
 
     public function test_approve_last_step_finalizes(): void
@@ -167,11 +166,13 @@ class ApprovalWorkflowTest extends TestCase
         $payable = $this->makePayable();
         $this->workflow->sendForApproval($payable, $sender, 'matriz');
 
-        $admin = $this->userWithPerm('*');
+        $gerente = User::where('name', 'Gerente')->first();
 
-        // Aprova todos os 5 steps
-        for ($i = 0; $i < 5; $i++) {
-            $result = $this->workflow->approve($payable, $admin);
+        for ($i = 0; $i < 4; $i++) {
+            $result = $this->workflow->approve($payable, $gerente);
+            if (! $result['success']) {
+                $result = $this->workflow->approve($payable, $this->userWithPerm('*'));
+            }
             $this->assertTrue($result['success']);
         }
 
@@ -185,15 +186,13 @@ class ApprovalWorkflowTest extends TestCase
         $payable = $this->makePayable();
         $this->workflow->sendForApproval($payable, $sender, 'matriz');
 
-        // Aprova o primeiro (departamento, assigned_to=null → qualquer um com *)
-        $admin = $this->userWithPerm('*');
-        $this->workflow->approve($payable, $admin);
+        $gerente = User::where('name', 'Gerente')->first();
+        $this->workflow->approve($payable, $gerente);
 
-        // Agora step é gerencia, assigned ao gerente
         $step = $this->workflow->currentStep($payable);
-        $gerente = User::find($step->assigned_to);
+        $diretor = User::find($step->assigned_to);
 
-        $result = $this->workflow->approve($payable, $gerente);
+        $result = $this->workflow->approve($payable, $diretor);
         $this->assertTrue($result['success']);
     }
 
@@ -203,11 +202,11 @@ class ApprovalWorkflowTest extends TestCase
         $payable = $this->makePayable();
         $this->workflow->sendForApproval($payable, $sender, 'matriz');
 
-        // Aprova primeiro step
-        $admin = $this->userWithPerm('*');
-        $this->workflow->approve($payable, $admin);
+        $gerente = User::where('name', 'Gerente')->first();
+        $this->workflow->approve($payable, $gerente);
 
-        // Step agora é gerencia (assigned a gerente específico)
+        $step = $this->workflow->currentStep($payable);
+        $this->assertEquals('diretoria', $step->level_name);
         $randomUser = User::factory()->create(['is_active' => true]);
         $result = $this->workflow->approve($payable, $randomUser);
 
@@ -223,9 +222,8 @@ class ApprovalWorkflowTest extends TestCase
         $payable = $this->makePayable();
         $this->workflow->sendForApproval($payable, $sender, 'matriz');
 
-        // Aprova até chegar na presidência (steps 1-4)
         $admin = $this->userWithPerm('*');
-        for ($i = 0; $i < 4; $i++) {
+        for ($i = 0; $i < 3; $i++) {
             $this->workflow->approve($payable, $admin);
         }
 
@@ -246,16 +244,14 @@ class ApprovalWorkflowTest extends TestCase
         $payable = $this->makePayable();
         $this->workflow->sendForApproval($payable, $sender, 'comercial');
 
-        // Comercial: dept → gerencia → diretoria (Ana Paula) → financeiro → presidencia
-        $admin = $this->userWithPerm('*');
-        $this->workflow->approve($payable, $admin); // dept
-        $this->workflow->approve($payable, $admin); // gerencia
+        $gerenteCom = User::where('name', 'Gerente Comercial')->first();
+        $this->workflow->approve($payable, $gerenteCom);
 
-        // Ana Paula aprova como diretora
         $anaPaula = User::where('email', 'anapaula@grupo5estrelas.com.br')->first();
-        $this->workflow->approve($payable, $anaPaula); // diretoria
+        $this->workflow->approve($payable, $anaPaula);
 
-        $this->workflow->approve($payable, $admin); // financeiro
+        $admin = $this->userWithPerm('*');
+        $this->workflow->approve($payable, $admin);
 
         // Agora presidência: Ana Paula NÃO pode (regra 3 — já assinou como diretora)
         $result = $this->workflow->approve($payable, $anaPaula);
@@ -326,10 +322,9 @@ class ApprovalWorkflowTest extends TestCase
         $payable = $this->makePayable();
         $this->workflow->sendForApproval($payable, $sender, 'matriz');
 
-        $admin = $this->userWithPerm('*');
-        $this->workflow->approve($payable, $admin); // dept → gerencia
+        $gerente = User::where('name', 'Gerente')->first();
+        $this->workflow->approve($payable, $gerente);
 
-        // Gerente deve ter notificação
         $step = $this->workflow->currentStep($payable);
         if ($step && $step->assigned_to) {
             $this->assertDatabaseHas('notifications', [
@@ -347,14 +342,13 @@ class ApprovalWorkflowTest extends TestCase
         $payable = $this->makePayable();
         $this->workflow->sendForApproval($payable, $sender, 'matriz');
 
-        // Avança pro step da gerência
-        $admin = $this->userWithPerm('*');
-        $this->workflow->approve($payable, $admin);
+        $gerente = User::where('name', 'Gerente')->first();
+        $this->workflow->approve($payable, $gerente);
 
         $step = $this->workflow->currentStep($payable);
-        $gerente = User::find($step->assigned_to);
+        $diretor = User::find($step->assigned_to);
 
-        $pending = $this->workflow->myPendingApprovals($gerente);
+        $pending = $this->workflow->myPendingApprovals($diretor);
         $this->assertTrue($pending->contains('id', $payable->id));
     }
 

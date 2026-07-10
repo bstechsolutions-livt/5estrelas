@@ -66,16 +66,16 @@ class ApprovalWorkflowService
             ApprovalStep::where('payable_id', $payable->id)->delete();
 
             $order = 1;
-            foreach ($trails as $trail) {
-                foreach ($trail as $level) {
-                    ApprovalStep::create([
-                        'payable_id' => $payable->id,
-                        'order' => $order++,
-                        'level_name' => $level->level_name,
-                        'status' => 'pendente',
-                        'assigned_to' => $this->resolveAssigneeId($level, $department),
-                    ]);
-                }
+            foreach ($this->iterEffectiveTrailLevels($area, $department) as $item) {
+                $level = $item['level'];
+                $trailArea = $item['trail_area'];
+                ApprovalStep::create([
+                    'payable_id' => $payable->id,
+                    'order' => $order++,
+                    'level_name' => $level->level_name,
+                    'status' => 'pendente',
+                    'assigned_to' => $this->resolveAssigneeId($level, $department, $trailArea),
+                ]);
             }
 
             $payable->update([
@@ -389,20 +389,21 @@ class ApprovalWorkflowService
 
         $steps = [];
         $order = 1;
-        foreach ($this->resolveTrails($area) as $trail) {
-            foreach ($trail as $level) {
-                $assigneeId = $this->resolveAssigneeId($level, $department);
-                $assigneeName = $assigneeId ? User::whereKey($assigneeId)->value('name') : null;
-                $steps[] = [
-                    'order' => $order++,
-                    'level_name' => $level->level_name,
-                    'level_label' => ApprovalStep::LEVEL_LABELS[$level->level_name] ?? $level->level_name,
-                    'role_label' => $level->role_label,
-                    'assignee_id' => $assigneeId,
-                    'assignee_name' => $assigneeName,
-                    'configured' => $assigneeId !== null,
-                ];
-            }
+        foreach ($this->iterEffectiveTrailLevels($area, $department) as $item) {
+            $level = $item['level'];
+            $trailArea = $item['trail_area'];
+            $assigneeId = $this->resolveAssigneeId($level, $department, $trailArea);
+            $assigneeName = $assigneeId ? User::whereKey($assigneeId)->value('name') : null;
+            $roleLabel = $this->effectiveRoleLabel($level, $department, $trailArea);
+            $steps[] = [
+                'order' => $order++,
+                'level_name' => $level->level_name,
+                'level_label' => ApprovalStep::LEVEL_LABELS[$level->level_name] ?? $level->level_name,
+                'role_label' => $roleLabel,
+                'assignee_id' => $assigneeId,
+                'assignee_name' => $assigneeName,
+                'configured' => $assigneeId !== null,
+            ];
         }
 
         foreach ($steps as $step) {
@@ -484,10 +485,19 @@ class ApprovalWorkflowService
         return ApprovalTrail::trailFor($area)->isNotEmpty();
     }
 
-    private function resolveAssigneeId(ApprovalTrail $level, ?Department $department): ?int
+    private function resolveAssigneeId(ApprovalTrail $level, ?Department $department, ?string $area = null): ?int
     {
-        if ($level->level_name === 'departamento' && $department?->manager_id) {
-            return $department->manager_id;
+        if ($level->level_name === 'departamento') {
+            if ($department?->manager_id) {
+                return $department->manager_id;
+            }
+            if ($area) {
+                return ApprovalTrail::where('area', $area)
+                    ->where('level_name', 'gerencia')
+                    ->value('default_user_id');
+            }
+
+            return null;
         }
 
         if ($level->level_name === 'diretoria' && $department?->director_id) {
@@ -495,6 +505,40 @@ class ApprovalWorkflowService
         }
 
         return $level->default_user_id;
+    }
+
+    /** @return \Generator<int, array{level: ApprovalTrail, trail_area: string}> */
+    private function iterEffectiveTrailLevels(string $area, ?Department $department): \Generator
+    {
+        foreach ($this->resolveTrails($area) as $trail) {
+            $trailArea = $trail->first()?->area ?? $area;
+            $skipGerencia = $this->shouldSkipGerenciaStep($department, $trailArea);
+
+            foreach ($trail as $level) {
+                if ($skipGerencia && $level->level_name === 'gerencia') {
+                    continue;
+                }
+                yield ['level' => $level, 'trail_area' => $trailArea];
+            }
+        }
+    }
+
+    private function shouldSkipGerenciaStep(?Department $department, string $area): bool
+    {
+        // A 1ª etapa (departamento) absorve a gerência — evita Erismar duas vezes.
+        return ApprovalTrail::where('area', $area)->where('level_name', 'gerencia')->exists();
+    }
+
+    private function effectiveRoleLabel(ApprovalTrail $level, ?Department $department, string $area): string
+    {
+        if ($level->level_name === 'departamento') {
+            $gerencia = ApprovalTrail::where('area', $area)->where('level_name', 'gerencia')->first();
+            if ($gerencia) {
+                return $gerencia->role_label;
+            }
+        }
+
+        return $level->role_label;
     }
 
     /**
