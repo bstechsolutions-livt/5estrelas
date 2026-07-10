@@ -71,6 +71,7 @@ function setUserForLevel(levelId, userId) {
                     <li><strong>Departamento (1ª etapa):</strong> gestor cadastrado no departamento do remetente.</li>
                     <li><strong>Diretoria:</strong> diretor do departamento, se configurado; senão o padrão da área abaixo.</li>
                     <li><strong>Financeiro (auditoria):</strong> qualquer usuário vinculado ao departamento <a href="/departamentos" class="underline">Financeiro</a>.</li>
+                    <li><strong>Etapas sem aprovador:</strong> são ignoradas automaticamente (ex.: diretoria vazia na config e no departamento).</li>
                 </ul>
             </div>
 
@@ -87,7 +88,7 @@ function setUserForLevel(levelId, userId) {
                             <div class="flex-1 min-w-0">
                                 <p class="text-xs font-medium text-gray-700">{{ level.role_label }}</p>
                                 <p v-if="level.from_department" class="text-[10px] text-gray-400">Vem do cadastro do departamento</p>
-                                <p v-else-if="level.department_fallback" class="text-[10px] text-gray-400">Padrão quando o dept. não tem diretor</p>
+                                <p v-else-if="level.department_fallback" class="text-[10px] text-gray-400">Padrão quando o dept. não tem diretor — vazio pula a etapa</p>
                             </div>
 
                             <div

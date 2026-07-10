@@ -100,13 +100,13 @@ class ApprovalWorkflowService
                 auditable: $payable,
             );
 
-            // Notifica o primeiro aprovador (o primeiro step que tem assigned_to)
-            $firstAssigned = ApprovalStep::where('payable_id', $payable->id)
-                ->whereNotNull('assigned_to')
+            // Notifica o primeiro aprovador da 1ª etapa efetiva
+            $firstStep = ApprovalStep::where('payable_id', $payable->id)
+                ->where('status', 'pendente')
                 ->orderBy('order')
                 ->first();
-            if ($firstAssigned) {
-                $this->notifyApprover($firstAssigned, $payable, $sender);
+            if ($firstStep && ($firstStep->assigned_to || $firstStep->level_name === 'financeiro')) {
+                $this->notifyApprover($firstStep, $payable, $sender);
             }
         });
     }
@@ -535,15 +535,32 @@ class ApprovalWorkflowService
     {
         foreach ($this->resolveTrails($area) as $trail) {
             $trailArea = $trail->first()?->area ?? $area;
-            $skipGerencia = $this->shouldSkipGerenciaStep($department, $trailArea);
 
             foreach ($trail as $level) {
-                if ($skipGerencia && $level->level_name === 'gerencia') {
+                if ($this->shouldSkipLevel($level, $department, $trailArea)) {
                     continue;
                 }
                 yield ['level' => $level, 'trail_area' => $trailArea];
             }
         }
+    }
+
+    private function shouldSkipLevel(ApprovalTrail $level, ?Department $department, string $area): bool
+    {
+        if ($level->level_name === 'gerencia' && $this->shouldSkipGerenciaStep($department, $area)) {
+            return true;
+        }
+
+        // 1ª e última etapa nunca pulam — sem aprovador, o envio é bloqueado no preview
+        if (in_array($level->level_name, ['departamento', 'presidencia'], true)) {
+            return false;
+        }
+
+        if ($level->level_name === 'financeiro' && Department::financeApprovers()->exists()) {
+            return false;
+        }
+
+        return $this->resolveAssigneeId($level, $department, $area) === null;
     }
 
     private function shouldSkipGerenciaStep(?Department $department, string $area): bool
