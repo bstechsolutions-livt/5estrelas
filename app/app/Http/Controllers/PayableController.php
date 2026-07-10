@@ -107,9 +107,7 @@ class PayableController extends Controller
 
         $workflow = app(ApprovalWorkflowService::class);
         $currentStep = $workflow->currentStep($payable);
-        $canApproveStep = $currentStep && (
-            $currentStep->assigned_to === $user?->id || $user?->hasPermission('*')
-        );
+        $canApproveStep = $workflow->canUserApprove($payable, $user);
 
         return Inertia::render('Payables/Show', [
             'payable' => $payable,

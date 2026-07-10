@@ -193,6 +193,89 @@ class ApprovalWorkflowService
             ->first();
     }
 
+    public function canUserApprove(Payable $payable, User $user): bool
+    {
+        if ($payable->status !== 'aguardando_aprovacao') {
+            return false;
+        }
+
+        $step = $this->currentStep($payable);
+
+        return $step && $this->canApproveStep($step, $user, $payable);
+    }
+
+    /**
+     * Aprova, no borderô, cada título em que o usuário é o aprovador da etapa atual.
+     *
+     * @return array{count: int, message: string, error: ?string}
+     */
+    public function approveEligibleInBordero(iterable $payables, User $approver, ?string $comment = null): array
+    {
+        $approved = 0;
+        $message = '';
+        $errors = [];
+
+        foreach ($payables as $payable) {
+            if (! $this->canUserApprove($payable, $approver)) {
+                continue;
+            }
+
+            $result = $this->approve($payable, $approver, $comment);
+            if ($result['success']) {
+                $approved++;
+                $message = $result['message'];
+            } else {
+                $errors[] = $result['error'];
+            }
+        }
+
+        if ($approved === 0) {
+            return [
+                'count' => 0,
+                'message' => '',
+                'error' => $errors[0] ?? 'Nenhum título neste borderô aguarda sua aprovação nesta etapa.',
+            ];
+        }
+
+        return ['count' => $approved, 'message' => $message, 'error' => null];
+    }
+
+    /**
+     * Reprova, no borderô, cada título em que o usuário é o aprovador da etapa atual.
+     *
+     * @return array{count: int, message: string, error: ?string}
+     */
+    public function rejectEligibleInBordero(iterable $payables, User $rejector, string $reason): array
+    {
+        $rejected = 0;
+        $message = '';
+        $errors = [];
+
+        foreach ($payables as $payable) {
+            if (! $this->canUserApprove($payable, $rejector)) {
+                continue;
+            }
+
+            $result = $this->reject($payable, $rejector, $reason);
+            if ($result['success']) {
+                $rejected++;
+                $message = $result['message'];
+            } else {
+                $errors[] = $result['error'];
+            }
+        }
+
+        if ($rejected === 0) {
+            return [
+                'count' => 0,
+                'message' => '',
+                'error' => $errors[0] ?? 'Nenhum título neste borderô aguarda sua reprovação nesta etapa.',
+            ];
+        }
+
+        return ['count' => $rejected, 'message' => $message, 'error' => null];
+    }
+
     public function myPendingApprovals(User $user): \Illuminate\Database\Eloquent\Collection
     {
         // Steps assigned diretamente ao user

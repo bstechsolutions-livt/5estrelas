@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ApprovalStep;
 use App\Models\Bordero;
+use App\Models\Department;
 use App\Models\Payable;
 use App\Models\PayableComment;
+use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -49,7 +52,7 @@ class BorderoController extends Controller
         ]);
     }
 
-    public function show(int $id)
+    public function show(Request $request, int $id)
     {
         $bordero = Bordero::with([
             'creator:id,name',
@@ -57,10 +60,42 @@ class BorderoController extends Controller
             'payables' => fn ($q) => $q->with('branch:id,name')->withCount('documents')->orderBy('due_date'),
         ])->findOrFail($id);
 
+        $user = $request->user();
+        $workflow = app(ApprovalWorkflowService::class);
+
+        $payableIds = $bordero->payables->pluck('id');
+        $stepsByPayable = ApprovalStep::whereIn('payable_id', $payableIds)
+            ->with(['assignee:id,name', 'resolver:id,name'])
+            ->orderBy('order')
+            ->get()
+            ->groupBy('payable_id');
+
+        $payablesWithWorkflow = $bordero->payables->map(function (Payable $payable) use ($workflow, $stepsByPayable, $user) {
+            $steps = $stepsByPayable->get($payable->id, collect());
+            $currentStep = $workflow->currentStep($payable);
+
+            return [
+                'payable' => $payable,
+                'approval_steps' => $steps,
+                'current_step' => $currentStep,
+                'can_approve' => $workflow->canUserApprove($payable, $user),
+            ];
+        });
+
+        $canApproveStep = $payablesWithWorkflow->contains(fn ($row) => $row['can_approve']);
+        $approvableCount = $payablesWithWorkflow->where('can_approve', true)->count();
+        $currentStepLabel = $payablesWithWorkflow
+            ->first(fn ($row) => $row['can_approve'])['current_step']?->level_name ?? null;
+
         return Inertia::render('Borderos/Show', [
             'bordero' => $bordero,
             'statusLabels' => Bordero::STATUS_LABELS,
             'statusColors' => Bordero::STATUS_COLORS,
+            'payablesWorkflow' => $payablesWithWorkflow,
+            'canApproveStep' => $canApproveStep,
+            'approvableCount' => $approvableCount,
+            'currentStepLabel' => $currentStepLabel,
+            'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name', 'area_key']),
         ]);
     }
 
@@ -133,19 +168,37 @@ class BorderoController extends Controller
 
     public function sendForApproval(Request $request, int $id)
     {
-        $bordero = Bordero::findOrFail($id);
+        $bordero = Bordero::with('payables')->findOrFail($id);
 
         if ($bordero->status !== 'rascunho') {
             return back()->with('error', 'Este borderô não pode ser enviado.');
         }
 
-        DB::transaction(function () use ($bordero) {
-            $bordero->update([
-                'status' => 'aguardando_aprovacao',
-                'sent_for_approval_at' => now(),
-            ]);
+        if ($bordero->payables->isEmpty()) {
+            return back()->with('error', 'O borderô não possui títulos.');
+        }
 
-            $bordero->payables()->update([
+        $data = $request->validate([
+            'department_id' => ['required', 'integer', 'exists:departments,id'],
+        ]);
+
+        $withoutDocs = $bordero->payables->filter(fn (Payable $p) => $p->documents()->count() === 0);
+        if ($withoutDocs->isNotEmpty()) {
+            $nums = $withoutDocs->pluck('title_number')->take(3)->join(', ');
+
+            return back()->with('error', "Anexe ao menos um documento em cada título antes de enviar. Sem anexo: {$nums}.");
+        }
+
+        $workflow = app(ApprovalWorkflowService::class);
+
+        DB::transaction(function () use ($bordero, $request, $workflow, $data) {
+            foreach ($bordero->payables as $payable) {
+                $payable->update(['department_id' => $data['department_id']]);
+                $payable->refresh();
+                $workflow->sendForApproval($payable, $request->user());
+            }
+
+            $bordero->update([
                 'status' => 'aguardando_aprovacao',
                 'sent_for_approval_at' => now(),
             ]);
@@ -154,57 +207,53 @@ class BorderoController extends Controller
         AuditLogger::log(
             event: 'bordero.enviado_aprovacao',
             module: 'financeiro.contas_pagar',
-            description: "Borderô {$bordero->number} enviado para aprovação (R$ {$bordero->total_amount})",
+            description: "Borderô {$bordero->number} enviado para aprovação multinível ({$bordero->items_count} títulos, R$ {$bordero->total_amount})",
             auditable: $bordero,
         );
 
-        return back()->with('success', 'Borderô enviado para aprovação.');
+        return back()->with('success', 'Borderô enviado para o fluxo de aprovação.');
     }
 
     public function approve(Request $request, int $id)
     {
-        $bordero = Bordero::findOrFail($id);
+        $bordero = Bordero::with('payables')->findOrFail($id);
 
         if ($bordero->status !== 'aguardando_aprovacao') {
             return back()->with('error', 'Este borderô não está aguardando aprovação.');
         }
 
-        DB::transaction(function () use ($bordero, $request) {
-            $bordero->update([
-                'status' => 'aprovado',
-                'approved_by' => $request->user()->id,
-                'approved_at' => now(),
-            ]);
+        $workflow = app(ApprovalWorkflowService::class);
+        $result = $workflow->approveEligibleInBordero(
+            $bordero->payables,
+            $request->user(),
+            $request->input('comment')
+        );
 
-            $bordero->payables()->update([
-                'status' => 'aprovado',
-                'approved_by' => $request->user()->id,
-                'approved_at' => now(),
-            ]);
+        if ($result['error']) {
+            return back()->with('error', $result['error']);
+        }
 
-            foreach ($bordero->payables as $p) {
-                PayableComment::create([
-                    'payable_id' => $p->id,
-                    'user_id' => $request->user()->id,
-                    'body' => "Aprovado via borderô {$bordero->number}",
-                    'type' => 'approval',
-                ]);
-            }
-        });
+        $bordero->refresh();
+        $bordero->load('payables');
+        $bordero->syncStatusFromPayables();
+
+        if ($bordero->status === 'aprovado') {
+            $bordero->update(['approved_by' => $request->user()->id]);
+        }
 
         AuditLogger::log(
-            event: 'bordero.aprovado',
+            event: 'bordero.etapa_aprovada',
             module: 'financeiro.contas_pagar',
-            description: "Borderô {$bordero->number} aprovado (R$ {$bordero->total_amount}, {$bordero->items_count} títulos)",
+            description: "Borderô {$bordero->number}: {$result['count']} título(s) aprovado(s) na etapa atual",
             auditable: $bordero,
         );
 
-        return back()->with('success', 'Borderô aprovado.');
+        return back()->with('success', "{$result['count']} título(s) aprovado(s). {$result['message']}");
     }
 
     public function reject(Request $request, int $id)
     {
-        $bordero = Bordero::findOrFail($id);
+        $bordero = Bordero::with('payables')->findOrFail($id);
 
         if ($bordero->status !== 'aguardando_aprovacao') {
             return back()->with('error', 'Este borderô não está aguardando aprovação.');
@@ -214,36 +263,35 @@ class BorderoController extends Controller
             'reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        DB::transaction(function () use ($bordero, $request, $data) {
+        $workflow = app(ApprovalWorkflowService::class);
+        $result = $workflow->rejectEligibleInBordero(
+            $bordero->payables,
+            $request->user(),
+            $data['reason']
+        );
+
+        if ($result['error']) {
+            return back()->with('error', $result['error']);
+        }
+
+        $bordero->refresh();
+        $bordero->load('payables');
+        $bordero->syncStatusFromPayables();
+
+        if ($bordero->status === 'reprovado') {
             $bordero->update([
-                'status' => 'reprovado',
                 'approved_by' => $request->user()->id,
                 'rejection_reason' => $data['reason'],
             ]);
-
-            $bordero->payables()->update([
-                'status' => 'reprovado',
-                'approved_by' => $request->user()->id,
-                'rejection_reason' => $data['reason'],
-            ]);
-
-            foreach ($bordero->payables as $p) {
-                PayableComment::create([
-                    'payable_id' => $p->id,
-                    'user_id' => $request->user()->id,
-                    'body' => "Reprovado via borderô {$bordero->number}: {$data['reason']}",
-                    'type' => 'rejection',
-                ]);
-            }
-        });
+        }
 
         AuditLogger::log(
             event: 'bordero.reprovado',
             module: 'financeiro.contas_pagar',
-            description: "Borderô {$bordero->number} reprovado: {$data['reason']}",
+            description: "Borderô {$bordero->number}: {$result['count']} título(s) reprovado(s): {$data['reason']}",
             auditable: $bordero,
         );
 
-        return back()->with('success', 'Borderô reprovado.');
+        return back()->with('success', "{$result['count']} título(s) reprovado(s).");
     }
 }

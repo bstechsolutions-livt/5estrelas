@@ -441,7 +441,7 @@ function submitDueDate() {
                         <h3 class="text-sm font-semibold text-amber-700 mb-1 flex items-center gap-2">
                             <i class="pi pi-list-check"></i> Em um borderô
                         </h3>
-                        <p class="text-xs text-amber-600 mb-2">Este título faz parte de um borderô. O envio e aprovação são feitos pelo borderô.</p>
+                        <p class="text-xs text-amber-600 mb-2">Este título faz parte de um borderô. O envio é feito pelo borderô; a aprovação segue o mesmo fluxo configurado (pode ser feita aqui ou no borderô).</p>
                         <Button label="Ver borderô" icon="pi pi-arrow-right" size="small" outlined class="w-full" @click="router.visit(`/financeiro/borderos/${payable.bordero_id}`)" />
                     </div>
 

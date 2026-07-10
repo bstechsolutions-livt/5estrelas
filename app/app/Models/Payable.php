@@ -46,7 +46,7 @@ class Payable extends Model
      */
     public const WORKFLOW_FIELDS = [
         'status', 'prepared_by', 'approved_by', 'sent_for_approval_at',
-        'approved_at', 'rejection_reason', 'bordero_id',
+        'approved_at', 'rejection_reason', 'bordero_id', 'department_id',
         'paid_at', 'payment_method', 'paid_by',
         'conciliated_at', 'conciliated_by', 'conciliation_notes', 'divergence_reason',
     ];
@@ -128,7 +128,7 @@ class Payable extends Model
     protected $fillable = [
         'title_number', 'supplier_name', 'supplier_cnpj', 'amount',
         'due_date', 'issue_date', 'description', 'category', 'status',
-        'branch_id', 'prepared_by', 'approved_by', 'sent_for_approval_at',
+        'branch_id', 'department_id', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'senior_id',
         'paid_at', 'payment_method', 'paid_by',
         'conciliated_at', 'conciliated_by', 'conciliation_notes', 'divergence_reason',
@@ -216,6 +216,11 @@ class Payable extends Model
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
     }
 
     public function preparer(): BelongsTo

@@ -74,6 +74,40 @@ class Bordero extends Model
         $this->save();
     }
 
+    /** Mantém o status do borderô alinhado ao estado dos títulos (workflow multinível). */
+    public function syncStatusFromPayables(): void
+    {
+        $payables = $this->payables()->get(['id', 'status']);
+        if ($payables->isEmpty()) {
+            return;
+        }
+
+        if ($payables->every(fn ($p) => $p->status === 'aprovado')) {
+            $this->update([
+                'status' => 'aprovado',
+                'approved_at' => $this->approved_at ?? now(),
+            ]);
+
+            return;
+        }
+
+        if ($payables->contains(fn ($p) => $p->status === 'reprovado')) {
+            $this->update(['status' => 'reprovado']);
+
+            return;
+        }
+
+        if ($payables->contains(fn ($p) => $p->status === 'aguardando_aprovacao')) {
+            $this->update(['status' => 'aguardando_aprovacao']);
+
+            return;
+        }
+
+        if ($payables->every(fn ($p) => in_array($p->status, ['pendente', 'em_preparacao'], true))) {
+            $this->update(['status' => 'rascunho']);
+        }
+    }
+
     public static function generateNumber(): string
     {
         $last = static::orderByDesc('id')->first();
