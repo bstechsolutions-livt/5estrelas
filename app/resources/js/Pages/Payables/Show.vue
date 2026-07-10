@@ -172,6 +172,7 @@ function uploadDoc(event, type = 'outro') {
     router.post(`/financeiro/contas-pagar/${props.payable.id}/documentos`, formData, {
         preserveScroll: true,
         forceFormData: true,
+        onSuccess: () => markBorderoStale(),
     })
 }
 
@@ -193,7 +194,10 @@ function docsByType(typeKey) {
 }
 
 function removeDoc(docId) {
-    router.delete(`/financeiro/contas-pagar/${props.payable.id}/documentos/${docId}`, { preserveScroll: true })
+    router.delete(`/financeiro/contas-pagar/${props.payable.id}/documentos/${docId}`, {
+        preserveScroll: true,
+        onSuccess: () => markBorderoStale(),
+    })
 }
 
 function approve() {
@@ -255,7 +259,26 @@ const showSidebar = computed(() =>
     !!(props.payable.preparer || props.payable.approver || props.payable.approved_at)
 )
 
+function markBorderoStale() {
+    if (props.payable.bordero_id) {
+        sessionStorage.setItem(`bordero-${props.payable.bordero_id}-stale`, '1')
+    }
+}
+
+function goToBordero() {
+    if (!props.payable.bordero_id) return
+    sessionStorage.removeItem(`bordero-${props.payable.bordero_id}-stale`)
+    router.visit(`/financeiro/borderos/${props.payable.bordero_id}`, {
+        preserveState: false,
+        preserveScroll: false,
+    })
+}
+
 function goBack() {
+    if (props.payable.bordero_id) {
+        goToBordero()
+        return
+    }
     window.history.back()
 }
 
@@ -442,7 +465,7 @@ function submitDueDate() {
                             <i class="pi pi-list-check"></i> Em um borderô
                         </h3>
                         <p class="text-xs text-amber-600 mb-2">Este título faz parte de um borderô. O envio é feito pelo borderô; a aprovação segue o mesmo fluxo configurado (pode ser feita aqui ou no borderô).</p>
-                        <Button label="Ver borderô" icon="pi pi-arrow-right" size="small" outlined class="w-full" @click="router.visit(`/financeiro/borderos/${payable.bordero_id}`)" />
+                        <Button label="Ver borderô" icon="pi pi-arrow-right" size="small" outlined class="w-full" @click="goToBordero" />
                     </div>
 
                     <!-- Ações do preparador (só se NÃO está em borderô) -->

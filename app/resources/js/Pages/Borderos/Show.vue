@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
@@ -75,6 +75,22 @@ const levelLabels = {
     presidencia: 'Presidência',
     presidencia_2: 'Presidência (2ª assinatura)',
 }
+
+function openPayable(payableId) {
+    router.visit(`/financeiro/contas-pagar/${payableId}`)
+}
+
+function reloadIfStale() {
+    const key = `bordero-${props.bordero.id}-stale`
+    if (!sessionStorage.getItem(key)) return
+    sessionStorage.removeItem(key)
+    router.reload({
+        only: ['bordero', 'payablesWorkflow', 'canApproveStep', 'approvableCount', 'currentStepLabel'],
+        preserveScroll: true,
+    })
+}
+
+onMounted(reloadIfStale)
 </script>
 
 <template>
@@ -167,7 +183,7 @@ const levelLabels = {
                     <div v-for="row in payablesWorkflow" :key="row.payable.id" class="p-4">
                         <div
                             class="flex items-center justify-between cursor-pointer hover:bg-gray-50 -mx-2 px-2 py-1 rounded"
-                            @click="router.visit(`/financeiro/contas-pagar/${row.payable.id}`)"
+                            @click="openPayable(row.payable.id)"
                         >
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2">
