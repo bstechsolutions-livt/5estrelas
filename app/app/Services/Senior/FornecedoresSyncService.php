@@ -41,10 +41,10 @@ class FornecedoresSyncService
         $pageSize = max(10, (int) config('senior.fornecedor_page_size', 100));
 
         foreach ($codEmps as $codEmp) {
-            $page = 1;
+            $indicePagina = 1;
             while (true) {
                 try {
-                    $fornecedores = $this->client->consultarGeral((int) $codEmp, 1, $page, $pageSize);
+                    $fornecedores = $this->client->consultarGeral((int) $codEmp, 1, $indicePagina, $pageSize);
                     if ($fornecedores === []) {
                         break;
                     }
@@ -54,10 +54,12 @@ class FornecedoresSyncService
                             $this->upsert($fornecedor, $inserted, $updated);
                         });
                     }
-                    if (count($fornecedores) < $pageSize) {
+                    $count = count($fornecedores);
+                    if ($count < $pageSize) {
                         break;
                     }
-                    $page++;
+                    // Senior usa indicePagina como offset 1-based na lista, não número da página.
+                    $indicePagina += $count;
                 } catch (SeniorException $e) {
                     $errors++;
                     Log::warning('[senior-fornecedor] erro na empresa', ['codEmp' => $codEmp, 'erro' => $e->getMessage()]);
