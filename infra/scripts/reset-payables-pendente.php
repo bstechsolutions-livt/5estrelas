@@ -1,9 +1,11 @@
 <?php
 
 /**
- * Reseta títulos para status pendente limpo (sem borderô, sem etapas de aprovação).
- * Uso: php infra/scripts/reset-payables-pendente.php [id,id,...]
- * Sem IDs: reseta todos com status pendente que estão em borderô.
+ * Reseta TODOS os títulos para pendente limpo (sem borderô, sem fluxo de aprovação).
+ *
+ * Uso:
+ *   php infra/scripts/reset-payables-pendente.php --all
+ *   php infra/scripts/reset-payables-pendente.php [id,id,...]   (apenas IDs informados)
  */
 
 require dirname(__DIR__, 2) . '/app/vendor/autoload.php';
@@ -15,56 +17,62 @@ use App\Models\Bordero;
 use App\Models\Payable;
 use Illuminate\Support\Facades\DB;
 
-$ids = array_filter(array_map('intval', array_slice($argv, 1)));
+$all = in_array('--all', $argv, true);
+$ids = array_filter(array_map('intval', array_values(array_filter($argv, fn ($a) => $a !== '--all'))));
 
-$query = Payable::query();
-if ($ids) {
-    $query->whereIn('id', $ids);
-} else {
-    $query->where('status', 'pendente')->whereNotNull('bordero_id');
+if (! $all && ! $ids) {
+    echo "Informe --all para resetar 100% dos títulos, ou passe IDs específicos.\n";
+    exit(1);
 }
 
-$payables = $query->get();
-if ($payables->isEmpty()) {
+$query = Payable::query();
+if (! $all) {
+    $query->whereIn('id', $ids);
+}
+
+$total = (clone $query)->count();
+if ($total === 0) {
     echo "Nenhum título para resetar.\n";
     exit(0);
 }
 
-$borderoIds = $payables->pluck('bordero_id')->filter()->unique()->values();
+echo $all
+    ? "Resetando TODOS os {$total} título(s) para pendente...\n"
+    : "Resetando {$total} título(s)...\n";
 
-DB::transaction(function () use ($payables) {
-    foreach ($payables as $payable) {
-        ApprovalStep::where('payable_id', $payable->id)->delete();
-
-        $payable->update([
-            'status' => 'pendente',
-            'bordero_id' => null,
-            'prepared_by' => null,
-            'approved_by' => null,
-            'sent_for_approval_at' => null,
-            'approved_at' => null,
-            'rejection_reason' => null,
-            'department_id' => null,
-        ]);
-
-        echo "Reset: #{$payable->id} {$payable->title_number} — {$payable->supplier_name}\n";
+DB::transaction(function () use ($all, $ids) {
+    $payableQuery = Payable::query();
+    if (! $all) {
+        $payableQuery->whereIn('id', $ids);
     }
+    $payableIds = $payableQuery->pluck('id');
+
+    ApprovalStep::whereIn('payable_id', $payableIds)->delete();
+
+    $payableQuery->update([
+        'status' => 'pendente',
+        'bordero_id' => null,
+        'prepared_by' => null,
+        'approved_by' => null,
+        'sent_for_approval_at' => null,
+        'approved_at' => null,
+        'rejection_reason' => null,
+        'department_id' => null,
+        'paid_at' => null,
+        'payment_method' => null,
+        'paid_by' => null,
+        'conciliated_at' => null,
+        'conciliated_by' => null,
+        'conciliation_notes' => null,
+        'divergence_reason' => null,
+    ]);
+
+    Bordero::query()->delete();
 });
 
-foreach ($borderoIds as $borderoId) {
-    $bordero = Bordero::find($borderoId);
-    if (! $bordero) {
-        continue;
-    }
+$pendentes = Payable::where('status', 'pendente')->count();
+$borderos = Bordero::count();
 
-    $bordero->recalculate();
-    if ($bordero->items_count === 0) {
-        echo "Borderô removido (vazio): {$bordero->number}\n";
-        $bordero->delete();
-    } else {
-        $bordero->syncStatusFromPayables();
-        echo "Borderô atualizado: {$bordero->number} ({$bordero->items_count} títulos)\n";
-    }
-}
-
-echo "Concluído. {$payables->count()} título(s) em pendente limpo.\n";
+echo "Concluído.\n";
+echo "  Títulos pendentes: {$pendentes}\n";
+echo "  Borderôs restantes: {$borderos}\n";
