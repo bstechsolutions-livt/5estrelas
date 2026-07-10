@@ -33,9 +33,15 @@ class PayablesSyncService
     /**
      * @param  string|null  $mode  PayableSyncRun::MODE_* (default incremental — req 5.3)
      * @param  string  $trigger  PayableSyncRun::TRIGGER_*
+     * @param  Carbon|null  $windowFrom  Janela manual (vctIni)
+     * @param  Carbon|null  $windowTo  Janela manual (vctFim)
      */
-    public function run(?string $mode = null, string $trigger = PayableSyncRun::TRIGGER_SCHEDULED): PayableSyncRun
-    {
+    public function run(
+        ?string $mode = null,
+        string $trigger = PayableSyncRun::TRIGGER_SCHEDULED,
+        ?Carbon $windowFrom = null,
+        ?Carbon $windowTo = null,
+    ): PayableSyncRun {
         $mode ??= PayableSyncRun::MODE_INCREMENTAL;
         $env = strtoupper(config('senior.environment', 'HML'));
 
@@ -65,7 +71,7 @@ class PayablesSyncService
             ]);
         }
 
-        [$vctIni, $vctFim] = $this->window($mode);
+        [$vctIni, $vctFim] = $this->window($mode, $windowFrom, $windowTo);
 
         $run = PayableSyncRun::create([
             'environment' => $env, 'mode' => $mode, 'trigger' => $trigger,
@@ -217,8 +223,12 @@ class PayablesSyncService
     }
 
     /** Janela de vencimento [ini, fim] conforme o modo (req 5). */
-    private function window(string $mode): array
+    private function window(string $mode, ?Carbon $overrideFrom = null, ?Carbon $overrideTo = null): array
     {
+        if ($overrideFrom && $overrideTo) {
+            return [$overrideFrom->copy()->startOfDay(), $overrideTo->copy()->endOfDay()];
+        }
+
         if ($mode === PayableSyncRun::MODE_FULL) {
             return [null, null];
         }

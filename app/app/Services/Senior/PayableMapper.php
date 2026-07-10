@@ -4,6 +4,7 @@ namespace App\Services\Senior;
 
 use App\Models\Payable;
 use App\Models\PayableRateio;
+use App\Models\SeniorSupplier;
 use Carbon\Carbon;
 
 /**
@@ -76,14 +77,22 @@ class PayableMapper
         return $out;
     }
 
-    /** Nome de exibição do fornecedor (a Senior CP não retorna o nome, só o código). */
+    /** Nome de exibição do fornecedor (cache local ou docIdeFav da Senior). */
     private function supplierName(array $titulo): string
     {
+        $codEmp = isset($titulo['codEmp']) ? (int) $titulo['codEmp'] : null;
+        $codFor = $titulo['codFor'] ?? null;
+        if ($codEmp && $codFor !== null && $codFor !== '') {
+            $cached = SeniorSupplier::resolveName($codEmp, $codFor);
+            if ($cached) {
+                return $cached;
+            }
+        }
+
         $doc = trim((string) ($titulo['docIdeFav'] ?? ''));
         if ($doc !== '') {
             return $doc;
         }
-        $codFor = $titulo['codFor'] ?? null;
 
         return $codFor !== null && $codFor !== '' ? 'Fornecedor ' . $codFor : 'Fornecedor não identificado';
     }
