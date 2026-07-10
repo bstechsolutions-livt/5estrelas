@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ApprovalStep extends Model
 {
     protected $fillable = [
-        'payable_id', 'order', 'level_name', 'status',
-        'assigned_to', 'resolved_by', 'resolved_at', 'comment',
+        'payable_id', 'order', 'level_name', 'role_label', 'approver_type', 'approver_department_id',
+        'status', 'assigned_to', 'resolved_by', 'resolved_at', 'comment',
     ];
 
     protected function casts(): array

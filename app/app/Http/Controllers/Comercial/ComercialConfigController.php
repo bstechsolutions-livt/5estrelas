@@ -333,6 +333,7 @@ class ComercialConfigController extends Controller
 
         $data = $request->validate([
             'tag' => 'nullable|string|max:50',
+            'apelido' => 'nullable|string|max:100',
             'tipo' => ['nullable', 'in:'.implode(',', Filial::tiposValidos())],
             'ativo' => 'boolean',
             'ordem' => 'nullable|integer',

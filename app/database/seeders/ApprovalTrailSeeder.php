@@ -2,19 +2,21 @@
 
 namespace Database\Seeders;
 
+use App\Models\ApprovalFlowArea;
 use App\Models\ApprovalTrail;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * Trilhas de aprovação conforme organograma v3.0 (jun/2026).
- * A etapa "gerência" da trilha é absorvida pela 1ª etapa do departamento (gestor no cadastro).
+ * Trilhas de aprovação conforme organograma v3.0.
+ * Rótulos sem nomes de pessoas — aprovadores via approver_type + default_user_id.
  */
 class ApprovalTrailSeeder extends Seeder
 {
     public function run(): void
     {
         ApprovalTrail::truncate();
+        ApprovalFlowArea::query()->delete();
 
         $leonardo = $this->user('Leonardo Prudente', 'leonardo@grupo5estrelas.com.br');
         $dionei = $this->user('Dionei Eurich', 'dionei@grupo5estrelas.com.br');
@@ -30,78 +32,88 @@ class ApprovalTrailSeeder extends Seeder
         $alexyxandra = $this->user('Dra. Alexyxandra', 'alexyxandra@grupo5estrelas.com.br');
 
         $finPres = [
-            [4, 'financeiro', 'Financeiro (auditoria)', $karen?->id],
-            [5, 'presidencia', 'Presidência (Leonardo Prudente)', $leonardo?->id],
+            [4, 'financeiro', 'Financeiro (auditoria)', ApprovalTrail::TYPE_DEPT_FINANCEIRO, null, null],
+            [5, 'presidencia', 'Presidência', ApprovalTrail::TYPE_USUARIO, $leonardo?->id, null],
         ];
 
-        $this->trail('matriz', [
-            [1, 'departamento', 'Departamento', null],
-            [2, 'gerencia', 'Gerência Operacional (Erismar)', $erismar?->id],
-            [3, 'diretoria', 'Diretoria (Dionei Eurich)', $dionei?->id],
+        $this->trail('matriz', 'Matriz', [
+            [1, 'departamento', 'Departamento', ApprovalTrail::TYPE_GESTOR_DEPTO, null, null],
+            [2, 'gerencia', 'Gerência Operacional', ApprovalTrail::TYPE_USUARIO, $erismar?->id, null],
+            [3, 'diretoria', 'Diretoria', ApprovalTrail::TYPE_DIRETOR_DEPTO, $dionei?->id, null],
             ...$finPres,
         ]);
 
-        $this->trail('filiais', [
-            [1, 'departamento', 'Departamento', null],
-            [2, 'gerencia', 'Gerência de Filiais (Cilas)', $cilas?->id],
-            [3, 'diretoria', 'Diretoria (Dionei Eurich)', $dionei?->id],
+        $this->trail('filiais', 'Filiais', [
+            [1, 'departamento', 'Departamento', ApprovalTrail::TYPE_GESTOR_DEPTO, null, null],
+            [2, 'gerencia', 'Gerência de Filiais', ApprovalTrail::TYPE_USUARIO, $cilas?->id, null],
+            [3, 'diretoria', 'Diretoria', ApprovalTrail::TYPE_DIRETOR_DEPTO, $dionei?->id, null],
             ...$finPres,
         ]);
 
-        $this->trail('compras', [
-            [1, 'departamento', 'Departamento', null],
-            [2, 'gerencia', 'Gerência Operacional (Erismar)', $erismar?->id],
-            [3, 'diretoria', 'Diretoria (Dionei Eurich)', $dionei?->id],
+        $this->trail('compras', 'Compras', [
+            [1, 'departamento', 'Departamento', ApprovalTrail::TYPE_GESTOR_DEPTO, null, null],
+            [2, 'gerencia', 'Gerência Operacional', ApprovalTrail::TYPE_USUARIO, $erismar?->id, null],
+            [3, 'diretoria', 'Diretoria', ApprovalTrail::TYPE_DIRETOR_DEPTO, $dionei?->id, null],
             ...$finPres,
         ]);
 
-        $this->trail('modernizacao', [
-            [1, 'departamento', 'Departamento', null],
-            [2, 'gerencia', 'Head Modernização (Matheus Xavier)', $matheus?->id],
-            [3, 'diretoria', 'Diretoria (Dionei Eurich)', $dionei?->id],
+        $this->trail('modernizacao', 'Modernização', [
+            [1, 'departamento', 'Departamento', ApprovalTrail::TYPE_GESTOR_DEPTO, null, null],
+            [2, 'gerencia', 'Head Modernização', ApprovalTrail::TYPE_USUARIO, $matheus?->id, null],
+            [3, 'diretoria', 'Diretoria', ApprovalTrail::TYPE_DIRETOR_DEPTO, $dionei?->id, null],
             ...$finPres,
         ]);
 
-        $this->trail('comercial', [
-            [1, 'departamento', 'Departamento', null],
-            [2, 'gerencia', 'Gerência Comercial (Leiliane)', $leiliane?->id],
-            [3, 'diretoria', 'Diretoria Comercial (Ana Paula)', $anaPaula?->id],
+        $this->trail('comercial', 'Comercial / Faturamento / Marketing', [
+            [1, 'departamento', 'Departamento', ApprovalTrail::TYPE_GESTOR_DEPTO, null, null],
+            [2, 'gerencia', 'Gerência Comercial', ApprovalTrail::TYPE_USUARIO, $leiliane?->id, null],
+            [3, 'diretoria', 'Diretoria Comercial', ApprovalTrail::TYPE_DIRETOR_DEPTO, $anaPaula?->id, null],
             ...$finPres,
         ]);
 
-        $this->trail('licitacao', [
-            [1, 'departamento', 'Departamento', null],
-            [2, 'gerencia', 'Gerência Licitação (Letícia)', $leticia?->id],
-            [3, 'diretoria', 'Diretoria (Luiz Farias)', $luizFarias?->id],
+        $this->trail('licitacao', 'Licitação', [
+            [1, 'departamento', 'Departamento', ApprovalTrail::TYPE_GESTOR_DEPTO, null, null],
+            [2, 'gerencia', 'Gerência Licitação', ApprovalTrail::TYPE_USUARIO, $leticia?->id, null],
+            [3, 'diretoria', 'Diretoria', ApprovalTrail::TYPE_DIRETOR_DEPTO, $luizFarias?->id, null],
             ...$finPres,
         ]);
 
-        $this->trail('dp_rh', [
-            [1, 'departamento', 'Departamento', null],
-            [2, 'gerencia', 'Head DP/RH (Silene)', $silene?->id],
-            [3, 'financeiro', 'Financeiro (auditoria)', $karen?->id],
-            [4, 'presidencia', 'Presidência (Leonardo Prudente)', $leonardo?->id],
+        $this->trail('dp_rh', 'DP / RH', [
+            [1, 'departamento', 'Departamento', ApprovalTrail::TYPE_GESTOR_DEPTO, null, null],
+            [2, 'gerencia', 'Head DP/RH', ApprovalTrail::TYPE_USUARIO, $silene?->id, null],
+            [3, 'financeiro', 'Financeiro (auditoria)', ApprovalTrail::TYPE_DEPT_FINANCEIRO, null, null],
+            [4, 'presidencia', 'Presidência', ApprovalTrail::TYPE_USUARIO, $leonardo?->id, null],
         ]);
 
-        $this->trail('juridico', [
-            [1, 'departamento', 'Departamento', null],
-            [2, 'gerencia', 'Head Jurídico (Dra. Alexyxandra)', $alexyxandra?->id],
-            [3, 'financeiro', 'Financeiro (auditoria)', $karen?->id],
-            [4, 'presidencia', 'Presidência (Leonardo Prudente)', $leonardo?->id],
+        $this->trail('juridico', 'Jurídico', [
+            [1, 'departamento', 'Departamento', ApprovalTrail::TYPE_GESTOR_DEPTO, null, null],
+            [2, 'gerencia', 'Head Jurídico', ApprovalTrail::TYPE_USUARIO, $alexyxandra?->id, null],
+            [3, 'financeiro', 'Financeiro (auditoria)', ApprovalTrail::TYPE_DEPT_FINANCEIRO, null, null],
+            [4, 'presidencia', 'Presidência', ApprovalTrail::TYPE_USUARIO, $leonardo?->id, null],
         ]);
 
-        $this->command?->info('✅ Trilhas de aprovação configuradas (8 áreas).');
+        $this->trail('financeiro', 'Financeiro', [
+            [1, 'departamento', 'Departamento', ApprovalTrail::TYPE_GESTOR_DEPTO, null, null],
+            [2, 'diretoria', 'Diretoria', ApprovalTrail::TYPE_DIRETOR_DEPTO, $dionei?->id, null],
+            [3, 'presidencia', 'Presidência', ApprovalTrail::TYPE_USUARIO, $leonardo?->id, null],
+        ]);
+
+        $this->command?->info('✅ Trilhas de aprovação configuradas (9 áreas).');
     }
 
-    private function trail(string $area, array $levels): void
+    private function trail(string $area, string $label, array $levels): void
     {
-        foreach ($levels as [$order, $levelName, $roleLabel, $userId]) {
+        ApprovalFlowArea::create(['area' => $area, 'label' => $label]);
+
+        foreach ($levels as [$order, $levelName, $roleLabel, $type, $userId, $deptId]) {
             ApprovalTrail::create([
                 'area' => $area,
                 'order' => $order,
                 'level_name' => $levelName,
                 'role_label' => $roleLabel,
+                'approver_type' => $type,
                 'default_user_id' => $userId,
+                'approver_department_id' => $deptId,
             ]);
         }
     }

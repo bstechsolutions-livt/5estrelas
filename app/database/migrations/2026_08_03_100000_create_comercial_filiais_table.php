@@ -26,6 +26,7 @@ return new class extends Migration
             $table->string('senior_id')->nullable()->unique(); // "codEmp-codFil" (business key)
             $table->string('nome');                            // razão social (Senior nomFil/nenFil)
             $table->string('fantasia')->nullable();            // nome fantasia
+            $table->string('apelido', 100)->nullable();        // nome curto local (exibição no sistema)
             $table->string('tag')->nullable();                 // sigla curta (badge — apresentação)
             $table->string('tipo')->nullable();                // seguranca | apoio (classificação local)
             $table->string('uf', 2)->nullable();               // Senior sigUfs

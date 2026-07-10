@@ -148,13 +148,13 @@ const modalFilial = ref(false)
 const editFilialId = ref(null)
 const salvandoFilial = ref(false)
 const sincronizandoFiliais = ref(false)
-const filialForm = ref({ tipo: "seguranca", tag: "" })
+const filialForm = ref({ tipo: "seguranca", tag: "", apelido: "" })
 
 const tipoFilialLabel = (t) => (t === "apoio" ? "Apoio / Serviços" : "Segurança")
 
 function abrirEditarFilial(f) {
   editFilialId.value = f.id
-  filialForm.value = { tipo: f.tipo || "seguranca", tag: f.tag || "" }
+  filialForm.value = { tipo: f.tipo || "seguranca", tag: f.tag || "", apelido: f.apelido || f.label || "" }
   modalFilial.value = true
 }
 
@@ -530,12 +530,13 @@ async function criarServico() {
           <div class="contracts-table-wrap">
             <table>
               <thead>
-                <tr><th>Cód.</th><th>Empresa</th><th>Sigla</th><th>Tipo</th><th>CNPJ</th><th>UF</th><th>Exibir</th><th style="text-align:right">Ações</th></tr>
+                <tr><th>Cód.</th><th>Empresa</th><th>Apelido</th><th>Sigla</th><th>Tipo</th><th>CNPJ</th><th>UF</th><th>Exibir</th><th style="text-align:right">Ações</th></tr>
               </thead>
               <tbody>
                 <tr v-for="f in filiais" :key="f.id" :dusk="'cfg-filial-row-' + f.id">
                   <td style="font-weight:700;color:var(--text-muted)">{{ f.cod_emp ?? '—' }}</td>
                   <td style="font-weight:600">{{ f.nome }}</td>
+                  <td style="font-weight:600;color:var(--brand-gold)">{{ f.apelido || f.label || '—' }}</td>
                   <td>{{ f.tag || '—' }}</td>
                   <td>{{ tipoFilialLabel(f.tipo) }}</td>
                   <td style="font-size:12px;color:var(--text-secondary)">{{ f.cnpj || '—' }}</td>
@@ -552,7 +553,7 @@ async function criarServico() {
                   </td>
                 </tr>
                 <tr v-if="!filiais.length">
-                  <td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Nenhuma empresa sincronizada</td>
+                  <td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">Nenhuma empresa sincronizada</td>
                 </tr>
               </tbody>
             </table>
@@ -569,9 +570,13 @@ async function criarServico() {
           </div>
           <div class="g360-modal-body" style="flex-direction:column">
             <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">
-              Nome, CNPJ e código vêm da Senior e não são editáveis aqui. Ajuste apenas a classificação e a sigla de exibição.
+              Nome e CNPJ vêm da Senior. Ajuste o <strong>apelido</strong> (nome curto usado no sistema), tipo e sigla de badge.
             </p>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div class="form-group" style="grid-column:1/-1">
+                <label class="form-label">Apelido (exibição no sistema)</label>
+                <input type="text" class="form-input" dusk="cfg-filial-apelido" v-model="filialForm.apelido" placeholder="Ex: 5 Estrelas">
+              </div>
               <div class="form-group">
                 <label class="form-label">Tipo</label>
                 <SearchSelect v-model="filialForm.tipo" :options="TIPO_FILIAL_OPTIONS" :clearable="false" dusk="cfg-filial-tipo" option-dusk-prefix="cfg-filial-tipo-opt" />

@@ -298,9 +298,9 @@ class Payable extends Model
         $map = $codEmps->isEmpty()
             ? collect()
             : \App\Models\Comercial\Filial::whereIn('cod_emp', $codEmps)
-                ->get(['cod_emp', 'nome', 'fantasia'])
+                ->get(['cod_emp', 'nome', 'fantasia', 'apelido'])
                 ->groupBy('cod_emp')
-                ->map(fn ($grupo) => $grupo->first()->fantasia ?: $grupo->first()->nome);
+                ->map(fn ($grupo) => $grupo->first()->apelido ?: $grupo->first()->fantasia ?: $grupo->first()->nome);
 
         foreach ($items as $p) {
             $p->setAttribute('empresa_nome', $p->codemp ? ($map[$p->codemp] ?? null) : null);

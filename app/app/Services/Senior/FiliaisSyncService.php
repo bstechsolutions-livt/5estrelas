@@ -122,6 +122,7 @@ class FiliaisSyncService
             $f->forceFill($attrs);
             $f->senior_id = $bk;
             $f->ativo = true;
+            $f->apelido = $f->apelido ?: Filial::gerarApelido($f->nome, $f->fantasia, $f->tag);
             $f->senior_synced_at = now();
             $f->save();
             $inserted++;
@@ -134,8 +135,10 @@ class FiliaisSyncService
             return;
         }
 
-        // Atualiza origem Senior; preserva tipo/tag/ativo/ordem (apresentação local).
+        $apelido = $existing->apelido;
+        // Atualiza origem Senior; preserva tipo/tag/ativo/ordem/apelido (apresentação local).
         $existing->forceFill($attrs);
+        $existing->apelido = $apelido;
         $existing->senior_synced_at = now();
         $existing->save();
         $updated++;

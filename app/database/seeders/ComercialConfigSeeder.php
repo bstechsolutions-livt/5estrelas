@@ -135,6 +135,7 @@ class ComercialConfigSeeder extends Seeder
                     'nome' => $nome,
                     'fantasia' => $fantasia,
                     'tag' => $fantasia,
+                    'apelido' => Filial::gerarApelido($nome, $fantasia, $fantasia),
                     'tipo' => $tipo,
                     'ativo' => true,
                     'ordem' => $ordem++,

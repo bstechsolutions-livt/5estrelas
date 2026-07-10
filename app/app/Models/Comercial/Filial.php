@@ -29,7 +29,7 @@ class Filial extends Model
         'senior_synced_at' => 'datetime',
     ];
 
-    /** Rótulo amigável para selects (fantasia curta ou razão social). */
+    /** Rótulo curto para exibição (apelido local, não vem da Senior). */
     protected $appends = ['label', 'codigo'];
 
     /** Não expõe o payload bruto da Senior nas respostas JSON. */
@@ -37,7 +37,35 @@ class Filial extends Model
 
     public function getLabelAttribute(): string
     {
-        return $this->fantasia ?: $this->nome;
+        return $this->apelido ?: $this->fantasia ?: $this->nome;
+    }
+
+    /** Gera apelido a partir do nome/fantasia/tag. */
+    public static function gerarApelido(?string $nome, ?string $fantasia = null, ?string $tag = null): string
+    {
+        if (filled($tag)) {
+            return mb_substr(trim($tag), 0, 100);
+        }
+
+        $base = trim($fantasia ?: $nome ?: '');
+        if ($base === '') {
+            return 'Filial';
+        }
+
+        $base = preg_replace('/\s+(LTDA|EIRELI|S\.?A\.?|ME|EPP|S\/A)\.?$/iu', '', $base) ?? $base;
+        $base = preg_replace('/\s+SERVI(CO|Ç)OS.*$/iu', '', $base) ?? $base;
+        $base = trim($base);
+
+        if (mb_strlen($base) > 25) {
+            $words = preg_split('/\s+/', $base) ?: [];
+            $short = $words[0] ?? $base;
+            if (isset($words[1]) && mb_strlen($short.' '.$words[1]) <= 25) {
+                $short .= ' '.$words[1];
+            }
+            $base = $short;
+        }
+
+        return mb_substr($base, 0, 100) ?: 'Filial';
     }
 
     /** Valor (string) usado nos selects de empresa — o cod_emp da Senior como string. */

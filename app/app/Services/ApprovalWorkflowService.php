@@ -74,6 +74,9 @@ class ApprovalWorkflowService
                     'payable_id' => $payable->id,
                     'order' => $order++,
                     'level_name' => $level->level_name,
+                    'role_label' => $level->role_label,
+                    'approver_type' => $level->effectiveApproverType(),
+                    'approver_department_id' => $level->approver_department_id,
                     'status' => 'pendente',
                     'assigned_to' => $this->resolveAssigneeId($level, $department, $trailArea),
                 ]);
@@ -105,7 +108,7 @@ class ApprovalWorkflowService
                 ->where('status', 'pendente')
                 ->orderBy('order')
                 ->first();
-            if ($firstStep && ($firstStep->assigned_to || $firstStep->level_name === 'financeiro')) {
+            if ($firstStep && ($firstStep->assigned_to || $this->isWildcardStep($firstStep))) {
                 $this->notifyApprover($firstStep, $payable, $sender);
             }
         });
@@ -133,7 +136,7 @@ class ApprovalWorkflowService
         PayableComment::create([
             'payable_id' => $payable->id,
             'user_id' => $approver->id,
-            'body' => "Aprovado na etapa: " . (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name)
+            'body' => "Aprovado na etapa: " . ($step->role_label ?: (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name))
                 . ($comment ? " — {$comment}" : ''),
             'type' => 'approval',
         ]);
@@ -335,14 +338,15 @@ class ApprovalWorkflowService
             ->pluck('payable_id');
 
         if ($this->userBelongsToFinanceDepartment($user)) {
-            $financePayables = ApprovalStep::where('level_name', 'financeiro')
+            $financePayables = ApprovalStep::where('approver_type', ApprovalTrail::TYPE_DEPT_FINANCEIRO)
                 ->where('status', 'pendente')
                 ->pluck('payable_id');
             $payableIds = $payableIds->merge($financePayables);
         }
 
         if ($user->hasPermission('*') === false) {
-            $presidencyIds = ApprovalStep::where('level_name', 'presidencia')
+            $presidencyIds = ApprovalStep::where('approver_type', ApprovalTrail::TYPE_USUARIO)
+                ->where('level_name', 'presidencia')
                 ->where('status', 'pendente')
                 ->pluck('payable_id');
             if ($presidencyIds->isNotEmpty() && $this->isPresidentSubstitute($user)) {
@@ -406,15 +410,19 @@ class ApprovalWorkflowService
             $trailArea = $item['trail_area'];
             $assigneeId = $this->resolveAssigneeId($level, $department, $trailArea);
             $assigneeName = $this->resolveAssigneeName($level, $assigneeId);
-            $roleLabel = $this->effectiveRoleLabel($level, $department, $trailArea);
-            $configured = $level->level_name === 'financeiro'
-                ? (Department::financeApprovers()->exists() || $assigneeId !== null)
-                : $assigneeId !== null;
+            $roleLabel = $level->role_label;
+            $type = $level->effectiveApproverType();
+            $configured = match ($type) {
+                ApprovalTrail::TYPE_DEPT_FINANCEIRO => Department::financeApprovers()->exists() || $assigneeId !== null,
+                ApprovalTrail::TYPE_DEPARTAMENTO => $assigneeId !== null || $this->departmentHasMembers($level->approver_department_id),
+                default => $assigneeId !== null,
+            };
             $steps[] = [
                 'order' => $order++,
                 'level_name' => $level->level_name,
-                'level_label' => ApprovalStep::LEVEL_LABELS[$level->level_name] ?? $level->level_name,
+                'level_label' => $roleLabel,
                 'role_label' => $roleLabel,
+                'approver_type' => $type,
                 'assignee_id' => $assigneeId,
                 'assignee_name' => $assigneeName,
                 'configured' => $configured,
@@ -502,32 +510,35 @@ class ApprovalWorkflowService
 
     private function resolveAssigneeId(ApprovalTrail $level, ?Department $department, ?string $area = null): ?int
     {
-        if ($level->level_name === 'departamento') {
-            if ($department?->manager_id) {
-                return $department->manager_id;
-            }
-            if ($area) {
-                return ApprovalTrail::where('area', $area)
-                    ->where('level_name', 'gerencia')
-                    ->value('default_user_id');
-            }
+        return match ($level->effectiveApproverType()) {
+            ApprovalTrail::TYPE_GESTOR_DEPTO => $department?->manager_id
+                ?? ($area ? ApprovalTrail::where('area', $area)->where('level_name', 'gerencia')->value('default_user_id') : null),
+            ApprovalTrail::TYPE_DIRETOR_DEPTO => $department?->director_id ?? $level->default_user_id,
+            ApprovalTrail::TYPE_DEPT_FINANCEIRO => Department::financeApprovers()->exists()
+                ? null
+                : $level->default_user_id,
+            ApprovalTrail::TYPE_DEPARTAMENTO => $this->resolveDepartmentManagerId($level->approver_department_id),
+            ApprovalTrail::TYPE_USUARIO => $level->default_user_id,
+            default => $level->default_user_id,
+        };
+    }
 
+    private function resolveDepartmentManagerId(?int $departmentId): ?int
+    {
+        if (! $departmentId) {
             return null;
         }
 
-        if ($level->level_name === 'diretoria' && $department?->director_id) {
-            return $department->director_id;
+        return Department::whereKey($departmentId)->value('manager_id');
+    }
+
+    private function departmentHasMembers(?int $departmentId): bool
+    {
+        if (! $departmentId) {
+            return false;
         }
 
-        if ($level->level_name === 'financeiro') {
-            if (Department::financeApprovers()->exists()) {
-                return null;
-            }
-
-            return $level->default_user_id;
-        }
-
-        return $level->default_user_id;
+        return User::where('department_id', $departmentId)->where('is_active', true)->exists();
     }
 
     /** @return \Generator<int, array{level: ApprovalTrail, trail_area: string}> */
@@ -547,51 +558,83 @@ class ApprovalWorkflowService
 
     private function shouldSkipLevel(ApprovalTrail $level, ?Department $department, string $area): bool
     {
-        if ($level->level_name === 'gerencia' && $this->shouldSkipGerenciaStep($department, $area)) {
+        if ($level->level_name === 'gerencia' && $this->trailHasGestorDepto($area)) {
             return true;
         }
 
-        // 1ª e última etapa nunca pulam — sem aprovador, o envio é bloqueado no preview
-        if (in_array($level->level_name, ['departamento', 'presidencia'], true)) {
+        $type = $level->effectiveApproverType();
+
+        if (in_array($type, [ApprovalTrail::TYPE_GESTOR_DEPTO, ApprovalTrail::TYPE_DEPT_FINANCEIRO], true)) {
+            if ($type === ApprovalTrail::TYPE_DEPT_FINANCEIRO && Department::financeApprovers()->exists()) {
+                return false;
+            }
+
             return false;
         }
 
-        if ($level->level_name === 'financeiro' && Department::financeApprovers()->exists()) {
-            return false;
+        if ($type === ApprovalTrail::TYPE_DEPARTAMENTO) {
+            return $this->resolveAssigneeId($level, $department, $area) === null
+                && ! $this->departmentHasMembers($level->approver_department_id);
         }
 
         return $this->resolveAssigneeId($level, $department, $area) === null;
     }
 
-    private function shouldSkipGerenciaStep(?Department $department, string $area): bool
+    private function trailHasGestorDepto(string $area): bool
     {
-        // A 1ª etapa (departamento) absorve a gerência — evita Erismar duas vezes.
-        return ApprovalTrail::where('area', $area)->where('level_name', 'gerencia')->exists();
-    }
-
-    private function effectiveRoleLabel(ApprovalTrail $level, ?Department $department, string $area): string
-    {
-        if ($level->level_name === 'departamento') {
-            $gerencia = ApprovalTrail::where('area', $area)->where('level_name', 'gerencia')->first();
-            if ($gerencia) {
-                return $gerencia->role_label;
-            }
-        }
-
-        return $level->role_label;
+        return ApprovalTrail::where('area', $area)
+            ->where(function ($q) {
+                $q->where('approver_type', ApprovalTrail::TYPE_GESTOR_DEPTO)
+                    ->orWhere('level_name', 'departamento');
+            })
+            ->exists();
     }
 
     private function resolveAssigneeName(ApprovalTrail $level, ?int $assigneeId): ?string
     {
-        if ($level->level_name === 'financeiro') {
-            if (Department::financeApprovers()->exists()) {
-                $count = Department::financeApprovers()->count();
+        $type = $level->effectiveApproverType();
 
-                return "Equipe Financeiro ({$count})";
-            }
+        if ($type === ApprovalTrail::TYPE_DEPT_FINANCEIRO && Department::financeApprovers()->exists()) {
+            $count = Department::financeApprovers()->count();
+
+            return "Equipe Financeiro ({$count})";
+        }
+
+        if ($type === ApprovalTrail::TYPE_DEPARTAMENTO && ! $assigneeId && $level->approver_department_id) {
+            $dept = Department::find($level->approver_department_id);
+            $count = User::where('department_id', $level->approver_department_id)->where('is_active', true)->count();
+
+            return $dept ? "{$dept->name} ({$count})" : null;
         }
 
         return $assigneeId ? User::whereKey($assigneeId)->value('name') : null;
+    }
+
+    private function stepApproverType(ApprovalStep $step): string
+    {
+        if ($step->approver_type) {
+            return $step->approver_type;
+        }
+
+        return match ($step->level_name) {
+            'departamento' => ApprovalTrail::TYPE_GESTOR_DEPTO,
+            'diretoria' => ApprovalTrail::TYPE_DIRETOR_DEPTO,
+            'financeiro' => ApprovalTrail::TYPE_DEPT_FINANCEIRO,
+            default => ApprovalTrail::TYPE_USUARIO,
+        };
+    }
+
+    private function isWildcardStep(ApprovalStep $step): bool
+    {
+        $type = $this->stepApproverType($step);
+
+        return $type === ApprovalTrail::TYPE_DEPT_FINANCEIRO
+            || ($type === ApprovalTrail::TYPE_DEPARTAMENTO && $step->approver_department_id);
+    }
+
+    private function userBelongsToDepartment(User $user, int $departmentId): bool
+    {
+        return $user->department_id === $departmentId;
     }
 
     private function userBelongsToFinanceDepartment(User $user): bool
@@ -623,7 +666,15 @@ class ApprovalWorkflowService
         }
 
         // Etapa financeiro: qualquer integrante do departamento Financeiro
-        if ($step->level_name === 'financeiro' && $this->userBelongsToFinanceDepartment($approver)) {
+        if ($this->stepApproverType($step) === ApprovalTrail::TYPE_DEPT_FINANCEIRO
+            && $this->userBelongsToFinanceDepartment($approver)) {
+            return true;
+        }
+
+        // Etapa departamento específico: gestor ou qualquer membro ativo
+        if ($this->stepApproverType($step) === ApprovalTrail::TYPE_DEPARTAMENTO
+            && $step->approver_department_id
+            && $this->userBelongsToDepartment($approver, (int) $step->approver_department_id)) {
             return true;
         }
 
@@ -694,8 +745,15 @@ class ApprovalWorkflowService
     {
         $recipients = collect();
 
-        if ($step->level_name === 'financeiro') {
+        if ($this->stepApproverType($step) === ApprovalTrail::TYPE_DEPT_FINANCEIRO) {
             $recipients = Department::financeApprovers()->pluck('id');
+            if ($recipients->isEmpty() && $step->assigned_to) {
+                $recipients = collect([$step->assigned_to]);
+            }
+        } elseif ($this->stepApproverType($step) === ApprovalTrail::TYPE_DEPARTAMENTO && $step->approver_department_id) {
+            $recipients = User::where('department_id', $step->approver_department_id)
+                ->where('is_active', true)
+                ->pluck('id');
             if ($recipients->isEmpty() && $step->assigned_to) {
                 $recipients = collect([$step->assigned_to]);
             }
@@ -707,7 +765,7 @@ class ApprovalWorkflowService
             $notification = Notification::create([
                 'user_id' => $userId,
                 'title' => 'Aprovação pendente',
-                'body' => "Título {$payable->title_number} (R$ " . number_format($payable->amount, 2, ',', '.') . ") aguarda sua aprovação na etapa: " . (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name),
+                'body' => "Título {$payable->title_number} (R$ " . number_format($payable->amount, 2, ',', '.') . ") aguarda sua aprovação na etapa: " . ($step->role_label ?: (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name)),
                 'type' => 'approval_pending',
                 'link' => "/financeiro/contas-pagar/{$payable->id}",
                 'data' => [
