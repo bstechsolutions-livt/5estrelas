@@ -1,19 +1,22 @@
 <?php
 
 /**
- * Remove dados de demonstração / teste (Financeiro + Gestão de Contratos).
+ * Remove dados de TESTE inseridos para validação (Financeiro + Gestão de Contratos).
+ *
+ * Não é só seeder/mock: apaga TUDO que foi cadastrado para testar o fluxo,
+ * para o cliente começar com base limpa e dados reais (Senior, importação, etc.).
  *
  * Financeiro (--financeiro):
- *   - Títulos com senior_raw._demo = true (PayableSeeder)
- *   - Importações OFX demo (file_name demo-*)
- *   - NÃO remove títulos reais da Senior (sem flag _demo)
+ *   - Todos os títulos, borderôs, etapas de aprovação, anexos, comentários, rateios
+ *   - Todas as importações OFX / conciliação
+ *   - Mantém: alçada (payable_roles), filiais, usuários, fluxos configurados
  *
  * Contratos (--contratos):
- *   - Contratos, alvarás, equipamentos, anexos, reajustes (dados do GestaoContratosDemoSeeder)
- *   - Mantém cadastros: tipos de índice, tipos de alvará, tipos de equipamento
+ *   - Contratos, alvarás, equipamentos, anexos, reajustes
+ *   - Mantém: tipos de índice, tipos de alvará, tipos de equipamento
  *
  * Uso:
- *   php infra/scripts/reset-demo-data.php --dry-run
+ *   php infra/scripts/reset-demo-data.php --dry-run --all
  *   php infra/scripts/reset-demo-data.php --financeiro
  *   php infra/scripts/reset-demo-data.php --contratos
  *   php infra/scripts/reset-demo-data.php --all
@@ -25,6 +28,7 @@ $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use App\Models\ApprovalStep;
 use App\Models\BankStatementImport;
+use App\Models\Bordero;
 use App\Models\Payable;
 use App\Models\PayableComment;
 use App\Models\PayableDocument;
@@ -38,6 +42,7 @@ use App\Models\v2\BsGestaoEquipamentoFoto;
 use App\Models\v2\BsGestaoEquipamentoOcorrencia;
 use App\Models\v2\BsGestaoEquipamentoTratativa;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 $dryRun = in_array('--dry-run', $argv, true);
@@ -53,45 +58,40 @@ if (! $financeiro && ! $contratos) {
 $report = [];
 
 if ($financeiro) {
-    $demoPayables = Payable::query()
-        ->whereJsonContains('senior_raw->_demo', true)
-        ->get();
-
-    $demoOfx = BankStatementImport::query()
-        ->where('file_name', 'like', 'demo-%')
-        ->get();
-
     $report['financeiro'] = [
-        'titulos_demo' => $demoPayables->count(),
-        'ofx_demo' => $demoOfx->count(),
-        'titulos_totais_antes' => Payable::count(),
+        'titulos' => Payable::count(),
+        'borderos' => Bordero::count(),
+        'etapas_aprovacao' => ApprovalStep::count(),
+        'documentos' => PayableDocument::count(),
+        'comentarios' => PayableComment::count(),
+        'ofx_imports' => BankStatementImport::count(),
     ];
 
     if (! $dryRun) {
-        DB::transaction(function () use ($demoPayables, $demoOfx) {
-            $ids = $demoPayables->pluck('id');
+        DB::transaction(function () {
+            PayableDocument::all()->each(function (PayableDocument $doc) {
+                if ($doc->path) {
+                    Storage::disk('public')->delete($doc->path);
+                }
+            });
 
-            if ($ids->isNotEmpty()) {
-                ApprovalStep::whereIn('payable_id', $ids)->delete();
+            ApprovalStep::query()->delete();
+            PayableDocument::query()->delete();
+            PayableComment::query()->delete();
+            PayableRateio::query()->delete();
+            Payable::query()->delete();
+            Bordero::query()->delete();
 
-                PayableDocument::whereIn('payable_id', $ids)->each(function (PayableDocument $doc) {
-                    if ($doc->path) {
-                        Storage::disk('public')->delete($doc->path);
-                    }
-                    $doc->delete();
-                });
-
-                PayableComment::whereIn('payable_id', $ids)->delete();
-                PayableRateio::whereIn('payable_id', $ids)->delete();
-                Payable::whereIn('id', $ids)->delete();
-            }
-
-            $demoOfx->each(function (BankStatementImport $import) {
+            BankStatementImport::all()->each(function (BankStatementImport $import) {
                 if ($import->file_path) {
                     Storage::disk('local')->delete($import->file_path);
                 }
-                $import->delete();
             });
+            BankStatementImport::query()->delete();
+
+            if (Schema::hasTable('payable_sync_runs')) {
+                DB::table('payable_sync_runs')->delete();
+            }
         });
     }
 }
@@ -115,7 +115,7 @@ if ($contratos) {
             });
             BsGestaoEquipamentoFoto::query()->delete();
 
-            if (DB::getSchemaBuilder()->hasTable('bs_gestao_equipamento_hist_validade')) {
+            if (Schema::hasTable('bs_gestao_equipamento_hist_validade')) {
                 DB::table('bs_gestao_equipamento_hist_validade')->delete();
             }
 
@@ -136,14 +136,15 @@ if ($contratos) {
     }
 }
 
-echo ($dryRun ? "[DRY-RUN] " : '') . "Reset demo data\n";
+echo ($dryRun ? "[DRY-RUN] " : '') . "Limpeza de dados de teste\n";
 echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
 
 if ($dryRun) {
     echo "Nada foi alterado. Rode sem --dry-run para executar.\n";
 } else {
     if ($financeiro) {
-        echo 'Títulos restantes (reais): ' . Payable::count() . "\n";
+        echo 'Títulos restantes: ' . Payable::count() . "\n";
+        echo 'Borderôs restantes: ' . Bordero::count() . "\n";
     }
     if ($contratos) {
         echo 'Contratos restantes: ' . BsGestaoContrato::count() . "\n";
