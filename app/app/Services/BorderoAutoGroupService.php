@@ -14,28 +14,15 @@ use Illuminate\Support\Facades\DB;
 class BorderoAutoGroupService
 {
     public function __construct(
-        private PayableBranchScope $branchScope,
-        private PayableDepartmentClassifier $classifier,
+        private BorderoAutoRuleFilterService $filters,
     ) {}
 
     /** @return Builder<Payable> */
     public function eligibleQuery(?User $user, BorderoAutoRule $rule): Builder
     {
-        $query = Payable::query()
-            ->whereNull('bordero_id')
-            ->whereIn('status', ['pendente', 'em_preparacao', 'reprovado']);
+        $query = $this->filters->baseOpenQuery($user);
 
-        if ($user) {
-            $this->branchScope->applyFilter($query, $user);
-        }
-
-        if ($rule->eligibility_mode === BorderoAutoRule::ELIGIBILITY_DUE_WITHIN) {
-            $days = max(1, (int) ($rule->eligibility_due_days ?? 30));
-            $limit = Carbon::today()->addDays($days)->toDateString();
-            $query->whereNotNull('due_date')->whereDate('due_date', '<=', $limit);
-        }
-
-        return $query;
+        return $this->filters->applyRule($rule, $query);
     }
 
     /**
@@ -50,7 +37,6 @@ class BorderoAutoGroupService
     public function preview(?User $user, BorderoAutoRule $rule): array
     {
         $payables = $this->eligibleQuery($user, $rule)
-            ->orderBy('codemp')
             ->orderBy('due_date')
             ->get();
 
@@ -61,7 +47,6 @@ class BorderoAutoGroupService
 
         $groups = [];
         $skippedSingles = 0;
-        $unclassified = 0;
 
         foreach ($rawGroups as $bucket) {
             if (count($bucket['payables']) < $min) {
@@ -69,14 +54,8 @@ class BorderoAutoGroupService
                 continue;
             }
 
-            if ($bucket['segment_type'] === 'unclassified') {
-                $unclassified += count($bucket['payables']);
-            }
-
             $groups[] = $this->formatGroup($bucket, $rule);
         }
-
-        usort($groups, fn ($a, $b) => $b['titles_count'] <=> $a['titles_count']);
 
         $eligibleTotal = $payables->count();
         $groupedTitles = array_sum(array_column($groups, 'titles_count'));
@@ -91,12 +70,11 @@ class BorderoAutoGroupService
                 'total_amount_in_groups' => round(array_sum(array_column($groups, 'total_amount')), 2),
             ],
             'skipped_singles' => $skippedSingles,
-            'unclassified_count' => $unclassified,
+            'unclassified_count' => 0,
             'rules_summary' => $rule->rulesSummary(),
         ];
     }
 
-    /** Aplica a regra nos títulos abertos (todos os grupos da simulação). */
     public function applyRule(?User $user, BorderoAutoRule $rule): array
     {
         $preview = $this->preview($user, $rule);
@@ -110,7 +88,6 @@ class BorderoAutoGroupService
         return $result;
     }
 
-    /** Cron: executa todas as regras ativas em ordem. */
     public function runActiveRulesForCron(): array
     {
         $rules = BorderoAutoRule::query()
@@ -158,8 +135,7 @@ class BorderoAutoGroupService
 
         DB::transaction(function () use ($groups, $user, $rule, &$createdIds) {
             foreach ($groups as $group) {
-                $payableIds = $group['payable_ids'];
-                $payables = Payable::whereIn('id', $payableIds)
+                $payables = Payable::whereIn('id', $group['payable_ids'])
                     ->whereNull('bordero_id')
                     ->whereIn('status', ['pendente', 'em_preparacao', 'reprovado'])
                     ->get();
@@ -190,7 +166,7 @@ class BorderoAutoGroupService
                 AuditLogger::log(
                     event: 'bordero.created',
                     module: 'financeiro.contas_pagar',
-                    description: "Borderô automático ({$source}: {$rule->name}) {$bordero->number}: {$bordero->items_count} título(s) — {$group['label']}",
+                    description: "Borderô automático ({$source}: {$rule->name}) {$bordero->number}: {$bordero->items_count} título(s)",
                     auditable: $bordero,
                 );
             }
@@ -208,46 +184,27 @@ class BorderoAutoGroupService
      */
     private function bucketPayables(Collection $payables, BorderoAutoRule $rule): array
     {
-        $baseBuckets = [];
-
-        foreach ($payables as $payable) {
-            $parts = $this->resolveGroupParts($payable, $rule);
-            $baseKey = implode('|', array_map(fn (array $p) => "{$p['key']}:{$p['id']}", $parts));
-            $segmentLabel = implode(' · ', array_map(fn (array $p) => $p['label'], $parts));
-            $primaryType = $parts[array_key_last($parts)]['key'] ?? 'outros';
-            $emp = (int) ($payable->codemp ?? 0);
-
-            if (! isset($baseBuckets[$baseKey])) {
-                $baseBuckets[$baseKey] = [
-                    'base_key' => $baseKey,
-                    'codemp' => $emp,
-                    'empresa_nome' => $payable->getAttribute('empresa_nome') ?? ($emp ? "Empresa {$emp}" : 'Sem empresa'),
-                    'segment_type' => $primaryType,
-                    'segment_id' => $baseKey,
-                    'segment_label' => $segmentLabel,
-                    'department_id' => $this->departmentIdFromParts($parts),
-                    'codccu' => $this->codccuFromParts($parts, $payable),
-                    'payables' => [],
-                ];
-            }
-
-            $baseBuckets[$baseKey]['payables'][] = $payable;
+        if ($payables->isEmpty()) {
+            return [];
         }
 
+        $base = [
+            'base_key' => 'matched',
+            'label' => $rule->name,
+            'payables' => $payables->all(),
+        ];
+
+        $chunks = match ($rule->due_grouping) {
+            BorderoAutoRule::DUE_SAME_DAY => $this->splitBySameDay($base),
+            BorderoAutoRule::DUE_MAX_SPAN => $this->splitByMaxSpan($base, max(1, (int) $rule->max_due_span_days)),
+            default => [$base],
+        };
+
         $final = [];
-
-        foreach ($baseBuckets as $base) {
-            $chunks = match ($rule->due_grouping) {
-                BorderoAutoRule::DUE_SAME_DAY => $this->splitBySameDay($base),
-                BorderoAutoRule::DUE_MAX_SPAN => $this->splitByMaxSpan($base, max(1, (int) $rule->max_due_span_days)),
-                default => [$base],
-            };
-
-            foreach ($chunks as $i => $chunk) {
-                $chunk['key'] = $this->finalizeKey($chunk, $rule, $i);
-                $chunk['due_label'] = $this->dueLabelForChunk($chunk, $rule);
-                $final[] = $chunk;
-            }
+        foreach ($chunks as $i => $chunk) {
+            $chunk['key'] = $this->finalizeKey($chunk, $rule, $i);
+            $chunk['due_label'] = $this->dueLabelForChunk($chunk, $rule);
+            $final[] = $chunk;
         }
 
         return $final;
@@ -390,18 +347,14 @@ class BorderoAutoGroupService
         $amount = array_sum(array_map(fn (Payable $p) => (float) $p->amount, $payables));
         $ids = array_map(fn (Payable $p) => $p->id, $payables);
 
-        $labelParts = array_filter([$bucket['segment_label'], $bucket['due_label'] ?? null]);
-        $label = implode(' · ', $labelParts) ?: $bucket['empresa_nome'];
+        $label = $bucket['label'];
+        if (! empty($bucket['due_label'])) {
+            $label .= ' · ' . $bucket['due_label'];
+        }
 
         return [
             'key' => $bucket['key'],
             'label' => $label,
-            'codemp' => $bucket['codemp'],
-            'empresa_nome' => $bucket['empresa_nome'],
-            'segment_type' => $bucket['segment_type'],
-            'segment_label' => $bucket['segment_label'],
-            'department_id' => $bucket['department_id'],
-            'codccu' => $bucket['codccu'],
             'due_label' => $bucket['due_label'] ?? null,
             'titles_count' => count($payables),
             'total_amount' => round($amount, 2),
@@ -413,142 +366,7 @@ class BorderoAutoGroupService
                 'supplier_name' => $p->supplier_name,
                 'amount' => (float) $p->amount,
                 'due_date' => $p->due_date?->toDateString(),
-            ], $payables), 0, 3),
+            ], $payables), 0, 5),
         ];
-    }
-
-    /**
-     * @return list<array{key: string, id: string, label: string, department_id?: int}>
-     */
-    private function resolveGroupParts(Payable $payable, BorderoAutoRule $rule): array
-    {
-        $parts = [];
-
-        foreach ($rule->normalizedGroupBy() as $dimension) {
-            $parts[] = match ($dimension) {
-                'empresa' => [
-                    'key' => 'empresa',
-                    'id' => (string) ((int) ($payable->codemp ?? 0)),
-                    'label' => $payable->getAttribute('empresa_nome')
-                        ?? (((int) ($payable->codemp ?? 0)) ? 'Empresa ' . $payable->codemp : 'Sem empresa'),
-                ],
-                'filial' => [
-                    'key' => 'filial',
-                    'id' => (string) ((int) ($payable->codfil ?? 0)),
-                    'label' => ((int) ($payable->codfil ?? 0)) ? 'Filial ' . $payable->codfil : 'Sem filial',
-                ],
-                'departamento' => $this->departmentPart($payable),
-                'ccu' => [
-                    'key' => 'ccu',
-                    'id' => ($ccu = trim((string) ($payable->codccu ?? ''))) !== '' ? $ccu : '0',
-                    'label' => $ccu !== '' ? "CCU {$ccu}" : 'Sem CCU',
-                ],
-                'fornecedor' => $this->supplierPart($payable),
-                'natureza' => [
-                    'key' => 'natureza',
-                    'id' => (string) ((int) ($payable->codntg ?? 0)),
-                    'label' => ((int) ($payable->codntg ?? 0)) ? 'Natureza ' . $payable->codntg : 'Sem natureza',
-                ],
-                'transacao' => [
-                    'key' => 'transacao',
-                    'id' => ($tns = trim((string) ($payable->codtns ?? ''))) !== '' ? $tns : '0',
-                    'label' => $tns !== '' ? "Trans. {$tns}" : 'Sem transação',
-                ],
-                'tipo_titulo' => [
-                    'key' => 'tipo_titulo',
-                    'id' => ($tpt = trim((string) ($payable->codtpt ?? ''))) !== '' ? $tpt : '0',
-                    'label' => $tpt !== '' ? "Tipo {$tpt}" : 'Sem tipo',
-                ],
-                'categoria' => [
-                    'key' => 'categoria',
-                    'id' => ($cat = trim((string) ($payable->category ?? ''))) !== '' ? $cat : '0',
-                    'label' => $cat !== '' ? $cat : 'Sem categoria',
-                ],
-                default => [
-                    'key' => $dimension,
-                    'id' => '0',
-                    'label' => $dimension,
-                ],
-            };
-        }
-
-        return $parts;
-    }
-
-    /** @return array{key: string, id: string, label: string, department_id?: int} */
-    private function departmentPart(Payable $payable): array
-    {
-        $department = $this->classifier->departmentForPayable($payable);
-        if ($department) {
-            return [
-                'key' => 'departamento',
-                'id' => (string) $department->id,
-                'label' => $department->name,
-                'department_id' => $department->id,
-            ];
-        }
-
-        return [
-            'key' => 'departamento',
-            'id' => '0',
-            'label' => 'Sem departamento',
-        ];
-    }
-
-    /** @return array{key: string, id: string, label: string} */
-    private function supplierPart(Payable $payable): array
-    {
-        if ((int) ($payable->codfor ?? 0)) {
-            $name = trim((string) ($payable->supplier_name ?? ''));
-
-            return [
-                'key' => 'fornecedor',
-                'id' => 'codfor:' . $payable->codfor,
-                'label' => $name !== '' ? $name : "Fornecedor {$payable->codfor}",
-            ];
-        }
-
-        $cnpj = preg_replace('/\D/', '', (string) ($payable->supplier_cnpj ?? ''));
-        if ($cnpj !== '') {
-            return [
-                'key' => 'fornecedor',
-                'id' => 'cnpj:' . $cnpj,
-                'label' => trim((string) ($payable->supplier_name ?? '')) ?: "CNPJ {$cnpj}",
-            ];
-        }
-
-        $name = trim((string) ($payable->supplier_name ?? ''));
-
-        return [
-            'key' => 'fornecedor',
-            'id' => 'nome:' . ($name !== '' ? md5(mb_strtolower($name)) : '0'),
-            'label' => $name !== '' ? $name : 'Sem fornecedor',
-        ];
-    }
-
-    /** @param list<array{key: string, id: string, label: string, department_id?: int}> $parts */
-    private function departmentIdFromParts(array $parts): ?int
-    {
-        foreach ($parts as $part) {
-            if ($part['key'] === 'departamento' && isset($part['department_id'])) {
-                return $part['department_id'];
-            }
-        }
-
-        return null;
-    }
-
-    /** @param list<array{key: string, id: string, label: string}> $parts */
-    private function codccuFromParts(array $parts, Payable $payable): ?string
-    {
-        foreach ($parts as $part) {
-            if ($part['key'] === 'ccu' && $part['id'] !== '0') {
-                return $part['id'];
-            }
-        }
-
-        $ccu = trim((string) ($payable->codccu ?? ''));
-
-        return $ccu !== '' ? $ccu : null;
     }
 }

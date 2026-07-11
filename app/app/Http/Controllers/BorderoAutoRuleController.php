@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BorderoAutoRule;
 use App\Services\BorderoAutoGroupService;
+use App\Services\BorderoAutoRuleFilterService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -19,9 +20,6 @@ class BorderoAutoRuleController extends Controller
                 'id' => $rule->id,
                 'name' => $rule->name,
                 'is_active' => $rule->is_active,
-                'min_titles_per_group' => $rule->min_titles_per_group,
-                'due_grouping' => $rule->due_grouping,
-                'eligibility_mode' => $rule->eligibility_mode,
                 'rules_summary' => $rule->rulesSummary(),
                 'last_applied_at' => $rule->last_applied_at?->toIso8601String(),
                 'last_applied_count' => $rule->last_applied_count,
@@ -98,19 +96,29 @@ class BorderoAutoRuleController extends Controller
         return response()->json($preview);
     }
 
+    public function filterOptions(Request $request, BorderoAutoRuleFilterService $filterService)
+    {
+        $data = $request->validate([
+            'field' => ['required', 'string', Rule::in(array_keys(BorderoAutoRule::filterFields()))],
+        ]);
+
+        return response()->json(
+            $filterService->fieldOptions($request->user(), $data['field']),
+        );
+    }
+
     private function formPage(?BorderoAutoRule $rule, BorderoAutoGroupService $grouper, Request $request)
     {
-        $draft = $rule
-            ? $rule
-            : BorderoAutoRule::fromPayload([
-                'name' => '',
-                'group_by' => ['empresa', 'departamento'],
-                'min_titles_per_group' => 2,
-                'due_grouping' => BorderoAutoRule::DUE_NONE,
-                'max_due_span_days' => 7,
-                'eligibility_mode' => BorderoAutoRule::ELIGIBILITY_ALL,
-                'eligibility_due_days' => 30,
-            ]);
+        $draft = $rule ?? BorderoAutoRule::fromPayload([
+            'name' => '',
+            'filters' => [],
+            'filter_logic' => 'and',
+            'min_titles_per_group' => 2,
+            'due_grouping' => BorderoAutoRule::DUE_NONE,
+            'max_due_span_days' => 7,
+            'eligibility_mode' => BorderoAutoRule::ELIGIBILITY_ALL,
+            'eligibility_due_days' => 30,
+        ]);
 
         $preview = $grouper->preview($request->user(), $draft);
 
@@ -118,7 +126,8 @@ class BorderoAutoRuleController extends Controller
             'rule' => $rule ? $rule->toFormArray() : null,
             'defaults' => [
                 'name' => '',
-                'group_by' => ['empresa', 'departamento'],
+                'filters' => [],
+                'filter_logic' => 'and',
                 'min_titles_per_group' => 2,
                 'due_grouping' => BorderoAutoRule::DUE_NONE,
                 'max_due_span_days' => 7,
@@ -126,8 +135,8 @@ class BorderoAutoRuleController extends Controller
                 'eligibility_due_days' => 30,
             ],
             'options' => [
-                'group_by' => BorderoAutoRule::groupByLabels(),
-                'group_by_order' => BorderoAutoRule::GROUP_BY_ORDER,
+                'filter_fields' => BorderoAutoRule::filterFields(),
+                'operators' => BorderoAutoRule::operatorLabels(),
                 'due_grouping' => BorderoAutoRule::dueGroupingLabels(),
                 'eligibility_mode' => BorderoAutoRule::eligibilityLabels(),
             ],
@@ -142,7 +151,7 @@ class BorderoAutoRuleController extends Controller
 
             if ($result['created'] === 0) {
                 return redirect('/financeiro/borderos/automatico')
-                    ->with('error', 'Regra salva, mas nenhum borderô foi criado — não há títulos elegíveis ou grupos abaixo do mínimo.');
+                    ->with('error', 'Regra salva, mas nenhum borderô foi criado — nenhum título atende às condições ou está abaixo do mínimo.');
             }
 
             $msg = $created
@@ -162,9 +171,14 @@ class BorderoAutoRuleController extends Controller
     /** @return array<string, mixed> */
     private function validated(Request $request, bool $requireName = true): array
     {
+        $fieldKeys = array_keys(BorderoAutoRule::filterFields());
+
         $rules = [
-            'group_by' => ['required', 'array', 'min:1'],
-            'group_by.*' => ['required', 'string', Rule::in(BorderoAutoRule::GROUP_BY_ORDER)],
+            'filters' => ['required', 'array', 'min:1'],
+            'filters.*.field' => ['required', 'string', Rule::in($fieldKeys)],
+            'filters.*.operator' => ['required', 'string', Rule::in(['eq', 'in', 'contains'])],
+            'filters.*.value' => ['required', 'string', 'max:500'],
+            'filter_logic' => ['required', Rule::in(['and', 'or'])],
             'min_titles_per_group' => ['required', 'integer', 'min:2', 'max:50'],
             'due_grouping' => ['required', Rule::in([
                 BorderoAutoRule::DUE_NONE,
@@ -197,8 +211,12 @@ class BorderoAutoRuleController extends Controller
 
         $data['apply_mode'] ??= 'cron';
 
-        $rule = BorderoAutoRule::fromPayload($data);
-        $data['group_by'] = $rule->normalizedGroupBy();
+        $draft = BorderoAutoRule::fromPayload($data);
+        $data['filters'] = $draft->normalizedFilters();
+
+        if ($data['filters'] === []) {
+            abort(422, 'Informe ao menos uma condição com valor.');
+        }
 
         return $data;
     }

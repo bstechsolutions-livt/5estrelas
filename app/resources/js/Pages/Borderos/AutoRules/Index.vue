@@ -49,7 +49,8 @@ watch(() => page.props.flash?.error, (msg) => {
                         Regras de Borderô Automático
                     </h1>
                     <p class="text-sm text-gray-500 mt-1 max-w-xl">
-                        Cada regra define como agrupar títulos abertos em borderôs. O cron das <strong>6h</strong> executa todas as regras ativas.
+                        Cada regra cria borderô quando o título bate com condições específicas — natureza, filial, CCU, fornecedor, etc.
+                        O cron das <strong>6h</strong> executa todas as regras ativas.
                     </p>
                 </div>
                 <div class="flex gap-2 shrink-0">
@@ -63,7 +64,7 @@ watch(() => page.props.flash?.error, (msg) => {
             <div v-if="!rules.length" class="bg-white rounded-xl border border-gray-100 p-10 text-center">
                 <i class="pi pi-bolt text-3xl text-gray-300 mb-3"></i>
                 <p class="text-sm text-gray-600 font-medium">Nenhuma regra cadastrada</p>
-                <p class="text-xs text-gray-400 mt-1 mb-4">Crie a primeira regra para automatizar a geração de borderôs.</p>
+                <p class="text-xs text-gray-400 mt-1 mb-4">Ex.: “quando natureza = 90500 e filial = 2, criar borderô”.</p>
                 <Button label="Criar regra" icon="pi pi-plus" size="small"
                     @click="router.visit('/financeiro/borderos/automatico/criar')" />
             </div>

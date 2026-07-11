@@ -18,22 +18,10 @@ class BorderoAutoRule extends Model
 
     public const ELIGIBILITY_DUE_WITHIN = 'due_within_days';
 
-    /** Ordem canônica dos critérios de agrupamento. */
-    public const GROUP_BY_ORDER = [
-        'empresa',
-        'filial',
-        'departamento',
-        'ccu',
-        'fornecedor',
-        'natureza',
-        'transacao',
-        'tipo_titulo',
-        'categoria',
-    ];
-
     protected $fillable = [
         'name',
-        'group_by',
+        'filters',
+        'filter_logic',
         'is_active',
         'min_titles_per_group',
         'due_grouping',
@@ -48,7 +36,7 @@ class BorderoAutoRule extends Model
     ];
 
     protected $casts = [
-        'group_by' => 'array',
+        'filters' => 'array',
         'is_active' => 'boolean',
         'min_titles_per_group' => 'integer',
         'max_due_span_days' => 'integer',
@@ -58,6 +46,50 @@ class BorderoAutoRule extends Model
         'last_cron_at' => 'datetime',
         'last_cron_count' => 'integer',
     ];
+
+    /** @return array<string, array{label: string, operators: list<string>}> */
+    public static function filterFields(): array
+    {
+        return [
+            'codemp' => ['label' => 'Empresa', 'operators' => ['eq', 'in']],
+            'codfil' => ['label' => 'Filial (codFil)', 'operators' => ['eq', 'in']],
+            'department_id' => ['label' => 'Departamento', 'operators' => ['eq']],
+            'codccu' => ['label' => 'Centro de custo (CCU)', 'operators' => ['eq', 'in']],
+            'codntg' => ['label' => 'Natureza (codNtg)', 'operators' => ['eq', 'in']],
+            'codtns' => ['label' => 'Transação (codTns)', 'operators' => ['eq', 'in']],
+            'codtpt' => ['label' => 'Tipo de título (codTpt)', 'operators' => ['eq', 'in']],
+            'codfor' => ['label' => 'Código fornecedor (codFor)', 'operators' => ['eq', 'in']],
+            'supplier_cnpj' => ['label' => 'CNPJ fornecedor', 'operators' => ['eq']],
+            'supplier_name' => ['label' => 'Nome fornecedor', 'operators' => ['eq', 'contains']],
+            'category' => ['label' => 'Categoria (Hub)', 'operators' => ['eq', 'contains']],
+        ];
+    }
+
+    public static function filterColumn(string $field): ?string
+    {
+        return match ($field) {
+            'codemp' => 'codemp',
+            'codfil' => 'codfil',
+            'codccu' => 'codccu',
+            'codntg' => 'codntg',
+            'codtns' => 'codtns',
+            'codtpt' => 'codtpt',
+            'codfor' => 'codfor',
+            'supplier_cnpj' => 'supplier_cnpj',
+            'supplier_name' => 'supplier_name',
+            'category' => 'category',
+            default => null,
+        };
+    }
+
+    public static function operatorLabels(): array
+    {
+        return [
+            'eq' => 'é igual a',
+            'in' => 'está em (vírgula)',
+            'contains' => 'contém',
+        ];
+    }
 
     public function creator(): BelongsTo
     {
@@ -70,28 +102,12 @@ class BorderoAutoRule extends Model
     }
 
     /** @return array<string, string> */
-    public static function groupByLabels(): array
-    {
-        return [
-            'empresa' => 'Empresa',
-            'filial' => 'Filial (codFil)',
-            'departamento' => 'Departamento (classificação)',
-            'ccu' => 'Centro de custo (CCU)',
-            'fornecedor' => 'Fornecedor',
-            'natureza' => 'Natureza (codNtg)',
-            'transacao' => 'Transação (codTns)',
-            'tipo_titulo' => 'Tipo de título (codTpt)',
-            'categoria' => 'Categoria (Hub)',
-        ];
-    }
-
-    /** @return array<string, string> */
     public static function dueGroupingLabels(): array
     {
         return [
-            self::DUE_NONE => 'Ignorar vencimento',
-            self::DUE_SAME_DAY => 'Mesmo dia de vencimento',
-            self::DUE_MAX_SPAN => 'Diferença máxima de dias',
+            self::DUE_NONE => 'Um borderô com todos os títulos',
+            self::DUE_SAME_DAY => 'Separar por mesmo dia de vencimento',
+            self::DUE_MAX_SPAN => 'Separar por diferença máxima de dias',
         ];
     }
 
@@ -104,15 +120,37 @@ class BorderoAutoRule extends Model
         ];
     }
 
-    /** @return list<string> */
-    public function normalizedGroupBy(): array
+    /** @return list<array{field: string, operator: string, value: string}> */
+    public function normalizedFilters(): array
     {
-        $selected = array_values(array_intersect(
-            self::GROUP_BY_ORDER,
-            is_array($this->group_by) ? $this->group_by : [],
-        ));
+        $fields = self::filterFields();
+        $normalized = [];
 
-        return $selected !== [] ? $selected : ['empresa', 'departamento'];
+        foreach (is_array($this->filters) ? $this->filters : [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $field = (string) ($row['field'] ?? '');
+            $operator = (string) ($row['operator'] ?? 'eq');
+            $value = trim((string) ($row['value'] ?? ''));
+
+            if (! isset($fields[$field]) || $value === '') {
+                continue;
+            }
+
+            if (! in_array($operator, $fields[$field]['operators'], true)) {
+                $operator = $fields[$field]['operators'][0];
+            }
+
+            $normalized[] = [
+                'field' => $field,
+                'operator' => $operator,
+                'value' => $value,
+            ];
+        }
+
+        return $normalized;
     }
 
     /** @return array<string, mixed> */
@@ -121,7 +159,8 @@ class BorderoAutoRule extends Model
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'group_by' => $this->normalizedGroupBy(),
+            'filters' => $this->normalizedFilters(),
+            'filter_logic' => $this->filter_logic === 'or' ? 'or' : 'and',
             'is_active' => $this->is_active,
             'min_titles_per_group' => $this->min_titles_per_group,
             'due_grouping' => $this->due_grouping,
@@ -134,19 +173,28 @@ class BorderoAutoRule extends Model
     /** @return list<string> */
     public function rulesSummary(): array
     {
-        $labels = self::groupByLabels();
-        $groupLine = 'Agrupar por: ' . implode(' → ', array_map(
-            fn (string $key) => $labels[$key] ?? $key,
-            $this->normalizedGroupBy(),
-        ));
+        $fieldLabels = collect(self::filterFields())->mapWithKeys(fn ($m, $k) => [$k => $m['label']]);
+        $opLabels = self::operatorLabels();
+        $filters = $this->normalizedFilters();
 
-        $lines = [
-            $groupLine,
-            self::eligibilityLabels()[$this->eligibility_mode] ?? $this->eligibility_mode,
-        ];
+        $lines = [];
+        if ($filters === []) {
+            $lines[] = 'Sem condições específicas (pega todos os elegíveis).';
+        } else {
+            $joiner = $this->filter_logic === 'or' ? ' OU ' : ' E ';
+            $parts = array_map(function (array $f) use ($fieldLabels, $opLabels) {
+                $label = $fieldLabels[$f['field']] ?? $f['field'];
+                $op = $opLabels[$f['operator']] ?? $f['operator'];
+
+                return "{$label} {$op} {$f['value']}";
+            }, $filters);
+            $lines[] = 'Quando: ' . implode($joiner, $parts);
+        }
+
+        $lines[] = self::eligibilityLabels()[$this->eligibility_mode] ?? $this->eligibility_mode;
 
         if ($this->eligibility_mode === self::ELIGIBILITY_DUE_WITHIN && $this->eligibility_due_days) {
-            $lines[] = "Janela: até {$this->eligibility_due_days} dias a partir de hoje.";
+            $lines[] = "Janela: até {$this->eligibility_due_days} dias.";
         }
 
         $lines[] = self::dueGroupingLabels()[$this->due_grouping] ?? $this->due_grouping;
@@ -160,13 +208,13 @@ class BorderoAutoRule extends Model
         return $lines;
     }
 
-    /** Instância temporária a partir dos dados do formulário (simulação). */
     public static function fromPayload(array $data): self
     {
         $rule = new self;
         $rule->fill([
             'name' => $data['name'] ?? 'Nova regra',
-            'group_by' => $data['group_by'] ?? ['empresa', 'departamento'],
+            'filters' => $data['filters'] ?? [],
+            'filter_logic' => ($data['filter_logic'] ?? 'and') === 'or' ? 'or' : 'and',
             'min_titles_per_group' => $data['min_titles_per_group'] ?? 2,
             'due_grouping' => $data['due_grouping'] ?? self::DUE_NONE,
             'max_due_span_days' => $data['max_due_span_days'] ?? 7,

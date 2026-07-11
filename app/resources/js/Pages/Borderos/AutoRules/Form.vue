@@ -7,7 +7,6 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
-import Checkbox from 'primevue/checkbox'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import { useDevice } from '@/composables/useDevice'
@@ -25,9 +24,14 @@ const toast = useToast()
 
 const isEditing = computed(() => !!props.rule?.id)
 
+const emptyFilter = () => ({ field: 'codccu', operator: 'eq', value: '' })
+
 const form = useForm({
     name: props.rule?.name ?? props.defaults.name,
-    group_by: [...(props.rule?.group_by ?? props.defaults.group_by ?? ['empresa', 'departamento'])],
+    filters: props.rule?.filters?.length
+        ? props.rule.filters.map(f => ({ ...f }))
+        : [emptyFilter()],
+    filter_logic: props.rule?.filter_logic ?? props.defaults.filter_logic ?? 'and',
     min_titles_per_group: props.rule?.min_titles_per_group ?? props.defaults.min_titles_per_group,
     due_grouping: props.rule?.due_grouping ?? props.defaults.due_grouping,
     max_due_span_days: props.rule?.max_due_span_days ?? props.defaults.max_due_span_days,
@@ -37,7 +41,20 @@ const form = useForm({
 
 const livePreview = ref(props.preview)
 const simulating = ref(false)
+const fieldOptionsCache = ref({})
 let simulateTimer = null
+
+const fieldChoices = computed(() =>
+    Object.entries(props.options?.filter_fields ?? {}).map(([value, meta]) => ({
+        value,
+        label: meta.label,
+    }))
+)
+
+const filterLogicOptions = [
+    { value: 'and', label: 'Todas as condições (E)' },
+    { value: 'or', label: 'Qualquer condição (OU)' },
+]
 
 const dueGroupingOptions = computed(() =>
     Object.entries(props.options?.due_grouping ?? {}).map(([value, label]) => ({ value, label }))
@@ -46,47 +63,86 @@ const eligibilityOptions = computed(() =>
     Object.entries(props.options?.eligibility_mode ?? {}).map(([value, label]) => ({ value, label }))
 )
 
-const groupByOptions = computed(() =>
-    (props.options?.group_by_order ?? Object.keys(props.options?.group_by ?? {}))
-        .map(key => ({
-            key,
-            label: props.options?.group_by?.[key] ?? key,
-        }))
+const showMaxSpan = computed(() => form.due_grouping === 'max_span')
+const showEligibilityDays = computed(() => form.eligibility_mode === 'due_within_days')
+
+const hasValidFilters = computed(() =>
+    form.filters.some(f => String(f.value ?? '').trim() !== '')
 )
 
-const groupBySummary = computed(() => {
-    const labels = props.options?.group_by ?? {}
-    return form.group_by.map(k => labels[k] ?? k).join(' → ')
-})
+const canSubmit = computed(() => form.name && hasValidFilters.value)
 
-function toggleGroupBy(key, checked) {
-    if (checked) {
-        if (!form.group_by.includes(key)) {
-            const order = props.options?.group_by_order ?? []
-            const next = [...form.group_by, key].sort((a, b) => order.indexOf(a) - order.indexOf(b))
-            form.group_by = next
-        }
+function operatorsFor(field) {
+    const ops = props.options?.filter_fields?.[field]?.operators ?? ['eq']
+    const labels = props.options?.operators ?? {}
+    return ops.map(op => ({ value: op, label: labels[op] ?? op }))
+}
+
+function valueOptionsFor(index) {
+    const field = form.filters[index]?.field
+    return fieldOptionsCache.value[field]?.options ?? []
+}
+
+function usesSelectValue(index) {
+    const field = form.filters[index]?.field
+    const opts = valueOptionsFor(index)
+    return ['codemp', 'department_id'].includes(field) || opts.length > 0
+}
+
+async function loadFieldOptions(field) {
+    if (!field || fieldOptionsCache.value[field]) return
+    try {
+        const { data } = await window.axios.get('/financeiro/borderos/automatico/opcoes-filtro', {
+            params: { field },
+        })
+        fieldOptionsCache.value[field] = data
+    } catch {
+        fieldOptionsCache.value[field] = { options: [] }
+    }
+}
+
+function onFieldChange(index) {
+    const field = form.filters[index].field
+    const ops = operatorsFor(field)
+    form.filters[index].operator = ops[0]?.value ?? 'eq'
+    form.filters[index].value = ''
+    loadFieldOptions(field)
+    scheduleSimulate()
+}
+
+function addCondition() {
+    form.filters.push(emptyFilter())
+}
+
+function removeCondition(index) {
+    if (form.filters.length <= 1) {
+        form.filters[0] = emptyFilter()
     } else {
-        form.group_by = form.group_by.filter(k => k !== key)
+        form.filters.splice(index, 1)
     }
     scheduleSimulate()
 }
 
-const showMaxSpan = computed(() => form.due_grouping === 'max_span')
-const showEligibilityDays = computed(() => form.eligibility_mode === 'due_within_days')
-const canSubmit = computed(() => form.name && form.group_by.length > 0)
-
 function scheduleSimulate() {
     clearTimeout(simulateTimer)
-    simulateTimer = setTimeout(runSimulate, 400)
+    simulateTimer = setTimeout(runSimulate, 450)
 }
 
 async function runSimulate() {
+    if (!hasValidFilters.value) {
+        livePreview.value = {
+            groups: [],
+            summary: { eligible_titles: 0, suggested_groups: 0, titles_in_groups: 0, titles_outside_groups: 0 },
+        }
+        return
+    }
+
     simulating.value = true
     try {
         const { data } = await window.axios.post('/financeiro/borderos/automatico/simular', {
             name: form.name || 'Simulação',
-            group_by: form.group_by,
+            filters: form.filters.filter(f => String(f.value).trim() !== ''),
+            filter_logic: form.filter_logic,
             min_titles_per_group: form.min_titles_per_group,
             due_grouping: form.due_grouping,
             max_due_span_days: form.max_due_span_days,
@@ -95,14 +151,18 @@ async function runSimulate() {
         })
         livePreview.value = data
     } catch {
-        // mantém última simulação válida
+        // mantém última simulação
     } finally {
         simulating.value = false
     }
 }
 
 function submit(applyMode) {
-    const payload = { ...form.data(), apply_mode: applyMode }
+    const payload = {
+        ...form.data(),
+        filters: form.filters.filter(f => String(f.value).trim() !== ''),
+        apply_mode: applyMode,
+    }
     if (isEditing.value) {
         form.transform(() => payload).put(`/financeiro/borderos/automatico/${props.rule.id}`)
     } else {
@@ -114,20 +174,13 @@ function fmtMoney(v) {
     return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function segmentSeverity(type) {
-    const map = {
-        departamento: 'info',
-        ccu: 'warn',
-        fornecedor: 'success',
-        empresa: 'secondary',
-    }
-    return map[type] ?? 'secondary'
-}
+form.filters.forEach((row, i) => {
+    if (row.field) loadFieldOptions(row.field)
+})
 
 watch(
-    () => [form.group_by, form.min_titles_per_group, form.due_grouping, form.max_due_span_days, form.eligibility_mode, form.eligibility_due_days],
+    () => [form.filter_logic, form.min_titles_per_group, form.due_grouping, form.max_due_span_days, form.eligibility_mode, form.eligibility_due_days],
     scheduleSimulate,
-    { deep: true },
 )
 
 watch(() => page.props.flash?.success, (msg) => {
@@ -143,7 +196,7 @@ watch(() => page.props.flash?.error, (msg) => {
         :title="isMobile ? (isEditing ? 'Editar regra' : 'Nova regra') : undefined"
         :show-back="isMobile">
         <Toast />
-        <div :class="isMobile ? 'px-4 py-3 pb-28' : 'max-w-5xl mx-auto space-y-6'">
+        <div :class="isMobile ? 'px-4 py-3 pb-28' : 'max-w-6xl mx-auto space-y-6'">
             <div>
                 <button type="button" class="text-xs text-blue-600 hover:underline mb-2 inline-flex items-center gap-1"
                     @click="router.visit('/financeiro/borderos/automatico')">
@@ -152,88 +205,103 @@ watch(() => page.props.flash?.error, (msg) => {
                 <h1 :class="isMobile ? 'text-lg font-bold text-gray-800' : 'text-2xl font-bold text-gray-800'">
                     {{ isEditing ? 'Editar regra' : 'Nova regra' }}
                 </h1>
-                <p class="text-sm text-gray-500 mt-1">
-                    Defina os parâmetros e veja a simulação antes de salvar.
+                <p class="text-sm text-gray-500 mt-1 max-w-2xl">
+                    Defina <strong>quando</strong> criar o borderô — com valores específicos de natureza, filial, CCU, fornecedor, etc.
                 </p>
             </div>
 
             <div class="grid lg:grid-cols-2 gap-6 items-start">
-                <!-- Parâmetros -->
                 <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
                     <div class="px-4 py-3 border-b border-gray-100">
-                        <h2 class="text-sm font-semibold text-gray-800">Parâmetros da regra</h2>
+                        <h2 class="text-sm font-semibold text-gray-800">Condições da regra</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">Só entram títulos que batem com estas condições.</p>
                     </div>
+
                     <div class="p-4 space-y-4">
                         <div class="space-y-1">
                             <label class="block text-xs font-medium text-gray-600">Nome da regra</label>
-                            <InputText v-model="form.name" class="w-full" placeholder="Ex: DP/RH — vencimento próximo" />
-                            <p v-if="form.errors.name" class="text-xs text-red-500">{{ form.errors.name }}</p>
+                            <InputText v-model="form.name" class="w-full" placeholder="Ex: Natureza 90500 — Filial 2" />
                         </div>
 
                         <div class="space-y-2">
-                            <label class="block text-xs font-medium text-gray-600">Agrupar títulos por</label>
-                            <p class="text-[11px] text-gray-400">Marque um ou mais critérios. Títulos com os mesmos valores vão no mesmo borderô.</p>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <label v-for="opt in groupByOptions" :key="opt.key"
-                                    class="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 cursor-pointer hover:bg-gray-50"
-                                    :class="form.group_by.includes(opt.key) ? 'bg-blue-50/60 border-blue-100' : ''">
-                                    <Checkbox :model-value="form.group_by.includes(opt.key)" :binary="true"
-                                        @update:model-value="(v) => toggleGroupBy(opt.key, v)" />
-                                    <span class="text-xs text-gray-700">{{ opt.label }}</span>
-                                </label>
+                            <div class="flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-gray-600">Quando o título…</label>
+                                <Select v-model="form.filter_logic" :options="filterLogicOptions"
+                                    option-label="label" option-value="value" class="w-48" size="small" />
                             </div>
-                            <p v-if="form.errors.group_by" class="text-xs text-red-500">{{ form.errors.group_by }}</p>
-                            <p v-else-if="form.group_by.length" class="text-[11px] text-blue-700 bg-blue-50 rounded px-2 py-1">
-                                Ordem: {{ groupBySummary }}
-                            </p>
-                            <p v-else class="text-[11px] text-amber-600">Selecione ao menos um critério.</p>
+
+                            <div v-for="(cond, index) in form.filters" :key="index"
+                                class="rounded-lg border border-gray-100 p-3 space-y-2 bg-gray-50/40">
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <Select v-model="cond.field" :options="fieldChoices"
+                                        option-label="label" option-value="value" placeholder="Campo"
+                                        class="w-full" @update:model-value="onFieldChange(index)" />
+                                    <Select v-model="cond.operator" :options="operatorsFor(cond.field)"
+                                        option-label="label" option-value="value" class="w-full"
+                                        @update:model-value="scheduleSimulate" />
+                                    <div class="flex gap-1">
+                                        <Select v-if="usesSelectValue(index)" v-model="cond.value"
+                                            :options="valueOptionsFor(index)" option-label="label" option-value="value"
+                                            placeholder="Valor" class="w-full flex-1" filter show-clear
+                                            @update:model-value="scheduleSimulate" />
+                                        <InputText v-else v-model="cond.value" class="w-full flex-1"
+                                            :placeholder="cond.operator === 'in' ? 'Ex: 2363, 2566' : 'Valor'"
+                                            @update:model-value="scheduleSimulate" />
+                                        <Button icon="pi pi-trash" severity="danger" text size="small"
+                                            @click="removeCondition(index)" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Button label="Adicionar condição" icon="pi pi-plus" severity="secondary" text size="small"
+                                @click="addCondition" />
                         </div>
 
-                        <div class="space-y-1">
-                            <label class="block text-xs font-medium text-gray-600">Quais títulos entram?</label>
-                            <Select v-model="form.eligibility_mode" :options="eligibilityOptions"
-                                option-label="label" option-value="value" class="w-full" />
-                        </div>
+                        <div class="border-t border-gray-100 pt-4 space-y-3">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Opções extras</p>
 
-                        <div v-if="showEligibilityDays" class="space-y-1">
-                            <label class="block text-xs font-medium text-gray-600">Vencimento até (dias)</label>
-                            <InputNumber v-model="form.eligibility_due_days" :min="1" :max="365" class="w-full" input-class="w-full" />
-                            <p class="text-[11px] text-gray-400">Inclui vencidos.</p>
-                        </div>
+                            <div class="space-y-1">
+                                <label class="block text-xs font-medium text-gray-600">Janela de vencimento</label>
+                                <Select v-model="form.eligibility_mode" :options="eligibilityOptions"
+                                    option-label="label" option-value="value" class="w-full" />
+                            </div>
 
-                        <div class="space-y-1">
-                            <label class="block text-xs font-medium text-gray-600">Subdividir por vencimento</label>
-                            <Select v-model="form.due_grouping" :options="dueGroupingOptions"
-                                option-label="label" option-value="value" class="w-full" />
-                        </div>
+                            <div v-if="showEligibilityDays" class="space-y-1">
+                                <label class="block text-xs font-medium text-gray-600">Até quantos dias</label>
+                                <InputNumber v-model="form.eligibility_due_days" :min="1" :max="365" class="w-full md:max-w-[140px]" input-class="w-full" />
+                            </div>
 
-                        <div v-if="showMaxSpan" class="space-y-1">
-                            <label class="block text-xs font-medium text-gray-600">Diferença máxima (dias)</label>
-                            <InputNumber v-model="form.max_due_span_days" :min="1" :max="90" class="w-full" input-class="w-full" />
-                        </div>
+                            <div class="space-y-1">
+                                <label class="block text-xs font-medium text-gray-600">Se muitos títulos baterem</label>
+                                <Select v-model="form.due_grouping" :options="dueGroupingOptions"
+                                    option-label="label" option-value="value" class="w-full" />
+                            </div>
 
-                        <div class="space-y-1">
-                            <label class="block text-xs font-medium text-gray-600">Mínimo de títulos por borderô</label>
-                            <InputNumber v-model="form.min_titles_per_group" :min="2" :max="50" class="w-full md:max-w-[140px]" input-class="w-full" />
+                            <div v-if="showMaxSpan" class="space-y-1">
+                                <label class="block text-xs font-medium text-gray-600">Diferença máxima (dias)</label>
+                                <InputNumber v-model="form.max_due_span_days" :min="1" :max="90" class="w-full md:max-w-[140px]" input-class="w-full" />
+                            </div>
+
+                            <div class="space-y-1">
+                                <label class="block text-xs font-medium text-gray-600">Mínimo de títulos</label>
+                                <InputNumber v-model="form.min_titles_per_group" :min="2" :max="50" class="w-full md:max-w-[140px]" input-class="w-full" />
+                            </div>
                         </div>
                     </div>
 
                     <div class="px-4 py-3 border-t border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-2">
                         <Button label="Salvar e aguardar cron" icon="pi pi-clock" severity="secondary" outlined size="small"
-                            class="flex-1" :loading="form.processing" :disabled="!canSubmit"
-                            @click="submit('cron')" />
+                            class="flex-1" :loading="form.processing" :disabled="!canSubmit" @click="submit('cron')" />
                         <Button label="Salvar e aplicar nos abertos" icon="pi pi-bolt" severity="success" size="small"
-                            class="flex-1" :loading="form.processing" :disabled="!canSubmit"
-                            @click="submit('now')" />
+                            class="flex-1" :loading="form.processing" :disabled="!canSubmit" @click="submit('now')" />
                     </div>
                 </div>
 
-                <!-- Simulação -->
                 <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
                     <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                         <div>
                             <h2 class="text-sm font-semibold text-gray-800">Simulação agora</h2>
-                            <p class="text-xs text-gray-500 mt-0.5">Com os títulos abertos no momento</p>
+                            <p class="text-xs text-gray-500 mt-0.5">Títulos abertos que batem com as condições</p>
                         </div>
                         <i v-if="simulating" class="pi pi-spin pi-spinner text-gray-400 text-sm"></i>
                     </div>
@@ -241,7 +309,7 @@ watch(() => page.props.flash?.error, (msg) => {
                     <div class="grid grid-cols-2 divide-x divide-y divide-gray-100 border-b border-gray-100">
                         <div class="p-3 text-center">
                             <p class="text-xl font-bold text-blue-600 tabular-nums">{{ livePreview?.summary?.suggested_groups ?? 0 }}</p>
-                            <p class="text-[11px] text-gray-500">Borderôs</p>
+                            <p class="text-[11px] text-gray-500">Borderô(s)</p>
                         </div>
                         <div class="p-3 text-center">
                             <p class="text-xl font-bold text-emerald-600 tabular-nums">{{ livePreview?.summary?.titles_in_groups ?? 0 }}</p>
@@ -249,27 +317,33 @@ watch(() => page.props.flash?.error, (msg) => {
                         </div>
                         <div class="p-3 text-center">
                             <p class="text-lg font-semibold text-gray-700 tabular-nums">{{ livePreview?.summary?.eligible_titles ?? 0 }}</p>
-                            <p class="text-[11px] text-gray-500">Elegíveis</p>
+                            <p class="text-[11px] text-gray-500">Batem na regra</p>
                         </div>
                         <div class="p-3 text-center">
                             <p class="text-lg font-semibold text-amber-600 tabular-nums">{{ livePreview?.summary?.titles_outside_groups ?? 0 }}</p>
-                            <p class="text-[11px] text-gray-500">Fora (&lt; mín.)</p>
+                            <p class="text-[11px] text-gray-500">Abaixo do mín.</p>
                         </div>
                     </div>
 
-                    <div v-if="!livePreview?.groups?.length" class="p-6 text-center text-sm text-gray-500">
-                        Nenhum borderô seria criado com estes parâmetros.
+                    <div v-if="!hasValidFilters" class="p-6 text-center text-sm text-gray-500">
+                        Preencha ao menos uma condição com valor.
                     </div>
-
-                    <div v-else class="max-h-[420px] overflow-y-auto divide-y divide-gray-50">
-                        <div v-for="group in livePreview.groups" :key="group.key" class="px-4 py-3">
-                            <div class="flex items-start justify-between gap-2">
-                                <div class="min-w-0">
-                                    <p class="text-xs font-semibold text-gray-800 leading-snug">{{ group.label }}</p>
-                                    <p class="text-[11px] text-gray-500 mt-0.5">{{ group.titles_count }} títulos</p>
-                                </div>
-                                <span class="text-xs font-semibold text-gray-700 shrink-0 tabular-nums">{{ fmtMoney(group.total_amount) }}</span>
+                    <div v-else-if="!livePreview?.groups?.length" class="p-6 text-center text-sm text-gray-500">
+                        Nenhum título aberto bate com estas condições (ou abaixo do mínimo).
+                    </div>
+                    <div v-else class="max-h-[480px] overflow-y-auto divide-y divide-gray-50 p-4 space-y-3">
+                        <div v-for="group in livePreview.groups" :key="group.key"
+                            class="rounded-lg border border-gray-100 p-3">
+                            <div class="flex justify-between gap-2 mb-2">
+                                <p class="text-sm font-semibold text-gray-800">{{ group.label }}</p>
+                                <span class="text-sm font-semibold tabular-nums shrink-0">{{ fmtMoney(group.total_amount) }}</span>
                             </div>
+                            <p class="text-xs text-gray-500 mb-2">{{ group.titles_count }} título(s)</p>
+                            <ul class="text-[11px] text-gray-600 space-y-0.5">
+                                <li v-for="t in group.sample_titles" :key="t.id" class="truncate">
+                                    {{ t.title_number }} — {{ t.supplier_name }} — {{ fmtMoney(t.amount) }}
+                                </li>
+                            </ul>
                         </div>
                     </div>
                 </div>

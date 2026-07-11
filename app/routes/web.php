@@ -212,6 +212,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/automatico/simular', [\App\Http\Controllers\BorderoAutoRuleController::class, 'simulate'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.simulate');
+        Route::get('/automatico/opcoes-filtro', [\App\Http\Controllers\BorderoAutoRuleController::class, 'filterOptions'])
+            ->middleware('permission:financeiro.borderos.automatico_gerenciar')
+            ->name('borderos.auto-rules.filter-options');
         Route::get('/automatico/{rule}/editar', [\App\Http\Controllers\BorderoAutoRuleController::class, 'edit'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.edit');
