@@ -146,6 +146,19 @@ watch(() => page.props.flash?.error, (msg) => {
                             <span class="text-sm text-gray-600">{{ data.department?.name || '—' }}</span>
                         </template>
                     </Column>
+                    <Column header="Filiais">
+                        <template #body="{ data }">
+                            <div v-if="data.branches?.length" class="flex flex-wrap gap-1 max-w-xs">
+                                <Tag
+                                    v-for="b in data.branches"
+                                    :key="b.id"
+                                    :value="b.display_name || b.name"
+                                    severity="info"
+                                />
+                            </div>
+                            <span v-else class="text-xs text-gray-400">Nenhuma</span>
+                        </template>
+                    </Column>
                     <Column field="is_active" header="Status">
                         <template #body="{ data }">
                             <Tag :value="data.is_active ? 'Ativo' : 'Inativo'" :severity="data.is_active ? 'success' : 'secondary'" />

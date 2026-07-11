@@ -19,7 +19,7 @@ class UserController extends Controller
         $page = (int) $request->input('page', 1);
 
         $query = User::query()
-            ->with('department:id,name')
+            ->with(['department:id,name', 'branches:id,name,code'])
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -71,7 +71,19 @@ class UserController extends Controller
             'department_id' => $data['department_id'] ?? null,
         ]);
 
-        $user->branches()->sync($data['branch_ids'] ?? []);
+        $newBranchIds = $this->normalizeBranchIds($data['branch_ids'] ?? []);
+        $user->branches()->sync($newBranchIds);
+
+        if ($newBranchIds !== []) {
+            AuditLogger::log(
+                event: 'usuarios.filiais_atualizadas',
+                module: 'usuarios',
+                description: "Filiais de {$user->name} definidas",
+                auditable: $user,
+                oldValues: ['branch_ids' => []],
+                newValues: ['branch_ids' => $newBranchIds],
+            );
+        }
 
         return redirect('/usuarios')->with('success', 'Usuário criado com sucesso.');
     }
@@ -117,9 +129,34 @@ class UserController extends Controller
         $user->is_active = $data['is_active'] ?? $user->is_active;
         $user->department_id = $data['department_id'] ?? $user->department_id;
         $user->save();
-        $user->branches()->sync($data['branch_ids'] ?? []);
+
+        $oldBranchIds = $this->normalizeBranchIds($user->branches()->pluck('branches.id')->all());
+        $newBranchIds = $this->normalizeBranchIds($data['branch_ids'] ?? []);
+        $user->branches()->sync($newBranchIds);
+
+        if ($oldBranchIds !== $newBranchIds) {
+            AuditLogger::log(
+                event: 'usuarios.filiais_atualizadas',
+                module: 'usuarios',
+                description: "Filiais de {$user->name} atualizadas",
+                auditable: $user,
+                oldValues: ['branch_ids' => $oldBranchIds],
+                newValues: ['branch_ids' => $newBranchIds],
+            );
+        }
 
         return redirect('/usuarios')->with('success', 'Usuário atualizado com sucesso.');
+    }
+
+    /** @param array<int, mixed> $ids */
+    private function normalizeBranchIds(array $ids): array
+    {
+        return collect($ids)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
     }
 
     /** @return array<int, array{id:int,name:string,code:?string}> */

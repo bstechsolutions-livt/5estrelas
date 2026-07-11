@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Payable;
 use App\Models\Permission;
@@ -123,5 +124,70 @@ class PayableFilialScopeTest extends TestCase
         $created = User::where('email', 'filial@test.com')->first();
         $this->assertNotNull($created);
         $this->assertSame([$filial->id], $created->branches()->pluck('branches.id')->all());
+    }
+
+    public function test_lista_usuarios_inclui_filiais(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'usuarios.listar'],
+                ['label' => 'Listar usuários', 'module' => 'usuarios'],
+            )->id,
+        );
+
+        $filial = $this->makeBranch('Filial Lista', '25');
+        $target = User::factory()->create(['name' => 'Usuario Com Filial', 'is_active' => true]);
+        $target->branches()->attach([$filial->id]);
+
+        $this->actingAs($admin)
+            ->get('/usuarios')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('users.data', 2)
+                ->where('users.data', fn ($users) => collect($users)->contains(
+                    fn ($u) => $u['id'] === $target->id
+                        && count($u['branches']) === 1
+                        && $u['branches'][0]['id'] === $filial->id,
+                )),
+            );
+    }
+
+    public function test_atualizacao_usuario_sincroniza_filiais_e_audita(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'usuarios.editar'],
+                ['label' => 'Editar usuários', 'module' => 'usuarios'],
+            )->id,
+        );
+
+        $filialA = $this->makeBranch('Filial A Update', '30');
+        $filialB = $this->makeBranch('Filial B Update', '31');
+
+        $target = User::factory()->create([
+            'name' => 'Usuario Update',
+            'email' => 'update@test.com',
+            'is_active' => true,
+        ]);
+        $target->branches()->attach([$filialA->id]);
+
+        $this->actingAs($admin)->put("/usuarios/{$target->id}", [
+            'name' => $target->name,
+            'email' => $target->email,
+            'is_active' => true,
+            'branch_ids' => [$filialB->id],
+        ])->assertRedirect('/usuarios');
+
+        $target->refresh();
+        $this->assertSame([$filialB->id], $target->branches()->pluck('branches.id')->all());
+
+        $log = AuditLog::where('event', 'usuarios.filiais_atualizadas')
+            ->where('auditable_id', $target->id)
+            ->first();
+        $this->assertNotNull($log);
+        $this->assertSame([$filialA->id], $log->old_values['branch_ids']);
+        $this->assertSame([$filialB->id], $log->new_values['branch_ids']);
     }
 }
