@@ -182,8 +182,10 @@ Route::middleware('auth')->group(function () {
     // Financeiro - Contas a Pagar
     Route::prefix('financeiro/contas-pagar')->middleware('permission:financeiro.contas_pagar.visualizar')->group(function () {
         Route::get('/', [PayableController::class, 'index'])->name('payables.index');
-        Route::get('/lote', [PayableController::class, 'batch'])->name('payables.batch');
         Route::post('/lote/apelidos', [PayableController::class, 'batchUpdateNicknames'])->name('payables.batch_nicknames');
+        Route::post('/lote/enviar-aprovacao', [PayableController::class, 'batchSendForApproval'])->name('payables.batch_send_approval');
+        Route::post('/lote/aprovar', [PayableController::class, 'batchApprove'])->name('payables.batch_approve');
+        Route::post('/lote/prioridade', [PayableController::class, 'batchUpdatePriority'])->name('payables.batch_priority');
         Route::get('/{id}', [PayableController::class, 'show'])->whereNumber('id')->name('payables.show');
         Route::post('/{id}/apelido', [PayableController::class, 'updateNickname'])->whereNumber('id')->name('payables.nickname');
         Route::post('/{id}/comentarios', [PayableController::class, 'addComment'])->name('payables.comment');

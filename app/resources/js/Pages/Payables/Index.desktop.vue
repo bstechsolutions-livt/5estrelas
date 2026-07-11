@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { useAuth } from '@/composables/useAuth'
 import DataTable from 'primevue/datatable'
@@ -10,6 +10,7 @@ import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import DatePicker from 'primevue/datepicker'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
@@ -35,6 +36,7 @@ const props = defineProps({
     lockedBranches: { type: Array, default: () => [] },
     noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
+    canManagePriority: { type: Boolean, default: false },
     priorityOptions: { type: Object, default: () => ({}) },
 })
 
@@ -255,13 +257,22 @@ function goShow(id) {
     router.visit(`/financeiro/contas-pagar/${id}`)
 }
 
-// Seleção para borderô
+// Seleção e ações em lote
 const selected = ref([])
 
-// Só pode selecionar títulos que estão livres pra agrupar
-const selectableStatuses = ['pendente', 'em_preparacao', 'reprovado']
-const canSelect = computed(() => selectableStatuses.includes(status.value))
-const canSelectBordero = computed(() => canSelect.value && canBorderos.value)
+const prepareStatuses = ['pendente', 'em_preparacao', 'reprovado']
+const canSelect = computed(() => [...prepareStatuses, 'aguardando_aprovacao'].includes(status.value))
+const canSelectBordero = computed(() => prepareStatuses.includes(status.value) && canBorderos.value)
+const canBatchSend = computed(() => prepareStatuses.includes(status.value))
+const canBatchApprove = computed(() => status.value === 'aguardando_aprovacao')
+
+const currentPageIds = computed(() => (props.payables?.data || []).map(p => p.id))
+const allPageSelected = computed(() =>
+    currentPageIds.value.length > 0 && currentPageIds.value.every(id => selected.value.includes(id))
+)
+const somePageSelected = computed(() =>
+    currentPageIds.value.some(id => selected.value.includes(id)) && !allPageSelected.value
+)
 
 function toggleSelect(id) {
     const i = selected.value.indexOf(id)
@@ -269,9 +280,27 @@ function toggleSelect(id) {
     else selected.value.push(id)
 }
 
+function toggleSelectAll() {
+    if (allPageSelected.value) {
+        selected.value = selected.value.filter(id => !currentPageIds.value.includes(id))
+    } else {
+        const toAdd = currentPageIds.value.filter(id => !selected.value.includes(id))
+        selected.value.push(...toAdd)
+    }
+}
+
 function isSelected(id) {
     return selected.value.includes(id)
 }
+
+function clearSelection() {
+    selected.value = []
+}
+
+watch(() => status.value, clearSelection)
+watch(() => props.payables?.current_page, () => {
+    selected.value = selected.value.filter(id => currentPageIds.value.includes(id))
+})
 
 const createBorderoForm = ref({ description: '' })
 function createBordero() {
@@ -279,9 +308,108 @@ function createBordero() {
     router.post('/financeiro/borderos', {
         payable_ids: selected.value,
         description: createBorderoForm.value.description || undefined,
-    }, {
-        onSuccess: () => { selected.value = [] },
+    }, { onSuccess: clearSelection })
+}
+
+function batchSendForApproval() {
+    if (selected.value.length === 0) return
+    router.post('/financeiro/contas-pagar/lote/enviar-aprovacao', {
+        payable_ids: selected.value,
+    }, { onSuccess: clearSelection })
+}
+
+const showApproveDialog = ref(false)
+const approveForm = useForm({
+    payment_priority: 'normal',
+    payment_sla_date: null,
+    comment: '',
+})
+
+const prioritySelectOptions = computed(() =>
+    Object.entries(props.priorityOptions || {}).map(([value, label]) => ({ value, label }))
+)
+
+function toYmd(d) {
+    if (!d) return null
+    const dt = d instanceof Date ? d : new Date(d)
+    const y = dt.getFullYear()
+    const m = String(dt.getMonth() + 1).padStart(2, '0')
+    const day = String(dt.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+}
+
+function openBatchApprove() {
+    if (selected.value.length === 0) return
+    approveForm.payment_priority = 'normal'
+    approveForm.payment_sla_date = null
+    approveForm.comment = ''
+    showApproveDialog.value = true
+}
+
+function batchApprove() {
+    const payload = {
+        payable_ids: selected.value,
+        comment: approveForm.comment || undefined,
+    }
+    if (props.canManagePriority) {
+        payload.payment_priority = approveForm.payment_priority
+        payload.payment_sla_date = approveForm.payment_sla_date ? toYmd(approveForm.payment_sla_date) : null
+    }
+    router.post('/financeiro/contas-pagar/lote/aprovar', payload, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showApproveDialog.value = false
+            clearSelection()
+        },
     })
+}
+
+const showNicknameDialog = ref(false)
+const batchNickname = ref('')
+
+function openNicknameDialog() {
+    batchNickname.value = ''
+    showNicknameDialog.value = true
+}
+
+function applyBatchNickname() {
+    const nickname = batchNickname.value?.trim() || null
+    router.post('/financeiro/contas-pagar/lote/apelidos', {
+        items: selected.value.map(id => ({ id, nickname })),
+    }, {
+        onSuccess: () => {
+            showNicknameDialog.value = false
+            clearSelection()
+        },
+    })
+}
+
+const showPriorityDialog = ref(false)
+const batchPriorityForm = useForm({
+    payment_priority: 'normal',
+    payment_sla_date: null,
+})
+
+function openPriorityDialog() {
+    batchPriorityForm.payment_priority = 'normal'
+    batchPriorityForm.payment_sla_date = null
+    showPriorityDialog.value = true
+}
+
+function applyBatchPriority() {
+    batchPriorityForm
+        .transform((data) => ({
+            payable_ids: selected.value,
+            payment_priority: data.payment_priority,
+            payment_sla_date: data.payment_sla_date ? toYmd(data.payment_sla_date) : null,
+        }))
+        .post('/financeiro/contas-pagar/lote/prioridade', {
+            preserveScroll: true,
+            onSuccess: () => {
+                showPriorityDialog.value = false
+                clearSelection()
+            },
+        })
 }
 
 function formatMoney(val) {
@@ -328,13 +456,9 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
 <template>
     <AppLayout>
         <div class="max-w-7xl mx-auto">
-            <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-800">Contas a Pagar</h1>
-                    <p class="text-sm text-gray-500 mt-1">Gerencie títulos, anexe documentos e envie para aprovação.</p>
-                </div>
-                <Button label="Visão em lote" icon="pi pi-table" severity="secondary" outlined size="small" class="shrink-0"
-                    @click="router.get('/financeiro/contas-pagar/lote', currentFilters())" />
+            <div class="mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Contas a Pagar</h1>
+                <p class="text-sm text-gray-500 mt-1">Gerencie títulos, anexe documentos e envie para aprovação.</p>
             </div>
 
             <BranchAccessBlocked v-if="noBranchAccess" />
@@ -520,13 +644,22 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                 </div>
             </div>
 
-            <!-- Barra de seleção pra borderô -->
-            <div v-if="canSelectBordero && selected.length > 0" class="bg-blue-600 text-white rounded-xl p-3 mb-4 flex items-center justify-between">
+            <!-- Barra de ações em lote -->
+            <div v-if="canSelect && selected.length > 0" class="bg-blue-600 text-white rounded-xl p-3 mb-4 flex flex-wrap items-center justify-between gap-3">
                 <span class="text-sm font-medium">{{ selected.length }} título(s) selecionado(s)</span>
-                <div class="flex items-center gap-2">
-                    <InputText v-model="createBorderoForm.description" placeholder="Descrição do borderô (opcional)" class="w-72" />
-                    <Button label="Criar Borderô" icon="pi pi-list-check" severity="contrast" size="small" @click="createBordero" />
-                    <Button icon="pi pi-times" severity="contrast" text size="small" @click="selected = []" />
+                <div class="flex flex-wrap items-center gap-2">
+                    <Button v-if="canBatchSend" label="Enviar para aprovação" icon="pi pi-send" severity="contrast" size="small"
+                        dusk="btn-batch-send-approval" @click="batchSendForApproval" />
+                    <Button v-if="canBatchApprove" label="Aprovar selecionados" icon="pi pi-check" severity="success" size="small"
+                        dusk="btn-batch-approve" @click="openBatchApprove" />
+                    <Button v-if="canSelectBordero" label="Criar Borderô" icon="pi pi-list-check" severity="contrast" size="small"
+                        dusk="btn-batch-bordero" @click="createBordero" />
+                    <Button label="Definir apelido" icon="pi pi-tag" severity="contrast" outlined size="small"
+                        dusk="btn-batch-nickname" @click="openNicknameDialog" />
+                    <Button v-if="canManagePriority" label="Definir prioridade" icon="pi pi-flag" severity="contrast" outlined size="small"
+                        dusk="btn-batch-priority" @click="openPriorityDialog" />
+                    <InputText v-if="canSelectBordero" v-model="createBorderoForm.description" placeholder="Descrição do borderô (opcional)" class="w-56" />
+                    <Button icon="pi pi-times" severity="contrast" text size="small" @click="clearSelection" />
                 </div>
             </div>
 
@@ -541,9 +674,19 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     @page="onPage"
                     @sort="onTableSort"
                     paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
-                    :rows-per-page-options="[20, 50, 100]"
+                    :rows-per-page-options="[20, 50, 100, 200, 500, 1000]"
                 >
-                    <Column v-if="canSelectBordero" header="" style="width: 2.5rem">
+                    <Column v-if="canSelect" header="" style="width: 2.5rem">
+                        <template #header>
+                            <input
+                                type="checkbox"
+                                :checked="allPageSelected"
+                                :indeterminate="somePageSelected"
+                                class="w-4 h-4 cursor-pointer"
+                                dusk="select-all-payables"
+                                @click.stop="toggleSelectAll"
+                            />
+                        </template>
                         <template #body="{ data }">
                             <input type="checkbox" :checked="isSelected(data.id)" @click.stop="toggleSelect(data.id)" class="w-4 h-4 cursor-pointer" />
                         </template>
@@ -644,6 +787,57 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </template>
                 </DataTable>
             </div>
+
+            <Dialog v-model:visible="showNicknameDialog" header="Apelido em lote" modal :style="{ width: '28rem' }">
+                <p class="text-sm text-gray-600 mb-3">Aplicar o mesmo apelido em {{ selected.length }} título(s).</p>
+                <InputText v-model="batchNickname" placeholder="Apelido (deixe vazio para remover)" class="w-full" dusk="batch-nickname-input" />
+                <template #footer>
+                    <Button label="Cancelar" severity="secondary" text @click="showNicknameDialog = false" />
+                    <Button label="Aplicar" icon="pi pi-check" dusk="batch-nickname-confirm" @click="applyBatchNickname" />
+                </template>
+            </Dialog>
+
+            <Dialog v-model:visible="showPriorityDialog" header="Prioridade em lote" modal :style="{ width: '28rem' }">
+                <p class="text-sm text-gray-600 mb-3">Definir prioridade em {{ selected.length }} título(s).</p>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Prioridade</label>
+                        <Select v-model="batchPriorityForm.payment_priority" :options="prioritySelectOptions" option-label="label" option-value="value" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">SLA (opcional)</label>
+                        <DatePicker v-model="batchPriorityForm.payment_sla_date" date-format="dd/mm/yy" show-icon class="w-full" />
+                    </div>
+                </div>
+                <template #footer>
+                    <Button label="Cancelar" severity="secondary" text @click="showPriorityDialog = false" />
+                    <Button label="Aplicar" icon="pi pi-check" :loading="batchPriorityForm.processing" dusk="batch-priority-confirm" @click="applyBatchPriority" />
+                </template>
+            </Dialog>
+
+            <Dialog v-model:visible="showApproveDialog" header="Aprovar selecionados" modal :style="{ width: '28rem' }">
+                <p class="text-sm text-gray-600 mb-3">Aprovar {{ selected.length }} título(s) na etapa atual.</p>
+                <div class="space-y-3">
+                    <template v-if="canManagePriority">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Prioridade de pagamento</label>
+                            <Select v-model="approveForm.payment_priority" :options="prioritySelectOptions" option-label="label" option-value="value" class="w-full" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">SLA (opcional)</label>
+                            <DatePicker v-model="approveForm.payment_sla_date" date-format="dd/mm/yy" show-icon class="w-full" />
+                        </div>
+                    </template>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Comentário (opcional)</label>
+                        <InputText v-model="approveForm.comment" class="w-full" />
+                    </div>
+                </div>
+                <template #footer>
+                    <Button label="Cancelar" severity="secondary" text @click="showApproveDialog = false" />
+                    <Button label="Aprovar" icon="pi pi-check" severity="success" dusk="batch-approve-confirm" @click="batchApprove" />
+                </template>
+            </Dialog>
         </div>
     </AppLayout>
 </template>

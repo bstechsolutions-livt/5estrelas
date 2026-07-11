@@ -36,13 +36,6 @@ class PayableController extends Controller
         return Inertia::render('Payables/Index', $this->payablesIndexProps($request, $pageData));
     }
 
-    public function batch(Request $request)
-    {
-        $pageData = $this->resolvePayablesPageData($request, defaultPerPage: 50);
-
-        return Inertia::render('Payables/Batch', $this->payablesIndexProps($request, $pageData));
-    }
-
     public function updateNickname(Request $request, int $id)
     {
         $payable = $this->findPayableForUser($id);
@@ -79,7 +72,7 @@ class PayableController extends Controller
     public function batchUpdateNicknames(Request $request)
     {
         $data = $request->validate([
-            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items' => ['required', 'array', 'min:1', 'max:1000'],
             'items.*.id' => ['required', 'integer'],
             'items.*.nickname' => ['nullable', 'string', 'max:120'],
         ]);
@@ -107,6 +100,140 @@ class PayableController extends Controller
             : 'Nenhuma alteração para salvar.');
     }
 
+    public function batchSendForApproval(Request $request)
+    {
+        $data = $request->validate([
+            'payable_ids' => ['required', 'array', 'min:1', 'max:1000'],
+            'payable_ids.*' => ['integer'],
+        ]);
+
+        $user = $request->user();
+        $workflow = app(ApprovalWorkflowService::class);
+        $preview = $workflow->buildPreviewStepsForSender($user);
+        if (! $preview['ok']) {
+            return back()->with('error', $preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
+        }
+
+        $sent = 0;
+        $skipped = 0;
+        $errors = [];
+
+        foreach ($data['payable_ids'] as $id) {
+            try {
+                $payable = $this->findPayableForUser((int) $id, $user);
+
+                if (! in_array($payable->status, ['pendente', 'em_preparacao', 'reprovado'], true)) {
+                    $skipped++;
+                    continue;
+                }
+                if ($payable->bordero_id) {
+                    $skipped++;
+                    continue;
+                }
+                if ($payable->documents()->count() === 0) {
+                    $skipped++;
+                    continue;
+                }
+
+                $workflow->sendForApproval($payable, $user);
+                $sent++;
+            } catch (\Throwable $e) {
+                $errors[] = $e->getMessage();
+            }
+        }
+
+        if ($sent === 0) {
+            return back()->with('error', $errors[0] ?? 'Nenhum título elegível para envio (verifique documentos, status e borderô).');
+        }
+
+        $message = "{$sent} título(s) enviado(s) para aprovação.";
+        if ($skipped > 0) {
+            $message .= " {$skipped} ignorado(s).";
+        }
+
+        return back()->with('success', $message);
+    }
+
+    public function batchApprove(Request $request)
+    {
+        $data = $request->validate([
+            'payable_ids' => ['required', 'array', 'min:1', 'max:1000'],
+            'payable_ids.*' => ['integer'],
+            'comment' => ['nullable', 'string', 'max:500'],
+            'payment_priority' => ['nullable', Rule::in(Payable::PRIORITY_VALUES)],
+            'payment_sla_date' => ['nullable', 'date'],
+        ]);
+
+        $user = $request->user();
+        $workflow = app(ApprovalWorkflowService::class);
+
+        $payables = collect($data['payable_ids'])
+            ->map(fn ($id) => $this->findPayableForUser((int) $id, $user))
+            ->filter(fn (Payable $payable) => $payable->status === 'aguardando_aprovacao' && ! $payable->bordero_id)
+            ->filter(fn (Payable $payable) => $payable->documents()->count() > 0)
+            ->values();
+
+        if ($payables->isEmpty()) {
+            return back()->with('error', 'Nenhum título selecionado está aguardando aprovação.');
+        }
+
+        $sample = $payables->first(fn (Payable $payable) => $workflow->canUserApprove($payable, $user));
+        if ($sample && $workflow->isFinanceStep($workflow->currentStep($sample))) {
+            $priorityData = $request->validate([
+                'payment_priority' => ['required', Rule::in(Payable::PRIORITY_VALUES)],
+                'payment_sla_date' => ['nullable', 'date'],
+            ]);
+
+            foreach ($payables as $payable) {
+                if (! $workflow->canUserApprove($payable, $user)) {
+                    continue;
+                }
+                $this->applyPaymentPriority($payable, $user, $priorityData);
+            }
+        }
+
+        $result = $workflow->approveEligibleInBordero($payables, $user, $data['comment'] ?? null);
+
+        if ($result['error']) {
+            return back()->with('error', $result['error']);
+        }
+
+        return back()->with('success', "{$result['count']} título(s) aprovado(s). {$result['message']}");
+    }
+
+    public function batchUpdatePriority(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user?->hasPermission('financeiro.contas_pagar.prioridade_gerenciar')) {
+            abort(403, 'Você não tem permissão para alterar a prioridade de pagamento.');
+        }
+
+        $data = $request->validate([
+            'payable_ids' => ['required', 'array', 'min:1', 'max:1000'],
+            'payable_ids.*' => ['integer'],
+            'payment_priority' => ['required', Rule::in(Payable::PRIORITY_VALUES)],
+            'payment_sla_date' => ['nullable', 'date'],
+        ]);
+
+        $updated = 0;
+
+        foreach ($data['payable_ids'] as $id) {
+            $payable = $this->findPayableForUser((int) $id, $user);
+
+            if ($payable->status === 'encerrado') {
+                continue;
+            }
+
+            $this->applyPaymentPriority($payable, $user, $data);
+            $updated++;
+        }
+
+        return back()->with('success', $updated > 0
+            ? "Prioridade atualizada em {$updated} título(s)."
+            : 'Nenhum título elegível para alteração de prioridade.');
+    }
+
     /** @return array<string, mixed> */
     private function payablesIndexProps(Request $request, array $pageData): array
     {
@@ -132,6 +259,7 @@ class PayableController extends Controller
             'lockedBranches' => $branchScope['locked_branches'],
             'noBranchAccess' => $branchScope['no_branch_access'],
             'canManageClassification' => $user?->hasPermission('financeiro.contas_pagar.classificacao_gerenciar') ?? false,
+            'canManagePriority' => $user?->hasPermission('financeiro.contas_pagar.prioridade_gerenciar') ?? false,
             'priorityOptions' => Payable::PRIORITY_LABELS,
         ];
     }
@@ -195,7 +323,7 @@ class PayableController extends Controller
         app(PayableBranchScope::class)->applyFilter($query, $user);
         $this->applyPayablesOrdering($query, $request->input('sort'), $request->input('dir'));
 
-        $payables = $query->paginate($request->input('per_page', $defaultPerPage))->withQueryString();
+        $payables = $query->paginate($this->resolvePerPage($request, $defaultPerPage))->withQueryString();
 
         Payable::attachEmpresaNome($payables->getCollection());
         Payable::attachFilialNome($payables->getCollection());
@@ -223,6 +351,13 @@ class PayableController extends Controller
             'departmentContext' => $departmentContext,
             'totals' => $totals,
         ];
+    }
+
+    private function resolvePerPage(Request $request, int $default): int
+    {
+        $perPage = (int) $request->input('per_page', $default);
+
+        return max(1, min(1000, $perPage));
     }
 
     /** @return array{department_id: ?int, can_change: bool, locked_department: ?array{id:int,name:string}} */

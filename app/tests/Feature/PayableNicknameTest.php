@@ -76,17 +76,17 @@ class PayableNicknameTest extends TestCase
         $this->assertSame('Aluguel filial 2', $row['nickname']);
     }
 
-    public function test_visao_em_lote_carrega(): void
+    public function test_lista_aceita_ate_1000_por_pagina(): void
     {
-        $this->makePayable(['nickname' => 'CCU 2363']);
+        for ($i = 0; $i < 5; $i++) {
+            $this->makePayable(['title_number' => "TIT-{$i}"]);
+        }
 
         $response = $this->actingAs($this->viewer())
-            ->get('/financeiro/contas-pagar/lote?status=pendente')
+            ->get('/financeiro/contas-pagar?status=pendente&per_page=1000')
             ->assertOk();
 
-        $page = $response->viewData('page');
-        $this->assertSame('Payables/Batch', $page['component']);
-        $this->assertSame('CCU 2363', $page['props']['payables']['data'][0]['nickname']);
+        $this->assertSame(1000, $response->viewData('page')['props']['payables']['per_page']);
     }
 
     public function test_salvar_apelidos_em_lote(): void
