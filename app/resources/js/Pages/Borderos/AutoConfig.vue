@@ -88,6 +88,11 @@ function fmtDate(iso) {
     return new Date(iso).toLocaleString('pt-BR')
 }
 
+function fmtDueDate(iso) {
+    if (!iso) return '—'
+    return new Date(iso + 'T12:00:00').toLocaleDateString('pt-BR')
+}
+
 function segmentSeverity(type) {
     return type === 'dept' ? 'info' : type === 'ccu' ? 'warn' : 'secondary'
 }
@@ -107,114 +112,130 @@ watch(() => props.preview?.groups, (groups) => {
 <template>
     <component :is="isMobile ? AppLayoutMobile : AppLayout" :title="isMobile ? 'Borderô auto' : undefined" :show-back="isMobile">
         <Toast />
-        <div :class="isMobile ? 'px-4 py-3 pb-28' : 'max-w-6xl mx-auto'" dusk="bordero-auto-config-page">
-            <div class="mb-6 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div :class="isMobile ? 'px-4 py-3 pb-28' : 'max-w-6xl mx-auto space-y-6'" dusk="bordero-auto-config-page">
+            <!-- Cabeçalho -->
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 <div>
                     <h1 :class="isMobile ? 'text-lg font-bold text-gray-800' : 'text-2xl font-bold text-gray-800'">
                         Borderô Automático
                     </h1>
-                    <p class="text-sm text-gray-500 mt-1">
-                        Configure as regras e veja a simulação com os <strong>títulos abertos agora</strong> — o mesmo cálculo do cron das 6h.
+                    <p class="text-sm text-gray-500 mt-1 max-w-2xl">
+                        Configure as regras e veja a simulação com os títulos abertos agora — o mesmo cálculo do cron das 6h.
                     </p>
                 </div>
                 <Button label="Ver borderôs" icon="pi pi-list-check" severity="secondary" outlined size="small"
-                    @click="router.visit('/financeiro/borderos?status=rascunho')" />
+                    class="shrink-0 self-start" @click="router.visit('/financeiro/borderos?status=rascunho')" />
             </div>
 
-            <!-- O que será aplicado -->
-            <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 text-sm text-blue-900">
-                <p class="font-semibold mb-2">Regras que serão aplicadas (após salvar)</p>
-                <ul class="list-disc pl-5 space-y-1">
-                    <li v-for="(line, i) in preview.rules_summary" :key="i">{{ line }}</li>
-                </ul>
-                <p v-if="config.cron_enabled" class="text-xs text-blue-700 mt-3">
-                    Cron: todo dia às <strong>06:00</strong> gera <em>todos</em> os grupos abaixo em rascunho.
-                    <span v-if="config.last_cron_run_at">
-                        Última execução: {{ fmtDate(config.last_cron_run_at) }}
-                        ({{ config.last_cron_created_count ?? 0 }} borderô(s)).
-                    </span>
-                    <span v-else> Ainda não rodou em produção.</span>
-                </p>
+            <!-- Regras ativas -->
+            <div class="bg-white rounded-xl border border-blue-100 overflow-hidden">
+                <div class="px-4 py-3 bg-blue-50 border-b border-blue-100">
+                    <p class="text-sm font-semibold text-blue-900">Regras que serão aplicadas</p>
+                    <p class="text-xs text-blue-700 mt-0.5">Após salvar, a simulação abaixo usa estas regras.</p>
+                </div>
+                <div class="px-4 py-3">
+                    <ul class="grid md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-gray-700">
+                        <li v-for="(line, i) in preview.rules_summary" :key="i" class="flex gap-2">
+                            <span class="text-blue-400 shrink-0">•</span>
+                            <span>{{ line }}</span>
+                        </li>
+                    </ul>
+                    <p v-if="config.cron_enabled" class="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
+                        <i class="pi pi-clock text-[10px] mr-1"></i>
+                        Cron diário às <strong>06:00</strong> gera todos os grupos em rascunho.
+                        <template v-if="config.last_cron_run_at">
+                            Última execução: {{ fmtDate(config.last_cron_run_at) }}
+                            ({{ config.last_cron_created_count ?? 0 }} borderô(s)).
+                        </template>
+                        <template v-else> Ainda não executou.</template>
+                    </p>
+                </div>
             </div>
 
-            <!-- Config -->
-            <form @submit.prevent="saveConfig" class="bg-white rounded-xl border border-gray-100 p-4 mb-6 space-y-4">
-                <h2 class="text-sm font-semibold text-gray-800">Configuração</h2>
+            <!-- Configuração -->
+            <form @submit.prevent="saveConfig" class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-100">
+                    <h2 class="text-sm font-semibold text-gray-800">Configuração</h2>
+                </div>
 
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Quais títulos entram na simulação?</label>
-                        <Select v-model="configForm.eligibility_mode" :options="eligibilityOptions"
-                            option-label="label" option-value="value" class="w-full" />
+                <div class="p-4 space-y-5">
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="block text-xs font-medium text-gray-600">Quais títulos entram na simulação?</label>
+                            <Select v-model="configForm.eligibility_mode" :options="eligibilityOptions"
+                                option-label="label" option-value="value" class="w-full" />
+                        </div>
+                        <div v-if="showEligibilityDays" class="space-y-1">
+                            <label class="block text-xs font-medium text-gray-600">Vencimento até quantos dias à frente?</label>
+                            <InputNumber v-model="configForm.eligibility_due_days" :min="1" :max="365" class="w-full" input-class="w-full" />
+                            <p class="text-[11px] text-gray-400">Inclui títulos já vencidos.</p>
+                        </div>
                     </div>
-                    <div v-if="showEligibilityDays">
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Vencimento até quantos dias à frente?</label>
-                        <InputNumber v-model="configForm.eligibility_due_days" :min="1" :max="365" class="w-full" />
-                        <p class="text-[11px] text-gray-400 mt-1">Inclui títulos já vencidos.</p>
+
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="block text-xs font-medium text-gray-600">Como agrupar por vencimento?</label>
+                            <Select v-model="configForm.due_grouping" :options="dueGroupingOptions"
+                                option-label="label" option-value="value" class="w-full" />
+                        </div>
+                        <div v-if="showMaxSpan" class="space-y-1">
+                            <label class="block text-xs font-medium text-gray-600">Diferença máxima entre vencimentos (dias)</label>
+                            <InputNumber v-model="configForm.max_due_span_days" :min="1" :max="90" class="w-full" input-class="w-full" />
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-4 items-end">
+                        <div class="space-y-1">
+                            <label class="block text-xs font-medium text-gray-600">Mínimo de títulos por borderô</label>
+                            <InputNumber v-model="configForm.min_titles_per_group" :min="2" :max="50" class="w-full md:max-w-[140px]" input-class="w-full" />
+                        </div>
+                        <div class="flex items-center gap-2.5 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 min-h-[42px]">
+                            <Checkbox v-model="configForm.cron_enabled" :binary="true" input-id="cron-enabled" />
+                            <label for="cron-enabled" class="text-sm text-gray-700 cursor-pointer leading-snug">
+                                Ativar cron diário às <strong>06:00</strong>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Como agrupar por vencimento?</label>
-                        <Select v-model="configForm.due_grouping" :options="dueGroupingOptions"
-                            option-label="label" option-value="value" class="w-full" />
-                    </div>
-                    <div v-if="showMaxSpan">
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Diferença máxima entre vencimentos (dias)</label>
-                        <InputNumber v-model="configForm.max_due_span_days" :min="1" :max="90" class="w-full" />
-                    </div>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-6">
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm text-gray-600">Mínimo de títulos por borderô</label>
-                        <InputNumber v-model="configForm.min_titles_per_group" :min="2" :max="50" class="w-24" />
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <Checkbox v-model="configForm.cron_enabled" :binary="true" input-id="cron-enabled" />
-                        <label for="cron-enabled" class="text-sm text-gray-700 cursor-pointer">
-                            Ativar cron diário às <strong>06:00</strong>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="flex justify-end">
+                <div class="px-4 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-end">
                     <Button type="submit" label="Salvar e atualizar simulação" icon="pi pi-save"
                         :loading="configForm.processing" size="small" dusk="save-bordero-auto-config" />
                 </div>
             </form>
 
-            <!-- Resumo simulação -->
-            <div class="mb-2">
-                <h2 class="text-sm font-semibold text-gray-800">Simulação agora ({{ preview.summary.eligible_titles }} títulos elegíveis)</h2>
-                <p class="text-xs text-gray-500">É exatamente isso que o cron criaria se rodasse neste momento (ou o que você gera manualmente ao clicar abaixo).</p>
-            </div>
+            <!-- Simulação -->
+            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-100">
+                    <h2 class="text-sm font-semibold text-gray-800">Simulação agora</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">
+                        {{ preview.summary.eligible_titles }} títulos elegíveis — mesmo resultado que o cron geraria neste instante.
+                    </p>
+                </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                <div class="bg-white rounded-xl border border-gray-100 p-3 text-center">
-                    <p class="text-2xl font-bold text-gray-800">{{ preview.summary.eligible_titles }}</p>
-                    <p class="text-xs text-gray-500">Elegíveis</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-gray-100 border-b border-gray-100">
+                    <div class="p-4 text-center">
+                        <p class="text-2xl font-bold text-gray-800 tabular-nums">{{ preview.summary.eligible_titles }}</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Elegíveis</p>
+                    </div>
+                    <div class="p-4 text-center">
+                        <p class="text-2xl font-bold text-blue-600 tabular-nums">{{ preview.summary.suggested_groups }}</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Grupos / borderôs</p>
+                    </div>
+                    <div class="p-4 text-center">
+                        <p class="text-2xl font-bold text-emerald-600 tabular-nums">{{ preview.summary.titles_in_groups }}</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Títulos agrupados</p>
+                    </div>
+                    <div class="p-4 text-center">
+                        <p class="text-2xl font-bold text-amber-600 tabular-nums">{{ preview.summary.titles_outside_groups }}</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Fora (&lt; mínimo)</p>
+                    </div>
                 </div>
-                <div class="bg-white rounded-xl border border-gray-100 p-3 text-center">
-                    <p class="text-2xl font-bold text-blue-600">{{ preview.summary.suggested_groups }}</p>
-                    <p class="text-xs text-gray-500">Grupos / borderôs</p>
-                </div>
-                <div class="bg-white rounded-xl border border-gray-100 p-3 text-center">
-                    <p class="text-2xl font-bold text-emerald-600">{{ preview.summary.titles_in_groups }}</p>
-                    <p class="text-xs text-gray-500">Títulos agrupados</p>
-                </div>
-                <div class="bg-white rounded-xl border border-gray-100 p-3 text-center">
-                    <p class="text-2xl font-bold text-amber-600">{{ preview.summary.titles_outside_groups }}</p>
-                    <p class="text-xs text-gray-500">Fora (&lt; mínimo)</p>
-                </div>
-            </div>
 
-            <!-- Grupos -->
-            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden mb-20">
-                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <!-- Grupos -->
+                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
                     <h3 class="text-sm font-semibold text-gray-800">Grupos sugeridos</h3>
-                    <label v-if="preview.groups.length" class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                    <label v-if="preview.groups.length" class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer shrink-0">
                         <Checkbox v-model="allSelected" :binary="true" />
                         Selecionar todos
                     </label>
@@ -224,42 +245,56 @@ watch(() => props.preview?.groups, (groups) => {
                     Nenhum grupo atende ao mínimo de {{ config.min_titles_per_group }} títulos com a configuração atual.
                 </div>
 
-                <div v-else class="divide-y divide-gray-50">
+                <div v-else class="divide-y divide-gray-100">
                     <div v-for="group in preview.groups" :key="group.key"
-                        class="p-4 hover:bg-gray-50/50 transition-colors"
-                        :class="{ 'bg-blue-50/30': selectedKeys.includes(group.key) }">
+                        class="p-4 transition-colors"
+                        :class="selectedKeys.includes(group.key) ? 'bg-blue-50/40' : 'hover:bg-gray-50/60'">
                         <div class="flex items-start gap-3">
                             <Checkbox :model-value="selectedKeys.includes(group.key)" :binary="true"
-                                class="mt-1" @update:model-value="(v) => toggleGroup(group.key, v)" />
+                                class="mt-0.5 shrink-0" @update:model-value="(v) => toggleGroup(group.key, v)" />
                             <div class="flex-1 min-w-0">
-                                <div class="flex flex-wrap items-center gap-2 mb-1">
-                                    <p class="text-sm font-semibold text-gray-800">{{ group.label }}</p>
-                                    <Tag :value="group.segment_type === 'dept' ? 'Dept' : group.segment_type === 'ccu' ? 'CCU' : 'Outros'"
-                                        :severity="segmentSeverity(group.segment_type)" class="!text-[10px]" />
+                                <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
+                                    <div class="flex flex-wrap items-center gap-2 min-w-0">
+                                        <p class="text-sm font-semibold text-gray-800">{{ group.label }}</p>
+                                        <Tag :value="group.segment_type === 'dept' ? 'Dept' : group.segment_type === 'ccu' ? 'CCU' : 'Outros'"
+                                            :severity="segmentSeverity(group.segment_type)" class="!text-[10px]" />
+                                    </div>
+                                    <p class="text-sm font-semibold text-gray-700 shrink-0 tabular-nums">
+                                        {{ fmtMoney(group.total_amount) }}
+                                    </p>
                                 </div>
+
                                 <p class="text-xs text-gray-500 mb-2">
-                                    {{ group.titles_count }} títulos · {{ fmtMoney(group.total_amount) }}
+                                    {{ group.titles_count }} título{{ group.titles_count !== 1 ? 's' : '' }}
+                                    <span v-if="group.due_label"> · {{ group.due_label }}</span>
                                 </p>
-                                <ul class="text-[11px] text-gray-400 space-y-0.5">
-                                    <li v-for="t in group.sample_titles" :key="t.id">
-                                        {{ t.title_number }} — {{ t.supplier_name }} — {{ fmtMoney(t.amount) }}
-                                        <span v-if="t.due_date"> ({{ t.due_date }})</span>
-                                    </li>
-                                    <li v-if="group.titles_count > 3" class="text-gray-300">
-                                        + {{ group.titles_count - 3 }} título(s)…
-                                    </li>
-                                </ul>
+
+                                <div class="rounded-lg border border-gray-100 bg-gray-50/80 overflow-hidden">
+                                    <div v-for="t in group.sample_titles" :key="t.id"
+                                        class="grid grid-cols-[72px_1fr_auto_auto] gap-2 items-center px-3 py-2 text-xs border-b border-gray-100 last:border-b-0">
+                                        <span class="font-medium text-gray-500 tabular-nums">{{ t.title_number }}</span>
+                                        <span class="text-gray-700 truncate" :title="t.supplier_name">{{ t.supplier_name }}</span>
+                                        <span class="text-gray-500 shrink-0">{{ fmtDueDate(t.due_date) }}</span>
+                                        <span class="font-medium text-gray-800 shrink-0 tabular-nums">{{ fmtMoney(t.amount) }}</span>
+                                    </div>
+                                    <p v-if="group.titles_count > 3" class="px-3 py-1.5 text-[11px] text-gray-400 bg-white">
+                                        + {{ group.titles_count - 3 }} título(s) neste grupo
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div v-if="preview.groups.length"
-                :class="isMobile ? 'fixed bottom-16 left-0 right-0 px-4 z-20' : 'flex justify-end gap-2'">
-                <Button :label="`Gerar manualmente ${selectedKeys.length} borderô(s)`" icon="pi pi-bolt" severity="success"
-                    :disabled="!selectedKeys.length" :loading="generating" class="w-full md:w-auto"
-                    dusk="generate-auto-borderos" @click="generate" />
+                <div v-if="preview.groups.length"
+                    class="px-4 py-3 border-t border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <p class="text-xs text-gray-500">
+                        {{ selectedKeys.length }} de {{ preview.groups.length }} grupo(s) selecionado(s)
+                    </p>
+                    <Button :label="`Gerar manualmente ${selectedKeys.length} borderô(s)`" icon="pi pi-bolt" severity="success"
+                        :disabled="!selectedKeys.length" :loading="generating" class="w-full sm:w-auto shrink-0"
+                        dusk="generate-auto-borderos" @click="generate" />
+                </div>
             </div>
         </div>
     </component>
