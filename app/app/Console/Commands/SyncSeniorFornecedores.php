@@ -7,19 +7,26 @@ use Illuminate\Console\Command;
 
 class SyncSeniorFornecedores extends Command
 {
-    protected $signature = 'senior:sync-fornecedores {--scheduled : Marca a execução como agendada}';
+    protected $signature = 'senior:sync-fornecedores
+        {--full : Sincroniza o catálogo completo via paginação (bootstrap/noturno)}
+        {--missing : Sincroniza só fornecedores dos títulos sem cache (default)}
+        {--scheduled : Marca a execução como agendada}';
 
     protected $description = 'Sincroniza fornecedores da Senior (cad_fornecedor) e enriquece títulos';
 
     public function handle(): int
     {
-        $r = FornecedoresSyncService::make()->run(
-            $this->option('scheduled') ? 'agendado' : 'manual'
-        );
+        $full = (bool) $this->option('full');
+        $trigger = $this->option('scheduled') ? 'agendado' : 'manual';
 
+        $r = FornecedoresSyncService::make()->run($trigger, $full);
+
+        $mode = $full ? 'full' : 'delta';
         $this->info(sprintf(
-            'Sync fornecedores [%s]: %d inseridos, %d atualizados, %d erros, %d títulos enriquecidos.',
+            'Sync fornecedores [%s/%s]: %d consultados, %d inseridos, %d atualizados, %d erros, %d títulos enriquecidos.',
             $r['status'],
+            $mode,
+            $r['looked_up'] ?? 0,
             $r['inserted'],
             $r['updated'],
             $r['errors'],

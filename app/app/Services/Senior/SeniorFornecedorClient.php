@@ -209,6 +209,30 @@ XML;
         return $this->callOnce($params);
     }
 
+    /** Busca um fornecedor específico pelo codFor (lookup pontual). */
+    public function consultarPorCodFor(int $codEmp, int $codFor, int $codFil = 1): ?array
+    {
+        $params = [
+            'codEmp' => $codEmp,
+            'codFil' => $codFil,
+            'codFor' => $codFor,
+            'identificadorSistema' => $this->config['identificador_sistema'] ?? 'EASYTECH',
+            'indicePagina' => 1,
+            'limitePagina' => 1,
+        ];
+
+        try {
+            $rows = $this->callOnce($params);
+
+            return $rows[0] ?? null;
+        } catch (SeniorException $e) {
+            if ($e->kind === SeniorException::KIND_BUSINESS) {
+                return null;
+            }
+            throw $e;
+        }
+    }
+
     private function callOnce(array $params): array
     {
         $envelope = $this->buildEnvelope($params);

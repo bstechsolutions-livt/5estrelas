@@ -20,29 +20,102 @@ class FornecedoresSyncService
         return new self(SeniorFornecedorClient::fromConfig(), new FornecedorMapper());
     }
 
-    /** @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, message:?string} */
-    public function run(string $trigger = 'manual'): array
+    /**
+     * @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, message:?string, looked_up:int}
+     */
+    public function run(string $trigger = 'manual', bool $fullCatalog = false): array
     {
         if (!config('senior.enabled', false)) {
-            return [
-                'status' => 'skipped', 'inserted' => 0, 'updated' => 0, 'errors' => 0, 'enriched' => 0,
-                'message' => 'Integração Senior desabilitada por configuração.',
-            ];
+            return $this->skippedResult();
         }
 
-        $codEmps = config('senior.cod_emps');
-        if (empty($codEmps)) {
-            $codEmps = [(int) config('senior.cod_emp', 2)];
+        if ($fullCatalog) {
+            return $this->syncFullCatalog($trigger);
         }
 
+        return $this->syncMissingFromPayables($trigger);
+    }
+
+    /**
+     * Delta: busca na Senior só os codFor dos títulos que ainda não estão no cache local.
+     *
+     * @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, message:?string, looked_up:int}
+     */
+    public function syncMissingFromPayables(string $trigger = 'manual'): array
+    {
+        if (!config('senior.enabled', false)) {
+            return $this->skippedResult();
+        }
+
+        $pairs = $this->missingSupplierPairs();
+        $inserted = 0;
+        $updated = 0;
+        $errors = 0;
+        $lookedUp = 0;
+
+        foreach ($pairs as $pair) {
+            $lookedUp++;
+            try {
+                $fornecedor = $this->client->consultarPorCodFor((int) $pair->codemp, (int) $pair->codfor);
+                if ($fornecedor === null) {
+                    continue;
+                }
+                $fornecedor['codEmp'] ??= (int) $pair->codemp;
+                DB::transaction(function () use ($fornecedor, &$inserted, &$updated) {
+                    $this->upsert($fornecedor, $inserted, $updated);
+                });
+            } catch (SeniorException $e) {
+                $errors++;
+                Log::warning('[senior-fornecedor] lookup delta falhou', [
+                    'codEmp' => $pair->codemp,
+                    'codFor' => $pair->codfor,
+                    'erro' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $enriched = $this->enrichPayables();
+
+        if ($lookedUp > 0 || $enriched > 0) {
+            Log::info('[senior-fornecedor] sync delta concluído', [
+                'trigger' => $trigger,
+                'looked_up' => $lookedUp,
+                'inserted' => $inserted,
+                'updated' => $updated,
+                'enriched' => $enriched,
+                'errors' => $errors,
+            ]);
+        }
+
+        return [
+            'status' => $errors > 0 && $inserted + $updated === 0 && $lookedUp > 0 ? 'failed' : 'success',
+            'inserted' => $inserted,
+            'updated' => $updated,
+            'errors' => $errors,
+            'enriched' => $enriched,
+            'looked_up' => $lookedUp,
+            'message' => null,
+        ];
+    }
+
+    /**
+     * Full: pagina o catálogo inteiro via ConsultarGeral (bootstrap / manutenção noturna).
+     *
+     * @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, message:?string, looked_up:int}
+     */
+    public function syncFullCatalog(string $trigger = 'manual'): array
+    {
+        $codEmps = config('senior.cod_emps') ?: [(int) config('senior.cod_emp', 2)];
         $inserted = 0;
         $updated = 0;
         $errors = 0;
         $pageSize = max(10, (int) config('senior.fornecedor_page_size', 100));
+        $maxPages = max(1, (int) config('senior.fornecedor_max_pages', 500));
 
         foreach ($codEmps as $codEmp) {
             $indicePagina = 1;
-            while (true) {
+            $pages = 0;
+            while ($pages < $maxPages) {
                 try {
                     $fornecedores = $this->client->consultarGeral((int) $codEmp, 1, $indicePagina, $pageSize);
                     if ($fornecedores === []) {
@@ -54,13 +127,11 @@ class FornecedoresSyncService
                             $this->upsert($fornecedor, $inserted, $updated);
                         });
                     }
-                    if (count($fornecedores) < $pageSize) {
-                        break;
-                    }
                     $indicePagina++;
+                    $pages++;
                 } catch (SeniorException $e) {
                     $errors++;
-                    Log::warning('[senior-fornecedor] erro na empresa', ['codEmp' => $codEmp, 'erro' => $e->getMessage()]);
+                    Log::warning('[senior-fornecedor] erro na empresa (full)', ['codEmp' => $codEmp, 'erro' => $e->getMessage()]);
                     break;
                 }
             }
@@ -68,13 +139,53 @@ class FornecedoresSyncService
 
         $enriched = $this->enrichPayables();
 
+        Log::info('[senior-fornecedor] sync full concluído', [
+            'trigger' => $trigger,
+            'inserted' => $inserted,
+            'updated' => $updated,
+            'enriched' => $enriched,
+            'errors' => $errors,
+        ]);
+
         return [
             'status' => $errors > 0 && $inserted + $updated === 0 ? 'failed' : 'success',
             'inserted' => $inserted,
             'updated' => $updated,
             'errors' => $errors,
             'enriched' => $enriched,
+            'looked_up' => 0,
             'message' => null,
+        ];
+    }
+
+    /** Pares (codemp, codfor) presentes em payables mas ausentes em senior_suppliers. */
+    public function missingSupplierPairs(): \Illuminate\Support\Collection
+    {
+        return Payable::query()
+            ->select('codemp', 'codfor')
+            ->whereNotNull('codemp')
+            ->whereNotNull('codfor')
+            ->whereNotExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('senior_suppliers as s')
+                    ->whereColumn('s.cod_emp', 'payables.codemp')
+                    ->whereColumn('s.cod_for', 'payables.codfor');
+            })
+            ->distinct()
+            ->get();
+    }
+
+    public function countMissingSuppliers(): int
+    {
+        return $this->missingSupplierPairs()->count();
+    }
+
+    private function skippedResult(): array
+    {
+        return [
+            'status' => 'skipped', 'inserted' => 0, 'updated' => 0, 'errors' => 0,
+            'enriched' => 0, 'looked_up' => 0,
+            'message' => 'Integração Senior desabilitada por configuração.',
         ];
     }
 

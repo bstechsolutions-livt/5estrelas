@@ -38,6 +38,7 @@ return [
     // Servlet SOAP do serviço de Cadastro de Fornecedor (cad_fornecedor / ConsultarGeral).
     'fornecedor_service' => 'sapiens_Synccom_senior_g5_co_cad_fornecedor',
     'fornecedor_page_size' => (int) env('SENIOR_FORNECEDOR_PAGE_SIZE', 100),
+    'fornecedor_max_pages' => (int) env('SENIOR_FORNECEDOR_MAX_PAGES', 500),
 
     // Sigla do "Sistema Integrado" registrada no Senior (identificadorSistema),
     // exigida pelos serviços de cadastro (filial/fornecedor). Confirmada: EASYTECH.

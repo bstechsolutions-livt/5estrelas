@@ -34,4 +34,14 @@ if (config('senior.enabled', false)) {
     Schedule::command('senior:sync-filiais --scheduled')
         ->dailyAt('03:20')
         ->withoutOverlapping();
+
+    // Delta de fornecedores: só os codFor dos títulos sem cache local (a cada sync CP).
+    Schedule::command('senior:sync-fornecedores --missing --scheduled')
+        ->cron($cron)
+        ->withoutOverlapping();
+
+    // Catálogo completo de fornecedores — bootstrap/manutenção noturna.
+    Schedule::command('senior:sync-fornecedores --full --scheduled')
+        ->dailyAt('03:30')
+        ->withoutOverlapping();
 }

@@ -140,9 +140,24 @@ class PayablesSyncService
                 description: "Sync Contas a Pagar: {$inserted} inseridos, {$updated} atualizados, {$missing} ausentes",
                 metadata: ['sync_run_id' => $run->id, 'inserted' => $inserted, 'updated' => $updated, 'missing' => $missing],
             );
+
+            $this->syncMissingSuppliersAfterPayables();
         }
 
         return $run->fresh();
+    }
+
+    /** Após importar títulos, resolve nomes dos fornecedores que ainda não estão no cache. */
+    private function syncMissingSuppliersAfterPayables(): void
+    {
+        try {
+            $r = FornecedoresSyncService::make()->syncMissingFromPayables('pos-payables');
+            if (($r['looked_up'] ?? 0) > 0 || ($r['enriched'] ?? 0) > 0) {
+                Log::info('[senior-cp] fornecedores delta pós-sync', $r);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[senior-cp] fornecedores delta pós-sync falhou', ['erro' => $e->getMessage()]);
+        }
     }
 
     /**
