@@ -82,7 +82,7 @@ function wasRejectedBack(bordero) {
                 </div>
                 <button v-if="canManageAuto" @click="router.visit('/financeiro/borderos/automatico')"
                     class="text-sm text-blue-600 hover:underline flex items-center gap-1 shrink-0">
-                    <i class="pi pi-bolt text-xs"></i> Borderô automático
+                    <i class="pi pi-bolt text-xs"></i> Regras automáticas
                 </button>
             </div>
 

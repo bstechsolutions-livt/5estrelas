@@ -1,0 +1,109 @@
+<script setup>
+import { router, usePage } from '@inertiajs/vue3'
+import AppLayout from '@/Layouts/AppLayout.vue'
+import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
+import Button from 'primevue/button'
+import Tag from 'primevue/tag'
+import Toast from 'primevue/toast'
+import { useToast } from 'primevue/usetoast'
+import { useDevice } from '@/composables/useDevice'
+import { watch } from 'vue'
+
+defineProps({
+    rules: Array,
+})
+
+const { isMobile } = useDevice()
+const page = usePage()
+const toast = useToast()
+
+function fmtDate(iso) {
+    if (!iso) return '—'
+    return new Date(iso).toLocaleString('pt-BR')
+}
+
+function toggleRule(id) {
+    router.post(`/financeiro/borderos/automatico/${id}/toggle`, {}, { preserveScroll: true })
+}
+
+function deleteRule(id, name) {
+    if (!confirm(`Remover a regra "${name}"?`)) return
+    router.delete(`/financeiro/borderos/automatico/${id}`)
+}
+
+watch(() => page.props.flash?.success, (msg) => {
+    if (msg) toast.add({ severity: 'success', summary: 'Pronto', detail: msg, life: 4000 })
+})
+watch(() => page.props.flash?.error, (msg) => {
+    if (msg) toast.add({ severity: 'error', summary: 'Erro', detail: msg, life: 5000 })
+})
+</script>
+
+<template>
+    <component :is="isMobile ? AppLayoutMobile : AppLayout" :title="isMobile ? 'Regras auto' : undefined" :show-back="isMobile">
+        <Toast />
+        <div :class="isMobile ? 'px-4 py-3 pb-20' : 'max-w-5xl mx-auto space-y-6'">
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div>
+                    <h1 :class="isMobile ? 'text-lg font-bold text-gray-800' : 'text-2xl font-bold text-gray-800'">
+                        Regras de Borderô Automático
+                    </h1>
+                    <p class="text-sm text-gray-500 mt-1 max-w-xl">
+                        Cada regra define como agrupar títulos abertos em borderôs. O cron das <strong>6h</strong> executa todas as regras ativas.
+                    </p>
+                </div>
+                <div class="flex gap-2 shrink-0">
+                    <Button label="Nova regra" icon="pi pi-plus" size="small"
+                        @click="router.visit('/financeiro/borderos/automatico/criar')" />
+                    <Button label="Ver borderôs" icon="pi pi-list-check" severity="secondary" outlined size="small"
+                        @click="router.visit('/financeiro/borderos?status=rascunho')" />
+                </div>
+            </div>
+
+            <div v-if="!rules.length" class="bg-white rounded-xl border border-gray-100 p-10 text-center">
+                <i class="pi pi-bolt text-3xl text-gray-300 mb-3"></i>
+                <p class="text-sm text-gray-600 font-medium">Nenhuma regra cadastrada</p>
+                <p class="text-xs text-gray-400 mt-1 mb-4">Crie a primeira regra para automatizar a geração de borderôs.</p>
+                <Button label="Criar regra" icon="pi pi-plus" size="small"
+                    @click="router.visit('/financeiro/borderos/automatico/criar')" />
+            </div>
+
+            <div v-else class="space-y-3">
+                <div v-for="rule in rules" :key="rule.id"
+                    class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                    <div class="px-4 py-3 flex flex-wrap items-start justify-between gap-3 border-b border-gray-50">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h2 class="text-sm font-semibold text-gray-800">{{ rule.name }}</h2>
+                                <Tag :value="rule.is_active ? 'Ativa no cron' : 'Inativa'" :severity="rule.is_active ? 'success' : 'secondary'" class="!text-[10px]" />
+                            </div>
+                            <ul class="mt-2 space-y-0.5">
+                                <li v-for="(line, i) in rule.rules_summary" :key="i" class="text-xs text-gray-500">{{ line }}</li>
+                            </ul>
+                        </div>
+                        <div class="flex gap-1.5 shrink-0">
+                            <Button icon="pi pi-pencil" severity="secondary" text size="small"
+                                @click="router.visit(`/financeiro/borderos/automatico/${rule.id}/editar`)" />
+                            <Button :icon="rule.is_active ? 'pi pi-pause' : 'pi pi-play'" severity="secondary" text size="small"
+                                :title="rule.is_active ? 'Desativar cron' : 'Ativar cron'"
+                                @click="toggleRule(rule.id)" />
+                            <Button icon="pi pi-trash" severity="danger" text size="small"
+                                @click="deleteRule(rule.id, rule.name)" />
+                        </div>
+                    </div>
+                    <div class="px-4 py-2.5 flex flex-wrap gap-4 text-[11px] text-gray-400 bg-gray-50/50">
+                        <span v-if="rule.last_applied_at">
+                            Última aplicação manual: {{ fmtDate(rule.last_applied_at) }}
+                            ({{ rule.last_applied_count ?? 0 }} borderô(s))
+                        </span>
+                        <span v-if="rule.last_cron_at">
+                            Último cron: {{ fmtDate(rule.last_cron_at) }}
+                            ({{ rule.last_cron_count ?? 0 }} borderô(s))
+                        </span>
+                        <span v-if="!rule.last_applied_at && !rule.last_cron_at">Ainda não executada</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </component>
+</template>

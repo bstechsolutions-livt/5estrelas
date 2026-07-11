@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\Bordero;
-use App\Models\BorderoAutoConfig;
+use App\Models\BorderoAutoRule;
 use App\Models\Payable;
 use App\Models\User;
 use Carbon\Carbon;
@@ -19,7 +19,7 @@ class BorderoAutoGroupService
     ) {}
 
     /** @return Builder<Payable> */
-    public function eligibleQuery(?User $user, BorderoAutoConfig $config): Builder
+    public function eligibleQuery(?User $user, BorderoAutoRule $rule): Builder
     {
         $query = Payable::query()
             ->whereNull('bordero_id')
@@ -29,8 +29,8 @@ class BorderoAutoGroupService
             $this->branchScope->applyFilter($query, $user);
         }
 
-        if ($config->eligibility_mode === BorderoAutoConfig::ELIGIBILITY_DUE_WITHIN) {
-            $days = max(1, (int) ($config->eligibility_due_days ?? 30));
+        if ($rule->eligibility_mode === BorderoAutoRule::ELIGIBILITY_DUE_WITHIN) {
+            $days = max(1, (int) ($rule->eligibility_due_days ?? 30));
             $limit = Carbon::today()->addDays($days)->toDateString();
             $query->whereNotNull('due_date')->whereDate('due_date', '<=', $limit);
         }
@@ -47,18 +47,17 @@ class BorderoAutoGroupService
      *   rules_summary: list<string>
      * }
      */
-    public function preview(?User $user, ?BorderoAutoConfig $config = null): array
+    public function preview(?User $user, BorderoAutoRule $rule): array
     {
-        $config ??= BorderoAutoConfig::current();
-        $payables = $this->eligibleQuery($user, $config)
+        $payables = $this->eligibleQuery($user, $rule)
             ->orderBy('codemp')
             ->orderBy('due_date')
             ->get();
 
         Payable::attachEmpresaNome($payables);
 
-        $rawGroups = $this->bucketPayables($payables, $config);
-        $min = max(2, (int) $config->min_titles_per_group);
+        $rawGroups = $this->bucketPayables($payables, $rule);
+        $min = max(2, (int) $rule->min_titles_per_group);
 
         $groups = [];
         $skippedSingles = 0;
@@ -74,7 +73,7 @@ class BorderoAutoGroupService
                 $unclassified += count($bucket['payables']);
             }
 
-            $groups[] = $this->formatGroup($bucket);
+            $groups[] = $this->formatGroup($bucket, $rule);
         }
 
         usort($groups, fn ($a, $b) => $b['titles_count'] <=> $a['titles_count']);
@@ -93,51 +92,63 @@ class BorderoAutoGroupService
             ],
             'skipped_singles' => $skippedSingles,
             'unclassified_count' => $unclassified,
-            'rules_summary' => $config->rulesSummary(),
+            'rules_summary' => $rule->rulesSummary(),
         ];
     }
 
-    /**
-     * @param  list<string>  $groupKeys
-     * @return array{created: int, bordero_ids: list<int>}
-     */
-    public function generate(?User $user, array $groupKeys, ?BorderoAutoConfig $config = null): array
+    /** Aplica a regra nos títulos abertos (todos os grupos da simulação). */
+    public function applyRule(?User $user, BorderoAutoRule $rule): array
     {
-        $config ??= BorderoAutoConfig::current();
-        $preview = $this->preview($user, $config);
-        $selected = collect($preview['groups'])
-            ->filter(fn (array $g) => in_array($g['key'], $groupKeys, true))
-            ->values()
-            ->all();
+        $preview = $this->preview($user, $rule);
+        $result = $this->createBorderosFromGroups($preview['groups'], $user, $rule);
 
-        return $this->createBorderosFromGroups($selected, $user);
-    }
-
-    /** Gera borderôs para todos os grupos da simulação (cron). */
-    public function generateAllFromConfig(?BorderoAutoConfig $config = null): array
-    {
-        $config ??= BorderoAutoConfig::current();
-
-        if (! $config->cron_enabled) {
-            return ['created' => 0, 'bordero_ids' => [], 'skipped' => true];
-        }
-
-        $preview = $this->preview(null, $config);
-        $result = $this->createBorderosFromGroups($preview['groups'], null);
-
-        $config->update([
-            'last_cron_run_at' => now(),
-            'last_cron_created_count' => $result['created'],
+        $rule->update([
+            'last_applied_at' => now(),
+            'last_applied_count' => $result['created'],
         ]);
 
         return $result;
+    }
+
+    /** Cron: executa todas as regras ativas em ordem. */
+    public function runActiveRulesForCron(): array
+    {
+        $rules = BorderoAutoRule::query()
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->get();
+
+        $totalCreated = 0;
+        $ruleResults = [];
+
+        foreach ($rules as $rule) {
+            $preview = $this->preview(null, $rule);
+            $result = $this->createBorderosFromGroups($preview['groups'], null, $rule);
+
+            $rule->update([
+                'last_cron_at' => now(),
+                'last_cron_count' => $result['created'],
+            ]);
+
+            $totalCreated += $result['created'];
+            $ruleResults[] = [
+                'rule_id' => $rule->id,
+                'rule_name' => $rule->name,
+                'created' => $result['created'],
+            ];
+        }
+
+        return [
+            'created' => $totalCreated,
+            'rules' => $ruleResults,
+        ];
     }
 
     /**
      * @param  list<array<string, mixed>>  $groups
      * @return array{created: int, bordero_ids: list<int>}
      */
-    private function createBorderosFromGroups(array $groups, ?User $user): array
+    private function createBorderosFromGroups(array $groups, ?User $user, BorderoAutoRule $rule): array
     {
         if ($groups === []) {
             return ['created' => 0, 'bordero_ids' => []];
@@ -145,7 +156,7 @@ class BorderoAutoGroupService
 
         $createdIds = [];
 
-        DB::transaction(function () use ($groups, $user, &$createdIds) {
+        DB::transaction(function () use ($groups, $user, $rule, &$createdIds) {
             foreach ($groups as $group) {
                 $payableIds = $group['payable_ids'];
                 $payables = Payable::whereIn('id', $payableIds)
@@ -153,7 +164,7 @@ class BorderoAutoGroupService
                     ->whereIn('status', ['pendente', 'em_preparacao', 'reprovado'])
                     ->get();
 
-                if ($payables->count() < 2) {
+                if ($payables->count() < max(2, (int) $rule->min_titles_per_group)) {
                     continue;
                 }
 
@@ -162,6 +173,7 @@ class BorderoAutoGroupService
                     'description' => $group['bordero_description'],
                     'status' => 'rascunho',
                     'created_by' => $user?->id,
+                    'auto_rule_id' => $rule->id ?: null,
                 ]);
 
                 $update = ['bordero_id' => $bordero->id];
@@ -174,11 +186,11 @@ class BorderoAutoGroupService
                 $bordero->recalculate();
                 $createdIds[] = $bordero->id;
 
-                $source = $user ? 'manual' : 'cron';
+                $source = $user ? 'regra' : 'cron';
                 AuditLogger::log(
                     event: 'bordero.created',
                     module: 'financeiro.contas_pagar',
-                    description: "Borderô automático ({$source}) {$bordero->number}: {$bordero->items_count} título(s) — {$group['label']}",
+                    description: "Borderô automático ({$source}: {$rule->name}) {$bordero->number}: {$bordero->items_count} título(s) — {$group['label']}",
                     auditable: $bordero,
                 );
             }
@@ -194,7 +206,7 @@ class BorderoAutoGroupService
      * @param  Collection<int, Payable>  $payables
      * @return list<array<string, mixed>>
      */
-    private function bucketPayables(Collection $payables, BorderoAutoConfig $config): array
+    private function bucketPayables(Collection $payables, BorderoAutoRule $rule): array
     {
         $baseBuckets = [];
 
@@ -223,15 +235,15 @@ class BorderoAutoGroupService
         $final = [];
 
         foreach ($baseBuckets as $base) {
-            $chunks = match ($config->due_grouping) {
-                BorderoAutoConfig::DUE_SAME_DAY => $this->splitBySameDay($base),
-                BorderoAutoConfig::DUE_MAX_SPAN => $this->splitByMaxSpan($base, max(1, (int) $config->max_due_span_days)),
+            $chunks = match ($rule->due_grouping) {
+                BorderoAutoRule::DUE_SAME_DAY => $this->splitBySameDay($base),
+                BorderoAutoRule::DUE_MAX_SPAN => $this->splitByMaxSpan($base, max(1, (int) $rule->max_due_span_days)),
                 default => [$base],
             };
 
             foreach ($chunks as $i => $chunk) {
-                $chunk['key'] = $this->finalizeKey($chunk, $config, $i);
-                $chunk['due_label'] = $this->dueLabelForChunk($chunk, $config);
+                $chunk['key'] = $this->finalizeKey($chunk, $rule, $i);
+                $chunk['due_label'] = $this->dueLabelForChunk($chunk, $rule);
                 $final[] = $chunk;
             }
         }
@@ -326,15 +338,15 @@ class BorderoAutoGroupService
     }
 
     /** @param array<string, mixed> $chunk */
-    private function finalizeKey(array $chunk, BorderoAutoConfig $config, int $index): string
+    private function finalizeKey(array $chunk, BorderoAutoRule $rule, int $index): string
     {
         $key = $chunk['base_key'];
 
-        if ($config->due_grouping === BorderoAutoConfig::DUE_SAME_DAY) {
+        if ($rule->due_grouping === BorderoAutoRule::DUE_SAME_DAY) {
             $key .= '|date:' . ($chunk['due_date_key'] ?? $index);
         }
 
-        if ($config->due_grouping === BorderoAutoConfig::DUE_MAX_SPAN) {
+        if ($rule->due_grouping === BorderoAutoRule::DUE_MAX_SPAN) {
             $key .= '|span:' . ($chunk['due_date_key'] ?? $index);
         }
 
@@ -342,9 +354,9 @@ class BorderoAutoGroupService
     }
 
     /** @param array<string, mixed> $chunk */
-    private function dueLabelForChunk(array $chunk, BorderoAutoConfig $config): ?string
+    private function dueLabelForChunk(array $chunk, BorderoAutoRule $rule): ?string
     {
-        if ($config->due_grouping === BorderoAutoConfig::DUE_SAME_DAY) {
+        if ($rule->due_grouping === BorderoAutoRule::DUE_SAME_DAY) {
             $key = $chunk['due_date_key'] ?? null;
             if ($key === 'sem-vencimento' || ! $key) {
                 return 'Sem vencimento';
@@ -353,7 +365,7 @@ class BorderoAutoGroupService
             return 'Venc. ' . Carbon::parse($key)->format('d/m/Y');
         }
 
-        if ($config->due_grouping === BorderoAutoConfig::DUE_MAX_SPAN) {
+        if ($rule->due_grouping === BorderoAutoRule::DUE_MAX_SPAN) {
             if (($chunk['due_date_key'] ?? '') === 'sem-vencimento') {
                 return 'Sem vencimento';
             }
@@ -369,7 +381,7 @@ class BorderoAutoGroupService
     }
 
     /** @param array<string, mixed> $bucket */
-    private function formatGroup(array $bucket): array
+    private function formatGroup(array $bucket, BorderoAutoRule $rule): array
     {
         /** @var list<Payable> $payables */
         $payables = $bucket['payables'];
@@ -396,7 +408,7 @@ class BorderoAutoGroupService
             'titles_count' => count($payables),
             'total_amount' => round($amount, 2),
             'payable_ids' => $ids,
-            'bordero_description' => 'Auto: ' . $label,
+            'bordero_description' => 'Auto (' . $rule->name . '): ' . $label,
             'sample_titles' => array_slice(array_map(fn (Payable $p) => [
                 'id' => $p->id,
                 'title_number' => $p->title_number,

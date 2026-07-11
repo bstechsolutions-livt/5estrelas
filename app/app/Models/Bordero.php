@@ -13,7 +13,7 @@ class Bordero extends Model
 
     protected $fillable = [
         'number', 'description', 'status', 'total_amount', 'items_count',
-        'created_by', 'approved_by', 'sent_for_approval_at', 'approved_at', 'rejection_reason',
+        'created_by', 'auto_rule_id', 'approved_by', 'sent_for_approval_at', 'approved_at', 'rejection_reason',
     ];
 
     protected $casts = [

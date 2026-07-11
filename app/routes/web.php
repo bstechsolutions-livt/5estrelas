@@ -200,15 +200,30 @@ Route::middleware('auth')->group(function () {
 
     // Financeiro - Borderôs
     Route::prefix('financeiro/borderos')->middleware('permission:financeiro.borderos.visualizar')->group(function () {
-        Route::get('/automatico', [\App\Http\Controllers\BorderoAutoConfigController::class, 'index'])
+        Route::get('/automatico', [\App\Http\Controllers\BorderoAutoRuleController::class, 'index'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
-            ->name('borderos.auto-config.index');
-        Route::post('/automatico', [\App\Http\Controllers\BorderoAutoConfigController::class, 'update'])
+            ->name('borderos.auto-rules.index');
+        Route::get('/automatico/criar', [\App\Http\Controllers\BorderoAutoRuleController::class, 'create'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
-            ->name('borderos.auto-config.update');
-        Route::post('/automatico/gerar', [\App\Http\Controllers\BorderoAutoConfigController::class, 'generate'])
+            ->name('borderos.auto-rules.create');
+        Route::post('/automatico', [\App\Http\Controllers\BorderoAutoRuleController::class, 'store'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
-            ->name('borderos.auto-config.generate');
+            ->name('borderos.auto-rules.store');
+        Route::post('/automatico/simular', [\App\Http\Controllers\BorderoAutoRuleController::class, 'simulate'])
+            ->middleware('permission:financeiro.borderos.automatico_gerenciar')
+            ->name('borderos.auto-rules.simulate');
+        Route::get('/automatico/{rule}/editar', [\App\Http\Controllers\BorderoAutoRuleController::class, 'edit'])
+            ->middleware('permission:financeiro.borderos.automatico_gerenciar')
+            ->name('borderos.auto-rules.edit');
+        Route::put('/automatico/{rule}', [\App\Http\Controllers\BorderoAutoRuleController::class, 'update'])
+            ->middleware('permission:financeiro.borderos.automatico_gerenciar')
+            ->name('borderos.auto-rules.update');
+        Route::delete('/automatico/{rule}', [\App\Http\Controllers\BorderoAutoRuleController::class, 'destroy'])
+            ->middleware('permission:financeiro.borderos.automatico_gerenciar')
+            ->name('borderos.auto-rules.destroy');
+        Route::post('/automatico/{rule}/toggle', [\App\Http\Controllers\BorderoAutoRuleController::class, 'toggle'])
+            ->middleware('permission:financeiro.borderos.automatico_gerenciar')
+            ->name('borderos.auto-rules.toggle');
         Route::get('/', [BorderoController::class, 'index'])->name('borderos.index');
         Route::post('/', [BorderoController::class, 'store'])->name('borderos.store');
         Route::get('/{id}', [BorderoController::class, 'show'])->name('borderos.show');
