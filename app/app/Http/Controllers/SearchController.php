@@ -139,6 +139,7 @@ class SearchController extends Controller
         // Contas a Pagar
         if ($user->hasPermission('financeiro.contas_pagar.visualizar')) {
             $payables = \App\Models\Payable::query()
+                ->excludeMissingInSenior()
                 ->where(function ($qq) use ($q) {
                     $qq->where('supplier_name', 'ilike', "%{$q}%")
                         ->orWhere('title_number', 'ilike', "%{$q}%")

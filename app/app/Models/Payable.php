@@ -293,6 +293,12 @@ class Payable extends Model
         return $this->senior_missing_at !== null;
     }
 
+    /** Exclui títulos baixados na Senior das listagens padrão de CP. */
+    public function scopeExcludeMissingInSenior($query)
+    {
+        return $query->whereNull('senior_missing_at');
+    }
+
     /** Título foi reprovado no fluxo e devolvido para pendente (aguarda correção). */
     public function wasRejectedBack(): bool
     {

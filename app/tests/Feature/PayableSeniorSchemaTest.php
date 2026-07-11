@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Payable;
 use App\Models\PayableRateio;
 use App\Models\PayableSyncRun;
+use App\Models\User;
 use Database\Seeders\PayableSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -94,6 +95,54 @@ class PayableSeniorSchemaTest extends TestCase
 
         $p->update(['senior_missing_at' => now()]);
         $this->assertTrue($p->fresh()->isMissingInSenior());
+    }
+
+    public function test_lista_oculta_titulos_baixados_na_senior(): void
+    {
+        $visible = Payable::create([
+            'supplier_name' => 'Fornecedor Visível',
+            'amount' => 100,
+            'due_date' => now()->addDays(5)->toDateString(),
+            'status' => 'pendente',
+            'title_number' => 'TIT-VIS',
+        ]);
+        $missing = Payable::create([
+            'supplier_name' => 'Fornecedor Baixado',
+            'amount' => 200,
+            'due_date' => now()->addDays(5)->toDateString(),
+            'status' => 'pendente',
+            'title_number' => 'TIT-BAIX',
+            'senior_id' => '1-1-TIT-BAIX-1000',
+            'senior_missing_at' => now(),
+        ]);
+
+        $user = User::factory()->create(['is_active' => true]);
+        $user->permissions()->attach(
+            \App\Models\Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.visualizar'],
+                ['label' => 'Ver CP', 'module' => 'financeiro'],
+            )->id,
+        );
+        $user->permissions()->attach(
+            \App\Models\Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.ver_todos_departamentos'],
+                ['label' => 'Ver todos deptos', 'module' => 'financeiro'],
+            )->id,
+        );
+        $user->permissions()->attach(
+            \App\Models\Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.ver_todas_filiais'],
+                ['label' => 'Ver todas filiais', 'module' => 'financeiro'],
+            )->id,
+        );
+
+        $response = $this->actingAs($user)
+            ->get('/financeiro/contas-pagar?status=pendente')
+            ->assertOk();
+
+        $ids = collect($response->viewData('page')['props']['payables']['data'])->pluck('id');
+        $this->assertTrue($ids->contains($visible->id));
+        $this->assertFalse($ids->contains($missing->id));
     }
 
     public function test_sync_run_model(): void

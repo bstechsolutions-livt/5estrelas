@@ -118,11 +118,8 @@ class PayablesSyncService
             }
         }
 
-        // req 7: títulos ausentes na Senior — somente no Full_Sync.
-        $missing = 0;
-        if ($mode === PayableSyncRun::MODE_FULL) {
-            $missing = $this->marcarAusentes($businessKeys);
-        }
+        // req 7: títulos ausentes na Senior — full (todos) ou incremental (janela vctIni/vctFim).
+        $missing = $this->marcarAusentes($businessKeys, $vctIni, $vctFim);
 
         $run->update([
             'status' => PayableSyncRun::STATUS_SUCCESS,
@@ -310,12 +307,21 @@ class PayablesSyncService
         }
     }
 
-    /** Marca como ausentes os títulos de origem Senior não retornados (req 7.1). */
-    private function marcarAusentes(array $businessKeys): int
+    /**
+     * Marca como ausentes os títulos de origem Senior não retornados (req 7.1).
+     * No incremental, restringe à janela de vencimento consultada (vctIni/vctFim).
+     */
+    private function marcarAusentes(array $businessKeys, ?Carbon $vctIni = null, ?Carbon $vctFim = null): int
     {
         $query = Payable::whereNotNull('senior_id')->whereNull('senior_missing_at');
         if ($businessKeys !== []) {
             $query->whereNotIn('senior_id', array_values(array_unique($businessKeys)));
+        }
+        if ($vctIni !== null) {
+            $query->where('due_date', '>=', $vctIni);
+        }
+        if ($vctFim !== null) {
+            $query->where('due_date', '<=', $vctFim);
         }
 
         return $query->update(['senior_missing_at' => now()]);

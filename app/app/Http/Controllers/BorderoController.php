@@ -141,6 +141,7 @@ class BorderoController extends Controller
 
         // Valida que os títulos estão em status que permite agrupar
         $payablesQuery = Payable::whereIn('id', $data['payable_ids'])
+            ->excludeMissingInSenior()
             ->whereIn('status', ['pendente', 'em_preparacao', 'reprovado'])
             ->whereNull('bordero_id');
         $branchScope->applyFilter($payablesQuery, $user);

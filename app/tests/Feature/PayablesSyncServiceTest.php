@@ -184,7 +184,7 @@ class PayablesSyncServiceTest extends TestCase
         $this->assertNull(Payable::where('title_number', 'TIT-2')->first()->senior_missing_at);
     }
 
-    public function test_incremental_nao_marca_ausentes(): void
+    public function test_incremental_marca_ausentes_na_janela(): void
     {
         config(['senior.enabled' => true]);
         $t1 = $this->titulo('TIT-1');
@@ -192,7 +192,21 @@ class PayablesSyncServiceTest extends TestCase
         $t2['codFor'] = 1001;
         $this->service([$t1, $t2])->run(PayableSyncRun::MODE_FULL);
 
-        // Incremental retornando só TIT-1 não pode marcar TIT-2 como ausente (req 7.2).
+        // Incremental retornando só TIT-1 marca TIT-2 como ausente (vencimento na janela).
+        $run = $this->service([$t1])->run(PayableSyncRun::MODE_INCREMENTAL);
+        $this->assertEquals(1, $run->missing_count);
+        $this->assertNotNull(Payable::where('title_number', 'TIT-2')->first()->senior_missing_at);
+    }
+
+    public function test_incremental_nao_marca_ausentes_fora_da_janela(): void
+    {
+        config(['senior.enabled' => true]);
+        $t1 = $this->titulo('TIT-1');
+        $t2 = $this->titulo('TIT-2', 'NOR', 1000);
+        $t2['codFor'] = 1001;
+        $t2['vctPro'] = '2010-01-01';
+        $this->service([$t1, $t2])->run(PayableSyncRun::MODE_FULL);
+
         $run = $this->service([$t1])->run(PayableSyncRun::MODE_INCREMENTAL);
         $this->assertEquals(0, $run->missing_count);
         $this->assertNull(Payable::where('title_number', 'TIT-2')->first()->senior_missing_at);

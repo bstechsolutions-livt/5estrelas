@@ -278,6 +278,7 @@ class PayableController extends Controller
         $departmentContext = $this->resolveDepartmentFilter($request);
 
         $query = Payable::query()
+            ->excludeMissingInSenior()
             ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number']);
 
         $status = $request->input('status') ?: 'pendente';
@@ -333,6 +334,7 @@ class PayableController extends Controller
         Payable::attachPriorityMeta($payables->getCollection());
 
         $totalsQuery = Payable::query()
+            ->excludeMissingInSenior()
             ->where(function ($q) {
                 $q->where('status', '!=', 'pendente')
                     ->orWhereNull('bordero_id');
