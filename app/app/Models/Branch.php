@@ -18,26 +18,78 @@ class Branch extends Model
 
     protected $appends = ['display_name'];
 
-    /** Nome curto para exibição (apelido da empresa espelhada na Senior, se houver). */
+    /** Nome curto para exibição (apelido da filial espelhada na Senior, se houver). */
     public function getDisplayNameAttribute(): string
     {
         return $this->resolveDisplayName();
     }
 
+    /** Apelido da filial comercial vinculada a este cadastro local. */
     public function resolveDisplayName(): string
     {
-        if (is_numeric($this->code)) {
-            $apelido = \App\Models\Comercial\Filial::where('cod_emp', (int) $this->code)->value('apelido');
-            if (filled($apelido)) {
-                if (preg_match('/FILIAL\s+([A-ZÀ-Ú]{2,})\b/iu', $this->name, $m)) {
-                    return trim($apelido . ' ' . mb_strtoupper($m[1]));
-                }
-
-                return $apelido;
-            }
+        $filial = $this->resolveComercialFilial();
+        if ($filial !== null) {
+            return filled($filial->apelido) ? $filial->apelido : $filial->label;
         }
 
         return \App\Models\Comercial\Filial::gerarApelido($this->name);
+    }
+
+    /** Filial Senior espelhada (match por CNPJ, cod_fil ou cod_emp único). */
+    public function resolveComercialFilial(): ?\App\Models\Comercial\Filial
+    {
+        $query = \App\Models\Comercial\Filial::query()->where('ativo', true);
+        $cnpj = $this->normalizedCnpj();
+
+        if ($cnpj !== null) {
+            $byCnpj = (clone $query)->get()->first(
+                fn (\App\Models\Comercial\Filial $f) => $this->cnpjMatches($f->cnpj, $cnpj),
+            );
+            if ($byCnpj !== null) {
+                return $byCnpj;
+            }
+        }
+
+        if (! is_numeric($this->code)) {
+            return null;
+        }
+
+        $code = (int) $this->code;
+        $byCodFil = (clone $query)->where('cod_fil', $code)->get();
+
+        if ($byCodFil->count() === 1) {
+            return $byCodFil->first();
+        }
+
+        if ($byCodFil->count() > 1 && $cnpj !== null) {
+            $match = $byCodFil->first(
+                fn (\App\Models\Comercial\Filial $f) => $this->cnpjMatches($f->cnpj, $cnpj),
+            );
+            if ($match !== null) {
+                return $match;
+            }
+        }
+
+        $byCodEmp = (clone $query)->where('cod_emp', $code)->get();
+        if ($byCodEmp->count() === 1) {
+            return $byCodEmp->first();
+        }
+
+        return null;
+    }
+
+    private function normalizedCnpj(): ?string
+    {
+        $cnpj = preg_replace('/\D/', '', $this->cnpj ?? '');
+
+        return strlen($cnpj) === 14 ? $cnpj : null;
+    }
+
+    private function cnpjMatches(?string $filialCnpj, string $normalized): bool
+    {
+        $candidate = preg_replace('/\D/', '', $filialCnpj ?? '');
+
+        return strlen($candidate) === 14 && $candidate === $normalized;
     }
 
     protected string $auditableModule = 'filiais';

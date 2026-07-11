@@ -126,13 +126,13 @@ class UserController extends Controller
     private function branchOptions(): array
     {
         return Branch::where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name', 'code'])
+            ->get(['id', 'name', 'code', 'cnpj'])
             ->map(fn (Branch $b) => [
                 'id' => $b->id,
                 'name' => $b->display_name,
                 'code' => $b->code,
             ])
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
             ->values()
             ->all();
     }
