@@ -323,6 +323,13 @@ const currentTotal = computed(() => {
                     class="!text-[9px] !px-1.5 !py-0 mt-1"
                     :title="p.document_pair_alert.message"
                 />
+                <Tag
+                    v-if="p.origem_hub"
+                    value="Hub"
+                    severity="info"
+                    class="!text-[9px] !px-1.5 !py-0 mt-1"
+                    title="Criado na intranet"
+                />
                 <span v-if="status !== 'pendente' && p.bordero" class="inline-block mt-1 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
                     {{ p.bordero.number }}
                 </span>

@@ -334,6 +334,7 @@ function submitDueDate() {
                             {{ payable.supplier_name }}
                         </h1>
                         <Tag :value="statusLabels[payable.status]" :severity="statusColors[payable.status]" />
+                        <Tag v-if="payable.origem_hub" value="Hub" severity="info" class="!text-xs" dusk="origem-hub-badge" title="Criado na intranet (não importado da Senior)" />
                     </div>
                     <p class="text-sm text-gray-500 mt-1">
                         Título: {{ payable.title_number || '—' }} · Vencimento: {{ formatDate(payable.due_date) }}

@@ -389,6 +389,14 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                                     :title="data.document_pair_alert.message"
                                     dusk="doc-pair-alert"
                                 />
+                                <Tag
+                                    v-if="data.origem_hub"
+                                    value="Hub"
+                                    severity="info"
+                                    class="!text-[9px] !px-1.5 !py-0 leading-tight"
+                                    title="Criado na intranet"
+                                    dusk="origem-hub-badge"
+                                />
                             </div>
                         </template>
                     </Column>

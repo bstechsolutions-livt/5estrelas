@@ -307,8 +307,34 @@ class Payable extends Model
         }
     }
 
+    /** Título criado na intranet (sem Business Key da Senior). */
+    public function isHubManual(): bool
+    {
+        return empty($this->senior_id);
+    }
+
+    /** Título importado via sync Senior. */
+    public function isFromSenior(): bool
+    {
+        return ! $this->isHubManual();
+    }
+
     /**
-     * Nome curto da filial operacional (apelido). Usa branch vinculada,
+     * Marca títulos criados no Hub (futuro: lançamento manual na intranet).
+     * Títulos Senior não recebem badge — evita ruído enquanto a base é 100% Senior.
+     *
+     * @param iterable<Payable> $payables
+     */
+    public static function attachOrigemHub(iterable $payables): void
+    {
+        foreach ($payables as $payable) {
+            if ($payable->isHubManual()) {
+                $payable->setAttribute('origem_hub', true);
+            }
+        }
+    }
+
+    /**
      * ou resolve pelo codFil via tabela branches, ou cai no apelido da empresa.
      *
      * @param iterable<Payable> $payables

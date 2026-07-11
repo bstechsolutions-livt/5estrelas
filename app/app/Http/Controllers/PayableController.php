@@ -75,6 +75,7 @@ class PayableController extends Controller
         Payable::attachFilialNome($payables->getCollection());
         Payable::attachDepartmentNome($payables->getCollection());
         PayableDocumentPairAlert::attachToPayables($payables->getCollection());
+        Payable::attachOrigemHub($payables->getCollection());
 
         if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
             return response()->json($payables);
@@ -174,6 +175,9 @@ class PayableController extends Controller
             'document_pair_alert',
             PayableDocumentPairAlert::resolveFromDocuments($payable->documents, $payable->status),
         );
+        if ($payable->isHubManual()) {
+            $payable->setAttribute('origem_hub', true);
+        }
 
         // Approval steps (workflow multinível)
         $approvalSteps = ApprovalStep::where('payable_id', $id)
