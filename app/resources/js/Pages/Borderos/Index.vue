@@ -3,12 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
-import { useFinanceiroViewMode } from '@/composables/useFinanceiroViewMode'
-import BorderoDetailedCard from '@/Components/Financeiro/BorderoDetailedCard.vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
-import Paginator from 'primevue/paginator'
 import { useDevice } from '@/composables/useDevice'
 
 const props = defineProps({
@@ -16,13 +13,10 @@ const props = defineProps({
     totals: Object,
     filters: Object,
     statusOptions: Object,
-    payableStatusOptions: { type: Object, default: () => ({}) },
-    documentTypes: { type: Object, default: () => ({}) },
 })
 
 const STORAGE_KEY = 'borderos_status'
 const { isMobile } = useDevice()
-const { viewMode, persistViewMode, withView } = useFinanceiroViewMode('borderos_view_mode', () => props.filters?.view)
 const status = ref(props.filters?.status || 'aguardando_aprovacao')
 
 const statusList = [
@@ -36,54 +30,29 @@ function filterStatus(s) {
     if (status.value === s) return
     status.value = s
     localStorage.setItem(STORAGE_KEY, s)
-    router.get('/financeiro/borderos', withView({ status: s }), { preserveState: true, replace: true })
-}
-
-function setViewMode(mode) {
-    if (viewMode.value === mode) return
-    persistViewMode(mode)
-    router.get('/financeiro/borderos', withView({ status: status.value }), { preserveState: true, replace: true })
-}
-
-function onDetailedPage(event) {
-    router.get('/financeiro/borderos', {
-        ...withView({ status: status.value }),
-        page: event.page + 1,
-        per_page: event.rows,
-    }, { preserveState: true, replace: true })
+    router.get('/financeiro/borderos', { status: s }, { preserveState: true, replace: true })
 }
 
 onMounted(() => {
     if (status.value === 'reprovado') {
         status.value = 'rascunho'
         localStorage.setItem(STORAGE_KEY, 'rascunho')
-        router.get('/financeiro/borderos', withView({ status: 'rascunho' }), { preserveState: true, replace: true })
+        router.get('/financeiro/borderos', { status: 'rascunho' }, { preserveState: true, replace: true })
         return
     }
 
-    // Visita "limpa" (sem query): restaura último status e visão usados
+    // Visita "limpa" (sem query): restaura último status usado
     if (!window.location.search) {
-        const cachedView = localStorage.getItem('borderos_view_mode')
         const cached = localStorage.getItem(STORAGE_KEY)
         const normalized = cached === 'reprovado' ? 'rascunho' : cached
-        const serverStatus = props.filters?.status || 'aguardando_aprovacao'
-        const serverView = props.filters?.view || 'resumida'
-
-        if (cachedView && cachedView !== serverView) {
-            persistViewMode(cachedView)
-            router.get('/financeiro/borderos', withView({ status: normalized || serverStatus }), { preserveState: true, replace: true })
-            return
-        }
-
-        if (normalized && normalized !== serverStatus) {
+        if (normalized && normalized !== (props.filters?.status || 'aguardando_aprovacao')) {
             status.value = normalized
-            router.get('/financeiro/borderos', withView({ status: normalized }), { preserveState: true, replace: true })
+            router.get('/financeiro/borderos', { status: normalized }, { preserveState: true, replace: true })
         }
     }
 })
 
 function goShow(id) { router.visit(`/financeiro/borderos/${id}`) }
-function goPayable(id) { router.visit(`/financeiro/contas-pagar/${id}`) }
 
 function formatMoney(val) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
@@ -95,12 +64,6 @@ function formatDate(d) {
 
 const statusSeverity = { rascunho: 'secondary', aguardando_aprovacao: 'warn', aprovado: 'success', reprovado: 'danger', pago: 'success' }
 
-const prioritySeverity = {
-    normal: 'secondary',
-    alta: 'warn',
-    urgente: 'danger',
-}
-
 function wasRejectedBack(bordero) {
     return bordero.status === 'rascunho' && !!bordero.rejection_reason
 }
@@ -109,27 +72,9 @@ function wasRejectedBack(bordero) {
 <template>
     <component :is="isMobile ? AppLayoutMobile : AppLayout" :title="isMobile ? 'Borderôs' : undefined">
         <div :class="isMobile ? 'px-4 py-3' : 'max-w-6xl mx-auto'">
-            <div v-if="!isMobile" class="mb-6 flex flex-wrap items-start justify-between gap-4">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-800">Borderôs</h1>
-                    <p class="text-sm text-gray-500 mt-1">Agrupamentos de títulos para pagamento.</p>
-                </div>
-                <div class="flex rounded-lg border border-gray-200 bg-white p-0.5 shrink-0" dusk="borderos-view-toggle">
-                    <button
-                        type="button"
-                        :class="['px-3 py-1.5 rounded-md text-sm font-medium transition-colors', viewMode === 'resumida' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50']"
-                        @click="setViewMode('resumida')"
-                    >
-                        Resumida
-                    </button>
-                    <button
-                        type="button"
-                        :class="['px-3 py-1.5 rounded-md text-sm font-medium transition-colors', viewMode === 'detalhada' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50']"
-                        @click="setViewMode('detalhada')"
-                    >
-                        Detalhada
-                    </button>
-                </div>
+            <div v-if="!isMobile" class="mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Borderôs</h1>
+                <p class="text-sm text-gray-500 mt-1">Agrupamentos de títulos para pagamento.</p>
             </div>
 
             <!-- Tabs status -->
@@ -142,28 +87,8 @@ function wasRejectedBack(bordero) {
                 </button>
             </div>
 
-            <!-- Toggle visão (mobile) -->
-            <div v-if="isMobile" class="px-0 pb-3">
-                <div class="flex rounded-lg border border-gray-200 bg-white p-0.5" dusk="borderos-view-toggle">
-                    <button
-                        type="button"
-                        :class="['flex-1 py-2 rounded-md text-xs font-medium', viewMode === 'resumida' ? 'bg-blue-600 text-white' : 'text-gray-600']"
-                        @click="setViewMode('resumida')"
-                    >
-                        Resumida
-                    </button>
-                    <button
-                        type="button"
-                        :class="['flex-1 py-2 rounded-md text-xs font-medium', viewMode === 'detalhada' ? 'bg-blue-600 text-white' : 'text-gray-600']"
-                        @click="setViewMode('detalhada')"
-                    >
-                        Detalhada
-                    </button>
-                </div>
-            </div>
-
-            <!-- Mobile: cards resumidos -->
-            <div v-if="isMobile && viewMode === 'resumida'">
+            <!-- Mobile: cards -->
+            <div v-if="isMobile">
                 <div v-if="borderos.data.length" class="space-y-2 pb-20">
                     <button v-for="b in borderos.data" :key="b.id" @click="goShow(b.id)"
                         class="w-full bg-white rounded-xl border border-gray-200 p-3 text-left active:bg-gray-50">
@@ -187,34 +112,8 @@ function wasRejectedBack(bordero) {
                 <div v-else class="text-center py-12 text-gray-400 text-sm">Nenhum borderô.</div>
             </div>
 
-            <!-- Mobile: cards detalhados -->
-            <div v-else-if="isMobile && viewMode === 'detalhada'" class="space-y-3 pb-20">
-                <BorderoDetailedCard
-                    v-for="b in borderos.data"
-                    :key="b.id"
-                    :bordero="b"
-                    :status-options="statusOptions"
-                    :status-severity="statusSeverity"
-                    :priority-severity="prioritySeverity"
-                    :document-types="documentTypes"
-                    :payable-status-options="payableStatusOptions"
-                    @open-bordero="goShow"
-                    @open-payable="goPayable"
-                />
-                <div v-if="!borderos.data.length" class="text-center py-12 text-gray-400 text-sm">Nenhum borderô.</div>
-                <Paginator
-                    v-if="borderos.total > borderos.per_page"
-                    :rows="borderos.per_page"
-                    :total-records="borderos.total"
-                    :first="(borderos.current_page - 1) * borderos.per_page"
-                    :rows-per-page-options="[5, 10]"
-                    @page="onDetailedPage"
-                    class="bg-white rounded-xl border border-gray-200 p-2"
-                />
-            </div>
-
-            <!-- Desktop: tabela resumida -->
-            <div v-else-if="!isMobile && viewMode === 'resumida'" class="bg-white rounded-xl shadow-sm border border-gray-100">
+            <!-- Desktop: tabela -->
+            <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100">
                 <DataTable :value="borderos.data" striped-rows @row-click="(e) => goShow(e.data.id)" class="cursor-pointer">
                     <Column field="number" header="Número" style="width: 8.5rem; min-width: 8.5rem">
                         <template #body="{ data }">
@@ -255,34 +154,6 @@ function wasRejectedBack(bordero) {
                     </Column>
                     <template #empty><div class="text-center py-8 text-gray-500">Nenhum borderô criado.</div></template>
                 </DataTable>
-            </div>
-
-            <!-- Desktop: cards detalhados -->
-            <div v-else-if="!isMobile && viewMode === 'detalhada'" class="space-y-4">
-                <BorderoDetailedCard
-                    v-for="b in borderos.data"
-                    :key="b.id"
-                    :bordero="b"
-                    :status-options="statusOptions"
-                    :status-severity="statusSeverity"
-                    :priority-severity="prioritySeverity"
-                    :document-types="documentTypes"
-                    :payable-status-options="payableStatusOptions"
-                    @open-bordero="goShow"
-                    @open-payable="goPayable"
-                />
-                <div v-if="!borderos.data.length" class="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-100">
-                    Nenhum borderô criado.
-                </div>
-                <Paginator
-                    v-if="borderos.total > borderos.per_page"
-                    :rows="borderos.per_page"
-                    :total-records="borderos.total"
-                    :first="(borderos.current_page - 1) * borderos.per_page"
-                    :rows-per-page-options="[5, 10]"
-                    @page="onDetailedPage"
-                    class="bg-white rounded-xl border border-gray-100 p-2"
-                />
             </div>
         </div>
     </component>

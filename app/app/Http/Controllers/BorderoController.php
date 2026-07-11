@@ -6,7 +6,6 @@ use App\Models\ApprovalStep;
 use App\Models\Bordero;
 use App\Models\Department;
 use App\Models\Payable;
-use App\Models\PayableDocument;
 use App\Models\PayableComment;
 use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogger;
@@ -19,17 +18,8 @@ class BorderoController extends Controller
 {
     public function index(Request $request)
     {
-        $view = $request->input('view') === 'detalhada' ? 'detalhada' : 'resumida';
-
-        $with = ['creator:id,name'];
-        if ($view === 'detalhada') {
-            $with['payables'] = fn ($q) => $q
-                ->with('documents')
-                ->orderBy('due_date');
-        }
-
         $query = Bordero::query()
-            ->with($with)
+            ->with('creator:id,name')
             ->orderByDesc('created_at');
 
         // Sempre filtra por um status (default: aguardando_aprovacao). Não existe "ver todos".
@@ -44,17 +34,7 @@ class BorderoController extends Controller
             });
         }
 
-        $defaultPerPage = $view === 'detalhada' ? 5 : 20;
-        $borderos = $query->paginate($request->input('per_page', $defaultPerPage))->withQueryString();
-
-        if ($view === 'detalhada') {
-            $borderos->getCollection()->each(function (Bordero $bordero) {
-                Payable::attachEmpresaNome($bordero->payables);
-                Payable::attachFilialNome($bordero->payables);
-                Payable::attachDepartmentNome($bordero->payables);
-                Payable::attachPriorityMeta($bordero->payables);
-            });
-        }
+        $borderos = $query->paginate($request->input('per_page', 20))->withQueryString();
 
         $totals = Bordero::query()
             ->selectRaw("status, count(*) as count, coalesce(sum(total_amount), 0) as total")
@@ -62,20 +42,14 @@ class BorderoController extends Controller
             ->get()
             ->keyBy('status');
 
-        if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
-            return response()->json($borderos);
-        }
-
         return Inertia::render('Borderos/Index', [
             'borderos' => $borderos,
             'totals' => $totals,
             'filters' => array_merge(
                 $request->only(['search']),
-                ['status' => $status, 'view' => $view],
+                ['status' => $status],
             ),
             'statusOptions' => Bordero::STATUS_LABELS,
-            'payableStatusOptions' => Payable::STATUS_LABELS,
-            'documentTypes' => PayableDocument::TYPES,
         ]);
     }
 

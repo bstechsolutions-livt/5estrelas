@@ -28,15 +28,9 @@ class PayableController extends Controller
     {
         $user = $request->user();
         $departmentContext = $this->resolveDepartmentFilter($request);
-        $view = $request->input('view') === 'detalhada' ? 'detalhada' : 'resumida';
-
-        $with = ['branch:id,name', 'preparer:id,name', 'bordero:id,number'];
-        if ($view === 'detalhada') {
-            $with[] = 'documents';
-        }
 
         $query = Payable::query()
-            ->with($with)
+            ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number'])
             ->orderByRaw("CASE COALESCE(payment_priority, '') WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END")
             ->orderBy('payment_sla_date')
             ->orderByDesc('due_date');
@@ -80,8 +74,7 @@ class PayableController extends Controller
         }
         $this->applyDepartmentScope($query, $departmentContext['department_id']);
 
-        $defaultPerPage = $view === 'detalhada' ? 10 : 20;
-        $payables = $query->paginate($request->input('per_page', $defaultPerPage))->withQueryString();
+        $payables = $query->paginate($request->input('per_page', 20))->withQueryString();
 
         // A3: resolve o NOME da empresa (nunca código) para cada título da página.
         Payable::attachEmpresaNome($payables->getCollection());
@@ -118,10 +111,8 @@ class PayableController extends Controller
                 [
                     'status' => $status,
                     'department_id' => $effectiveDepartmentId,
-                    'view' => $view,
                 ],
             ),
-            'documentTypes' => PayableDocument::TYPES,
             'empresas' => ComercialFilial::selectOptions(),
             'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),

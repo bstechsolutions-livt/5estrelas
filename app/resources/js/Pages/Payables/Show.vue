@@ -14,6 +14,7 @@ import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import BottomSheet from '@/Components/Mobile/BottomSheet.vue'
 import { useDevice } from '@/composables/useDevice'
+import PayableDocumentPreviewCard from '@/Components/Financeiro/PayableDocumentPreviewCard.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 
 const props = defineProps({
@@ -38,7 +39,23 @@ const props = defineProps({
     approvalPreview: { type: Object, default: () => ({ ok: false, errors: [], steps: [] }) },
 })
 
+const DOCS_VIEW_STORAGE_KEY = 'payable_docs_view_mode'
+
+function readDocsViewMode() {
+    if (typeof window === 'undefined') return 'resumida'
+    const cached = localStorage.getItem(DOCS_VIEW_STORAGE_KEY)
+    return cached === 'detalhada' ? 'detalhada' : 'resumida'
+}
+
 const { isMobile } = useDevice()
+const docsViewMode = ref(readDocsViewMode())
+
+function setDocsViewMode(mode) {
+    const next = mode === 'detalhada' ? 'detalhada' : 'resumida'
+    if (docsViewMode.value === next) return
+    docsViewMode.value = next
+    localStorage.setItem(DOCS_VIEW_STORAGE_KEY, next)
+}
 const page = usePage()
 const authUser = page.props.auth?.user
 const toast = useToast()
@@ -464,7 +481,25 @@ const slaAlertClass = computed(() => {
 
                     <!-- Documentos -->
                     <div class="bg-white rounded-xl border border-gray-100 p-4">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Documentos ({{ payable.documents?.length || 0 }})</h3>
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                            <h3 class="text-sm font-semibold text-gray-700">Documentos ({{ payable.documents?.length || 0 }})</h3>
+                            <div class="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5" dusk="payable-docs-view-toggle">
+                                <button
+                                    type="button"
+                                    :class="['px-2.5 py-1 rounded-md text-xs font-medium transition-colors', docsViewMode === 'resumida' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-white']"
+                                    @click="setDocsViewMode('resumida')"
+                                >
+                                    Resumida
+                                </button>
+                                <button
+                                    type="button"
+                                    :class="['px-2.5 py-1 rounded-md text-xs font-medium transition-colors', docsViewMode === 'detalhada' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-white']"
+                                    @click="setDocsViewMode('detalhada')"
+                                >
+                                    Detalhada
+                                </button>
+                            </div>
+                        </div>
                         <p v-if="!payable.documents?.length" class="text-sm text-gray-400 mb-4">Nenhum documento anexado.</p>
                         <div class="space-y-3">
                             <div v-for="t in DOC_TYPES" :key="t.key" v-show="canPrepare || docsByType(t.key).length"
@@ -473,7 +508,9 @@ const slaAlertClass = computed(() => {
                                     <i :class="['pi', t.icon, 'text-gray-400']"></i> {{ t.label }}
                                     <span class="text-gray-400 font-normal">({{ docsByType(t.key).length }})</span>
                                 </h4>
-                                <div v-if="docsByType(t.key).length" class="space-y-2 mb-2">
+
+                                <!-- Visão resumida: lista com ações -->
+                                <div v-if="docsViewMode === 'resumida' && docsByType(t.key).length" class="space-y-2 mb-2">
                                     <div v-for="doc in docsByType(t.key)" :key="doc.id"
                                         class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                                         <button type="button" @click="openViewer(doc)" dusk="doc-open"
@@ -499,7 +536,21 @@ const slaAlertClass = computed(() => {
                                         </div>
                                     </div>
                                 </div>
-                                <p v-else class="text-[11px] text-gray-400 mb-2">Nenhum anexo deste tipo.</p>
+
+                                <!-- Visão detalhada: previews inline -->
+                                <div v-else-if="docsViewMode === 'detalhada' && docsByType(t.key).length" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+                                    <PayableDocumentPreviewCard
+                                        v-for="doc in docsByType(t.key)"
+                                        :key="doc.id"
+                                        :doc="doc"
+                                        :type-label="t.label.replace(/s$/, '')"
+                                        :can-remove="canPrepare"
+                                        @open="openViewer"
+                                        @remove="removeDoc"
+                                    />
+                                </div>
+
+                                <p v-else-if="!docsByType(t.key).length" class="text-[11px] text-gray-400 mb-2">Nenhum anexo deste tipo.</p>
                                 <FileUpload v-if="canPrepare" mode="basic" multiple :auto="true" :choose-label="`Anexar ${t.label}`"
                                     :max-file-size="10485760" @select="(e) => uploadDoc(e, t.key)" class="w-full"
                                     invalid-file-size-message="O arquivo é muito grande. O tamanho máximo permitido é {1}." />
