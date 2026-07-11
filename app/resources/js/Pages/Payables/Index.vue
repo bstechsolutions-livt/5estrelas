@@ -16,6 +16,7 @@ defineProps({
     lockedBranches: { type: Array, default: () => [] },
     noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
+    priorityOptions: { type: Object, default: () => ({}) },
 })
 
 const { isMobile } = useDevice()

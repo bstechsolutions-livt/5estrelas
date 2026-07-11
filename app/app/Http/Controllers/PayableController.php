@@ -72,7 +72,11 @@ class PayableController extends Controller
             $query->where('amount', '<=', (float) $request->amount_max);
         }
         if ($request->filled('payment_priority')) {
-            $query->where('payment_priority', $request->payment_priority);
+            if ($request->payment_priority === 'sem') {
+                $query->whereNull('payment_priority');
+            } else {
+                $query->where('payment_priority', $request->payment_priority);
+            }
         }
         $this->applyDepartmentScope($query, $departmentContext['department_id']);
         app(PayableBranchScope::class)->applyFilter($query, $user);
@@ -111,7 +115,7 @@ class PayableController extends Controller
             'payables' => $payables,
             'totals' => $totals,
             'filters' => array_merge(
-                $request->only(['search', 'due_from', 'due_to', 'codemp', 'branch_id', 'amount_min', 'amount_max']),
+                $request->only(['search', 'due_from', 'due_to', 'codemp', 'branch_id', 'amount_min', 'amount_max', 'payment_priority']),
                 [
                     'status' => $status,
                     'department_id' => $effectiveDepartmentId,

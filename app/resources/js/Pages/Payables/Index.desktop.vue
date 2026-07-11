@@ -12,7 +12,7 @@ import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
-import { DUE_DATE_PRESETS, useDueDatePresets } from '@/composables/useDueDatePresets'
+import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
 
 const props = defineProps({
     payables: Object,
@@ -27,6 +27,7 @@ const props = defineProps({
     lockedBranches: { type: Array, default: () => [] },
     noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
+    priorityOptions: { type: Object, default: () => ({}) },
 })
 
 const { can } = useAuth()
@@ -44,9 +45,10 @@ const departmentId = ref(
 )
 const amountMin = ref(props.filters?.amount_min ? Number(props.filters.amount_min) : null)
 const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_max) : null)
+const paymentPriority = ref(props.filters?.payment_priority || null)
 const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
-const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange } = useDueDatePresets(dueFrom, dueTo)
+const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange, presetChipClass } = useDueDatePresets(dueFrom, dueTo)
 
 function selectDuePreset(key) {
     applyDuePreset(key)
@@ -71,6 +73,14 @@ const departmentList = computed(() => [
     ...(props.departments || []).map(d => ({ label: d.name, value: d.id })),
 ])
 
+const priorityList = computed(() => [
+    { label: 'Todas', value: null },
+    { label: 'Urgente', value: 'urgente' },
+    { label: 'Alta', value: 'alta' },
+    { label: 'Normal', value: 'normal' },
+    { label: 'Sem prioridade', value: 'sem' },
+])
+
 let timer = null
 function currentFilters() {
     return {
@@ -80,6 +90,7 @@ function currentFilters() {
         department_id: departmentId.value || undefined,
         amount_min: amountMin.value || undefined,
         amount_max: amountMax.value || undefined,
+        payment_priority: paymentPriority.value || undefined,
         due_from: dueFrom.value || undefined,
         due_to: dueTo.value || undefined,
     }
@@ -103,7 +114,7 @@ function selectStatus(s) {
 
 const hasActiveFilters = computed(() => {
     const deptActive = props.canChangeDepartmentFilter && departmentId.value
-    return !!(search.value || codemp.value || deptActive || amountMin.value || amountMax.value || dueFrom.value || dueTo.value)
+    return !!(search.value || codemp.value || deptActive || amountMin.value || amountMax.value || paymentPriority.value || dueFrom.value || dueTo.value)
 })
 
 const activeFilterCount = computed(() => {
@@ -113,6 +124,7 @@ const activeFilterCount = computed(() => {
     if (props.canChangeDepartmentFilter && departmentId.value) c++
     if (amountMin.value) c++
     if (amountMax.value) c++
+    if (paymentPriority.value) c++
     if (dueFrom.value) c++
     if (dueTo.value) c++
     return c
@@ -126,6 +138,7 @@ function clearFilters() {
     }
     amountMin.value = ''
     amountMax.value = ''
+    paymentPriority.value = null
     dueFrom.value = ''
     dueTo.value = ''
     clearDuePreset()
@@ -140,6 +153,7 @@ function onPage(event) {
         department_id: departmentId.value || undefined,
         amount_min: amountMin.value || undefined,
         amount_max: amountMax.value || undefined,
+        payment_priority: paymentPriority.value || undefined,
         due_from: dueFrom.value || undefined,
         due_to: dueTo.value || undefined,
         page: event.page + 1,
@@ -169,12 +183,14 @@ onMounted(() => {
                 }
                 amountMin.value = f.amount_min ? Number(f.amount_min) : null
                 amountMax.value = f.amount_max ? Number(f.amount_max) : null
+                paymentPriority.value = f.payment_priority || null
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
+                onDueDateManualChange()
                 const serverStatus = props.filters?.status || 'pendente'
                 const differs = status.value !== serverStatus || f.search || f.codemp
                     || (props.canChangeDepartmentFilter && f.department_id)
-                    || f.amount_min || f.amount_max || f.due_from || f.due_to
+                    || f.amount_min || f.amount_max || f.payment_priority || f.due_from || f.due_to
                 if (differs) {
                     applyFilters()
                     return
@@ -343,27 +359,59 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                         <label class="block text-xs font-medium text-gray-500 mb-1">Valor máximo</label>
                         <InputNumber v-model="amountMax" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" :input-class="'w-full'" />
                     </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Prioridade</label>
+                        <Select
+                            v-model="paymentPriority"
+                            :options="priorityList"
+                            option-label="label"
+                            option-value="value"
+                            placeholder="Todas"
+                            class="w-full"
+                            @change="applyFilters"
+                        />
+                    </div>
                 </div>
 
-                <div class="mt-4 pt-4 border-t border-dashed border-gray-200 rounded-lg bg-slate-50/80 px-3 py-3">
-                    <p class="text-xs font-semibold text-gray-600 mb-2">Período de vencimento</p>
-                    <div class="flex flex-wrap gap-1.5 mb-3">
-                        <button
-                            v-for="preset in DUE_DATE_PRESETS"
-                            :key="preset.key"
-                            type="button"
-                            :class="[
-                                'px-2.5 py-1 rounded-full text-xs font-medium transition-colors border',
-                                duePreset === preset.key
-                                    ? 'bg-blue-600 text-white border-blue-600'
-                                    : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-700',
-                            ]"
-                            @click="selectDuePreset(preset.key)"
-                        >
-                            {{ preset.label }}
-                        </button>
+                <div class="mt-4 pt-4 border-t border-dashed border-gray-200 rounded-lg bg-slate-50/80 px-3 py-3 space-y-3">
+                    <p class="text-xs font-semibold text-gray-600">Período de vencimento</p>
+
+                    <div
+                        v-for="group in DUE_DATE_PRESET_GROUPS"
+                        :key="group.id"
+                        :class="[
+                            'rounded-lg border px-3 py-2.5',
+                            group.id === 'vencidos' ? 'border-amber-200 bg-amber-50/60' : 'border-blue-100 bg-white/80',
+                        ]"
+                    >
+                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-2">
+                            <span
+                                :class="[
+                                    'text-xs font-semibold',
+                                    group.id === 'vencidos' ? 'text-amber-800' : 'text-blue-800',
+                                ]"
+                            >
+                                {{ group.label }}
+                            </span>
+                            <span class="text-[11px] text-gray-500">{{ group.hint }}</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button
+                                v-for="preset in group.presets"
+                                :key="preset.key"
+                                type="button"
+                                :class="[
+                                    'px-2.5 py-1 rounded-full text-xs font-medium transition-colors border',
+                                    presetChipClass(preset.key, group.id),
+                                ]"
+                                @click="selectDuePreset(preset.key)"
+                            >
+                                {{ preset.label }}
+                            </button>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl pt-1">
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Vencimento de</label>
                             <InputText v-model="dueFrom" type="date" class="w-full" @input="onDueDateManualChange" />

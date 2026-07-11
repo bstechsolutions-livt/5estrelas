@@ -9,7 +9,7 @@ import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
-import { DUE_DATE_PRESETS, useDueDatePresets } from '@/composables/useDueDatePresets'
+import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
 
 const props = defineProps({
     payables: Object,
@@ -24,6 +24,7 @@ const props = defineProps({
     lockedBranches: { type: Array, default: () => [] },
     noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
+    priorityOptions: { type: Object, default: () => ({}) },
 })
 
 const { can } = useAuth()
@@ -42,9 +43,10 @@ const departmentId = ref(
 )
 const amountMin = ref(props.filters?.amount_min ? Number(props.filters.amount_min) : null)
 const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_max) : null)
+const paymentPriority = ref(props.filters?.payment_priority || null)
 const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
-const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange } = useDueDatePresets(dueFrom, dueTo)
+const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange, presetChipClass } = useDueDatePresets(dueFrom, dueTo)
 
 const statusList = [
     { label: 'Pendentes', value: 'pendente' },
@@ -64,6 +66,14 @@ const departmentList = computed(() => [
     ...(props.departments || []).map(d => ({ label: d.name, value: d.id })),
 ])
 
+const priorityList = computed(() => [
+    { label: 'Todas', value: null },
+    { label: 'Urgente', value: 'urgente' },
+    { label: 'Alta', value: 'alta' },
+    { label: 'Normal', value: 'normal' },
+    { label: 'Sem prioridade', value: 'sem' },
+])
+
 function currentFilters() {
     return {
         search: search.value || undefined,
@@ -72,6 +82,7 @@ function currentFilters() {
         department_id: departmentId.value || undefined,
         amount_min: amountMin.value || undefined,
         amount_max: amountMax.value || undefined,
+        payment_priority: paymentPriority.value || undefined,
         due_from: dueFrom.value || undefined,
         due_to: dueTo.value || undefined,
     }
@@ -125,12 +136,14 @@ onMounted(() => {
                 }
                 amountMin.value = f.amount_min ? Number(f.amount_min) : null
                 amountMax.value = f.amount_max ? Number(f.amount_max) : null
+                paymentPriority.value = f.payment_priority || null
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
+                onDueDateManualChange()
                 const serverStatus = props.filters?.status || 'pendente'
                 const differs = status.value !== serverStatus || f.search || f.codemp
                     || (props.canChangeDepartmentFilter && f.department_id)
-                    || f.amount_min || f.amount_max || f.due_from || f.due_to
+                    || f.amount_min || f.amount_max || f.payment_priority || f.due_from || f.due_to
                 setTimeout(() => { restoring = false }, 400)
                 if (differs) applyFilters()
             } catch (e) { restoring = false }
@@ -151,6 +164,7 @@ function clearFilters() {
     }
     amountMin.value = null
     amountMax.value = null
+    paymentPriority.value = null
     dueFrom.value = ''
     dueTo.value = ''
     clearDuePreset()
@@ -165,6 +179,7 @@ const activeFilterCount = computed(() => {
     if (props.canChangeDepartmentFilter && departmentId.value) c++
     if (amountMin.value) c++
     if (amountMax.value) c++
+    if (paymentPriority.value) c++
     if (dueFrom.value) c++
     if (dueTo.value) c++
     return c
@@ -411,25 +426,53 @@ const currentTotal = computed(() => {
                         <InputText v-model="amountMax" type="number" placeholder="0" class="w-full" />
                     </div>
                 </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Prioridade</label>
+                    <Select
+                        v-model="paymentPriority"
+                        :options="priorityList"
+                        option-label="label"
+                        option-value="value"
+                        placeholder="Todas"
+                        class="w-full"
+                    />
+                </div>
 
-                <div class="mt-3 pt-3 border-t border-dashed border-gray-200 rounded-lg bg-slate-50 px-2 py-3">
-                    <p class="text-xs font-semibold text-gray-600 mb-2">Período de vencimento</p>
-                    <div class="flex flex-wrap gap-1.5 mb-3">
-                        <button
-                            v-for="preset in DUE_DATE_PRESETS"
-                            :key="preset.key"
-                            type="button"
+                <div class="mt-3 pt-3 border-t border-dashed border-gray-200 rounded-lg bg-slate-50 px-2 py-3 space-y-3">
+                    <p class="text-xs font-semibold text-gray-600">Período de vencimento</p>
+
+                    <div
+                        v-for="group in DUE_DATE_PRESET_GROUPS"
+                        :key="group.id"
+                        :class="[
+                            'rounded-lg border px-2 py-2',
+                            group.id === 'vencidos' ? 'border-amber-200 bg-amber-50/70' : 'border-blue-100 bg-white',
+                        ]"
+                    >
+                        <p
                             :class="[
-                                'px-2 py-1 rounded-full text-[11px] font-medium border',
-                                duePreset === preset.key
-                                    ? 'bg-blue-600 text-white border-blue-600'
-                                    : 'bg-white text-gray-600 border-gray-200',
+                                'text-[11px] font-semibold mb-1.5',
+                                group.id === 'vencidos' ? 'text-amber-800' : 'text-blue-800',
                             ]"
-                            @click="applyDuePreset(preset.key)"
                         >
-                            {{ preset.label }}
-                        </button>
+                            {{ group.label }}
+                        </p>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button
+                                v-for="preset in group.presets"
+                                :key="preset.key"
+                                type="button"
+                                :class="[
+                                    'px-2 py-1 rounded-full text-[11px] font-medium border',
+                                    presetChipClass(preset.key, group.id),
+                                ]"
+                                @click="applyDuePreset(preset.key)"
+                            >
+                                {{ preset.label }}
+                            </button>
+                        </div>
                     </div>
+
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Vencimento de</label>
