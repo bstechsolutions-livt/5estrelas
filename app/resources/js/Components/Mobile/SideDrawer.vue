@@ -141,8 +141,8 @@ watch(() => props.modelValue, (val) => {
                                 ? { backgroundColor: primaryColor + '26', borderColor: primaryColor, color: '#fff' }
                                 : { color: 'var(--app-secondary-text-muted, rgba(255,255,255,0.7))' }"
                         >
-                            <i :class="[entry.icon, 'text-base']"></i>
-                            <span>{{ entry.label }}</span>
+                            <i :class="[entry.icon, 'text-base flex-shrink-0']"></i>
+                            <span class="min-w-0 flex-1 truncate text-left" :title="entry.label">{{ entry.label }}</span>
                         </button>
 
                         <!-- Grupo com submenus -->
@@ -168,8 +168,8 @@ watch(() => props.modelValue, (val) => {
                                         ? { backgroundColor: primaryColor + '26', borderColor: primaryColor, color: '#fff' }
                                         : { color: 'var(--app-secondary-text-muted, rgba(255,255,255,0.7))' }"
                                 >
-                                    <i :class="[item.icon, 'text-base']"></i>
-                                    <span>{{ item.label }}</span>
+                                    <i :class="[item.icon, 'text-base flex-shrink-0']"></i>
+                                    <span class="min-w-0 flex-1 truncate text-left" :title="item.label">{{ item.label }}</span>
                                 </button>
                             </div>
                         </div>

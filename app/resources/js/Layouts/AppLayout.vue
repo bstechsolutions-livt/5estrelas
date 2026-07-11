@@ -149,8 +149,8 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
                             ]"
                             :style="isActive(item.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
                         >
-                            <i :class="[item.icon, 'text-base']"></i>
-                            <span>{{ item.label }}</span>
+                            <i :class="[item.icon, 'text-base flex-shrink-0']"></i>
+                            <span class="sidebar-menu-label" :title="item.label">{{ item.label }}</span>
                         </button>
                         <p v-if="filteredMenuItems.length === 0" class="text-xs text-center py-4" :style="{ color: 'var(--app-secondary-text-muted)' }">
                             Nenhum resultado encontrado
@@ -169,8 +169,8 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
                             ]"
                             :style="isActive(entry.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
                         >
-                            <i :class="[entry.icon, 'text-base']"></i>
-                            <span>{{ entry.label }}</span>
+                            <i :class="[entry.icon, 'text-base flex-shrink-0']"></i>
+                            <span class="sidebar-menu-label" :title="entry.label">{{ entry.label }}</span>
                         </button>
 
                         <!-- Grupo com submenus -->
@@ -193,8 +193,8 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
                                     ]"
                                     :style="isActive(item.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
                                 >
-                                    <i :class="[item.icon, 'text-base']"></i>
-                                    <span>{{ item.label }}</span>
+                                    <i :class="[item.icon, 'text-base flex-shrink-0']"></i>
+                                    <span class="sidebar-menu-label" :title="item.label">{{ item.label }}</span>
                                 </button>
                             </div>
                         </div>
@@ -256,8 +256,8 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
                                 ]"
                                 :style="isActive(item.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
                             >
-                                <i :class="[item.icon, 'text-base']"></i>
-                                <span>{{ item.label }}</span>
+                                <i :class="[item.icon, 'text-base flex-shrink-0']"></i>
+                                <span class="sidebar-menu-label" :title="item.label">{{ item.label }}</span>
                             </button>
                             <p v-if="filteredMenuItems.length === 0" class="text-xs text-center py-4" :style="{ color: 'var(--app-secondary-text-muted)' }">
                                 Nenhum resultado encontrado
@@ -275,8 +275,8 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
                                 ]"
                                 :style="isActive(entry.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
                             >
-                                <i :class="[entry.icon, 'text-base']"></i>
-                                <span>{{ entry.label }}</span>
+                                <i :class="[entry.icon, 'text-base flex-shrink-0']"></i>
+                                <span class="sidebar-menu-label" :title="entry.label">{{ entry.label }}</span>
                             </button>
                             <div v-else-if="entry.type === 'group'">
                                 <button
@@ -297,8 +297,8 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
                                         ]"
                                         :style="isActive(item.href) ? { backgroundColor: primaryColor + '26', borderColor: primaryColor } : {}"
                                     >
-                                        <i :class="[item.icon, 'text-base']"></i>
-                                        <span>{{ item.label }}</span>
+                                        <i :class="[item.icon, 'text-base flex-shrink-0']"></i>
+                                        <span class="sidebar-menu-label" :title="item.label">{{ item.label }}</span>
                                     </button>
                                 </div>
                             </div>
@@ -408,6 +408,15 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
 /* Item de menu da sidebar */
 .sidebar-menu-item {
     color: var(--app-secondary-text-muted, rgba(255,255,255,0.6));
+    min-width: 0;
+}
+.sidebar-menu-label {
+    min-width: 0;
+    flex: 1 1 auto;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .sidebar-menu-item:hover:not(.sidebar-menu-active) {
     color: var(--app-secondary-text, #ffffff);
