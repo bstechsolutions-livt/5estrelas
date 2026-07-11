@@ -11,7 +11,7 @@ import Tag from 'primevue/tag'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
 import { formatApiDate } from '@/utils/apiDate'
-import { PAYABLE_SORT_OPTIONS, sortQueryFromValue, sortValueFromQuery } from '@/composables/usePayableSort'
+import { PAYABLE_SORT_GROUPS, sortQueryFromValue, sortValueFromQuery } from '@/composables/usePayableSort'
 
 const props = defineProps({
     payables: Object,
@@ -395,67 +395,71 @@ const currentTotal = computed(() => {
 
         <!-- Bottom sheet filtros avançados -->
         <BottomSheet v-model="filtersOpen" title="Filtros">
-            <div class="space-y-4">
+            <div class="space-y-5">
                 <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Empresa</label>
-                    <Select v-model="codemp" :options="empresaList" option-label="label" option-value="value" class="w-full" />
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Departamento</label>
-                    <Select
-                        v-if="canChangeDepartmentFilter"
-                        v-model="departmentId"
-                        :options="departmentList"
-                        option-label="label"
-                        option-value="value"
-                        class="w-full"
-                    />
-                    <div v-else class="h-11 px-3 flex items-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-700">
-                        {{ lockedDepartment?.name || 'Sem departamento vinculado' }}
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Escopo</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Empresa</label>
+                            <Select v-model="codemp" :options="empresaList" option-label="label" option-value="value" class="w-full" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Departamento</label>
+                            <Select
+                                v-if="canChangeDepartmentFilter"
+                                v-model="departmentId"
+                                :options="departmentList"
+                                option-label="label"
+                                option-value="value"
+                                class="w-full"
+                            />
+                            <div v-else class="h-11 px-3 flex items-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-700">
+                                {{ lockedDepartment?.name || 'Sem departamento vinculado' }}
+                            </div>
+                        </div>
                     </div>
-                    <p v-if="!canChangeDepartmentFilter" class="text-[11px] text-gray-400 mt-1">Somente títulos do seu departamento.</p>
-                    <a
-                        v-if="canManageClassification"
-                        href="/financeiro/contas-pagar/classificacao-departamentos"
-                        class="inline-block text-[11px] text-blue-600 mt-1"
-                    >
-                        Configurar regras →
-                    </a>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Valor mínimo</label>
-                        <InputText v-model="amountMin" type="number" placeholder="0" class="w-full" />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Valor máximo</label>
-                        <InputText v-model="amountMax" type="number" placeholder="0" class="w-full" />
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Prioridade</label>
-                    <Select
-                        v-model="paymentPriority"
-                        :options="priorityList"
-                        option-label="label"
-                        option-value="value"
-                        placeholder="Todas"
-                        class="w-full"
-                    />
                 </div>
 
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Ordenar por</label>
-                    <Select
-                        v-model="sortValue"
-                        :options="PAYABLE_SORT_OPTIONS"
-                        option-label="label"
-                        option-value="value"
-                        class="w-full"
-                    />
+                <div class="pt-3 border-t border-gray-100">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Valores e ordem</p>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Valor mínimo</label>
+                                <InputText v-model="amountMin" type="number" placeholder="0" class="w-full" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Valor máximo</label>
+                                <InputText v-model="amountMax" type="number" placeholder="0" class="w-full" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Prioridade</label>
+                            <Select
+                                v-model="paymentPriority"
+                                :options="priorityList"
+                                option-label="label"
+                                option-value="value"
+                                placeholder="Todas"
+                                class="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Ordenar por</label>
+                            <Select
+                                v-model="sortValue"
+                                :options="PAYABLE_SORT_GROUPS"
+                                option-label="label"
+                                option-value="value"
+                                option-group-label="label"
+                                option-group-children="items"
+                                class="w-full"
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                <div class="mt-3 pt-3 border-t border-dashed border-gray-200 rounded-lg bg-slate-50 px-2 py-3 space-y-3">
+                <div class="pt-3 border-t border-dashed border-gray-200 rounded-lg bg-slate-50 px-2 py-3 space-y-3">
                     <p class="text-xs font-semibold text-gray-600">Período de vencimento</p>
 
                     <div

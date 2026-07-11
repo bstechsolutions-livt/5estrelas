@@ -175,9 +175,11 @@ class PayableController extends Controller
             'amount',
             'supplier_name',
             'title_number',
+            'description',
             'payment_sla_date',
             'payment_priority',
             'department_id',
+            'department_nome',
             'codemp',
         ];
 
@@ -197,6 +199,14 @@ class PayableController extends Controller
             } else {
                 $query->orderByRaw("CASE COALESCE(payment_priority, '') WHEN '' THEN 1 WHEN 'normal' THEN 2 WHEN 'alta' THEN 3 WHEN 'urgente' THEN 4 ELSE 5 END");
             }
+
+            return;
+        }
+
+        if ($sort === 'department_nome') {
+            $query->leftJoin('departments', 'payables.department_id', '=', 'departments.id')
+                ->orderBy('departments.name', $direction)
+                ->select('payables.*');
 
             return;
         }

@@ -15,7 +15,7 @@ import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue
 import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
 import { formatApiDate } from '@/utils/apiDate'
 import {
-    PAYABLE_SORT_OPTIONS,
+    PAYABLE_SORT_GROUPS,
     sortQueryFromValue,
     sortValueFromQuery,
     sortValueFromTable,
@@ -326,79 +326,91 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             </div>
 
             <!-- Filtros -->
-            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="sm:col-span-2">
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
-                        <InputText v-model="search" placeholder="Fornecedor ou título" class="w-full" @keyup.enter="applyFilters" />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Empresa</label>
-                        <Select v-model="codemp" :options="empresaList" option-label="label" option-value="value" placeholder="Todas" class="w-full" />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Departamento</label>
-                        <Select
-                            v-if="canChangeDepartmentFilter"
-                            v-model="departmentId"
-                            :options="departmentList"
-                            option-label="label"
-                            option-value="value"
-                            placeholder="Todos"
-                            class="w-full"
-                            @change="applyFilters"
-                        />
-                        <div v-else class="h-[38px] px-3 flex items-center rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-700">
-                            {{ lockedDepartment?.name || 'Sem departamento vinculado' }}
+            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 space-y-4">
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-3">Busca e escopo</p>
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                        <div class="md:col-span-5">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
+                            <InputText v-model="search" placeholder="Fornecedor ou título" class="w-full" @keyup.enter="applyFilters" />
                         </div>
-                        <p v-if="!canChangeDepartmentFilter" class="text-[11px] text-gray-400 mt-1">Exibindo apenas títulos do seu departamento.</p>
-                        <p v-if="lockedBranches?.length" class="text-[11px] text-amber-700 mt-1" dusk="locked-branches-hint">
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Empresa</label>
+                            <Select v-model="codemp" :options="empresaList" option-label="label" option-value="value" placeholder="Todas" class="w-full" />
+                        </div>
+                        <div class="md:col-span-4">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Departamento</label>
+                            <Select
+                                v-if="canChangeDepartmentFilter"
+                                v-model="departmentId"
+                                :options="departmentList"
+                                option-label="label"
+                                option-value="value"
+                                placeholder="Todos"
+                                class="w-full"
+                                @change="applyFilters"
+                            />
+                            <div v-else class="h-[38px] px-3 flex items-center rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-700">
+                                {{ lockedDepartment?.name || 'Sem departamento vinculado' }}
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="!canChangeDepartmentFilter || lockedBranches?.length || canManageClassification" class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500">
+                        <span v-if="!canChangeDepartmentFilter">Exibindo apenas títulos do seu departamento.</span>
+                        <span v-if="lockedBranches?.length" class="text-amber-700" dusk="locked-branches-hint">
                             Filiais liberadas: {{ lockedBranches.map(b => b.name).join(', ') }}
-                        </p>
+                        </span>
                         <a
                             v-if="canManageClassification"
                             href="/financeiro/contas-pagar/classificacao-departamentos"
-                            class="inline-block text-[11px] text-blue-600 hover:underline mt-1"
+                            class="text-blue-600 hover:underline"
                         >
                             Configurar regras de classificação →
                         </a>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Valor mínimo</label>
-                        <InputNumber v-model="amountMin" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" :input-class="'w-full'" />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Valor máximo</label>
-                        <InputNumber v-model="amountMax" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" :input-class="'w-full'" />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Prioridade</label>
-                        <Select
-                            v-model="paymentPriority"
-                            :options="priorityList"
-                            option-label="label"
-                            option-value="value"
-                            placeholder="Todas"
-                            class="w-full"
-                            @change="applyFilters"
-                        />
+                </div>
+
+                <div class="pt-3 border-t border-gray-100">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-3">Valores, prioridade e ordem</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-end">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Valor mínimo</label>
+                            <InputNumber v-model="amountMin" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" :input-class="'w-full'" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Valor máximo</label>
+                            <InputNumber v-model="amountMax" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" :input-class="'w-full'" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Prioridade</label>
+                            <Select
+                                v-model="paymentPriority"
+                                :options="priorityList"
+                                option-label="label"
+                                option-value="value"
+                                placeholder="Todas"
+                                class="w-full"
+                                @change="applyFilters"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Ordenar por</label>
+                            <Select
+                                v-model="sortValue"
+                                :options="PAYABLE_SORT_GROUPS"
+                                option-label="label"
+                                option-value="value"
+                                option-group-label="label"
+                                option-group-children="items"
+                                class="w-full"
+                                @change="applyFilters"
+                            />
+                        </div>
                     </div>
                 </div>
 
-                <div class="mt-4 max-w-md">
-                    <label class="block text-xs font-medium text-gray-500 mb-1">Ordenar por</label>
-                    <Select
-                        v-model="sortValue"
-                        :options="PAYABLE_SORT_OPTIONS"
-                        option-label="label"
-                        option-value="value"
-                        class="w-full"
-                        @change="applyFilters"
-                    />
-                </div>
-
-                <div class="mt-4 pt-4 border-t border-dashed border-gray-200 rounded-lg bg-slate-50/80 px-3 py-3 space-y-3">
-                    <p class="text-xs font-semibold text-gray-600">Período de vencimento</p>
+                <div class="pt-3 border-t border-gray-100 rounded-lg bg-slate-50/80 px-3 py-3 space-y-3">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Período de vencimento</p>
 
                     <div
                         v-for="group in DUE_DATE_PRESET_GROUPS"
@@ -517,12 +529,12 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             </div>
                         </template>
                     </Column>
-                    <Column header="Empresa" style="width: 8%" dusk="col-empresa">
+                    <Column field="codemp" header="Empresa" style="width: 8%" sortable dusk="col-empresa">
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs text-gray-700" :title="data.empresa_nome" @click="goShow(data.id)">{{ data.empresa_nome || '—' }}</span>
                         </template>
                     </Column>
-                    <Column header="Depto" style="width: 8%" dusk="col-departamento">
+                    <Column field="department_nome" header="Depto" style="width: 8%" sortable dusk="col-departamento">
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs text-gray-600" :title="data.department_nome" @click="goShow(data.id)">{{ data.department_nome || '—' }}</span>
                         </template>
@@ -532,7 +544,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span class="cell-truncate text-xs" :title="data.supplier_name" @click="goShow(data.id)">{{ data.supplier_name }}</span>
                         </template>
                     </Column>
-                    <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '22%' : '18%' }">
+                    <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '22%' : '18%' }" sortable>
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs text-gray-600" :title="data.description" @click="goShow(data.id)">{{ data.description || '—' }}</span>
                         </template>
@@ -547,7 +559,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span class="text-xs whitespace-nowrap" @click="goShow(data.id)">{{ formatDate(data.due_date) }}</span>
                         </template>
                     </Column>
-                    <Column v-if="status !== 'pendente'" header="Prioridade" style="width: 7%">
+                    <Column v-if="status !== 'pendente'" field="payment_priority" header="Prioridade" style="width: 7%" sortable>
                         <template #body="{ data }">
                             <Tag
                                 v-if="data.payment_priority"
