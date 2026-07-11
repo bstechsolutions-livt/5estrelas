@@ -9,6 +9,7 @@ import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
+import { DUE_DATE_PRESETS, useDueDatePresets } from '@/composables/useDueDatePresets'
 
 const props = defineProps({
     payables: Object,
@@ -43,6 +44,7 @@ const amountMin = ref(props.filters?.amount_min ? Number(props.filters.amount_mi
 const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_max) : null)
 const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
+const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange } = useDueDatePresets(dueFrom, dueTo)
 
 const statusList = [
     { label: 'Pendentes', value: 'pendente' },
@@ -151,6 +153,7 @@ function clearFilters() {
     amountMax.value = null
     dueFrom.value = ''
     dueTo.value = ''
+    clearDuePreset()
     localStorage.removeItem(STORAGE_KEY)
     applyFilters()
     filtersOpen.value = false
@@ -408,14 +411,34 @@ const currentTotal = computed(() => {
                         <InputText v-model="amountMax" type="number" placeholder="0" class="w-full" />
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Vencimento de</label>
-                        <InputText v-model="dueFrom" type="date" class="w-full" />
+
+                <div class="mt-3 pt-3 border-t border-dashed border-gray-200 rounded-lg bg-slate-50 px-2 py-3">
+                    <p class="text-xs font-semibold text-gray-600 mb-2">Período de vencimento</p>
+                    <div class="flex flex-wrap gap-1.5 mb-3">
+                        <button
+                            v-for="preset in DUE_DATE_PRESETS"
+                            :key="preset.key"
+                            type="button"
+                            :class="[
+                                'px-2 py-1 rounded-full text-[11px] font-medium border',
+                                duePreset === preset.key
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'bg-white text-gray-600 border-gray-200',
+                            ]"
+                            @click="applyDuePreset(preset.key)"
+                        >
+                            {{ preset.label }}
+                        </button>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Vencimento até</label>
-                        <InputText v-model="dueTo" type="date" class="w-full" />
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Vencimento de</label>
+                            <InputText v-model="dueFrom" type="date" class="w-full" @input="onDueDateManualChange" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Vencimento até</label>
+                            <InputText v-model="dueTo" type="date" class="w-full" @input="onDueDateManualChange" />
+                        </div>
                     </div>
                 </div>
             </div>

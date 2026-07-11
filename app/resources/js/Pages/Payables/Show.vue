@@ -139,9 +139,26 @@ const paymentForm = useForm({ paid_at: new Date(), payment_method: null, file: n
 const paymentMethodOptions = computed(() => Object.keys(props.paymentMethods || {}))
 
 function pad(n) { return String(n).padStart(2, '0') }
+
+/** Converte data da API (YYYY-MM-DD ou Date) para DatePicker sem NaN/timezone. */
+function parseApiDate(val) {
+    if (!val) return null
+    if (val instanceof Date) {
+        return Number.isNaN(val.getTime()) ? null : val
+    }
+    const s = String(val).trim()
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (iso) {
+        const dt = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), 12, 0, 0)
+        return Number.isNaN(dt.getTime()) ? null : dt
+    }
+    const dt = new Date(s.includes('T') ? s : `${s}T12:00:00`)
+    return Number.isNaN(dt.getTime()) ? null : dt
+}
+
 function toYmd(d) {
-    if (!d) return null
-    const dt = d instanceof Date ? d : new Date(d)
+    const dt = parseApiDate(d)
+    if (!dt) return null
     return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
 }
 
@@ -229,13 +246,7 @@ const approvePriorityForm = useForm({
 })
 
 function defaultSlaDate() {
-    if (props.payable.payment_sla_date) {
-        return new Date(props.payable.payment_sla_date + 'T12:00:00')
-    }
-    if (props.payable.due_date) {
-        return new Date(props.payable.due_date + 'T12:00:00')
-    }
-    return null
+    return parseApiDate(props.payable.payment_sla_date) ?? parseApiDate(props.payable.due_date)
 }
 
 const priorityOptions = computed(() =>
@@ -372,7 +383,7 @@ function isPdf(doc) { return doc?.mime_type === 'application/pdf' }
 
 // ── A4: edição de vencimento (restrita ao financeiro) ──
 const showDueDate = ref(false)
-const dueDateForm = useForm({ due_date: props.payable.due_date ? new Date(props.payable.due_date) : new Date() })
+const dueDateForm = useForm({ due_date: parseApiDate(props.payable.due_date) ?? new Date() })
 function submitDueDate() {
     dueDateForm
         .transform((data) => ({ due_date: toYmd(data.due_date) }))
@@ -765,7 +776,7 @@ const slaAlertClass = computed(() => {
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Prazo (SLA)</label>
-                                    <DatePicker v-model="priorityForm.payment_sla_date" date-format="dd/mm/yy" class="w-full" show-icon />
+                                    <DatePicker v-model="priorityForm.payment_sla_date" date-format="dd/mm/yy" placeholder="dd/mm/aaaa" class="w-full" show-icon />
                                 </div>
                                 <Button label="Salvar prioridade" icon="pi pi-save" size="small" class="w-full" :loading="priorityForm.processing" @click="submitPriority" />
                             </div>
@@ -845,7 +856,7 @@ const slaAlertClass = computed(() => {
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Prazo (SLA)</label>
-                    <DatePicker v-model="approvePriorityForm.payment_sla_date" date-format="dd/mm/yy" class="w-full" show-icon />
+                    <DatePicker v-model="approvePriorityForm.payment_sla_date" date-format="dd/mm/yy" placeholder="dd/mm/aaaa" class="w-full" show-icon />
                     <p class="text-[11px] text-gray-400 mt-1">Sugestão: vencimento do título ({{ formatDate(payable.due_date) }})</p>
                 </div>
             </div>
