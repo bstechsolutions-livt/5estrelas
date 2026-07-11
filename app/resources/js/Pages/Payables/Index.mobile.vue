@@ -4,10 +4,13 @@ import { router } from '@inertiajs/vue3'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import BottomSheet from '@/Components/Mobile/BottomSheet.vue'
 import { useAuth } from '@/composables/useAuth'
+import { useFinanceiroViewMode } from '@/composables/useFinanceiroViewMode'
+import PayableDetailedCard from '@/Components/Financeiro/PayableDetailedCard.vue'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
+import Paginator from 'primevue/paginator'
 
 const props = defineProps({
     payables: Object,
@@ -20,7 +23,10 @@ const props = defineProps({
     canChangeDepartmentFilter: { type: Boolean, default: true },
     lockedDepartment: { type: Object, default: null },
     canManageClassification: { type: Boolean, default: false },
+    documentTypes: { type: Object, default: () => ({}) },
 })
+
+const { viewMode, persistViewMode, withView } = useFinanceiroViewMode('payables_view_mode', () => props.filters?.view)
 
 const { can } = useAuth()
 const canBorderos = computed(() => can('financeiro.borderos.visualizar'))
@@ -60,7 +66,7 @@ const departmentList = computed(() => [
 ])
 
 function currentFilters() {
-    return {
+    return withView({
         search: search.value || undefined,
         status: status.value || undefined,
         codemp: codemp.value || undefined,
@@ -69,7 +75,21 @@ function currentFilters() {
         amount_max: amountMax.value || undefined,
         due_from: dueFrom.value || undefined,
         due_to: dueTo.value || undefined,
-    }
+    })
+}
+
+function setViewMode(mode) {
+    if (viewMode.value === mode) return
+    persistViewMode(mode)
+    router.get('/financeiro/contas-pagar', currentFilters(), { preserveState: true, replace: true })
+}
+
+function onDetailedPage(event) {
+    router.get('/financeiro/contas-pagar', {
+        ...currentFilters(),
+        page: event.page + 1,
+        per_page: event.rows,
+    }, { preserveState: true, replace: true })
 }
 
 function saveFilters() {
@@ -107,6 +127,13 @@ onMounted(() => {
     }
 
     if (!window.location.search) {
+        const cachedView = localStorage.getItem('payables_view_mode')
+        if (cachedView && cachedView !== (props.filters?.view || 'resumida')) {
+            persistViewMode(cachedView)
+            router.get('/financeiro/contas-pagar', withView({ status: status.value }), { preserveState: true, replace: true })
+            return
+        }
+
         const cached = localStorage.getItem(STORAGE_KEY)
         if (cached) {
             try {
@@ -228,6 +255,12 @@ function documentPairAlertTag(alert) {
 
 const statusSeverity = { pendente: 'warn', em_preparacao: 'info', aguardando_aprovacao: 'warn', aprovado: 'success', reprovado: 'danger', pago: 'success' }
 
+const prioritySeverity = {
+    normal: 'secondary',
+    alta: 'warn',
+    urgente: 'danger',
+}
+
 const currentTotal = computed(() => {
     const t = props.totals?.[status.value]
     return { count: t?.count || 0, total: t?.total || 0 }
@@ -285,10 +318,30 @@ const currentTotal = computed(() => {
             </button>
         </div>
 
+        <!-- Toggle visão -->
+        <div class="px-4 pb-2">
+            <div class="flex rounded-lg border border-gray-200 bg-white p-0.5" dusk="payables-view-toggle">
+                <button
+                    type="button"
+                    :class="['flex-1 py-2 rounded-md text-xs font-medium', viewMode === 'resumida' ? 'bg-blue-600 text-white' : 'text-gray-600']"
+                    @click="setViewMode('resumida')"
+                >
+                    Resumida
+                </button>
+                <button
+                    type="button"
+                    :class="['flex-1 py-2 rounded-md text-xs font-medium', viewMode === 'detalhada' ? 'bg-blue-600 text-white' : 'text-gray-600']"
+                    @click="setViewMode('detalhada')"
+                >
+                    Detalhada
+                </button>
+            </div>
+        </div>
+
         <p v-if="selectionMode" class="px-4 pb-1 text-xs text-blue-600">Toque nos títulos para agrupar em um borderô.</p>
 
-        <!-- Lista -->
-        <div v-if="payables.data.length" class="px-4 space-y-2" :class="selectionMode && selected.length ? 'pb-28' : 'pb-20'">
+        <!-- Lista resumida -->
+        <div v-if="viewMode === 'resumida' && payables.data.length" class="px-4 space-y-2" :class="selectionMode && selected.length ? 'pb-28' : 'pb-20'">
             <button v-for="p in payables.data" :key="p.id" @click="onCardTap(p)"
                 :class="['w-full bg-white rounded-xl border p-3 text-left active:bg-gray-50 transition-colors',
                     selectionMode && isSelected(p.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200']">
@@ -335,7 +388,31 @@ const currentTotal = computed(() => {
                 </span>
             </button>
         </div>
-        <div v-else class="text-center py-12 text-gray-400 text-sm">Nenhum título encontrado.</div>
+
+        <!-- Lista detalhada -->
+        <div v-else-if="viewMode === 'detalhada'" class="px-4 space-y-3 pb-20">
+            <PayableDetailedCard
+                v-for="p in payables.data"
+                :key="p.id"
+                :payable="p"
+                :status-options="statusOptions"
+                :status-severity="statusSeverity"
+                :priority-severity="prioritySeverity"
+                :document-types="documentTypes"
+                @open="goShow"
+            />
+            <Paginator
+                v-if="payables.total > payables.per_page"
+                :rows="payables.per_page"
+                :total-records="payables.total"
+                :first="(payables.current_page - 1) * payables.per_page"
+                :rows-per-page-options="[10, 20]"
+                @page="onDetailedPage"
+                class="bg-white rounded-xl border border-gray-200 p-2"
+            />
+        </div>
+
+        <div v-if="!payables.data.length" class="text-center py-12 text-gray-400 text-sm">Nenhum título encontrado.</div>
 
         <!-- Barra de ação fixa quando há seleção -->
         <div v-if="selectionMode && selected.length" class="fixed bottom-16 left-0 right-0 px-4 z-30">

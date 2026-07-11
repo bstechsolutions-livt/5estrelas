@@ -3,6 +3,8 @@ import { ref, watch, computed, onMounted } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { useAuth } from '@/composables/useAuth'
+import { useFinanceiroViewMode } from '@/composables/useFinanceiroViewMode'
+import PayableDetailedCard from '@/Components/Financeiro/PayableDetailedCard.vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
@@ -11,6 +13,7 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
+import Paginator from 'primevue/paginator'
 
 const props = defineProps({
     payables: Object,
@@ -23,7 +26,10 @@ const props = defineProps({
     canChangeDepartmentFilter: { type: Boolean, default: true },
     lockedDepartment: { type: Object, default: null },
     canManageClassification: { type: Boolean, default: false },
+    documentTypes: { type: Object, default: () => ({}) },
 })
+
+const { viewMode, persistViewMode, withView } = useFinanceiroViewMode('payables_view_mode', () => props.filters?.view)
 
 const { can } = useAuth()
 const canBorderos = computed(() => can('financeiro.borderos.visualizar'))
@@ -63,7 +69,7 @@ const departmentList = computed(() => [
 
 let timer = null
 function currentFilters() {
-    return {
+    return withView({
         search: search.value || undefined,
         status: status.value || undefined,
         codemp: codemp.value || undefined,
@@ -72,7 +78,13 @@ function currentFilters() {
         amount_max: amountMax.value || undefined,
         due_from: dueFrom.value || undefined,
         due_to: dueTo.value || undefined,
-    }
+    })
+}
+
+function setViewMode(mode) {
+    if (viewMode.value === mode) return
+    persistViewMode(mode)
+    router.get('/financeiro/contas-pagar', currentFilters(), { preserveState: true, replace: true })
 }
 
 function saveFilters() {
@@ -123,14 +135,15 @@ function clearFilters() {
 
 function onPage(event) {
     router.get('/financeiro/contas-pagar', {
-        search: search.value || undefined,
-        status: status.value || undefined,
-        codemp: codemp.value || undefined,
-        department_id: departmentId.value || undefined,
-        amount_min: amountMin.value || undefined,
-        amount_max: amountMax.value || undefined,
-        due_from: dueFrom.value || undefined,
-        due_to: dueTo.value || undefined,
+        ...currentFilters(),
+        page: event.page + 1,
+        per_page: event.rows,
+    }, { preserveState: true, replace: true })
+}
+
+function onDetailedPage(event) {
+    router.get('/financeiro/contas-pagar', {
+        ...currentFilters(),
         page: event.page + 1,
         per_page: event.rows,
     }, { preserveState: true, replace: true })
@@ -146,6 +159,13 @@ onMounted(() => {
 
     // Sem query string na URL = chegou pelo menu. Restaura último filtro usado.
     if (!window.location.search) {
+        const cachedView = localStorage.getItem('payables_view_mode')
+        if (cachedView && cachedView !== (props.filters?.view || 'resumida')) {
+            persistViewMode(cachedView)
+            router.get('/financeiro/contas-pagar', withView({ status: status.value }), { preserveState: true, replace: true })
+            return
+        }
+
         const cached = localStorage.getItem(STORAGE_KEY)
         if (cached) {
             try {
@@ -263,9 +283,27 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
 <template>
     <AppLayout>
         <div class="max-w-7xl mx-auto">
-            <div class="mb-6">
-                <h1 class="text-2xl font-bold text-gray-800">Contas a Pagar</h1>
-                <p class="text-sm text-gray-500 mt-1">Gerencie títulos, anexe documentos e envie para aprovação.</p>
+            <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Contas a Pagar</h1>
+                    <p class="text-sm text-gray-500 mt-1">Gerencie títulos, anexe documentos e envie para aprovação.</p>
+                </div>
+                <div class="flex rounded-lg border border-gray-200 bg-white p-0.5 shrink-0" dusk="payables-view-toggle">
+                    <button
+                        type="button"
+                        :class="['px-3 py-1.5 rounded-md text-sm font-medium transition-colors', viewMode === 'resumida' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50']"
+                        @click="setViewMode('resumida')"
+                    >
+                        Resumida
+                    </button>
+                    <button
+                        type="button"
+                        :class="['px-3 py-1.5 rounded-md text-sm font-medium transition-colors', viewMode === 'detalhada' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50']"
+                        @click="setViewMode('detalhada')"
+                    >
+                        Detalhada
+                    </button>
+                </div>
             </div>
 
             <!-- Tabs de status -->
@@ -362,8 +400,8 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                 </div>
             </div>
 
-            <!-- Tabela -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 payables-table overflow-hidden">
+            <!-- Tabela (visão resumida) -->
+            <div v-if="viewMode === 'resumida'" class="bg-white rounded-xl shadow-sm border border-gray-100 payables-table overflow-hidden">
                 <DataTable :value="payables.data" striped-rows size="small" class="cursor-pointer w-full"
                     table-style="table-layout: fixed; width: 100%"
                     :lazy="true" :paginator="true" :rows="payables.per_page" :total-records="payables.total"
@@ -466,6 +504,32 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                         <div class="text-center py-8 text-gray-500">Nenhum título encontrado.</div>
                     </template>
                 </DataTable>
+            </div>
+
+            <!-- Cards com documentos (visão detalhada) -->
+            <div v-else class="space-y-4">
+                <PayableDetailedCard
+                    v-for="p in payables.data"
+                    :key="p.id"
+                    :payable="p"
+                    :status-options="statusOptions"
+                    :status-severity="statusSeverity"
+                    :priority-severity="prioritySeverity"
+                    :document-types="documentTypes"
+                    @open="goShow"
+                />
+                <div v-if="!payables.data.length" class="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-100">
+                    Nenhum título encontrado.
+                </div>
+                <Paginator
+                    v-if="payables.total > payables.per_page"
+                    :rows="payables.per_page"
+                    :total-records="payables.total"
+                    :first="(payables.current_page - 1) * payables.per_page"
+                    :rows-per-page-options="[10, 20]"
+                    @page="onDetailedPage"
+                    class="bg-white rounded-xl border border-gray-100 p-2"
+                />
             </div>
         </div>
     </AppLayout>

@@ -14,6 +14,7 @@ defineProps({
     canChangeDepartmentFilter: { type: Boolean, default: true },
     lockedDepartment: { type: Object, default: null },
     canManageClassification: { type: Boolean, default: false },
+    documentTypes: { type: Object, default: () => ({}) },
 })
 
 const { isMobile } = useDevice()
