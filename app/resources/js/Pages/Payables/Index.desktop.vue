@@ -665,37 +665,37 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             </div>
 
             <!-- Barra de ações em lote -->
-            <div v-if="canSelect && selected.length > 0" class="bg-blue-600 text-white rounded-xl p-3 mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div v-if="canSelect && selected.length > 0" class="batch-action-bar bg-blue-600 text-white rounded-xl p-3 mb-4 flex flex-wrap items-center justify-between gap-3">
                 <template v-if="borderoMode">
                     <span class="text-sm font-medium">Criar borderô com {{ selected.length }} título(s)</span>
                     <div class="flex flex-wrap items-center gap-2 flex-1 justify-end">
                         <InputText
                             v-model="createBorderoForm.description"
                             placeholder="Descrição do borderô (opcional)"
-                            class="w-64"
+                            class="w-64 batch-bar-input"
                             dusk="bordero-description-input"
                             @keyup.enter="confirmBordero"
                         />
-                        <Button label="Confirmar borderô" icon="pi pi-check" severity="contrast" size="small"
+                        <Button label="Confirmar borderô" icon="pi pi-check" size="small" class="batch-bar-btn-primary"
                             dusk="btn-bordero-confirm" @click="confirmBordero" />
-                        <Button label="Cancelar" icon="pi pi-times" severity="contrast" outlined size="small"
+                        <Button label="Cancelar" icon="pi pi-times" size="small" outlined class="batch-bar-btn-secondary"
                             dusk="btn-bordero-cancel" @click="cancelBordero" />
                     </div>
                 </template>
                 <template v-else>
                     <span class="text-sm font-medium">{{ selected.length }} título(s) selecionado(s)</span>
                     <div class="flex flex-wrap items-center gap-2">
-                        <Button v-if="canBatchSend" label="Enviar para aprovação" icon="pi pi-send" severity="contrast" size="small"
+                        <Button v-if="canBatchSend" label="Enviar para aprovação" icon="pi pi-send" size="small" class="batch-bar-btn-primary"
                             dusk="btn-batch-send-approval" @click="batchSendForApproval" />
                         <Button v-if="canBatchApprove" label="Aprovar selecionados" icon="pi pi-check" severity="success" size="small"
                             dusk="btn-batch-approve" @click="openBatchApprove" />
-                        <Button v-if="canSelectBordero" label="Criar borderô" icon="pi pi-list-check" severity="contrast" size="small"
+                        <Button v-if="canSelectBordero" label="Criar borderô" icon="pi pi-list-check" size="small" class="batch-bar-btn-primary"
                             dusk="btn-batch-bordero" @click="startBordero" />
-                        <Button label="Definir apelido" icon="pi pi-tag" severity="contrast" outlined size="small"
+                        <Button label="Definir apelido" icon="pi pi-tag" size="small" class="batch-bar-btn-primary"
                             dusk="btn-batch-nickname" @click="openNicknameDialog" />
-                        <Button v-if="canManagePriority" label="Definir prioridade" icon="pi pi-flag" severity="contrast" outlined size="small"
+                        <Button v-if="canManagePriority" label="Definir prioridade" icon="pi pi-flag" size="small" class="batch-bar-btn-primary"
                             dusk="btn-batch-priority" @click="openPriorityDialog" />
-                        <Button icon="pi pi-times" severity="contrast" text size="small" title="Limpar seleção" @click="clearSelection" />
+                        <Button icon="pi pi-times" text size="small" class="batch-bar-btn-ghost" title="Limpar seleção" @click="clearSelection" />
                     </div>
                 </template>
             </div>
@@ -898,5 +898,37 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
     white-space: nowrap;
     max-width: 100%;
     min-width: 0;
+}
+.batch-action-bar :deep(.batch-bar-btn-primary.p-button) {
+    background: #fff;
+    color: #1d4ed8;
+    border-color: #fff;
+}
+.batch-action-bar :deep(.batch-bar-btn-primary.p-button:hover) {
+    background: #eff6ff;
+    color: #1e40af;
+    border-color: #eff6ff;
+}
+.batch-action-bar :deep(.batch-bar-btn-secondary.p-button) {
+    background: transparent;
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.95);
+}
+.batch-action-bar :deep(.batch-bar-btn-secondary.p-button:hover) {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border-color: #fff;
+}
+.batch-action-bar :deep(.batch-bar-btn-ghost.p-button) {
+    color: #fff;
+}
+.batch-action-bar :deep(.batch-bar-btn-ghost.p-button:hover) {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+}
+.batch-action-bar :deep(.batch-bar-input) {
+    background: #fff;
+    color: #1f2937;
+    border-color: #fff;
 }
 </style>
