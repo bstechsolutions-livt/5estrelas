@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BorderoAutoRule;
+use App\Models\BorderoAutoSetting;
 use App\Services\BorderoAutoGroupService;
 use App\Services\BorderoAutoRuleFilterService;
 use Illuminate\Http\Request;
@@ -13,6 +14,9 @@ class BorderoAutoRuleController extends Controller
 {
     public function index()
     {
+        $settings = BorderoAutoSetting::instance();
+        $activeRulesCount = BorderoAutoRule::query()->where('is_active', true)->count();
+
         $rules = BorderoAutoRule::query()
             ->orderBy('name')
             ->get()
@@ -28,6 +32,14 @@ class BorderoAutoRuleController extends Controller
             ]);
 
         return Inertia::render('Borderos/AutoRules/Index', [
+            'scheduler' => [
+                'cron_enabled' => $settings->cron_enabled,
+                'schedule_label' => 'Todo dia às 6h',
+                'last_cron_at' => $settings->last_cron_at?->toIso8601String(),
+                'last_cron_count' => $settings->last_cron_count,
+                'active_rules_count' => $activeRulesCount,
+                'total_rules_count' => $rules->count(),
+            ],
             'rules' => $rules,
         ]);
     }
@@ -80,9 +92,19 @@ class BorderoAutoRuleController extends Controller
     {
         $rule->update(['is_active' => ! $rule->is_active]);
 
-        return back()->with('success', $rule->is_active
-            ? 'Regra ativada — será executada no cron das 6h.'
-            : 'Regra desativada — não roda no cron.');
+        return redirect('/financeiro/borderos/automatico')->with('success', $rule->is_active
+            ? "Regra \"{$rule->name}\" ativada — entra no agendamento automático das 6h."
+            : "Regra \"{$rule->name}\" pausada — não roda no agendamento (pode aplicar manualmente ao salvar).");
+    }
+
+    public function toggleScheduler()
+    {
+        $settings = BorderoAutoSetting::instance();
+        $settings->update(['cron_enabled' => ! $settings->cron_enabled]);
+
+        return redirect('/financeiro/borderos/automatico')->with('success', $settings->cron_enabled
+            ? 'Agendamento automático ativado — regras ativas rodam todo dia às 6h.'
+            : 'Agendamento automático pausado — nenhuma regra roda sozinha até reativar.');
     }
 
     public function simulate(Request $request, BorderoAutoGroupService $grouper)
@@ -162,8 +184,8 @@ class BorderoAutoRuleController extends Controller
         }
 
         $msg = $created
-            ? 'Regra criada. Será aplicada automaticamente no cron das 6h.'
-            : 'Regra atualizada. Será aplicada automaticamente no cron das 6h.';
+            ? 'Regra criada. Será aplicada no agendamento automático das 6h (se estiver ativa).'
+            : 'Regra atualizada. Será aplicada no agendamento automático das 6h (se estiver ativa).';
 
         return redirect('/financeiro/borderos/automatico')->with('success', $msg);
     }

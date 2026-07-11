@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Bordero;
 use App\Models\BorderoAutoRule;
+use App\Models\BorderoAutoSetting;
 use App\Models\Payable;
 use App\Models\User;
 use Carbon\Carbon;
@@ -90,6 +91,12 @@ class BorderoAutoGroupService
 
     public function runActiveRulesForCron(): array
     {
+        $settings = BorderoAutoSetting::instance();
+
+        if (! $settings->cron_enabled) {
+            return ['created' => 0, 'rules' => [], 'skipped' => 'cron_disabled'];
+        }
+
         $rules = BorderoAutoRule::query()
             ->where('is_active', true)
             ->orderBy('id')
@@ -114,6 +121,11 @@ class BorderoAutoGroupService
                 'created' => $result['created'],
             ];
         }
+
+        $settings->update([
+            'last_cron_at' => now(),
+            'last_cron_count' => $totalCreated,
+        ]);
 
         return [
             'created' => $totalCreated,

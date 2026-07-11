@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Bordero;
 use App\Models\BorderoAutoRule;
+use App\Models\BorderoAutoSetting;
 use App\Models\Department;
 use App\Models\Payable;
 use App\Models\Permission;
@@ -149,6 +150,8 @@ class BorderoAutoRuleTest extends TestCase
 
     public function test_cron_executa_regras_ativas(): void
     {
+        BorderoAutoSetting::instance()->update(['cron_enabled' => true]);
+
         BorderoAutoRule::create([
             'name' => 'Cron test',
             'filters' => [['field' => 'codccu', 'operator' => 'eq', 'value' => '3333']],
@@ -164,6 +167,58 @@ class BorderoAutoRuleTest extends TestCase
         $this->artisan('borderos:auto-generate --scheduled')->assertSuccessful();
 
         $this->assertSame(1, Bordero::count());
+    }
+
+    public function test_agendamento_pausado_nao_cria_bordero(): void
+    {
+        BorderoAutoSetting::instance()->update(['cron_enabled' => false]);
+
+        BorderoAutoRule::create([
+            'name' => 'Regra ativa mas cron off',
+            'filters' => [['field' => 'codccu', 'operator' => 'eq', 'value' => '3333']],
+            'filter_logic' => 'and',
+            'is_active' => true,
+            'min_titles_per_group' => 2,
+        ]);
+
+        $this->makePayable(['codccu' => '3333']);
+        $this->makePayable(['codccu' => '3333']);
+
+        $this->artisan('borderos:auto-generate --scheduled')->assertSuccessful();
+
+        $this->assertSame(0, Bordero::count());
+    }
+
+    public function test_toggle_agendamento_global(): void
+    {
+        $this->actingAs($this->manager())
+            ->post('/financeiro/borderos/automatico/agendamento/toggle')
+            ->assertRedirect('/financeiro/borderos/automatico');
+
+        $this->assertFalse(BorderoAutoSetting::instance()->fresh()->cron_enabled);
+
+        $this->actingAs($this->manager())
+            ->post('/financeiro/borderos/automatico/agendamento/toggle')
+            ->assertRedirect('/financeiro/borderos/automatico');
+
+        $this->assertTrue(BorderoAutoSetting::instance()->fresh()->cron_enabled);
+    }
+
+    public function test_toggle_regra_individual(): void
+    {
+        $rule = BorderoAutoRule::create([
+            'name' => 'Toggle test',
+            'filters' => [['field' => 'codccu', 'operator' => 'eq', 'value' => '3333']],
+            'filter_logic' => 'and',
+            'is_active' => true,
+            'min_titles_per_group' => 2,
+        ]);
+
+        $this->actingAs($this->manager())
+            ->post("/financeiro/borderos/automatico/{$rule->id}/toggle")
+            ->assertRedirect('/financeiro/borderos/automatico');
+
+        $this->assertFalse($rule->fresh()->is_active);
     }
 
     public function test_opcoes_filtro_retorna_valores(): void

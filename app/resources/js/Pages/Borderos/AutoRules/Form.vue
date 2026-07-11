@@ -289,11 +289,17 @@ watch(() => page.props.flash?.error, (msg) => {
                         </div>
                     </div>
 
-                    <div class="px-4 py-3 border-t border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-2">
-                        <Button label="Salvar e aguardar cron" icon="pi pi-clock" severity="secondary" outlined size="small"
+                    <div class="px-4 py-3 border-t border-gray-100 bg-gray-50/50">
+                        <p class="text-[11px] text-gray-500 mb-2 leading-relaxed">
+                            <strong>Aguardar agendamento:</strong> salva a regra e espera a execução automática das 6h (se o agendamento e a regra estiverem ativos).
+                            <strong class="ml-1">Aplicar nos abertos:</strong> salva e já cria borderôs agora.
+                        </p>
+                        <div class="flex flex-col sm:flex-row gap-2">
+                        <Button label="Salvar e aguardar agendamento" icon="pi pi-clock" severity="secondary" outlined size="small"
                             class="flex-1" :loading="form.processing" :disabled="!canSubmit" @click="submit('cron')" />
                         <Button label="Salvar e aplicar nos abertos" icon="pi pi-bolt" severity="success" size="small"
                             class="flex-1" :loading="form.processing" :disabled="!canSubmit" @click="submit('now')" />
+                        </div>
                     </div>
                 </div>
 

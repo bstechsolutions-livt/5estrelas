@@ -4,12 +4,14 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import ToggleSwitch from 'primevue/toggleswitch'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import { useDevice } from '@/composables/useDevice'
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 
-defineProps({
+const props = defineProps({
+    scheduler: Object,
     rules: Array,
 })
 
@@ -17,9 +19,18 @@ const { isMobile } = useDevice()
 const page = usePage()
 const toast = useToast()
 
+const schedulerOn = computed({
+    get: () => !!props.scheduler?.cron_enabled,
+    set: () => toggleScheduler(),
+})
+
 function fmtDate(iso) {
     if (!iso) return '—'
     return new Date(iso).toLocaleString('pt-BR')
+}
+
+function toggleScheduler() {
+    router.post('/financeiro/borderos/automatico/agendamento/toggle', {}, { preserveScroll: true })
 }
 
 function toggleRule(id) {
@@ -50,7 +61,6 @@ watch(() => page.props.flash?.error, (msg) => {
                     </h1>
                     <p class="text-sm text-gray-500 mt-1 max-w-xl">
                         Cada regra cria borderô quando o título bate com condições específicas — natureza, filial, CCU, fornecedor, etc.
-                        O cron das <strong>6h</strong> executa todas as regras ativas.
                     </p>
                 </div>
                 <div class="flex gap-2 shrink-0">
@@ -58,6 +68,41 @@ watch(() => page.props.flash?.error, (msg) => {
                         @click="router.visit('/financeiro/borderos/automatico/criar')" />
                     <Button label="Ver borderôs" icon="pi pi-list-check" severity="secondary" outlined size="small"
                         @click="router.visit('/financeiro/borderos?status=rascunho')" />
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-100 flex flex-wrap items-start justify-between gap-4">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h2 class="text-sm font-semibold text-gray-800">Agendamento automático</h2>
+                            <Tag
+                                :value="scheduler?.cron_enabled ? 'Ligado' : 'Pausado'"
+                                :severity="scheduler?.cron_enabled ? 'success' : 'secondary'"
+                                class="!text-[10px]"
+                            />
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1 max-w-2xl leading-relaxed">
+                            <strong>O que é:</strong> todo dia às <strong>6h</strong> o sistema verifica títulos abertos
+                            e cria borderôs em rascunho conforme as <strong>regras ativas</strong> abaixo.
+                            Não precisa clicar em nada — roda sozinho no servidor.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0">
+                        <label class="text-xs font-medium text-gray-600 whitespace-nowrap" for="scheduler-toggle">
+                            {{ scheduler?.cron_enabled ? 'Agendamento ligado' : 'Agendamento pausado' }}
+                        </label>
+                        <ToggleSwitch v-model="schedulerOn" inputId="scheduler-toggle" />
+                    </div>
+                </div>
+                <div class="px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-gray-400 bg-gray-50/50">
+                    <span>Horário: {{ scheduler?.schedule_label ?? 'Todo dia às 6h' }}</span>
+                    <span>Regras ativas: {{ scheduler?.active_rules_count ?? 0 }} de {{ scheduler?.total_rules_count ?? 0 }}</span>
+                    <span v-if="scheduler?.last_cron_at">
+                        Última execução: {{ fmtDate(scheduler.last_cron_at) }}
+                        ({{ scheduler.last_cron_count ?? 0 }} borderô(s))
+                    </span>
+                    <span v-else>Ainda não executou no agendamento</span>
                 </div>
             </div>
 
@@ -70,26 +115,45 @@ watch(() => page.props.flash?.error, (msg) => {
             </div>
 
             <div v-else class="space-y-3">
+                <p class="text-xs text-gray-500 px-1">
+                    Cada regra pode ser ligada ou pausada individualmente. Só entram no agendamento as regras
+                    <strong>ativas</strong> enquanto o agendamento geral estiver <strong>ligado</strong>.
+                </p>
+
                 <div v-for="rule in rules" :key="rule.id"
-                    class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                    class="bg-white rounded-xl border border-gray-100 overflow-hidden"
+                    :class="{ 'opacity-75': !rule.is_active }">
                     <div class="px-4 py-3 flex flex-wrap items-start justify-between gap-3 border-b border-gray-50">
-                        <div class="min-w-0">
+                        <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
                                 <h2 class="text-sm font-semibold text-gray-800">{{ rule.name }}</h2>
-                                <Tag :value="rule.is_active ? 'Ativa no cron' : 'Inativa'" :severity="rule.is_active ? 'success' : 'secondary'" class="!text-[10px]" />
+                                <Tag
+                                    :value="rule.is_active ? 'Regra ativa' : 'Regra pausada'"
+                                    :severity="rule.is_active ? 'success' : 'secondary'"
+                                    class="!text-[10px]"
+                                />
                             </div>
                             <ul class="mt-2 space-y-0.5">
                                 <li v-for="(line, i) in rule.rules_summary" :key="i" class="text-xs text-gray-500">{{ line }}</li>
                             </ul>
                         </div>
-                        <div class="flex gap-1.5 shrink-0">
-                            <Button icon="pi pi-pencil" severity="secondary" text size="small"
-                                @click="router.visit(`/financeiro/borderos/automatico/${rule.id}/editar`)" />
-                            <Button :icon="rule.is_active ? 'pi pi-pause' : 'pi pi-play'" severity="secondary" text size="small"
-                                :title="rule.is_active ? 'Desativar cron' : 'Ativar cron'"
-                                @click="toggleRule(rule.id)" />
-                            <Button icon="pi pi-trash" severity="danger" text size="small"
-                                @click="deleteRule(rule.id, rule.name)" />
+                        <div class="flex flex-wrap items-center gap-3 shrink-0">
+                            <div class="flex items-center gap-2">
+                                <label class="text-[11px] text-gray-500 whitespace-nowrap" :for="`rule-${rule.id}`">
+                                    {{ rule.is_active ? 'Ativa' : 'Pausada' }}
+                                </label>
+                                <ToggleSwitch
+                                    :model-value="rule.is_active"
+                                    :inputId="`rule-${rule.id}`"
+                                    @update:model-value="toggleRule(rule.id)"
+                                />
+                            </div>
+                            <div class="flex gap-1">
+                                <Button icon="pi pi-pencil" severity="secondary" text size="small"
+                                    @click="router.visit(`/financeiro/borderos/automatico/${rule.id}/editar`)" />
+                                <Button icon="pi pi-trash" severity="danger" text size="small"
+                                    @click="deleteRule(rule.id, rule.name)" />
+                            </div>
                         </div>
                     </div>
                     <div class="px-4 py-2.5 flex flex-wrap gap-4 text-[11px] text-gray-400 bg-gray-50/50">
@@ -98,7 +162,7 @@ watch(() => page.props.flash?.error, (msg) => {
                             ({{ rule.last_applied_count ?? 0 }} borderô(s))
                         </span>
                         <span v-if="rule.last_cron_at">
-                            Último cron: {{ fmtDate(rule.last_cron_at) }}
+                            Última execução no agendamento: {{ fmtDate(rule.last_cron_at) }}
                             ({{ rule.last_cron_count ?? 0 }} borderô(s))
                         </span>
                         <span v-if="!rule.last_applied_at && !rule.last_cron_at">Ainda não executada</span>

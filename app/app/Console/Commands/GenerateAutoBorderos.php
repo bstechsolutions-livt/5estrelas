@@ -16,7 +16,11 @@ class GenerateAutoBorderos extends Command
         $result = $grouper->runActiveRulesForCron();
 
         if ($result['created'] === 0) {
-            $this->info('Borderô automático: nenhuma regra ativa ou nenhum título elegível.');
+            $reason = ($result['skipped'] ?? null) === 'cron_disabled'
+                ? 'Agendamento automático está pausado.'
+                : 'Nenhuma regra ativa ou nenhum título elegível.';
+
+            $this->info("Borderô automático: {$reason}");
 
             return self::SUCCESS;
         }
