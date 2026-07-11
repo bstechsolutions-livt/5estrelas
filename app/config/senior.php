@@ -89,6 +89,10 @@ return [
     // Tentativas adicionais em erro transitório (requirement 1.10 / 2.4).
     'max_retries' => 3,
 
+    // Data-base da janela de vencimento (vctIni) no sync incremental.
+    // Títulos com vencimento a partir desta data entram na varredura a cada ciclo.
+    'vct_base_date' => env('SENIOR_VCT_BASE', '2026-06-01'),
+
     // Janela do sync incremental em dias (requirement 5.1): default 90/90, faixa 1..3650.
     'window_days_back' => (int) env('SENIOR_WINDOW_BACK', 90),
     'window_days_forward' => (int) env('SENIOR_WINDOW_FORWARD', 90),

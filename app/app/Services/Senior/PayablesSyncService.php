@@ -248,18 +248,13 @@ class PayablesSyncService
             return [null, null];
         }
 
-        $back = $this->clamp((int) config('senior.window_days_back', 90), 1, 3650);
         $forward = $this->clamp((int) config('senior.window_days_forward', 90), 1, 3650);
+        $base = config('senior.vct_base_date');
+        $ini = $base
+            ? Carbon::parse($base)->startOfDay()
+            : now()->subDays($this->clamp((int) config('senior.window_days_back', 90), 1, 3650))->startOfDay();
 
-        // req 5.5: usa o fim da última execução bem-sucedida como início, se houver.
-        $lastOk = PayableSyncRun::where('status', PayableSyncRun::STATUS_SUCCESS)
-            ->orderByDesc('finished_at')->first();
-
-        $ini = $lastOk && $lastOk->finished_at
-            ? $lastOk->finished_at->copy()
-            : now()->subDays($back);
-
-        return [$ini->startOfDay(), now()->addDays($forward)->endOfDay()];
+        return [$ini, now()->addDays($forward)->endOfDay()];
     }
 
     /** Insere ou atualiza um título preservando Workflow_Fields (req 4, 8). */
