@@ -67,6 +67,36 @@ class PayableDocumentoTipoTest extends TestCase
         ]);
     }
 
+    public function test_anexa_varios_documentos_de_uma_vez(): void
+    {
+        Storage::fake('public');
+        $user = $this->activeUser();
+        $payable = $this->makePayable();
+
+        $this->actingAs($user)
+            ->post($this->docUrl($payable), [
+                'files' => [
+                    UploadedFile::fake()->create('nf-1.pdf', 100, 'application/pdf'),
+                    UploadedFile::fake()->create('nf-2.pdf', 100, 'application/pdf'),
+                    UploadedFile::fake()->create('nf-3.pdf', 100, 'application/pdf'),
+                ],
+                'type' => 'nota_fiscal',
+            ])
+            ->assertRedirect();
+
+        $this->assertEquals(3, $payable->documents()->count());
+        $this->assertDatabaseHas('payable_documents', [
+            'payable_id' => $payable->id,
+            'name' => 'nf-1.pdf',
+            'doc_type' => 'nota_fiscal',
+        ]);
+        $this->assertDatabaseHas('payable_documents', [
+            'payable_id' => $payable->id,
+            'name' => 'nf-3.pdf',
+            'doc_type' => 'nota_fiscal',
+        ]);
+    }
+
     public function test_tipo_invalido_retorna_422(): void
     {
         Storage::fake('public');

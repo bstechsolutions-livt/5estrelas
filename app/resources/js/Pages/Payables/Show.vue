@@ -169,10 +169,10 @@ watch(() => page.props.flash?.error, (msg) => {
 })
 
 function uploadDoc(event, type = 'outro') {
-    const file = event.files?.[0]
-    if (!file) return
+    const files = [...(event.files || [])]
+    if (!files.length) return
     const formData = new FormData()
-    formData.append('file', file)
+    files.forEach((file) => formData.append('files[]', file))
     formData.append('type', type)
     router.post(`/financeiro/contas-pagar/${props.payable.id}/documentos`, formData, {
         preserveScroll: true,
@@ -500,9 +500,10 @@ const slaAlertClass = computed(() => {
                                     </div>
                                 </div>
                                 <p v-else class="text-[11px] text-gray-400 mb-2">Nenhum anexo deste tipo.</p>
-                                <FileUpload v-if="canPrepare" mode="basic" :auto="true" :choose-label="`Anexar ${t.label}`"
+                                <FileUpload v-if="canPrepare" mode="basic" multiple :auto="true" :choose-label="`Anexar ${t.label}`"
                                     :max-file-size="10485760" @select="(e) => uploadDoc(e, t.key)" class="w-full"
                                     invalid-file-size-message="O arquivo é muito grande. O tamanho máximo permitido é {1}." />
+                                <p v-if="canPrepare" class="text-[11px] text-gray-400 mt-1">Ctrl ou Shift para selecionar vários arquivos de uma vez.</p>
                             </div>
                         </div>
                         <p v-if="canPrepare" class="text-[11px] text-gray-400 mt-2 text-center">Tamanho máximo por arquivo: 10 MB.</p>

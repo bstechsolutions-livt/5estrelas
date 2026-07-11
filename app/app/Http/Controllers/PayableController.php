@@ -256,35 +256,57 @@ class PayableController extends Controller
         $payable = Payable::findOrFail($id);
 
         $request->validate([
-            'file' => ['required', 'file', 'max:10240'], // 10MB
+            'file' => ['nullable', 'file', 'max:10240'],
+            'files' => ['nullable', 'array'],
+            'files.*' => ['file', 'max:10240'],
             'type' => ['nullable', Rule::in(array_keys(PayableDocument::TYPES))],
         ]);
 
-        $file = $request->file('file');
-        $path = $file->store('payables/docs', 'public');
+        $files = $request->hasFile('files')
+            ? $request->file('files')
+            : ($request->hasFile('file') ? [$request->file('file')] : []);
 
-        PayableDocument::create([
-            'payable_id' => $payable->id,
-            'uploaded_by' => $request->user()->id,
-            'name' => $file->getClientOriginalName(),
-            'doc_type' => $request->input('type', 'outro'),
-            'path' => $path,
-            'mime_type' => $file->getMimeType(),
-            'size' => $file->getSize(),
-        ]);
+        if ($files === []) {
+            return back()->with('error', 'Nenhum arquivo enviado.');
+        }
 
-        // Se estava pendente, marca como em preparação
+        $type = $request->input('type', 'outro');
+        $user = $request->user();
+        $names = [];
+
+        foreach ($files as $file) {
+            $path = $file->store('payables/docs', 'public');
+
+            PayableDocument::create([
+                'payable_id' => $payable->id,
+                'uploaded_by' => $user->id,
+                'name' => $file->getClientOriginalName(),
+                'doc_type' => $type,
+                'path' => $path,
+                'mime_type' => $file->getMimeType(),
+                'size' => $file->getSize(),
+            ]);
+
+            $names[] = $file->getClientOriginalName();
+        }
+
         if ($payable->status === 'pendente') {
             $payable->update([
                 'status' => 'em_preparacao',
-                'prepared_by' => $request->user()->id,
+                'prepared_by' => $user->id,
             ]);
         }
 
+        $typeLabel = PayableDocument::TYPES[$type] ?? $type;
+        $list = implode(', ', $names);
+        $body = count($names) === 1
+            ? "Anexou documento: {$list}"
+            : 'Anexou ' . count($names) . " documentos ({$typeLabel}): {$list}";
+
         PayableComment::create([
             'payable_id' => $payable->id,
-            'user_id' => $request->user()->id,
-            'body' => "Anexou documento: {$file->getClientOriginalName()}",
+            'user_id' => $user->id,
+            'body' => $body,
             'type' => 'status_change',
         ]);
 
