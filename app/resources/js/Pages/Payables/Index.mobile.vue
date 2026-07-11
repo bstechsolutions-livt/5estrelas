@@ -51,6 +51,11 @@ const dueTo = ref(props.filters?.due_to || '')
 const sortValue = ref(sortValueFromQuery(props.filters?.sort, props.filters?.dir))
 const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange, presetChipClass } = useDueDatePresets(dueFrom, dueTo)
 
+function selectDuePreset(key) {
+    applyDuePreset(key)
+    applyFilters()
+}
+
 const statusList = [
     { label: 'Pendentes', value: 'pendente' },
     { label: 'Preparação', value: 'em_preparacao' },
@@ -298,6 +303,41 @@ const currentTotal = computed(() => {
             </div>
         </div>
 
+        <!-- Períodos rápidos -->
+        <div class="px-4 pb-2 space-y-2">
+            <div
+                v-for="group in DUE_DATE_PRESET_GROUPS"
+                :key="group.id"
+                :class="[
+                    'rounded-lg border px-2 py-2',
+                    group.id === 'vencidos' ? 'border-amber-200 bg-amber-50/70' : 'border-blue-100 bg-white',
+                ]"
+            >
+                <p
+                    :class="[
+                        'text-[11px] font-semibold mb-1.5',
+                        group.id === 'vencidos' ? 'text-amber-800' : 'text-blue-800',
+                    ]"
+                >
+                    {{ group.label }}
+                </p>
+                <div class="flex flex-wrap gap-1.5">
+                    <button
+                        v-for="preset in group.presets"
+                        :key="preset.key"
+                        type="button"
+                        :class="[
+                            'px-2 py-1 rounded-full text-[11px] font-medium border',
+                            presetChipClass(preset.key, group.id),
+                        ]"
+                        @click="selectDuePreset(preset.key)"
+                    >
+                        {{ preset.label }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Busca + botão filtro -->
         <div class="px-4 pb-2 flex gap-2">
             <InputText v-model="search" placeholder="Buscar..." class="flex-1" style="height: 44px" />
@@ -487,7 +527,7 @@ const currentTotal = computed(() => {
                                     'px-2 py-1 rounded-full text-[11px] font-medium border',
                                     presetChipClass(preset.key, group.id),
                                 ]"
-                                @click="applyDuePreset(preset.key)"
+                                @click="selectDuePreset(preset.key)"
                             >
                                 {{ preset.label }}
                             </button>

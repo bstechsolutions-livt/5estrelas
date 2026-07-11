@@ -61,6 +61,32 @@ const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange, preset
 
 const tableSortField = computed(() => tableSortState(sortValue.value).field)
 const tableSortOrder = computed(() => tableSortState(sortValue.value).order)
+const advancedFiltersOpen = ref(false)
+
+const hasAdvancedFilters = computed(() => {
+    const deptActive = props.canChangeDepartmentFilter && departmentId.value
+    return !!(
+        search.value
+        || codemp.value
+        || deptActive
+        || amountMin.value
+        || amountMax.value
+        || paymentPriority.value
+        || sortValue.value !== 'default'
+    )
+})
+
+const advancedFilterCount = computed(() => {
+    let c = 0
+    if (search.value) c++
+    if (codemp.value) c++
+    if (props.canChangeDepartmentFilter && departmentId.value) c++
+    if (amountMin.value) c++
+    if (amountMax.value) c++
+    if (paymentPriority.value) c++
+    if (sortValue.value !== 'default') c++
+    return c
+})
 
 function selectDuePreset(key) {
     applyDuePreset(key)
@@ -126,8 +152,7 @@ function selectStatus(s) {
 }
 
 const hasActiveFilters = computed(() => {
-    const deptActive = props.canChangeDepartmentFilter && departmentId.value
-    return !!(search.value || codemp.value || deptActive || amountMin.value || amountMax.value || paymentPriority.value || dueFrom.value || dueTo.value)
+    return hasAdvancedFilters.value || !!(dueFrom.value || dueTo.value)
 })
 
 const activeFilterCount = computed(() => {
@@ -138,6 +163,7 @@ const activeFilterCount = computed(() => {
     if (amountMin.value) c++
     if (amountMax.value) c++
     if (paymentPriority.value) c++
+    if (sortValue.value !== 'default') c++
     if (dueFrom.value) c++
     if (dueTo.value) c++
     return c
@@ -199,6 +225,12 @@ onMounted(() => {
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
                 onDueDateManualChange()
+                advancedFiltersOpen.value = !!(
+                    f.search || f.codemp
+                    || (props.canChangeDepartmentFilter && f.department_id)
+                    || f.amount_min || f.amount_max || f.payment_priority
+                    || (f.sort && f.sort !== 'default')
+                )
                 const serverStatus = props.filters?.status || 'pendente'
                 const differs = status.value !== serverStatus || f.search || f.codemp
                     || (props.canChangeDepartmentFilter && f.department_id)
@@ -210,6 +242,8 @@ onMounted(() => {
                 }
             } catch (e) { /* cache inválido, ignora */ }
         }
+    } else if (hasAdvancedFilters.value) {
+        advancedFiltersOpen.value = true
     }
 
     const saved = sessionStorage.getItem('payables_scroll')
@@ -326,7 +360,72 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             </div>
 
             <!-- Filtros -->
-            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 space-y-4">
+            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 space-y-3">
+                <div class="space-y-3">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Período de vencimento</p>
+
+                    <div
+                        v-for="group in DUE_DATE_PRESET_GROUPS"
+                        :key="group.id"
+                        :class="[
+                            'rounded-lg border px-3 py-2.5',
+                            group.id === 'vencidos' ? 'border-amber-200 bg-amber-50/60' : 'border-blue-100 bg-white/80',
+                        ]"
+                    >
+                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-2">
+                            <span
+                                :class="[
+                                    'text-xs font-semibold',
+                                    group.id === 'vencidos' ? 'text-amber-800' : 'text-blue-800',
+                                ]"
+                            >
+                                {{ group.label }}
+                            </span>
+                            <span class="text-[11px] text-gray-500">{{ group.hint }}</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button
+                                v-for="preset in group.presets"
+                                :key="preset.key"
+                                type="button"
+                                :class="[
+                                    'px-2.5 py-1 rounded-full text-xs font-medium transition-colors border',
+                                    presetChipClass(preset.key, group.id),
+                                ]"
+                                @click="selectDuePreset(preset.key)"
+                            >
+                                {{ preset.label }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                        @click="advancedFiltersOpen = !advancedFiltersOpen"
+                    >
+                        <i :class="['pi text-xs', advancedFiltersOpen ? 'pi-chevron-up' : 'pi-chevron-down']" />
+                        {{ advancedFiltersOpen ? 'Ocultar filtros' : 'Mais filtros' }}
+                        <span
+                            v-if="advancedFilterCount"
+                            class="text-[10px] font-semibold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full"
+                        >
+                            {{ advancedFilterCount }}
+                        </span>
+                    </button>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span v-if="hasActiveFilters" class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            {{ activeFilterCount }} filtro(s) ativo(s)
+                        </span>
+                        <span v-else class="text-xs text-gray-400">Nenhum filtro aplicado</span>
+                        <Button label="Limpar" severity="secondary" outlined size="small" @click="clearFilters" :disabled="!hasActiveFilters" />
+                        <Button v-if="advancedFiltersOpen" label="Filtrar" icon="pi pi-search" size="small" @click="applyFilters" />
+                    </div>
+                </div>
+
+                <div v-show="advancedFiltersOpen" class="space-y-4 pt-3 border-t border-gray-100">
                 <div>
                     <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-3">Busca e escopo</p>
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
@@ -409,45 +508,9 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </div>
                 </div>
 
-                <div class="pt-3 border-t border-gray-100 rounded-lg bg-slate-50/80 px-3 py-3 space-y-3">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Período de vencimento</p>
-
-                    <div
-                        v-for="group in DUE_DATE_PRESET_GROUPS"
-                        :key="group.id"
-                        :class="[
-                            'rounded-lg border px-3 py-2.5',
-                            group.id === 'vencidos' ? 'border-amber-200 bg-amber-50/60' : 'border-blue-100 bg-white/80',
-                        ]"
-                    >
-                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-2">
-                            <span
-                                :class="[
-                                    'text-xs font-semibold',
-                                    group.id === 'vencidos' ? 'text-amber-800' : 'text-blue-800',
-                                ]"
-                            >
-                                {{ group.label }}
-                            </span>
-                            <span class="text-[11px] text-gray-500">{{ group.hint }}</span>
-                        </div>
-                        <div class="flex flex-wrap gap-1.5">
-                            <button
-                                v-for="preset in group.presets"
-                                :key="preset.key"
-                                type="button"
-                                :class="[
-                                    'px-2.5 py-1 rounded-full text-xs font-medium transition-colors border',
-                                    presetChipClass(preset.key, group.id),
-                                ]"
-                                @click="selectDuePreset(preset.key)"
-                            >
-                                {{ preset.label }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl pt-1">
+                <div class="pt-3 border-t border-gray-100">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-3">Período personalizado</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Vencimento de</label>
                             <InputText v-model="dueFrom" type="date" class="w-full" @input="onDueDateManualChange" />
@@ -458,17 +521,6 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-gray-100">
-                    <div class="flex items-center gap-2 min-h-[32px]">
-                        <span v-if="hasActiveFilters" class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                            {{ activeFilterCount }} filtro(s) ativo(s)
-                        </span>
-                        <span v-else class="text-xs text-gray-400">Nenhum filtro aplicado</span>
-                    </div>
-                    <div class="flex gap-2 w-full sm:w-auto">
-                        <Button label="Limpar" severity="secondary" outlined size="small" class="flex-1 sm:flex-none" @click="clearFilters" :disabled="!hasActiveFilters" />
-                        <Button label="Filtrar" icon="pi pi-search" size="small" class="flex-1 sm:flex-none" @click="applyFilters" />
-                    </div>
                 </div>
             </div>
 
