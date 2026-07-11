@@ -182,6 +182,13 @@ class PayablesSyncService
         $consecutiveTransport = 0;
 
         foreach ($codEmps as $codEmp) {
+            Log::info('[senior-cp] varredura', [
+                'codEmp' => $codEmp,
+                'codFor' => $forStart,
+                'total' => count($all),
+                'evento' => 'empresa',
+            ]);
+
             for ($codFor = $forStart; $codFor <= $forEnd; $codFor++) {
                 try {
                     $titulos = $this->client->consultarTitulosPorFornecedor((int) $codEmp, $codFor, $vctIni, $vctFim);
@@ -207,6 +214,14 @@ class PayablesSyncService
                             'codEmp' => $codEmp, 'codFor' => $codFor, 'erro' => $e->getMessage(),
                         ]);
                     }
+                }
+
+                if ($codFor % 100 === 0) {
+                    Log::info('[senior-cp] varredura', [
+                        'codEmp' => $codEmp,
+                        'codFor' => $codFor,
+                        'total' => count($all),
+                    ]);
                 }
 
                 if ($delayMs > 0) {

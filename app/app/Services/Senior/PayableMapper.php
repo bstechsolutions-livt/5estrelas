@@ -26,11 +26,11 @@ class PayableMapper
     {
         $parts = [];
         foreach (['codEmp', 'codFil', 'numTit', 'codTpt', 'codFor'] as $k) {
-            $v = $titulo[$k] ?? null;
+            $v = $this->asString($titulo[$k] ?? null);
             if ($v === null || $v === '') {
                 return null;
             }
-            $parts[] = trim((string) $v);
+            $parts[] = trim($v);
         }
 
         return implode('-', $parts);
@@ -50,17 +50,18 @@ class PayableMapper
         }
 
         // Campos de exibição da tela (também origem Senior).
-        $out['title_number'] = isset($titulo['numTit']) ? (string) $titulo['numTit'] : null;
+        $out['title_number'] = $this->asString($titulo['numTit'] ?? null);
         $out['amount'] = $this->convert($titulo['vlrOri'] ?? null, 'money') ?? 0;
         $out['due_date'] = $this->convert($titulo['vctPro'] ?? $titulo['vctOri'] ?? null, 'date');
         $out['issue_date'] = $this->convert($titulo['datEmi'] ?? null, 'date');
         $out['supplier_name'] = $this->supplierName($titulo);
-        $out['supplier_cnpj'] = isset($titulo['docIdeFav']) ? (string) $titulo['docIdeFav'] : null;
- $out["description"] = isset($titulo["obsTcp"]) ? (string) $titulo["obsTcp"] : null;
- $out["category"] = isset($titulo["codTns"]) ? "Transação " . $titulo["codTns"] : null;
+        $out['supplier_cnpj'] = $this->asString($titulo['docIdeFav'] ?? null);
+        $out['description'] = $this->asString($titulo['obsTcp'] ?? null);
+        $codTns = $this->asString($titulo['codTns'] ?? null);
+        $out['category'] = $codTns !== null ? 'Transação ' . $codTns : null;
 
         // Metadados de origem.
-        $out['senior_situacao_original'] = isset($titulo['sitTit']) ? (string) $titulo['sitTit'] : null;
+        $out['senior_situacao_original'] = $this->asString($titulo['sitTit'] ?? null);
         $out['senior_raw'] = $titulo;
 
         return $out;
@@ -90,13 +91,13 @@ class PayableMapper
         }
 
         $fromDescription = (new SupplierDisplayNameResolver())->fromDescription(
-            isset($titulo['obsTcp']) ? (string) $titulo['obsTcp'] : null,
+            $this->asString($titulo['obsTcp'] ?? null),
         );
         if ($fromDescription) {
             return $fromDescription;
         }
 
-        $doc = trim((string) ($titulo['docIdeFav'] ?? ''));
+        $doc = trim($this->asString($titulo['docIdeFav'] ?? null) ?? '');
         if ($doc !== '') {
             return $doc;
         }
@@ -104,9 +105,46 @@ class PayableMapper
         return $codFor !== null && $codFor !== '' ? 'Fornecedor ' . $codFor : 'Fornecedor não identificado';
     }
 
+    /**
+     * Elemento XML vazio ou com xsi:nil="true" vira [] no json_encode(SimpleXML).
+     * Normaliza arrays antes da conversão tipada (mesmo padrão de SeniorCpClient::scalarOrNull).
+     */
+    private function normalizeScalar(mixed $value, bool $forString = false): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+        if ($value === []) {
+            return null;
+        }
+        if (count($value) === 1) {
+            return $this->normalizeScalar(reset($value), $forString);
+        }
+
+        return $forString
+            ? implode('; ', array_map('strval', $value))
+            : null;
+    }
+
+    private function asString(mixed $value): ?string
+    {
+        $normalized = $this->normalizeScalar($value, true);
+        if ($normalized === null || $normalized === '') {
+            return null;
+        }
+
+        return (string) $normalized;
+    }
+
     /** Converte um valor cru da Senior pelo tipo lógico; null em falha/ausência. */
     private function convert(mixed $value, string $type): mixed
     {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $forString = !in_array($type, ['money', 'rate', 'date', 'int'], true);
+        $value = $this->normalizeScalar($value, $forString);
         if ($value === null || $value === '') {
             return null;
         }
@@ -127,6 +165,9 @@ class PayableMapper
     /** Aceita "1234.56" e "1.234,56"; retorna float ou lança em valor inválido. */
     private function parseNumber(mixed $value): float
     {
+        if (is_array($value)) {
+            throw new \InvalidArgumentException('valor numérico inválido: array');
+        }
         if (is_int($value) || is_float($value)) {
             return (float) $value;
         }
@@ -148,6 +189,9 @@ class PayableMapper
     /** Tenta múltiplos formatos de data da Senior; lança em valor inválido. */
     private function parseDate(mixed $value): string
     {
+        if (is_array($value)) {
+            throw new \InvalidArgumentException('data inválida: array');
+        }
         $s = trim((string) $value);
 
         foreach (['Y-m-d', 'd/m/Y', 'Y-m-d\TH:i:s', 'd/m/Y H:i:s', 'dmY', 'Ymd'] as $fmt) {

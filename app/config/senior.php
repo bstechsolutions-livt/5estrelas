@@ -66,10 +66,10 @@ return [
 
     // Varredura de fornecedores (codFor é OBRIGATÓRIO no contrato real da Senior).
     // Para puxar TODOS os títulos, iteramos codFor nesta faixa por empresa.
-    // Os fornecedores são esparsos (gaps), por isso a faixa padrão é ampla; para uma
-    // execução rápida (teste/validação) configure uma faixa pequena via env.
+    // Os fornecedores são esparsos (gaps); em produção o max cod_for em senior_suppliers
+    // fica abaixo de 2000 — use SENIOR_CODFOR_END para ajustar (ex.: 2000).
     'cod_for_start' => (int) env('SENIOR_CODFOR_START', 1),
-    'cod_for_end' => (int) env('SENIOR_CODFOR_END', 9999),
+    'cod_for_end' => (int) env('SENIOR_CODFOR_END', 2000),
 
     // Pausa (ms) entre as chamadas da varredura, para não martelar a Senior.
     // 0 = sem pausa. Útil quando a faixa de codFor é grande.

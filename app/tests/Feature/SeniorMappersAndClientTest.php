@@ -91,6 +91,30 @@ class SeniorMappersAndClientTest extends TestCase
         $this->assertNull($attrs['datemi']);
     }
 
+    public function test_map_header_normaliza_campos_array_do_xml(): void
+    {
+        $m = new PayableMapper();
+        $attrs = $m->mapHeader([
+            'codEmp' => 1, 'codFil' => 2, 'numTit' => 'TIT-9', 'codTpt' => 'DP', 'codFor' => 500,
+            'sitTit' => 'NOR',
+            'vlrOri' => '1000.00',
+            'codMoe' => [],                    // xsi:nil → [] → null
+            'obsTcp' => ['ABASTECIMENTO'],     // elemento único → unwrap
+            'docIdeFav' => ['111', '222'],     // multi-elemento → implode
+            'datEmi' => [],                    // data nil → null
+        ]);
+
+        $this->assertNull($attrs['codmoe']);
+        $this->assertEquals('ABASTECIMENTO', $attrs['obstcp']);
+        $this->assertEquals('111; 222', $attrs['supplier_cnpj']);
+        $this->assertNull($attrs['datemi']);
+        $this->assertEquals('TIT-9', $attrs['title_number']);
+        $this->assertEquals(1000.0, (float) $attrs['vlrori']);
+        $this->assertEquals('1-2-TIT-9-DP-500', $m->businessKey([
+            'codEmp' => 1, 'codFil' => 2, 'numTit' => 'TIT-9', 'codTpt' => 'DP', 'codFor' => 500,
+        ]));
+    }
+
     // ─── Senior_CP_Client: envelope + parse (req 1, 2.5) ────────────────────────
 
     private function client(): SeniorCpClient
