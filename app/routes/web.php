@@ -200,6 +200,15 @@ Route::middleware('auth')->group(function () {
 
     // Financeiro - Borderôs
     Route::prefix('financeiro/borderos')->middleware('permission:financeiro.borderos.visualizar')->group(function () {
+        Route::get('/automatico', [\App\Http\Controllers\BorderoAutoConfigController::class, 'index'])
+            ->middleware('permission:financeiro.borderos.automatico_gerenciar')
+            ->name('borderos.auto-config.index');
+        Route::post('/automatico', [\App\Http\Controllers\BorderoAutoConfigController::class, 'update'])
+            ->middleware('permission:financeiro.borderos.automatico_gerenciar')
+            ->name('borderos.auto-config.update');
+        Route::post('/automatico/gerar', [\App\Http\Controllers\BorderoAutoConfigController::class, 'generate'])
+            ->middleware('permission:financeiro.borderos.automatico_gerenciar')
+            ->name('borderos.auto-config.generate');
         Route::get('/', [BorderoController::class, 'index'])->name('borderos.index');
         Route::post('/', [BorderoController::class, 'store'])->name('borderos.store');
         Route::get('/{id}', [BorderoController::class, 'show'])->name('borderos.show');

@@ -45,3 +45,8 @@ if (config('senior.enabled', false)) {
         ->dailyAt('03:30')
         ->withoutOverlapping();
 }
+
+// Borderôs automáticos — gera rascunhos diariamente às 6h (config em /financeiro/borderos/automatico).
+Schedule::command('borderos:auto-generate --scheduled')
+    ->dailyAt('06:00')
+    ->withoutOverlapping();

@@ -37,4 +37,9 @@ Thumbs.db
 .codex
 *.log
 infra/vpn/auth.txt
+infra/legado/.env
+infra/legado/.env.local
+infra/legado/node_modules
+infra/legado/exports/
+infra/legado/backups/
 app/nohup.out

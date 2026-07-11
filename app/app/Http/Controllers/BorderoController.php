@@ -64,6 +64,7 @@ class BorderoController extends Controller
             ),
             'statusOptions' => Bordero::STATUS_LABELS,
             'noBranchAccess' => $scope['no_branch_access'],
+            'canManageAuto' => $user->hasPermission('financeiro.borderos.automatico_gerenciar'),
         ]);
     }
 
