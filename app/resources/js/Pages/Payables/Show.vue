@@ -9,6 +9,7 @@ import FileUpload from 'primevue/fileupload'
 import Dialog from 'primevue/dialog'
 import ApprovalFlowPreview from '@/Components/Financeiro/ApprovalFlowPreview.vue'
 import Select from 'primevue/select'
+import InputText from 'primevue/inputtext'
 import DatePicker from 'primevue/datepicker'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
@@ -407,6 +408,16 @@ function submitPriority() {
         .post(`/financeiro/contas-pagar/${props.payable.id}/prioridade`, { preserveScroll: true })
 }
 
+const nicknameForm = useForm({
+    nickname: props.payable.nickname || '',
+})
+
+function submitNickname() {
+    nicknameForm
+        .transform(data => ({ nickname: data.nickname?.trim() || null }))
+        .post(`/financeiro/contas-pagar/${props.payable.id}/apelido`, { preserveScroll: true })
+}
+
 const slaAlertClass = computed(() => {
     if (props.payable.sla_status === 'overdue') return 'text-red-600'
     if (props.payable.sla_status === 'warning') return 'text-amber-600'
@@ -445,6 +456,26 @@ const slaAlertClass = computed(() => {
                             <i class="pi pi-pencil text-xs"></i>
                         </button>
                     </p>
+                    <div class="mt-2 flex flex-wrap items-center gap-2 max-w-xl">
+                        <label class="text-xs text-gray-500 shrink-0" for="payable-nickname">Apelido:</label>
+                        <InputText
+                            id="payable-nickname"
+                            v-model="nicknameForm.nickname"
+                            class="flex-1 min-w-[180px] !text-sm"
+                            placeholder="Ex: Energia jul, Aluguel filial 2"
+                            dusk="payable-nickname-input"
+                        />
+                        <Button
+                            label="Salvar"
+                            size="small"
+                            severity="secondary"
+                            outlined
+                            :loading="nicknameForm.processing"
+                            :disabled="nicknameForm.nickname === (payable.nickname || '')"
+                            dusk="payable-nickname-save"
+                            @click="submitNickname"
+                        />
+                    </div>
                 </div>
                 <p class="text-xl font-bold text-gray-800">{{ formatMoney(payable.amount) }}</p>
             </div>

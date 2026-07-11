@@ -26,6 +26,8 @@ export const PAYABLE_SORT_GROUPS = [
         items: [
             { label: 'Nº título — crescente', value: 'title_number:asc' },
             { label: 'Nº título — decrescente', value: 'title_number:desc' },
+            { label: 'Apelido — A → Z', value: 'nickname:asc' },
+            { label: 'Apelido — Z → A', value: 'nickname:desc' },
             { label: 'Fornecedor — A → Z', value: 'supplier_name:asc' },
             { label: 'Fornecedor — Z → A', value: 'supplier_name:desc' },
             { label: 'Empresa — A → Z', value: 'codemp:asc' },

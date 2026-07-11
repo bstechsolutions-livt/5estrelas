@@ -47,6 +47,7 @@ class Payable extends Model
     public const WORKFLOW_FIELDS = [
         'status', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'department_id',
+        'nickname',
         'paid_at', 'payment_method', 'paid_by',
         'payment_priority', 'payment_sla_date', 'priority_set_by', 'priority_set_at',
         'conciliated_at', 'conciliated_by', 'conciliation_notes', 'divergence_reason',
@@ -127,7 +128,7 @@ class Payable extends Model
     }
 
     protected $fillable = [
-        'title_number', 'supplier_name', 'supplier_cnpj', 'amount',
+        'title_number', 'nickname', 'supplier_name', 'supplier_cnpj', 'amount',
         'due_date', 'issue_date', 'description', 'category', 'status',
         'branch_id', 'department_id', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'senior_id',

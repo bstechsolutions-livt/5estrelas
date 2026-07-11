@@ -182,7 +182,10 @@ Route::middleware('auth')->group(function () {
     // Financeiro - Contas a Pagar
     Route::prefix('financeiro/contas-pagar')->middleware('permission:financeiro.contas_pagar.visualizar')->group(function () {
         Route::get('/', [PayableController::class, 'index'])->name('payables.index');
+        Route::get('/lote', [PayableController::class, 'batch'])->name('payables.batch');
+        Route::post('/lote/apelidos', [PayableController::class, 'batchUpdateNicknames'])->name('payables.batch_nicknames');
         Route::get('/{id}', [PayableController::class, 'show'])->whereNumber('id')->name('payables.show');
+        Route::post('/{id}/apelido', [PayableController::class, 'updateNickname'])->whereNumber('id')->name('payables.nickname');
         Route::post('/{id}/comentarios', [PayableController::class, 'addComment'])->name('payables.comment');
         Route::post('/{id}/documentos', [PayableController::class, 'addDocument'])->name('payables.document');
         Route::delete('/{payableId}/documentos/{docId}', [PayableController::class, 'removeDocument'])->name('payables.document.remove');

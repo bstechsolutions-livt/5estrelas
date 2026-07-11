@@ -328,9 +328,13 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
 <template>
     <AppLayout>
         <div class="max-w-7xl mx-auto">
-            <div class="mb-6">
-                <h1 class="text-2xl font-bold text-gray-800">Contas a Pagar</h1>
-                <p class="text-sm text-gray-500 mt-1">Gerencie títulos, anexe documentos e envie para aprovação.</p>
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Contas a Pagar</h1>
+                    <p class="text-sm text-gray-500 mt-1">Gerencie títulos, anexe documentos e envie para aprovação.</p>
+                </div>
+                <Button label="Visão em lote" icon="pi pi-table" severity="secondary" outlined size="small" class="shrink-0"
+                    @click="router.get('/financeiro/contas-pagar/lote', currentFilters())" />
             </div>
 
             <BranchAccessBlocked v-if="noBranchAccess" />
@@ -423,7 +427,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                         <div class="md:col-span-5">
                             <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
-                            <InputText v-model="search" placeholder="Fornecedor ou título" class="w-full" @keyup.enter="applyFilters" />
+                            <InputText v-model="search" placeholder="Fornecedor, título ou apelido" class="w-full" @keyup.enter="applyFilters" />
                         </div>
                         <div class="md:col-span-3">
                             <label class="block text-xs font-medium text-gray-500 mb-1">Empresa</label>
@@ -583,12 +587,18 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span class="cell-truncate text-xs text-gray-600" :title="data.department_nome" @click="goShow(data.id)">{{ data.department_nome || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '22%' : '18%' }" sortable>
+                    <Column field="nickname" header="Apelido" style="width: 10%" sortable>
+                        <template #body="{ data }">
+                            <span class="cell-truncate text-xs font-medium text-gray-800" :title="data.nickname"
+                                @click="goShow(data.id)">{{ data.nickname || '—' }}</span>
+                        </template>
+                    </Column>
+                    <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '18%' : '16%' }" sortable>
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs" :title="data.supplier_name" @click="goShow(data.id)">{{ data.supplier_name }}</span>
                         </template>
                     </Column>
-                    <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '22%' : '18%' }" sortable>
+                    <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '16%' : '14%' }" sortable>
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs text-gray-600" :title="data.description" @click="goShow(data.id)">{{ data.description || '—' }}</span>
                         </template>

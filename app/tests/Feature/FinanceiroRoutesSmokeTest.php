@@ -30,6 +30,11 @@ class FinanceiroRoutesSmokeTest extends TestCase
         $this->actingAs($this->admin())->get('/financeiro/contas-pagar')->assertOk();
     }
 
+    public function test_contas_pagar_lote(): void
+    {
+        $this->actingAs($this->admin())->get('/financeiro/contas-pagar/lote')->assertOk();
+    }
+
     public function test_contas_pagar_show(): void
     {
         $p = Payable::create(['title_number' => 'T1', 'supplier_name' => 'F', 'amount' => 100, 'due_date' => now()->toDateString(), 'status' => 'pendente']);

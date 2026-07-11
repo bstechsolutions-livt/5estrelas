@@ -27,18 +27,134 @@ class PayableController extends Controller
 {
     public function index(Request $request)
     {
+        $pageData = $this->resolvePayablesPageData($request, defaultPerPage: 20);
+
+        if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
+            return response()->json($pageData['payables']);
+        }
+
+        return Inertia::render('Payables/Index', $this->payablesIndexProps($request, $pageData));
+    }
+
+    public function batch(Request $request)
+    {
+        $pageData = $this->resolvePayablesPageData($request, defaultPerPage: 50);
+
+        return Inertia::render('Payables/Batch', $this->payablesIndexProps($request, $pageData));
+    }
+
+    public function updateNickname(Request $request, int $id)
+    {
+        $payable = $this->findPayableForUser($id);
+        $user = $request->user();
+
+        $data = $request->validate([
+            'nickname' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $nickname = filled($data['nickname'] ?? null) ? trim($data['nickname']) : null;
+        $old = $payable->nickname;
+        $payable->update(['nickname' => $nickname]);
+
+        if ($old !== $nickname) {
+            AuditLogger::log(
+                event: 'contas_pagar.apelido_atualizado',
+                module: 'financeiro.contas_pagar',
+                description: $nickname
+                    ? "Apelido do título {$payable->title_number} definido como \"{$nickname}\""
+                    : "Apelido removido do título {$payable->title_number}",
+                auditable: $payable,
+                oldValues: ['nickname' => $old],
+                newValues: ['nickname' => $nickname],
+            );
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true, 'nickname' => $nickname]);
+        }
+
+        return back()->with('success', $nickname ? 'Apelido salvo.' : 'Apelido removido.');
+    }
+
+    public function batchUpdateNicknames(Request $request)
+    {
+        $data = $request->validate([
+            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items.*.id' => ['required', 'integer'],
+            'items.*.nickname' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $updated = 0;
+
+        foreach ($data['items'] as $item) {
+            $payable = $this->findPayableForUser((int) $item['id']);
+            $nickname = filled($item['nickname'] ?? null) ? trim($item['nickname']) : null;
+
+            if ($payable->nickname === $nickname) {
+                continue;
+            }
+
+            $payable->update(['nickname' => $nickname]);
+            $updated++;
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true, 'updated' => $updated]);
+        }
+
+        return back()->with('success', $updated > 0
+            ? "{$updated} apelido(s) atualizado(s)."
+            : 'Nenhuma alteração para salvar.');
+    }
+
+    /** @return array<string, mixed> */
+    private function payablesIndexProps(Request $request, array $pageData): array
+    {
+        $user = $request->user();
+        $branchScope = app(PayableBranchScope::class)->resolve($user);
+
+        return [
+            'payables' => $pageData['payables'],
+            'totals' => $pageData['totals'],
+            'filters' => array_merge(
+                $request->only(['search', 'due_from', 'due_to', 'codemp', 'branch_id', 'amount_min', 'amount_max', 'payment_priority', 'sort', 'dir', 'per_page']),
+                [
+                    'status' => $pageData['status'],
+                    'department_id' => $pageData['departmentContext']['department_id'],
+                ],
+            ),
+            'empresas' => app(PayableBranchScope::class)->empresaOptionsForUser($user),
+            'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'branches' => Branch::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
+            'statusOptions' => Payable::STATUS_LABELS,
+            'canChangeDepartmentFilter' => $pageData['departmentContext']['can_change'],
+            'lockedDepartment' => $pageData['departmentContext']['locked_department'],
+            'lockedBranches' => $branchScope['locked_branches'],
+            'noBranchAccess' => $branchScope['no_branch_access'],
+            'canManageClassification' => $user?->hasPermission('financeiro.contas_pagar.classificacao_gerenciar') ?? false,
+            'priorityOptions' => Payable::PRIORITY_LABELS,
+        ];
+    }
+
+    /**
+     * @return array{
+     *   payables: \Illuminate\Contracts\Pagination\LengthAwarePaginator,
+     *   status: string,
+     *   departmentContext: array{department_id: ?int, can_change: bool, locked_department: ?array},
+     *   totals: \Illuminate\Support\Collection
+     * }
+     */
+    private function resolvePayablesPageData(Request $request, int $defaultPerPage = 20): array
+    {
         $user = $request->user();
         $departmentContext = $this->resolveDepartmentFilter($request);
-        $branchScope = app(PayableBranchScope::class)->resolve($user);
 
         $query = Payable::query()
             ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number']);
 
-        // Sempre filtra por um status (default: pendente). Não existe "ver todos".
         $status = $request->input('status') ?: 'pendente';
         $query->where('status', $status);
 
-        // Título em borderô não aparece nos pendentes — o agrupamento é feito pelo borderô.
         if ($status === 'pendente') {
             $query->whereNull('bordero_id');
         }
@@ -47,6 +163,7 @@ class PayableController extends Controller
             $query->where(function ($q) use ($s) {
                 $q->where('supplier_name', 'ilike', "%{$s}%")
                     ->orWhere('title_number', 'ilike', "%{$s}%")
+                    ->orWhere('nickname', 'ilike', "%{$s}%")
                     ->orWhere('description', 'ilike', "%{$s}%");
             });
         }
@@ -59,7 +176,6 @@ class PayableController extends Controller
         if ($request->filled('codemp')) {
             $query->where('codemp', (int) $request->codemp);
         } elseif ($request->filled('branch_id')) {
-            // Compat: filtro antigo por branch_id (payables Senior usam codemp).
             $query->where('branch_id', $request->branch_id);
         }
         if ($request->filled('amount_min')) {
@@ -79,9 +195,8 @@ class PayableController extends Controller
         app(PayableBranchScope::class)->applyFilter($query, $user);
         $this->applyPayablesOrdering($query, $request->input('sort'), $request->input('dir'));
 
-        $payables = $query->paginate($request->input('per_page', 20))->withQueryString();
+        $payables = $query->paginate($request->input('per_page', $defaultPerPage))->withQueryString();
 
-        // A3: resolve o NOME da empresa (nunca código) para cada título da página.
         Payable::attachEmpresaNome($payables->getCollection());
         Payable::attachFilialNome($payables->getCollection());
         Payable::attachDepartmentNome($payables->getCollection());
@@ -89,11 +204,6 @@ class PayableController extends Controller
         Payable::attachOrigemHub($payables->getCollection());
         Payable::attachPriorityMeta($payables->getCollection());
 
-        if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
-            return response()->json($payables);
-        }
-
-        // Totais por status (pendente em borderô não entra na aba Pendentes)
         $totalsQuery = Payable::query()
             ->where(function ($q) {
                 $q->where('status', '!=', 'pendente')
@@ -107,29 +217,12 @@ class PayableController extends Controller
             ->get()
             ->keyBy('status');
 
-        $effectiveDepartmentId = $departmentContext['department_id'];
-
-        return Inertia::render('Payables/Index', [
+        return [
             'payables' => $payables,
+            'status' => $status,
+            'departmentContext' => $departmentContext,
             'totals' => $totals,
-            'filters' => array_merge(
-                $request->only(['search', 'due_from', 'due_to', 'codemp', 'branch_id', 'amount_min', 'amount_max', 'payment_priority', 'sort', 'dir']),
-                [
-                    'status' => $status,
-                    'department_id' => $effectiveDepartmentId,
-                ],
-            ),
-            'empresas' => app(PayableBranchScope::class)->empresaOptionsForUser($user),
-            'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'branches' => Branch::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
-            'statusOptions' => Payable::STATUS_LABELS,
-            'canChangeDepartmentFilter' => $departmentContext['can_change'],
-            'lockedDepartment' => $departmentContext['locked_department'],
-            'lockedBranches' => $branchScope['locked_branches'],
-            'noBranchAccess' => $branchScope['no_branch_access'],
-            'canManageClassification' => $user?->hasPermission('financeiro.contas_pagar.classificacao_gerenciar') ?? false,
-            'priorityOptions' => Payable::PRIORITY_LABELS,
-        ]);
+        ];
     }
 
     /** @return array{department_id: ?int, can_change: bool, locked_department: ?array{id:int,name:string}} */
@@ -175,6 +268,7 @@ class PayableController extends Controller
             'amount',
             'supplier_name',
             'title_number',
+            'nickname',
             'description',
             'payment_sla_date',
             'payment_priority',

@@ -141,14 +141,17 @@ class SearchController extends Controller
             $payables = \App\Models\Payable::query()
                 ->where(function ($qq) use ($q) {
                     $qq->where('supplier_name', 'ilike', "%{$q}%")
-                        ->orWhere('title_number', 'ilike', "%{$q}%");
+                        ->orWhere('title_number', 'ilike', "%{$q}%")
+                        ->orWhere('nickname', 'ilike', "%{$q}%");
                 })
                 ->limit(5)
-                ->get(['id', 'supplier_name', 'title_number', 'amount', 'status'])
+                ->get(['id', 'supplier_name', 'title_number', 'nickname', 'amount', 'status'])
                 ->map(fn ($p) => [
                     'id' => $p->id,
-                    'title' => $p->supplier_name,
-                    'subtitle' => ($p->title_number ?? '') . ' · R$ ' . number_format($p->amount, 2, ',', '.'),
+                    'title' => $p->nickname ?: $p->supplier_name,
+                    'subtitle' => ($p->title_number ?? '')
+                        . ($p->nickname ? ' · ' . $p->nickname : '')
+                        . ' · R$ ' . number_format($p->amount, 2, ',', '.'),
                     'icon' => 'pi pi-wallet',
                     'href' => "/financeiro/contas-pagar/{$p->id}",
                 ]);
