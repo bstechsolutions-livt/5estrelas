@@ -11,6 +11,7 @@ import Tag from 'primevue/tag'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
 import { formatApiDate } from '@/utils/apiDate'
+import { PAYABLE_SORT_OPTIONS, sortQueryFromValue, sortValueFromQuery } from '@/composables/usePayableSort'
 
 const props = defineProps({
     payables: Object,
@@ -47,6 +48,7 @@ const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_ma
 const paymentPriority = ref(props.filters?.payment_priority || null)
 const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
+const sortValue = ref(sortValueFromQuery(props.filters?.sort, props.filters?.dir))
 const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange, presetChipClass } = useDueDatePresets(dueFrom, dueTo)
 
 const statusList = [
@@ -86,6 +88,7 @@ function currentFilters() {
         payment_priority: paymentPriority.value || undefined,
         due_from: dueFrom.value || undefined,
         due_to: dueTo.value || undefined,
+        ...sortQueryFromValue(sortValue.value),
     }
 }
 
@@ -138,6 +141,7 @@ onMounted(() => {
                 amountMin.value = f.amount_min ? Number(f.amount_min) : null
                 amountMax.value = f.amount_max ? Number(f.amount_max) : null
                 paymentPriority.value = f.payment_priority || null
+                sortValue.value = sortValueFromQuery(f.sort, f.dir)
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
                 onDueDateManualChange()
@@ -145,6 +149,7 @@ onMounted(() => {
                 const differs = status.value !== serverStatus || f.search || f.codemp
                     || (props.canChangeDepartmentFilter && f.department_id)
                     || f.amount_min || f.amount_max || f.payment_priority || f.due_from || f.due_to
+                    || (f.sort && f.sort !== 'default')
                 setTimeout(() => { restoring = false }, 400)
                 if (differs) applyFilters()
             } catch (e) { restoring = false }
@@ -166,6 +171,7 @@ function clearFilters() {
     amountMin.value = null
     amountMax.value = null
     paymentPriority.value = null
+    sortValue.value = 'default'
     dueFrom.value = ''
     dueTo.value = ''
     clearDuePreset()
@@ -434,6 +440,17 @@ const currentTotal = computed(() => {
                         option-label="label"
                         option-value="value"
                         placeholder="Todas"
+                        class="w-full"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Ordenar por</label>
+                    <Select
+                        v-model="sortValue"
+                        :options="PAYABLE_SORT_OPTIONS"
+                        option-label="label"
+                        option-value="value"
                         class="w-full"
                     />
                 </div>

@@ -32,10 +32,7 @@ class PayableController extends Controller
         $branchScope = app(PayableBranchScope::class)->resolve($user);
 
         $query = Payable::query()
-            ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number'])
-            ->orderByRaw("CASE COALESCE(payment_priority, '') WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END")
-            ->orderBy('payment_sla_date')
-            ->orderByDesc('due_date');
+            ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number']);
 
         // Sempre filtra por um status (default: pendente). Não existe "ver todos".
         $status = $request->input('status') ?: 'pendente';
@@ -80,6 +77,7 @@ class PayableController extends Controller
         }
         $this->applyDepartmentScope($query, $departmentContext['department_id']);
         app(PayableBranchScope::class)->applyFilter($query, $user);
+        $this->applyPayablesOrdering($query, $request->input('sort'), $request->input('dir'));
 
         $payables = $query->paginate($request->input('per_page', 20))->withQueryString();
 
@@ -115,7 +113,7 @@ class PayableController extends Controller
             'payables' => $payables,
             'totals' => $totals,
             'filters' => array_merge(
-                $request->only(['search', 'due_from', 'due_to', 'codemp', 'branch_id', 'amount_min', 'amount_max', 'payment_priority']),
+                $request->only(['search', 'due_from', 'due_to', 'codemp', 'branch_id', 'amount_min', 'amount_max', 'payment_priority', 'sort', 'dir']),
                 [
                     'status' => $status,
                     'department_id' => $effectiveDepartmentId,
@@ -168,6 +166,42 @@ class PayableController extends Controller
         if ($departmentId) {
             app(PayableDepartmentClassifier::class)->applyDepartmentFilter($query, $departmentId);
         }
+    }
+
+    private function applyPayablesOrdering(\Illuminate\Database\Eloquent\Builder $query, ?string $sort, ?string $dir): void
+    {
+        $allowed = [
+            'due_date',
+            'amount',
+            'supplier_name',
+            'title_number',
+            'payment_sla_date',
+            'payment_priority',
+            'department_id',
+            'codemp',
+        ];
+
+        if (empty($sort) || $sort === 'default' || ! in_array($sort, $allowed, true)) {
+            $query->orderByRaw("CASE COALESCE(payment_priority, '') WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END")
+                ->orderBy('payment_sla_date')
+                ->orderByDesc('due_date');
+
+            return;
+        }
+
+        $direction = strtolower((string) $dir) === 'asc' ? 'asc' : 'desc';
+
+        if ($sort === 'payment_priority') {
+            if ($direction === 'desc') {
+                $query->orderByRaw("CASE COALESCE(payment_priority, '') WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END DESC");
+            } else {
+                $query->orderByRaw("CASE COALESCE(payment_priority, '') WHEN '' THEN 1 WHEN 'normal' THEN 2 WHEN 'alta' THEN 3 WHEN 'urgente' THEN 4 ELSE 5 END");
+            }
+
+            return;
+        }
+
+        $query->orderBy($sort, $direction);
     }
 
     private function findPayableForUser(int $id, ?User $user = null): Payable

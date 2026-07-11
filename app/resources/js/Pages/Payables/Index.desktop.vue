@@ -14,6 +14,13 @@ import DatePicker from 'primevue/datepicker'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
 import { formatApiDate } from '@/utils/apiDate'
+import {
+    PAYABLE_SORT_OPTIONS,
+    sortQueryFromValue,
+    sortValueFromQuery,
+    sortValueFromTable,
+    tableSortState,
+} from '@/composables/usePayableSort'
 
 const props = defineProps({
     payables: Object,
@@ -49,7 +56,11 @@ const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_ma
 const paymentPriority = ref(props.filters?.payment_priority || null)
 const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
+const sortValue = ref(sortValueFromQuery(props.filters?.sort, props.filters?.dir))
 const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange, presetChipClass } = useDueDatePresets(dueFrom, dueTo)
+
+const tableSortField = computed(() => tableSortState(sortValue.value).field)
+const tableSortOrder = computed(() => tableSortState(sortValue.value).order)
 
 function selectDuePreset(key) {
     applyDuePreset(key)
@@ -94,6 +105,7 @@ function currentFilters() {
         payment_priority: paymentPriority.value || undefined,
         due_from: dueFrom.value || undefined,
         due_to: dueTo.value || undefined,
+        ...sortQueryFromValue(sortValue.value),
     }
 }
 
@@ -140,6 +152,7 @@ function clearFilters() {
     amountMin.value = ''
     amountMax.value = ''
     paymentPriority.value = null
+    sortValue.value = 'default'
     dueFrom.value = ''
     dueTo.value = ''
     clearDuePreset()
@@ -148,18 +161,15 @@ function clearFilters() {
 
 function onPage(event) {
     router.get('/financeiro/contas-pagar', {
-        search: search.value || undefined,
-        status: status.value || undefined,
-        codemp: codemp.value || undefined,
-        department_id: departmentId.value || undefined,
-        amount_min: amountMin.value || undefined,
-        amount_max: amountMax.value || undefined,
-        payment_priority: paymentPriority.value || undefined,
-        due_from: dueFrom.value || undefined,
-        due_to: dueTo.value || undefined,
+        ...currentFilters(),
         page: event.page + 1,
         per_page: event.rows,
     }, { preserveState: true, replace: true })
+}
+
+function onTableSort(event) {
+    sortValue.value = sortValueFromTable(event.sortField, event.sortOrder)
+    applyFilters()
 }
 
 // Restaura scroll ao voltar do detalhe + filtros do cache em visita "limpa"
@@ -185,6 +195,7 @@ onMounted(() => {
                 amountMin.value = f.amount_min ? Number(f.amount_min) : null
                 amountMax.value = f.amount_max ? Number(f.amount_max) : null
                 paymentPriority.value = f.payment_priority || null
+                sortValue.value = sortValueFromQuery(f.sort, f.dir)
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
                 onDueDateManualChange()
@@ -192,6 +203,7 @@ onMounted(() => {
                 const differs = status.value !== serverStatus || f.search || f.codemp
                     || (props.canChangeDepartmentFilter && f.department_id)
                     || f.amount_min || f.amount_max || f.payment_priority || f.due_from || f.due_to
+                    || (f.sort && f.sort !== 'default')
                 if (differs) {
                     applyFilters()
                     return
@@ -373,6 +385,18 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </div>
                 </div>
 
+                <div class="mt-4 max-w-md">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Ordenar por</label>
+                    <Select
+                        v-model="sortValue"
+                        :options="PAYABLE_SORT_OPTIONS"
+                        option-label="label"
+                        option-value="value"
+                        class="w-full"
+                        @change="applyFilters"
+                    />
+                </div>
+
                 <div class="mt-4 pt-4 border-t border-dashed border-gray-200 rounded-lg bg-slate-50/80 px-3 py-3 space-y-3">
                     <p class="text-xs font-semibold text-gray-600">Período de vencimento</p>
 
@@ -452,7 +476,10 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     table-style="table-layout: fixed; width: 100%"
                     :lazy="true" :paginator="true" :rows="payables.per_page" :total-records="payables.total"
                     :first="(payables.current_page - 1) * payables.per_page"
+                    :sort-field="tableSortField"
+                    :sort-order="tableSortOrder"
                     @page="onPage"
+                    @sort="onTableSort"
                     paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
                     :rows-per-page-options="[20, 50, 100]"
                 >
@@ -461,7 +488,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <input type="checkbox" :checked="isSelected(data.id)" @click.stop="toggleSelect(data.id)" class="w-4 h-4 cursor-pointer" />
                         </template>
                     </Column>
-                    <Column field="title_number" header="Nº" style="width: 7%">
+                    <Column field="title_number" header="Nº" style="width: 7%" sortable>
                         <template #body="{ data }">
                             <div class="flex flex-col items-start gap-0.5 py-0.5 min-w-0" @click="goShow(data.id)">
                                 <span class="text-xs font-medium whitespace-nowrap leading-none" :title="data.title_number">{{ data.title_number }}</span>
@@ -500,7 +527,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span class="cell-truncate text-xs text-gray-600" :title="data.department_nome" @click="goShow(data.id)">{{ data.department_nome || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '22%' : '18%' }">
+                    <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '22%' : '18%' }" sortable>
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs" :title="data.supplier_name" @click="goShow(data.id)">{{ data.supplier_name }}</span>
                         </template>
@@ -510,12 +537,12 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span class="cell-truncate text-xs text-gray-600" :title="data.description" @click="goShow(data.id)">{{ data.description || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="amount" header="Valor" style="width: 10%">
+                    <Column field="amount" header="Valor" style="width: 10%" sortable>
                         <template #body="{ data }">
                             <span class="text-xs font-semibold whitespace-nowrap" @click="goShow(data.id)">{{ formatMoney(data.amount) }}</span>
                         </template>
                     </Column>
-                    <Column field="due_date" header="Vencimento" style="width: 8%">
+                    <Column field="due_date" header="Vencimento" style="width: 8%" sortable>
                         <template #body="{ data }">
                             <span class="text-xs whitespace-nowrap" @click="goShow(data.id)">{{ formatDate(data.due_date) }}</span>
                         </template>
