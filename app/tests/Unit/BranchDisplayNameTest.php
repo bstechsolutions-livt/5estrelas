@@ -115,4 +115,42 @@ class BranchDisplayNameTest extends TestCase
 
         $this->assertSame('APELIDO B', $branch->resolveDisplayName());
     }
+
+    public function test_empresa_distinta_sem_sufixo_regional(): void
+    {
+        Filial::create([
+            'cod_emp' => 5,
+            'cod_fil' => 1,
+            'senior_id' => '5-1',
+            'nome' => '5 ESTRELAS REFEICOES COLETIVAS',
+            'fantasia' => 'REFEICOES',
+            'apelido' => 'REFEICOES',
+            'ativo' => true,
+        ]);
+
+        Filial::create([
+            'cod_emp' => 6,
+            'cod_fil' => 1,
+            'senior_id' => '6-1',
+            'nome' => '5 ESTRELAS SERVICOS ESPECIALIZADOS',
+            'fantasia' => 'SRV ESPEC',
+            'apelido' => 'SRV ESPEC',
+            'ativo' => true,
+        ]);
+
+        $refeicoes = Branch::create([
+            'name' => '5 ESTRELAS REFEIÇÕES COLETIVAS EIRELI',
+            'code' => '22',
+            'is_active' => true,
+        ]);
+
+        $srvEspec = Branch::create([
+            'name' => '5 ESTRELAS SERVIÇOS ESPECIALIZADOS',
+            'code' => '24',
+            'is_active' => true,
+        ]);
+
+        $this->assertSame('REFEICOES', $refeicoes->resolveDisplayName());
+        $this->assertSame('SRV ESPEC', $srvEspec->resolveDisplayName());
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Str;
 
 class Branch extends Model
 {
@@ -123,7 +124,7 @@ class Branch extends Model
      */
     private function matchComercialFilialByBranchName(\Illuminate\Support\Collection $filiais): ?\App\Models\Comercial\Filial
     {
-        $name = mb_strtoupper($this->name);
+        $name = $this->normalizeForMatch($this->name);
         $best = null;
         $bestLen = 0;
 
@@ -133,7 +134,7 @@ class Branch extends Model
                     continue;
                 }
 
-                $normalized = mb_strtoupper(preg_replace('/\s+/', ' ', trim($candidate)) ?? '');
+                $normalized = $this->normalizeForMatch($candidate);
                 if ($normalized === '' || ! str_contains($name, $normalized)) {
                     continue;
                 }
@@ -146,6 +147,11 @@ class Branch extends Model
         }
 
         return $best;
+    }
+
+    private function normalizeForMatch(string $text): string
+    {
+        return mb_strtoupper(preg_replace('/\s+/', ' ', trim(Str::ascii($text))) ?? '');
     }
 
     private function normalizedCnpj(): ?string
