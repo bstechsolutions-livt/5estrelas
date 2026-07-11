@@ -27,6 +27,19 @@ class PayableDepartamentoFiltroTest extends TestCase
         return $user;
     }
 
+    private function userComTodosDepartamentos(): User
+    {
+        $user = $this->activeUser();
+        $user->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.ver_todos_departamentos'],
+                ['label' => 'Ver todos deptos', 'module' => 'financeiro'],
+            )->id,
+        );
+
+        return $user;
+    }
+
     private function makePayable(array $attrs = []): Payable
     {
         return Payable::create(array_merge([
@@ -102,7 +115,7 @@ class PayableDepartamentoFiltroTest extends TestCase
             'description' => 'Material de escritorio',
         ]);
 
-        $resp = $this->actingAs($this->activeUser())
+        $resp = $this->actingAs($this->userComTodosDepartamentos())
             ->withHeaders(['X-Json-Only' => '1'])
             ->get("/financeiro/contas-pagar?status=pendente&department_id={$dept->id}")
             ->assertOk();
@@ -129,7 +142,7 @@ class PayableDepartamentoFiltroTest extends TestCase
             'description' => 'GFD JULHO',
         ]);
 
-        $resp = $this->actingAs($this->activeUser())
+        $resp = $this->actingAs($this->userComTodosDepartamentos())
             ->withHeaders(['X-Json-Only' => '1'])
             ->get("/financeiro/contas-pagar?status=pendente&department_id={$dept->id}")
             ->assertOk();
@@ -157,5 +170,65 @@ class PayableDepartamentoFiltroTest extends TestCase
 
         $this->assertNotNull($row);
         $this->assertSame('DP / RH', $row['department_nome']);
+    }
+
+    public function test_usuario_sem_permissao_ve_apenas_seu_departamento(): void
+    {
+        $dept = $this->dpRhDepartment();
+        $this->financeiroDepartment();
+
+        $user = User::factory()->create(['is_active' => true, 'department_id' => $dept->id]);
+        $user->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.visualizar'],
+                ['label' => 'Visualizar CP', 'module' => 'financeiro'],
+            )->id,
+        );
+
+        $this->makePayable(['supplier_name' => 'DoDpRh', 'description' => 'GFD JULHO']);
+        $this->makePayable(['supplier_name' => 'DoFinanceiro', 'description' => 'TAXA SERASA']);
+
+        $resp = $this->actingAs($user)
+            ->withHeaders(['X-Json-Only' => '1'])
+            ->get('/financeiro/contas-pagar?status=pendente')
+            ->assertOk();
+
+        $names = collect($resp->json('data'))->pluck('supplier_name')->all();
+
+        $this->assertContains('DoDpRh', $names);
+        $this->assertNotContains('DoFinanceiro', $names);
+    }
+
+    public function test_usuario_com_permissao_ver_todos_pode_filtrar_outro_departamento(): void
+    {
+        $dept = $this->financeiroDepartment();
+        $this->dpRhDepartment();
+
+        $user = User::factory()->create(['is_active' => true, 'department_id' => $dept->id]);
+        $user->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.ver_todos_departamentos'],
+                ['label' => 'Ver todos deptos', 'module' => 'financeiro'],
+            )->id,
+        );
+        $user->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.visualizar'],
+                ['label' => 'Visualizar CP', 'module' => 'financeiro'],
+            )->id,
+        );
+
+        $this->makePayable(['supplier_name' => 'DoDpRh', 'description' => 'GFD JULHO']);
+        $this->makePayable(['supplier_name' => 'DoFinanceiro', 'description' => 'TAXA SERASA']);
+
+        $resp = $this->actingAs($user)
+            ->withHeaders(['X-Json-Only' => '1'])
+            ->get("/financeiro/contas-pagar?status=pendente&department_id={$dept->id}")
+            ->assertOk();
+
+        $names = collect($resp->json('data'))->pluck('supplier_name')->all();
+
+        $this->assertContains('DoFinanceiro', $names);
+        $this->assertNotContains('DoDpRh', $names);
     }
 }

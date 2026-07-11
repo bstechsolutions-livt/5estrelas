@@ -24,6 +24,9 @@ class PayableController extends Controller
 {
     public function index(Request $request)
     {
+        $user = $request->user();
+        $departmentContext = $this->resolveDepartmentFilter($request);
+
         $query = Payable::query()
             ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number'])
             ->orderByDesc('due_date');
@@ -62,12 +65,7 @@ class PayableController extends Controller
         if ($request->filled('amount_max')) {
             $query->where('amount', '<=', (float) $request->amount_max);
         }
-        if ($request->filled('department_id')) {
-            app(PayableDepartmentClassifier::class)->applyDepartmentFilter(
-                $query,
-                (int) $request->department_id,
-            );
-        }
+        $this->applyDepartmentScope($query, $departmentContext['department_id']);
 
         $payables = $query->paginate($request->input('per_page', 20))->withQueryString();
 
@@ -81,28 +79,74 @@ class PayableController extends Controller
         }
 
         // Totais por status (pendente em borderô não entra na aba Pendentes)
-        $totals = Payable::query()
+        $totalsQuery = Payable::query()
             ->where(function ($q) {
                 $q->where('status', '!=', 'pendente')
                     ->orWhereNull('bordero_id');
-            })
+            });
+        $this->applyDepartmentScope($totalsQuery, $departmentContext['department_id']);
+        $totals = $totalsQuery
             ->selectRaw("status, count(*) as count, coalesce(sum(amount), 0) as total")
             ->groupBy('status')
             ->get()
             ->keyBy('status');
 
+        $effectiveDepartmentId = $departmentContext['department_id'];
+
         return Inertia::render('Payables/Index', [
             'payables' => $payables,
             'totals' => $totals,
             'filters' => array_merge(
-                $request->only(['search', 'due_from', 'due_to', 'codemp', 'branch_id', 'amount_min', 'amount_max', 'department_id']),
-                ['status' => $status],
+                $request->only(['search', 'due_from', 'due_to', 'codemp', 'branch_id', 'amount_min', 'amount_max']),
+                [
+                    'status' => $status,
+                    'department_id' => $effectiveDepartmentId,
+                ],
             ),
             'empresas' => ComercialFilial::selectOptions(),
             'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
             'statusOptions' => Payable::STATUS_LABELS,
+            'canChangeDepartmentFilter' => $departmentContext['can_change'],
+            'lockedDepartment' => $departmentContext['locked_department'],
+            'canManageClassification' => $user?->hasPermission('financeiro.contas_pagar.classificacao_gerenciar') ?? false,
         ]);
+    }
+
+    /** @return array{department_id: ?int, can_change: bool, locked_department: ?array{id:int,name:string}} */
+    private function resolveDepartmentFilter(Request $request): array
+    {
+        $user = $request->user();
+        $canChange = $user?->hasPermission('*')
+            || $user?->hasPermission('financeiro.contas_pagar.ver_todos_departamentos');
+
+        if ($canChange) {
+            $departmentId = $request->filled('department_id') ? (int) $request->department_id : null;
+
+            return [
+                'department_id' => $departmentId ?: null,
+                'can_change' => true,
+                'locked_department' => null,
+            ];
+        }
+
+        $departmentId = $user?->department_id ? (int) $user->department_id : null;
+        $locked = $departmentId
+            ? Department::whereKey($departmentId)->first(['id', 'name'])
+            : null;
+
+        return [
+            'department_id' => $departmentId,
+            'can_change' => false,
+            'locked_department' => $locked ? ['id' => $locked->id, 'name' => $locked->name] : null,
+        ];
+    }
+
+    private function applyDepartmentScope(\Illuminate\Database\Eloquent\Builder $query, ?int $departmentId): void
+    {
+        if ($departmentId) {
+            app(PayableDepartmentClassifier::class)->applyDepartmentFilter($query, $departmentId);
+        }
     }
 
     public function show(int $id, PayableAlcadaService $alcada)

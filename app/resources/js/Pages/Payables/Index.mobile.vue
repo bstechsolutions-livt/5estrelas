@@ -17,6 +17,9 @@ const props = defineProps({
     departments: Array,
     branches: Array,
     statusOptions: Object,
+    canChangeDepartmentFilter: { type: Boolean, default: true },
+    lockedDepartment: { type: Object, default: null },
+    canManageClassification: { type: Boolean, default: false },
 })
 
 const { can } = useAuth()
@@ -28,7 +31,11 @@ const search = ref(props.filters?.search || '')
 const status = ref(props.filters?.status || 'pendente')
 const filtersOpen = ref(false)
 const codemp = ref(props.filters?.codemp ? Number(props.filters.codemp) : null)
-const departmentId = ref(props.filters?.department_id ? Number(props.filters.department_id) : null)
+const departmentId = ref(
+    props.canChangeDepartmentFilter
+        ? (props.filters?.department_id ? Number(props.filters.department_id) : null)
+        : (props.lockedDepartment?.id ?? null),
+)
 const amountMin = ref(props.filters?.amount_min ? Number(props.filters.amount_min) : null)
 const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_max) : null)
 const dueFrom = ref(props.filters?.due_from || '')
@@ -108,13 +115,17 @@ onMounted(() => {
                 status.value = f.status === 'reprovado' ? 'pendente' : (f.status || 'pendente')
                 search.value = f.search || ''
                 codemp.value = f.codemp ? Number(f.codemp) : null
-                departmentId.value = f.department_id ? Number(f.department_id) : null
+                if (props.canChangeDepartmentFilter) {
+                    departmentId.value = f.department_id ? Number(f.department_id) : null
+                }
                 amountMin.value = f.amount_min ? Number(f.amount_min) : null
                 amountMax.value = f.amount_max ? Number(f.amount_max) : null
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
                 const serverStatus = props.filters?.status || 'pendente'
-                const differs = status.value !== serverStatus || f.search || f.codemp || f.department_id || f.amount_min || f.amount_max || f.due_from || f.due_to
+                const differs = status.value !== serverStatus || f.search || f.codemp
+                    || (props.canChangeDepartmentFilter && f.department_id)
+                    || f.amount_min || f.amount_max || f.due_from || f.due_to
                 setTimeout(() => { restoring = false }, 400)
                 if (differs) applyFilters()
             } catch (e) { restoring = false }
@@ -130,7 +141,9 @@ function applyAndClose() {
 function clearFilters() {
     search.value = ''
     codemp.value = null
-    departmentId.value = null
+    if (props.canChangeDepartmentFilter) {
+        departmentId.value = null
+    }
     amountMin.value = null
     amountMax.value = null
     dueFrom.value = ''
@@ -143,7 +156,7 @@ function clearFilters() {
 const activeFilterCount = computed(() => {
     let c = 0
     if (codemp.value) c++
-    if (departmentId.value) c++
+    if (props.canChangeDepartmentFilter && departmentId.value) c++
     if (amountMin.value) c++
     if (amountMax.value) c++
     if (dueFrom.value) c++
@@ -339,7 +352,25 @@ const currentTotal = computed(() => {
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Departamento</label>
-                    <Select v-model="departmentId" :options="departmentList" option-label="label" option-value="value" class="w-full" />
+                    <Select
+                        v-if="canChangeDepartmentFilter"
+                        v-model="departmentId"
+                        :options="departmentList"
+                        option-label="label"
+                        option-value="value"
+                        class="w-full"
+                    />
+                    <div v-else class="h-11 px-3 flex items-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-700">
+                        {{ lockedDepartment?.name || 'Sem departamento vinculado' }}
+                    </div>
+                    <p v-if="!canChangeDepartmentFilter" class="text-[11px] text-gray-400 mt-1">Somente títulos do seu departamento.</p>
+                    <a
+                        v-if="canManageClassification"
+                        href="/financeiro/contas-pagar/classificacao-departamentos"
+                        class="inline-block text-[11px] text-blue-600 mt-1"
+                    >
+                        Configurar regras →
+                    </a>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>

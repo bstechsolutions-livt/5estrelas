@@ -20,6 +20,9 @@ const props = defineProps({
     departments: Array,
     branches: Array,
     statusOptions: Object,
+    canChangeDepartmentFilter: { type: Boolean, default: true },
+    lockedDepartment: { type: Object, default: null },
+    canManageClassification: { type: Boolean, default: false },
 })
 
 const { can } = useAuth()
@@ -30,7 +33,11 @@ const STORAGE_KEY = 'payables_filters'
 const search = ref(props.filters?.search || '')
 const status = ref(props.filters?.status || 'pendente')
 const codemp = ref(props.filters?.codemp ? Number(props.filters.codemp) : null)
-const departmentId = ref(props.filters?.department_id ? Number(props.filters.department_id) : null)
+const departmentId = ref(
+    props.canChangeDepartmentFilter
+        ? (props.filters?.department_id ? Number(props.filters.department_id) : null)
+        : (props.lockedDepartment?.id ?? null),
+)
 const amountMin = ref(props.filters?.amount_min ? Number(props.filters.amount_min) : null)
 const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_max) : null)
 const dueFrom = ref(props.filters?.due_from || '')
@@ -85,14 +92,15 @@ function selectStatus(s) {
 }
 
 const hasActiveFilters = computed(() => {
-    return !!(search.value || codemp.value || departmentId.value || amountMin.value || amountMax.value || dueFrom.value || dueTo.value)
+    const deptActive = props.canChangeDepartmentFilter && departmentId.value
+    return !!(search.value || codemp.value || deptActive || amountMin.value || amountMax.value || dueFrom.value || dueTo.value)
 })
 
 const activeFilterCount = computed(() => {
     let c = 0
     if (search.value) c++
     if (codemp.value) c++
-    if (departmentId.value) c++
+    if (props.canChangeDepartmentFilter && departmentId.value) c++
     if (amountMin.value) c++
     if (amountMax.value) c++
     if (dueFrom.value) c++
@@ -103,7 +111,9 @@ const activeFilterCount = computed(() => {
 function clearFilters() {
     search.value = ''
     codemp.value = null
-    departmentId.value = null
+    if (props.canChangeDepartmentFilter) {
+        departmentId.value = null
+    }
     amountMin.value = ''
     amountMax.value = ''
     dueFrom.value = ''
@@ -143,13 +153,17 @@ onMounted(() => {
                 status.value = f.status === 'reprovado' ? 'pendente' : (f.status || 'pendente')
                 search.value = f.search || ''
                 codemp.value = f.codemp ? Number(f.codemp) : null
-                departmentId.value = f.department_id ? Number(f.department_id) : null
+                if (props.canChangeDepartmentFilter) {
+                    departmentId.value = f.department_id ? Number(f.department_id) : null
+                }
                 amountMin.value = f.amount_min ? Number(f.amount_min) : null
                 amountMax.value = f.amount_max ? Number(f.amount_max) : null
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
                 const serverStatus = props.filters?.status || 'pendente'
-                const differs = status.value !== serverStatus || f.search || f.codemp || f.department_id || f.amount_min || f.amount_max || f.due_from || f.due_to
+                const differs = status.value !== serverStatus || f.search || f.codemp
+                    || (props.canChangeDepartmentFilter && f.department_id)
+                    || f.amount_min || f.amount_max || f.due_from || f.due_to
                 if (differs) {
                     applyFilters()
                     return
@@ -263,8 +277,8 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
 
             <!-- Filtros -->
             <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4">
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="sm:col-span-2">
                         <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
                         <InputText v-model="search" placeholder="Fornecedor ou título" class="w-full" @keyup.enter="applyFilters" />
                     </div>
@@ -274,7 +288,27 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Departamento</label>
-                        <Select v-model="departmentId" :options="departmentList" option-label="label" option-value="value" placeholder="Todos" class="w-full" />
+                        <Select
+                            v-if="canChangeDepartmentFilter"
+                            v-model="departmentId"
+                            :options="departmentList"
+                            option-label="label"
+                            option-value="value"
+                            placeholder="Todos"
+                            class="w-full"
+                            @change="applyFilters"
+                        />
+                        <div v-else class="h-[38px] px-3 flex items-center rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-700">
+                            {{ lockedDepartment?.name || 'Sem departamento vinculado' }}
+                        </div>
+                        <p v-if="!canChangeDepartmentFilter" class="text-[11px] text-gray-400 mt-1">Exibindo apenas títulos do seu departamento.</p>
+                        <a
+                            v-if="canManageClassification"
+                            href="/financeiro/contas-pagar/classificacao-departamentos"
+                            class="inline-block text-[11px] text-blue-600 hover:underline mt-1"
+                        >
+                            Configurar regras de classificação →
+                        </a>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Valor mínimo</label>
@@ -293,14 +327,16 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                         <InputText v-model="dueTo" type="date" class="w-full" />
                     </div>
                 </div>
-                <div class="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-                    <span v-if="hasActiveFilters" class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                        {{ activeFilterCount }} filtro(s) ativo(s)
-                    </span>
-                    <span v-else class="text-xs text-gray-400">Nenhum filtro aplicado</span>
-                    <div class="flex gap-2">
-                        <Button label="Limpar" severity="secondary" outlined size="small" @click="clearFilters" :disabled="!hasActiveFilters" />
-                        <Button label="Filtrar" icon="pi pi-search" size="small" @click="applyFilters" />
+                <div class="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-gray-100">
+                    <div class="flex items-center gap-2 min-h-[32px]">
+                        <span v-if="hasActiveFilters" class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            {{ activeFilterCount }} filtro(s) ativo(s)
+                        </span>
+                        <span v-else class="text-xs text-gray-400">Nenhum filtro aplicado</span>
+                    </div>
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <Button label="Limpar" severity="secondary" outlined size="small" class="flex-1 sm:flex-none" @click="clearFilters" :disabled="!hasActiveFilters" />
+                        <Button label="Filtrar" icon="pi pi-search" size="small" class="flex-1 sm:flex-none" @click="applyFilters" />
                     </div>
                 </div>
             </div>

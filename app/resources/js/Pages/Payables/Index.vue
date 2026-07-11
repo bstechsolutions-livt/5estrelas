@@ -11,6 +11,9 @@ defineProps({
     departments: Array,
     branches: Array,
     statusOptions: Object,
+    canChangeDepartmentFilter: { type: Boolean, default: true },
+    lockedDepartment: { type: Object, default: null },
+    canManageClassification: { type: Boolean, default: false },
 })
 
 const { isMobile } = useDevice()
