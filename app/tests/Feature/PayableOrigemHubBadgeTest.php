@@ -17,8 +17,8 @@ class PayableOrigemHubBadgeTest extends TestCase
         $user = User::factory()->create(['is_active' => true]);
         $user->permissions()->attach(
             Permission::firstOrCreate(
-                ['key' => 'financeiro.contas_pagar.visualizar'],
-                ['label' => 'Visualizar CP', 'module' => 'financeiro'],
+                ['key' => '*'],
+                ['label' => 'Admin', 'module' => 'sistema'],
             )->id,
         );
 
@@ -51,6 +51,25 @@ class PayableOrigemHubBadgeTest extends TestCase
         $row = collect($resp->json('data'))->firstWhere('supplier_name', 'TituloSenior');
 
         $this->assertArrayNotHasKey('origem_hub', $row);
+        $this->assertTrue($row['origem_senior']);
+    }
+
+    public function test_senior_exibe_origem_senior_na_lista(): void
+    {
+        $this->makePayable([
+            'supplier_name' => 'TituloSeniorLista',
+            'senior_id' => '3-1-99999-01-1',
+        ]);
+
+        $resp = $this->actingAs($this->activeUser())
+            ->withHeaders(['X-Json-Only' => '1'])
+            ->get('/financeiro/contas-pagar?status=pendente')
+            ->assertOk();
+
+        $row = collect($resp->json('data'))->firstWhere('supplier_name', 'TituloSeniorLista');
+
+        $this->assertTrue($row['origem_senior']);
+        $this->assertArrayNotHasKey('field_origins', $row);
     }
 
     public function test_manual_exibe_badge_hub_na_lista(): void
@@ -65,6 +84,23 @@ class PayableOrigemHubBadgeTest extends TestCase
         $row = collect($resp->json('data'))->firstWhere('supplier_name', 'TituloHub');
 
         $this->assertTrue($row['origem_hub']);
+        $this->assertArrayNotHasKey('origem_senior', $row);
+    }
+
+    public function test_show_exibe_origem_senior_e_field_origins(): void
+    {
+        $payable = $this->makePayable([
+            'senior_id' => '3-1-55555-01-1',
+        ]);
+
+        $this->actingAs($this->activeUser())
+            ->get("/financeiro/contas-pagar/{$payable->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('payable.origem_senior', true)
+                ->where('payable.field_origins.supplier_name', 'senior')
+                ->where('payable.field_origins.nickname', 'hub')
+                ->missing('payable.origem_hub'));
     }
 
     public function test_show_exibe_badge_hub(): void

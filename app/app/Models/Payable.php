@@ -365,6 +365,53 @@ class Payable extends Model
     }
 
     /**
+     * Marca títulos importados da Senior (sync ERP).
+     *
+     * @param iterable<Payable> $payables
+     */
+    public static function attachOrigemSenior(iterable $payables): void
+    {
+        foreach ($payables as $payable) {
+            if ($payable->isFromSenior()) {
+                $payable->setAttribute('origem_senior', true);
+            }
+        }
+    }
+
+    /** @return array<string, 'senior'|'hub'> */
+    public static function fieldOriginsForSenior(): array
+    {
+        return [
+            'supplier_name' => 'senior',
+            'amount' => 'senior',
+            'due_date' => 'senior',
+            'title_number' => 'senior',
+            'empresa_nome' => 'senior',
+            'filial_nome' => 'senior',
+            'supplier_cnpj' => 'senior',
+            'issue_date' => 'senior',
+            'category' => 'senior',
+            'description' => 'senior',
+            'nickname' => 'hub',
+            'payment_priority' => 'hub',
+            'payment_sla_date' => 'hub',
+            'documents' => 'hub',
+            'comments' => 'hub',
+            'status' => 'hub',
+            'bordero' => 'hub',
+        ];
+    }
+
+    public static function attachFieldOrigins(Payable $payable): void
+    {
+        if (! $payable->isFromSenior()) {
+            return;
+        }
+
+        $payable->setAttribute('field_origins', self::fieldOriginsForSenior());
+    }
+
+    /**
      * ou resolve pelo codFil via tabela branches, ou cai no apelido da empresa.
      *
      * @param iterable<Payable> $payables

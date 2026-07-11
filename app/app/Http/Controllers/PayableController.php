@@ -331,6 +331,7 @@ class PayableController extends Controller
         Payable::attachDepartmentNome($payables->getCollection());
         PayableDocumentPairAlert::attachToPayables($payables->getCollection());
         Payable::attachOrigemHub($payables->getCollection());
+        Payable::attachOrigemSenior($payables->getCollection());
         Payable::attachPriorityMeta($payables->getCollection());
 
         $totalsQuery = Payable::query()
@@ -487,6 +488,9 @@ class PayableController extends Controller
         );
         if ($payable->isHubManual()) {
             $payable->setAttribute('origem_hub', true);
+        } else {
+            $payable->setAttribute('origem_senior', true);
+            Payable::attachFieldOrigins($payable);
         }
         Payable::attachPriorityMeta([$payable]);
 

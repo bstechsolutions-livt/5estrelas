@@ -16,6 +16,7 @@ import { useToast } from 'primevue/usetoast'
 import BottomSheet from '@/Components/Mobile/BottomSheet.vue'
 import { useDevice } from '@/composables/useDevice'
 import PayableDocumentPreviewCard from '@/Components/Financeiro/PayableDocumentPreviewCard.vue'
+import PayableFieldOriginLabel from '@/Components/Financeiro/PayableFieldOriginLabel.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 
 const props = defineProps({
@@ -423,6 +424,9 @@ const slaAlertClass = computed(() => {
     if (props.payable.sla_status === 'warning') return 'text-amber-600'
     return 'text-gray-600'
 })
+
+const fieldOrigins = computed(() => props.payable.field_origins ?? null)
+const isFromSenior = computed(() => !!props.payable.origem_senior)
 </script>
 
 <template>
@@ -439,7 +443,20 @@ const slaAlertClass = computed(() => {
                         <h1 :class="isMobile ? 'text-lg font-bold text-gray-800' : 'text-2xl font-bold text-gray-800'">
                             {{ payable.supplier_name }}
                         </h1>
+                        <i
+                            v-if="fieldOrigins?.supplier_name === 'senior'"
+                            class="pi pi-cloud-download text-sm text-slate-400"
+                            title="Fornecedor preenchido automaticamente pela Senior (ERP)"
+                            aria-label="Fornecedor preenchido automaticamente pela Senior (ERP)"
+                            dusk="field-origin-senior-supplier"
+                        />
                         <Tag :value="statusLabels[payable.status]" :severity="statusColors[payable.status]" />
+                        <i
+                            v-if="fieldOrigins?.status === 'hub'"
+                            class="pi pi-pencil text-[10px] text-blue-400"
+                            title="Status do fluxo de aprovação na intranet Hub"
+                            aria-label="Status do fluxo de aprovação na intranet Hub"
+                        />
                         <Tag
                             v-if="payable.payment_priority"
                             :value="payable.priority_label || priorityLabels[payable.payment_priority]"
@@ -448,16 +465,24 @@ const slaAlertClass = computed(() => {
                             dusk="payable-priority-badge"
                         />
                         <Tag v-if="payable.origem_hub" value="Hub" severity="info" class="!text-xs" dusk="origem-hub-badge" title="Criado na intranet (não importado da Senior)" />
+                        <Tag v-if="isFromSenior" value="Senior" severity="secondary" class="!text-xs" dusk="origem-senior-badge" title="Importado da Senior (ERP)" />
                     </div>
-                    <p class="text-sm text-gray-500 mt-1">
-                        Título: {{ payable.title_number || '—' }} · Vencimento: {{ formatDate(payable.due_date) }}
+                    <p class="text-sm text-gray-500 mt-1 flex flex-wrap items-center gap-x-1">
+                        <PayableFieldOriginLabel v-if="fieldOrigins" label="Título:" field="title_number" :field-origins="fieldOrigins" class="!inline-flex shrink-0" />
+                        <span v-else class="text-sm text-gray-500">Título:</span>
+                        <span>{{ payable.title_number || '—' }}</span>
+                        <span>·</span>
+                        <PayableFieldOriginLabel v-if="fieldOrigins" label="Vencimento:" field="due_date" :field-origins="fieldOrigins" class="!inline-flex shrink-0" />
+                        <span v-else class="text-sm text-gray-500">Vencimento:</span>
+                        <span>{{ formatDate(payable.due_date) }}</span>
                         <button v-if="canEditDueDate" @click="showDueDate = true" dusk="btn-edit-due-date"
                             class="ml-1 text-blue-600 hover:text-blue-800 cursor-pointer align-middle" title="Alterar vencimento (financeiro)">
                             <i class="pi pi-pencil text-xs"></i>
                         </button>
                     </p>
                     <div class="mt-2 flex flex-wrap items-center gap-2 max-w-xl">
-                        <label class="text-xs text-gray-500 shrink-0" for="payable-nickname">Apelido:</label>
+                        <PayableFieldOriginLabel v-if="fieldOrigins" label="Apelido:" field="nickname" :field-origins="fieldOrigins" />
+                        <label v-else class="text-xs text-gray-500 shrink-0" for="payable-nickname">Apelido:</label>
                         <InputText
                             id="payable-nickname"
                             v-model="nicknameForm.nickname"
@@ -477,7 +502,28 @@ const slaAlertClass = computed(() => {
                         />
                     </div>
                 </div>
-                <p class="text-xl font-bold text-gray-800">{{ formatMoney(payable.amount) }}</p>
+                <div class="text-right">
+                    <PayableFieldOriginLabel v-if="fieldOrigins" label="Valor" field="amount" :field-origins="fieldOrigins" class="justify-end mb-0.5" />
+                    <p class="text-xl font-bold text-gray-800">{{ formatMoney(payable.amount) }}</p>
+                </div>
+            </div>
+
+            <div
+                v-if="isFromSenior"
+                class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 text-sm text-slate-700"
+                dusk="origem-senior-legend"
+            >
+                <p class="font-medium text-slate-800 mb-1 flex items-center gap-2">
+                    <i class="pi pi-info-circle text-slate-500"></i>
+                    Campos importados da Senior
+                </p>
+                <p class="text-xs text-slate-600">
+                    <i class="pi pi-cloud-download text-[10px] text-slate-400"></i>
+                    <span class="ml-1">Dados do ERP (fornecedor, valor, vencimento, nº título, empresa)</span>
+                    <span class="mx-2">·</span>
+                    <i class="pi pi-pencil text-[10px] text-blue-400"></i>
+                    <span class="ml-1">Campos da intranet (apelido, prioridade, SLA, anexos, comentários, status)</span>
+                </p>
             </div>
 
             <div
@@ -512,19 +558,27 @@ const slaAlertClass = computed(() => {
                     <div class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Informações</h3>
                         <div class="grid grid-cols-2 gap-3 text-sm">
-                            <div><p class="text-xs text-gray-500">Empresa</p><p class="text-gray-800">{{ payable.empresa_nome || '—' }}</p></div>
-                            <div><p class="text-xs text-gray-500">Filial</p><p class="text-gray-800">{{ payable.filial_nome || '—' }}</p></div>
-                            <div><p class="text-xs text-gray-500">Categoria</p><p class="text-gray-800">{{ payable.category || '—' }}</p></div>
-                            <div><p class="text-xs text-gray-500">Emissão</p><p class="text-gray-800">{{ formatDate(payable.issue_date) }}</p></div>
-                            <div><p class="text-xs text-gray-500">CNPJ</p><p class="text-gray-800 font-mono text-xs">{{ payable.supplier_cnpj || '—' }}</p></div>
-                            <div class="col-span-2" v-if="payable.description"><p class="text-xs text-gray-500">Descrição</p><p class="text-gray-800">{{ payable.description }}</p></div>
+                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Empresa" field="empresa_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Empresa</p><p class="text-gray-800">{{ payable.empresa_nome || '—' }}</p></div>
+                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Filial" field="filial_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Filial</p><p class="text-gray-800">{{ payable.filial_nome || '—' }}</p></div>
+                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Categoria" field="category" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Categoria</p><p class="text-gray-800">{{ payable.category || '—' }}</p></div>
+                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Emissão" field="issue_date" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Emissão</p><p class="text-gray-800">{{ formatDate(payable.issue_date) }}</p></div>
+                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="CNPJ" field="supplier_cnpj" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">CNPJ</p><p class="text-gray-800 font-mono text-xs">{{ payable.supplier_cnpj || '—' }}</p></div>
+                            <div class="col-span-2" v-if="payable.description"><PayableFieldOriginLabel v-if="fieldOrigins" label="Descrição" field="description" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Descrição</p><p class="text-gray-800">{{ payable.description }}</p></div>
                         </div>
                     </div>
 
                     <!-- Documentos -->
                     <div class="bg-white rounded-xl border border-gray-100 p-4">
                         <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-                            <h3 class="text-sm font-semibold text-gray-700">Documentos ({{ payable.documents?.length || 0 }})</h3>
+                            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                                Documentos ({{ payable.documents?.length || 0 }})
+                                <i
+                                    v-if="fieldOrigins?.documents === 'hub'"
+                                    class="pi pi-pencil text-[10px] text-blue-400"
+                                    title="Anexos gerenciados na intranet Hub"
+                                    aria-label="Anexos gerenciados na intranet Hub"
+                                />
+                            </h3>
                             <div class="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5" dusk="payable-docs-view-toggle">
                                 <button
                                     type="button"
@@ -604,7 +658,15 @@ const slaAlertClass = computed(() => {
 
                     <!-- Timeline/Comentários -->
                     <div class="bg-white rounded-xl border border-gray-100 p-4">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Timeline</h3>
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+                            Timeline
+                            <i
+                                v-if="fieldOrigins?.comments === 'hub'"
+                                class="pi pi-pencil text-[10px] text-blue-400"
+                                title="Comentários e atividades da intranet Hub"
+                                aria-label="Comentários e atividades da intranet Hub"
+                            />
+                        </h3>
                         <div class="space-y-3 mb-4 max-h-80 overflow-y-auto">
                             <div v-for="c in payable.comments" :key="c.id" class="flex gap-2">
                                 <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-600">
@@ -659,7 +721,14 @@ const slaAlertClass = computed(() => {
                     <!-- Aviso: está em borderô -->
                     <div v-if="inBordero" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
                         <h3 class="text-sm font-semibold text-amber-700 mb-1 flex items-center gap-2">
-                            <i class="pi pi-list-check"></i> Em um borderô
+                            <i class="pi pi-list-check"></i>
+                            Em um borderô
+                            <i
+                                v-if="fieldOrigins?.bordero === 'hub'"
+                                class="pi pi-pencil text-[10px] text-blue-400"
+                                title="Borderô gerenciado na intranet Hub"
+                                aria-label="Borderô gerenciado na intranet Hub"
+                            />
                         </h3>
                         <p class="text-xs text-amber-600 mb-2">Este título faz parte de um borderô. O envio é feito pelo borderô; a aprovação segue o mesmo fluxo configurado (pode ser feita aqui ou no borderô).</p>
                         <Button label="Ver borderô" icon="pi pi-arrow-right" size="small" outlined class="w-full" @click="goToBordero" />
@@ -798,15 +867,25 @@ const slaAlertClass = computed(() => {
                         class="bg-white rounded-xl border border-gray-100 p-4"
                         dusk="payable-priority-section"
                     >
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Prioridade de pagamento</h3>
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+                            Prioridade de pagamento
+                            <i
+                                v-if="fieldOrigins?.payment_priority === 'hub'"
+                                class="pi pi-pencil text-[10px] text-blue-400"
+                                title="Prioridade definida na intranet Hub"
+                                aria-label="Prioridade definida na intranet Hub"
+                            />
+                        </h3>
                         <template v-if="canManagePriority && payable.status !== 'encerrado'">
                             <div class="space-y-3">
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">Prioridade</label>
+                                    <PayableFieldOriginLabel v-if="fieldOrigins" label="Prioridade" field="payment_priority" :field-origins="fieldOrigins" class="block mb-1" />
+                                    <label v-else class="block text-xs font-medium text-gray-500 mb-1">Prioridade</label>
                                     <Select v-model="priorityForm.payment_priority" :options="priorityOptions" option-label="label" option-value="value" class="w-full" />
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">Prazo (SLA)</label>
+                                    <PayableFieldOriginLabel v-if="fieldOrigins" label="Prazo (SLA)" field="payment_sla_date" :field-origins="fieldOrigins" class="block mb-1" />
+                                    <label v-else class="block text-xs font-medium text-gray-500 mb-1">Prazo (SLA)</label>
                                     <DatePicker v-model="priorityForm.payment_sla_date" date-format="dd/mm/yy" placeholder="dd/mm/aaaa" class="w-full" show-icon />
                                 </div>
                                 <Button label="Salvar prioridade" icon="pi pi-save" size="small" class="w-full" :loading="priorityForm.processing" @click="submitPriority" />
@@ -815,7 +894,8 @@ const slaAlertClass = computed(() => {
                         <template v-else>
                             <div class="text-sm space-y-2">
                                 <div>
-                                    <p class="text-xs text-gray-500">Prioridade</p>
+                                    <PayableFieldOriginLabel v-if="fieldOrigins" label="Prioridade" field="payment_priority" :field-origins="fieldOrigins" />
+                                    <p v-else class="text-xs text-gray-500">Prioridade</p>
                                     <Tag
                                         v-if="payable.payment_priority"
                                         :value="payable.priority_label"
@@ -824,7 +904,8 @@ const slaAlertClass = computed(() => {
                                     <p v-else class="text-gray-400">Não definida</p>
                                 </div>
                                 <div v-if="payable.payment_sla_date">
-                                    <p class="text-xs text-gray-500">Prazo (SLA)</p>
+                                    <PayableFieldOriginLabel v-if="fieldOrigins" label="Prazo (SLA)" field="payment_sla_date" :field-origins="fieldOrigins" />
+                                    <p v-else class="text-xs text-gray-500">Prazo (SLA)</p>
                                     <p :class="slaAlertClass">{{ formatDate(payable.payment_sla_date) }}</p>
                                 </div>
                                 <div v-if="payable.priority_setter">

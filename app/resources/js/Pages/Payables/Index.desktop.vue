@@ -754,6 +754,14 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                                     title="Criado na intranet"
                                     dusk="origem-hub-badge"
                                 />
+                                <Tag
+                                    v-if="data.origem_senior"
+                                    value="Senior"
+                                    severity="secondary"
+                                    class="!text-[9px] !px-1.5 !py-0 leading-tight"
+                                    title="Importado da Senior (ERP)"
+                                    dusk="origem-senior-badge"
+                                />
                             </div>
                         </template>
                     </Column>

@@ -402,6 +402,14 @@ const currentTotal = computed(() => {
                     class="!text-[9px] !px-1.5 !py-0 mt-1"
                     title="Criado na intranet"
                 />
+                <Tag
+                    v-if="p.origem_senior"
+                    value="Senior"
+                    severity="secondary"
+                    class="!text-[9px] !px-1.5 !py-0 mt-1"
+                    title="Importado da Senior (ERP)"
+                    dusk="origem-senior-badge"
+                />
                 <span v-if="status !== 'pendente' && p.bordero" class="inline-block mt-1 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
                     {{ p.bordero.number }}
                 </span>
