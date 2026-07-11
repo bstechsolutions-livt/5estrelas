@@ -43,7 +43,7 @@ class PayableEmpresaColunaTest extends TestCase
         ], $attrs));
     }
 
-    private function makeFilial(int $codEmp, string $nome, ?string $fantasia = null): Filial
+    private function makeFilial(int $codEmp, string $nome, ?string $fantasia = null, ?string $apelido = null): Filial
     {
         return Filial::create([
             'cod_emp' => $codEmp,
@@ -51,6 +51,7 @@ class PayableEmpresaColunaTest extends TestCase
             'senior_id' => "{$codEmp}-1",
             'nome' => $nome,
             'fantasia' => $fantasia,
+            'apelido' => $apelido,
             'ativo' => true,
         ]);
     }
@@ -64,7 +65,7 @@ class PayableEmpresaColunaTest extends TestCase
 
     public function test_index_resolve_nome_da_empresa_pelo_codemp(): void
     {
-        $this->makeFilial(2, '5 ESTRELAS SISTEMA DE SEGURANCA LTDA', '5 ESTRELAS');
+        $this->makeFilial(2, '5 ESTRELAS SISTEMA DE SEGURANCA LTDA', '5 ESTRELAS', '5 ESTRELAS');
         $this->makePayable(['codemp' => 2, 'supplier_name' => 'FornecedorEmp2']);
 
         $user = $this->activeUser();
@@ -102,7 +103,7 @@ class PayableEmpresaColunaTest extends TestCase
 
     public function test_show_expoe_nome_da_empresa(): void
     {
-        $this->makeFilial(2, 'Empresa Dois LTDA', 'EMP DOIS');
+        $this->makeFilial(2, 'Empresa Dois LTDA', 'EMP DOIS', 'EMP DOIS');
         $payable = $this->makePayable(['codemp' => 2]);
 
         $this->actingAs($this->activeUser())

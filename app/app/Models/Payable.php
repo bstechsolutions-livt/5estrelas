@@ -306,4 +306,32 @@ class Payable extends Model
             $p->setAttribute('empresa_nome', $p->codemp ? ($map[$p->codemp] ?? null) : null);
         }
     }
+
+    /**
+     * Nome curto da filial operacional (apelido). Usa branch vinculada,
+     * ou resolve pelo codFil via tabela branches, ou cai no apelido da empresa.
+     *
+     * @param iterable<Payable> $payables
+     */
+    public static function attachFilialNome(iterable $payables): void
+    {
+        $items = collect($payables);
+        $codFils = $items->map(fn (Payable $p) => $p->codfil)->filter()->unique()->values();
+
+        $branchMap = $codFils->isEmpty()
+            ? collect()
+            : Branch::whereIn('code', $codFils->map(fn ($c) => (string) $c))->get()
+                ->keyBy(fn (Branch $b) => (string) $b->code)
+                ->map(fn (Branch $b) => $b->display_name);
+
+        foreach ($items as $p) {
+            if ($p->relationLoaded('branch') && $p->branch) {
+                $p->setAttribute('filial_nome', $p->branch->display_name);
+
+                continue;
+            }
+            $filial = $p->codfil ? ($branchMap[(string) $p->codfil] ?? null) : null;
+            $p->setAttribute('filial_nome', $filial ?: $p->getAttribute('empresa_nome'));
+        }
+    }
 }

@@ -16,6 +16,7 @@ const props = defineProps({
     payables: Object,
     totals: Object,
     filters: Object,
+    empresas: Array,
     branches: Array,
     statusOptions: Object,
 })
@@ -27,7 +28,7 @@ const STORAGE_KEY = 'payables_filters'
 
 const search = ref(props.filters?.search || '')
 const status = ref(props.filters?.status || 'pendente')
-const branchId = ref(props.filters?.branch_id || null)
+const codemp = ref(props.filters?.codemp ? Number(props.filters.codemp) : null)
 const amountMin = ref(props.filters?.amount_min ? Number(props.filters.amount_min) : null)
 const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_max) : null)
 const dueFrom = ref(props.filters?.due_from || '')
@@ -41,9 +42,9 @@ const statusList = [
     { label: 'Pagos', value: 'pago', color: 'emerald' },
 ]
 
-const branchList = computed(() => [
-    { label: 'Todas as filiais', value: null },
-    ...props.branches.map(b => ({ label: b.name, value: b.id })),
+const empresaList = computed(() => [
+    { label: 'Todas as empresas', value: null },
+    ...(props.empresas || []).map(e => ({ label: e.label, value: e.value })),
 ])
 
 let timer = null
@@ -51,7 +52,7 @@ function currentFilters() {
     return {
         search: search.value || undefined,
         status: status.value || undefined,
-        branch_id: branchId.value || undefined,
+        codemp: codemp.value || undefined,
         amount_min: amountMin.value || undefined,
         amount_max: amountMax.value || undefined,
         due_from: dueFrom.value || undefined,
@@ -76,13 +77,13 @@ function selectStatus(s) {
 }
 
 const hasActiveFilters = computed(() => {
-    return !!(search.value || branchId.value || amountMin.value || amountMax.value || dueFrom.value || dueTo.value)
+    return !!(search.value || codemp.value || amountMin.value || amountMax.value || dueFrom.value || dueTo.value)
 })
 
 const activeFilterCount = computed(() => {
     let c = 0
     if (search.value) c++
-    if (branchId.value) c++
+    if (codemp.value) c++
     if (amountMin.value) c++
     if (amountMax.value) c++
     if (dueFrom.value) c++
@@ -92,7 +93,7 @@ const activeFilterCount = computed(() => {
 
 function clearFilters() {
     search.value = ''
-    branchId.value = null
+    codemp.value = null
     amountMin.value = ''
     amountMax.value = ''
     dueFrom.value = ''
@@ -104,7 +105,7 @@ function onPage(event) {
     router.get('/financeiro/contas-pagar', {
         search: search.value || undefined,
         status: status.value || undefined,
-        branch_id: branchId.value || undefined,
+        codemp: codemp.value || undefined,
         amount_min: amountMin.value || undefined,
         amount_max: amountMax.value || undefined,
         due_from: dueFrom.value || undefined,
@@ -130,13 +131,13 @@ onMounted(() => {
                 const f = JSON.parse(cached)
                 status.value = f.status === 'reprovado' ? 'pendente' : (f.status || 'pendente')
                 search.value = f.search || ''
-                branchId.value = f.branch_id || null
+                codemp.value = f.codemp ? Number(f.codemp) : null
                 amountMin.value = f.amount_min ? Number(f.amount_min) : null
                 amountMax.value = f.amount_max ? Number(f.amount_max) : null
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
                 const serverStatus = props.filters?.status || 'pendente'
-                const differs = status.value !== serverStatus || f.search || f.branch_id || f.amount_min || f.amount_max || f.due_from || f.due_to
+                const differs = status.value !== serverStatus || f.search || f.codemp || f.amount_min || f.amount_max || f.due_from || f.due_to
                 if (differs) {
                     applyFilters()
                     return
@@ -256,8 +257,8 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                         <InputText v-model="search" placeholder="Fornecedor ou título" class="w-full" @keyup.enter="applyFilters" />
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Filial</label>
-                        <Select v-model="branchId" :options="branchList" option-label="label" option-value="value" placeholder="Todas" class="w-full" />
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Empresa</label>
+                        <Select v-model="codemp" :options="empresaList" option-label="label" option-value="value" placeholder="Todas" class="w-full" />
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Valor mínimo</label>

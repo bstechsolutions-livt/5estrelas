@@ -52,7 +52,7 @@ function goToPayable(id) {
                             <p class="text-sm font-semibold text-gray-800">{{ p.supplier_name || p.title_number }}</p>
                             <p class="text-xs text-gray-500 mt-0.5">
                                 Título: {{ p.title_number }} · Venc: {{ formatDate(p.due_date) }}
-                                <span v-if="p.branch">· {{ p.branch.name }}</span>
+                                <span v-if="p.empresa_nome">· {{ p.empresa_nome }}</span>
                             </p>
                             <p v-if="p.preparer" class="text-[10px] text-gray-400 mt-1">
                                 Enviado por {{ p.preparer.name }}

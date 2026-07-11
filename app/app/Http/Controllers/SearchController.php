@@ -122,10 +122,10 @@ class SearchController extends Controller
                         ->orWhere('cnpj', 'like', "%{$q}%");
                 })
                 ->limit(5)
-                ->get(['id', 'name', 'cnpj'])
+                ->get(['id', 'name', 'code', 'cnpj'])
                 ->map(fn ($b) => [
                     'id' => $b->id,
-                    'title' => $b->name,
+                    'title' => $b->display_name,
                     'subtitle' => $b->cnpj ? "CNPJ: {$b->cnpj}" : 'Filial',
                     'icon' => 'pi pi-map-marker',
                     'href' => "/filiais/{$b->id}/editar",

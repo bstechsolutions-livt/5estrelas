@@ -7,6 +7,7 @@ defineProps({
     payables: Object,
     totals: Object,
     filters: Object,
+    empresas: Array,
     branches: Array,
     statusOptions: Object,
 })

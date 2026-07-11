@@ -193,7 +193,7 @@ onMounted(reloadIfStale)
                                         <i class="pi pi-paperclip" />
                                     </span>
                                 </div>
-                                <p class="text-xs text-gray-500">Venc: {{ formatDate(row.payable.due_date) }} · {{ row.payable.branch?.name || '' }}</p>
+                                <p class="text-xs text-gray-500">Venc: {{ formatDate(row.payable.due_date) }} · {{ row.payable.empresa_nome || row.payable.filial_nome || '' }}</p>
                                 <p v-if="row.payable.rejection_reason" class="text-xs text-red-600 mt-1 line-clamp-2">
                                     {{ row.payable.rejection_reason }}
                                 </p>

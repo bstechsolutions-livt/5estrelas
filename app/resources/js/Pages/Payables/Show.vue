@@ -366,7 +366,7 @@ function submitDueDate() {
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Informações</h3>
                         <div class="grid grid-cols-2 gap-3 text-sm">
                             <div><p class="text-xs text-gray-500">Empresa</p><p class="text-gray-800">{{ payable.empresa_nome || '—' }}</p></div>
-                            <div><p class="text-xs text-gray-500">Filial</p><p class="text-gray-800">{{ payable.branch?.name || '—' }}</p></div>
+                            <div><p class="text-xs text-gray-500">Filial</p><p class="text-gray-800">{{ payable.filial_nome || '—' }}</p></div>
                             <div><p class="text-xs text-gray-500">Categoria</p><p class="text-gray-800">{{ payable.category || '—' }}</p></div>
                             <div><p class="text-xs text-gray-500">Emissão</p><p class="text-gray-800">{{ formatDate(payable.issue_date) }}</p></div>
                             <div><p class="text-xs text-gray-500">CNPJ</p><p class="text-gray-800 font-mono text-xs">{{ payable.supplier_cnpj || '—' }}</p></div>

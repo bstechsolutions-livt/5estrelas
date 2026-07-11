@@ -60,6 +60,9 @@ class BorderoController extends Controller
             'payables' => fn ($q) => $q->with('branch:id,name')->withCount('documents')->orderBy('due_date'),
         ])->findOrFail($id);
 
+        Payable::attachEmpresaNome($bordero->payables);
+        Payable::attachFilialNome($bordero->payables);
+
         $user = $request->user();
         $workflow = app(ApprovalWorkflowService::class);
 

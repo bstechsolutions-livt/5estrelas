@@ -16,6 +16,30 @@ class Branch extends Model
         'is_active' => 'boolean',
     ];
 
+    protected $appends = ['display_name'];
+
+    /** Nome curto para exibição (apelido da empresa espelhada na Senior, se houver). */
+    public function getDisplayNameAttribute(): string
+    {
+        return $this->resolveDisplayName();
+    }
+
+    public function resolveDisplayName(): string
+    {
+        if (is_numeric($this->code)) {
+            $apelido = \App\Models\Comercial\Filial::where('cod_emp', (int) $this->code)->value('apelido');
+            if (filled($apelido)) {
+                if (preg_match('/FILIAL\s+([A-ZÀ-Ú]{2,})\b/iu', $this->name, $m)) {
+                    return trim($apelido . ' ' . mb_strtoupper($m[1]));
+                }
+
+                return $apelido;
+            }
+        }
+
+        return \App\Models\Comercial\Filial::gerarApelido($this->name);
+    }
+
     protected string $auditableModule = 'filiais';
     protected string $auditableEventPrefix = 'filiais';
     protected array $auditableEvents = ['created', 'updated', 'deleted'];

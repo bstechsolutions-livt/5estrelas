@@ -28,7 +28,7 @@ class UtilController extends Controller
         if (!$id) {
             return null;
         }
-        return Branch::find($id)?->name;
+        return Branch::find($id)?->display_name;
     }
 
     /**

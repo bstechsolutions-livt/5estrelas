@@ -354,11 +354,16 @@ class ApprovalWorkflowService
             }
         }
 
-        return Payable::whereIn('id', $payableIds->unique())
+        $payables = Payable::whereIn('id', $payableIds->unique())
             ->where('status', 'aguardando_aprovacao')
-            ->with(['branch:id,name', 'preparer:id,name'])
+            ->with(['branch:id,name,code', 'preparer:id,name'])
             ->orderByDesc('sent_for_approval_at')
             ->get();
+
+        Payable::attachEmpresaNome($payables);
+        Payable::attachFilialNome($payables);
+
+        return $payables;
     }
 
     /**

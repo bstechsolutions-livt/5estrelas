@@ -74,6 +74,22 @@ class Filial extends Model
         return $this->cod_emp !== null ? (string) $this->cod_emp : null;
     }
 
+    /** Opções para selects (apelido + cod_emp). */
+    public static function selectOptions(): array
+    {
+        return static::query()
+            ->where('ativo', true)
+            ->orderBy('apelido')
+            ->orderBy('nome')
+            ->get(['cod_emp', 'apelido', 'nome', 'fantasia'])
+            ->map(fn (self $f) => [
+                'label' => $f->label,
+                'value' => $f->cod_emp,
+            ])
+            ->values()
+            ->all();
+    }
+
     // ─── Auditoria ────────────────────────────────────────────────────────────
     protected string $auditableModule = 'comercial';
     protected string $auditableEventPrefix = 'comercial_filial';
