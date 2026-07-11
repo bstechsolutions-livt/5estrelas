@@ -225,12 +225,6 @@ onMounted(() => {
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
                 onDueDateManualChange()
-                advancedFiltersOpen.value = !!(
-                    f.search || f.codemp
-                    || (props.canChangeDepartmentFilter && f.department_id)
-                    || f.amount_min || f.amount_max || f.payment_priority
-                    || (f.sort && f.sort !== 'default')
-                )
                 const serverStatus = props.filters?.status || 'pendente'
                 const differs = status.value !== serverStatus || f.search || f.codemp
                     || (props.canChangeDepartmentFilter && f.department_id)
@@ -242,8 +236,6 @@ onMounted(() => {
                 }
             } catch (e) { /* cache inválido, ignora */ }
         }
-    } else if (hasAdvancedFilters.value) {
-        advancedFiltersOpen.value = true
     }
 
     const saved = sessionStorage.getItem('payables_scroll')
