@@ -104,6 +104,7 @@ class BorderoAutoRuleController extends Controller
             ? $rule
             : BorderoAutoRule::fromPayload([
                 'name' => '',
+                'group_by' => ['empresa', 'departamento'],
                 'min_titles_per_group' => 2,
                 'due_grouping' => BorderoAutoRule::DUE_NONE,
                 'max_due_span_days' => 7,
@@ -117,6 +118,7 @@ class BorderoAutoRuleController extends Controller
             'rule' => $rule ? $rule->toFormArray() : null,
             'defaults' => [
                 'name' => '',
+                'group_by' => ['empresa', 'departamento'],
                 'min_titles_per_group' => 2,
                 'due_grouping' => BorderoAutoRule::DUE_NONE,
                 'max_due_span_days' => 7,
@@ -124,6 +126,8 @@ class BorderoAutoRuleController extends Controller
                 'eligibility_due_days' => 30,
             ],
             'options' => [
+                'group_by' => BorderoAutoRule::groupByLabels(),
+                'group_by_order' => BorderoAutoRule::GROUP_BY_ORDER,
                 'due_grouping' => BorderoAutoRule::dueGroupingLabels(),
                 'eligibility_mode' => BorderoAutoRule::eligibilityLabels(),
             ],
@@ -159,6 +163,8 @@ class BorderoAutoRuleController extends Controller
     private function validated(Request $request, bool $requireName = true): array
     {
         $rules = [
+            'group_by' => ['required', 'array', 'min:1'],
+            'group_by.*' => ['required', 'string', Rule::in(BorderoAutoRule::GROUP_BY_ORDER)],
             'min_titles_per_group' => ['required', 'integer', 'min:2', 'max:50'],
             'due_grouping' => ['required', Rule::in([
                 BorderoAutoRule::DUE_NONE,
@@ -190,6 +196,9 @@ class BorderoAutoRuleController extends Controller
         }
 
         $data['apply_mode'] ??= 'cron';
+
+        $rule = BorderoAutoRule::fromPayload($data);
+        $data['group_by'] = $rule->normalizedGroupBy();
 
         return $data;
     }

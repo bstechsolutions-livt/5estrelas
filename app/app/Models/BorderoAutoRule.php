@@ -18,8 +18,22 @@ class BorderoAutoRule extends Model
 
     public const ELIGIBILITY_DUE_WITHIN = 'due_within_days';
 
+    /** Ordem canônica dos critérios de agrupamento. */
+    public const GROUP_BY_ORDER = [
+        'empresa',
+        'filial',
+        'departamento',
+        'ccu',
+        'fornecedor',
+        'natureza',
+        'transacao',
+        'tipo_titulo',
+        'categoria',
+    ];
+
     protected $fillable = [
         'name',
+        'group_by',
         'is_active',
         'min_titles_per_group',
         'due_grouping',
@@ -34,6 +48,7 @@ class BorderoAutoRule extends Model
     ];
 
     protected $casts = [
+        'group_by' => 'array',
         'is_active' => 'boolean',
         'min_titles_per_group' => 'integer',
         'max_due_span_days' => 'integer',
@@ -55,6 +70,22 @@ class BorderoAutoRule extends Model
     }
 
     /** @return array<string, string> */
+    public static function groupByLabels(): array
+    {
+        return [
+            'empresa' => 'Empresa',
+            'filial' => 'Filial (codFil)',
+            'departamento' => 'Departamento (classificação)',
+            'ccu' => 'Centro de custo (CCU)',
+            'fornecedor' => 'Fornecedor',
+            'natureza' => 'Natureza (codNtg)',
+            'transacao' => 'Transação (codTns)',
+            'tipo_titulo' => 'Tipo de título (codTpt)',
+            'categoria' => 'Categoria (Hub)',
+        ];
+    }
+
+    /** @return array<string, string> */
     public static function dueGroupingLabels(): array
     {
         return [
@@ -73,12 +104,24 @@ class BorderoAutoRule extends Model
         ];
     }
 
+    /** @return list<string> */
+    public function normalizedGroupBy(): array
+    {
+        $selected = array_values(array_intersect(
+            self::GROUP_BY_ORDER,
+            is_array($this->group_by) ? $this->group_by : [],
+        ));
+
+        return $selected !== [] ? $selected : ['empresa', 'departamento'];
+    }
+
     /** @return array<string, mixed> */
     public function toFormArray(): array
     {
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'group_by' => $this->normalizedGroupBy(),
             'is_active' => $this->is_active,
             'min_titles_per_group' => $this->min_titles_per_group,
             'due_grouping' => $this->due_grouping,
@@ -91,8 +134,14 @@ class BorderoAutoRule extends Model
     /** @return list<string> */
     public function rulesSummary(): array
     {
+        $labels = self::groupByLabels();
+        $groupLine = 'Agrupar por: ' . implode(' → ', array_map(
+            fn (string $key) => $labels[$key] ?? $key,
+            $this->normalizedGroupBy(),
+        ));
+
         $lines = [
-            'Separar por empresa → departamento / CCU.',
+            $groupLine,
             self::eligibilityLabels()[$this->eligibility_mode] ?? $this->eligibility_mode,
         ];
 
@@ -117,6 +166,7 @@ class BorderoAutoRule extends Model
         $rule = new self;
         $rule->fill([
             'name' => $data['name'] ?? 'Nova regra',
+            'group_by' => $data['group_by'] ?? ['empresa', 'departamento'],
             'min_titles_per_group' => $data['min_titles_per_group'] ?? 2,
             'due_grouping' => $data['due_grouping'] ?? self::DUE_NONE,
             'max_due_span_days' => $data['max_due_span_days'] ?? 7,

@@ -74,6 +74,7 @@ class BorderoAutoRuleTest extends TestCase
         $this->actingAs($this->manager())
             ->post('/financeiro/borderos/automatico', [
                 'name' => 'Regra DP',
+                'group_by' => ['empresa', 'departamento'],
                 'min_titles_per_group' => 2,
                 'due_grouping' => BorderoAutoRule::DUE_NONE,
                 'max_due_span_days' => 7,
@@ -99,6 +100,7 @@ class BorderoAutoRuleTest extends TestCase
         $this->actingAs($this->manager())
             ->post('/financeiro/borderos/automatico', [
                 'name' => 'Aplicar já',
+                'group_by' => ['empresa', 'departamento'],
                 'min_titles_per_group' => 2,
                 'due_grouping' => BorderoAutoRule::DUE_NONE,
                 'max_due_span_days' => 7,
@@ -119,6 +121,7 @@ class BorderoAutoRuleTest extends TestCase
 
         $this->actingAs($this->manager())
             ->postJson('/financeiro/borderos/automatico/simular', [
+                'group_by' => ['empresa', 'fornecedor'],
                 'min_titles_per_group' => 2,
                 'due_grouping' => BorderoAutoRule::DUE_NONE,
                 'max_due_span_days' => 7,
@@ -132,6 +135,7 @@ class BorderoAutoRuleTest extends TestCase
     {
         $rule = BorderoAutoRule::create([
             'name' => 'Mesmo dia',
+            'group_by' => ['empresa', 'departamento'],
             'is_active' => true,
             'due_grouping' => BorderoAutoRule::DUE_SAME_DAY,
             'min_titles_per_group' => 2,
@@ -175,10 +179,30 @@ class BorderoAutoRuleTest extends TestCase
         $this->assertCount(2, $preview['groups']);
     }
 
+    public function test_agrupa_por_fornecedor(): void
+    {
+        $rule = BorderoAutoRule::create([
+            'name' => 'Por fornecedor',
+            'group_by' => ['empresa', 'fornecedor'],
+            'is_active' => true,
+            'min_titles_per_group' => 2,
+        ]);
+
+        $this->makePayable(['supplier_name' => 'Fornecedor X', 'codfor' => 100, 'amount' => 50]);
+        $this->makePayable(['supplier_name' => 'Fornecedor X', 'codfor' => 100, 'amount' => 60]);
+        $this->makePayable(['supplier_name' => 'Fornecedor Y', 'codfor' => 200, 'amount' => 70]);
+        $this->makePayable(['supplier_name' => 'Fornecedor Y', 'codfor' => 200, 'amount' => 80]);
+
+        $preview = app(BorderoAutoGroupService::class)->preview($this->manager(), $rule);
+
+        $this->assertCount(2, $preview['groups']);
+    }
+
     public function test_cron_executa_regras_ativas(): void
     {
         BorderoAutoRule::create([
             'name' => 'Cron test',
+            'group_by' => ['empresa', 'departamento'],
             'is_active' => true,
             'min_titles_per_group' => 2,
         ]);
