@@ -295,6 +295,8 @@ function isSelected(id) {
 
 function clearSelection() {
     selected.value = []
+    borderoMode.value = false
+    createBorderoForm.value.description = ''
 }
 
 watch(() => status.value, clearSelection)
@@ -302,13 +304,31 @@ watch(() => props.payables?.current_page, () => {
     selected.value = selected.value.filter(id => currentPageIds.value.includes(id))
 })
 
+const borderoMode = ref(false)
 const createBorderoForm = ref({ description: '' })
-function createBordero() {
+
+function startBordero() {
+    if (selected.value.length === 0) return
+    createBorderoForm.value.description = ''
+    borderoMode.value = true
+}
+
+function cancelBordero() {
+    borderoMode.value = false
+    createBorderoForm.value.description = ''
+}
+
+function confirmBordero() {
     if (selected.value.length === 0) return
     router.post('/financeiro/borderos', {
         payable_ids: selected.value,
-        description: createBorderoForm.value.description || undefined,
-    }, { onSuccess: clearSelection })
+        description: createBorderoForm.value.description?.trim() || undefined,
+    }, {
+        onSuccess: () => {
+            borderoMode.value = false
+            clearSelection()
+        },
+    })
 }
 
 function batchSendForApproval() {
@@ -646,21 +666,38 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
 
             <!-- Barra de ações em lote -->
             <div v-if="canSelect && selected.length > 0" class="bg-blue-600 text-white rounded-xl p-3 mb-4 flex flex-wrap items-center justify-between gap-3">
-                <span class="text-sm font-medium">{{ selected.length }} título(s) selecionado(s)</span>
-                <div class="flex flex-wrap items-center gap-2">
-                    <Button v-if="canBatchSend" label="Enviar para aprovação" icon="pi pi-send" severity="contrast" size="small"
-                        dusk="btn-batch-send-approval" @click="batchSendForApproval" />
-                    <Button v-if="canBatchApprove" label="Aprovar selecionados" icon="pi pi-check" severity="success" size="small"
-                        dusk="btn-batch-approve" @click="openBatchApprove" />
-                    <Button v-if="canSelectBordero" label="Criar Borderô" icon="pi pi-list-check" severity="contrast" size="small"
-                        dusk="btn-batch-bordero" @click="createBordero" />
-                    <Button label="Definir apelido" icon="pi pi-tag" severity="contrast" outlined size="small"
-                        dusk="btn-batch-nickname" @click="openNicknameDialog" />
-                    <Button v-if="canManagePriority" label="Definir prioridade" icon="pi pi-flag" severity="contrast" outlined size="small"
-                        dusk="btn-batch-priority" @click="openPriorityDialog" />
-                    <InputText v-if="canSelectBordero" v-model="createBorderoForm.description" placeholder="Descrição do borderô (opcional)" class="w-56" />
-                    <Button icon="pi pi-times" severity="contrast" text size="small" @click="clearSelection" />
-                </div>
+                <template v-if="borderoMode">
+                    <span class="text-sm font-medium">Criar borderô com {{ selected.length }} título(s)</span>
+                    <div class="flex flex-wrap items-center gap-2 flex-1 justify-end">
+                        <InputText
+                            v-model="createBorderoForm.description"
+                            placeholder="Descrição do borderô (opcional)"
+                            class="w-64"
+                            dusk="bordero-description-input"
+                            @keyup.enter="confirmBordero"
+                        />
+                        <Button label="Confirmar borderô" icon="pi pi-check" severity="contrast" size="small"
+                            dusk="btn-bordero-confirm" @click="confirmBordero" />
+                        <Button label="Cancelar" icon="pi pi-times" severity="contrast" outlined size="small"
+                            dusk="btn-bordero-cancel" @click="cancelBordero" />
+                    </div>
+                </template>
+                <template v-else>
+                    <span class="text-sm font-medium">{{ selected.length }} título(s) selecionado(s)</span>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <Button v-if="canBatchSend" label="Enviar para aprovação" icon="pi pi-send" severity="contrast" size="small"
+                            dusk="btn-batch-send-approval" @click="batchSendForApproval" />
+                        <Button v-if="canBatchApprove" label="Aprovar selecionados" icon="pi pi-check" severity="success" size="small"
+                            dusk="btn-batch-approve" @click="openBatchApprove" />
+                        <Button v-if="canSelectBordero" label="Criar borderô" icon="pi pi-list-check" severity="contrast" size="small"
+                            dusk="btn-batch-bordero" @click="startBordero" />
+                        <Button label="Definir apelido" icon="pi pi-tag" severity="contrast" outlined size="small"
+                            dusk="btn-batch-nickname" @click="openNicknameDialog" />
+                        <Button v-if="canManagePriority" label="Definir prioridade" icon="pi pi-flag" severity="contrast" outlined size="small"
+                            dusk="btn-batch-priority" @click="openPriorityDialog" />
+                        <Button icon="pi pi-times" severity="contrast" text size="small" title="Limpar seleção" @click="clearSelection" />
+                    </div>
+                </template>
             </div>
 
             <!-- Tabela -->
