@@ -55,6 +55,11 @@ class FinanceiroRoutesSmokeTest extends TestCase
         $this->actingAs($this->admin())->get('/financeiro/pendencias')->assertOk();
     }
 
+    public function test_autorizacoes(): void
+    {
+        $this->actingAs($this->admin())->get('/financeiro/autorizacoes')->assertOk();
+    }
+
     public function test_fluxos_aprovacao(): void
     {
         $user = $this->admin();
