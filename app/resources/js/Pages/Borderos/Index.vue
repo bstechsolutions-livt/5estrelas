@@ -6,6 +6,7 @@ import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
+import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 import { useDevice } from '@/composables/useDevice'
 
 const props = defineProps({
@@ -13,6 +14,7 @@ const props = defineProps({
     totals: Object,
     filters: Object,
     statusOptions: Object,
+    noBranchAccess: { type: Boolean, default: false },
 })
 
 const STORAGE_KEY = 'borderos_status'
@@ -76,6 +78,8 @@ function wasRejectedBack(bordero) {
                 <h1 class="text-2xl font-bold text-gray-800">Borderôs</h1>
                 <p class="text-sm text-gray-500 mt-1">Agrupamentos de títulos para pagamento.</p>
             </div>
+
+            <BranchAccessBlocked v-if="noBranchAccess" class="mb-4" />
 
             <!-- Tabs status -->
             <div class="flex flex-wrap gap-2 mb-5 overflow-x-auto">

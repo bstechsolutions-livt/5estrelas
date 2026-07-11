@@ -35,7 +35,7 @@ class UtilController extends Controller
      * Filiais do usuário logado (Biglar: lista de filiais liberadas, como objetos).
      * No 5E: branches vinculadas ao usuário (pivot branch_user) como models Filial
      * (têm accessors codigo/razaosocial/fantasia e aceitam atributos dinâmicos).
-     * Sem vínculo → todas as filiais ativas.
+     * Sem vínculo → nenhuma filial liberada.
      */
     public static function filiaisUsuarioStatic()
     {
@@ -45,12 +45,13 @@ class UtilController extends Controller
         }
 
         $ids = method_exists($user, 'branches') ? $user->branches()->pluck('branches.id')->all() : [];
-        $query = \App\Models\Filial::query();
-        if (!empty($ids)) {
-            $query->whereIn('id', $ids);
-        } else {
-            $query->where('is_active', true);
+        if (empty($ids)) {
+            return collect();
         }
-        return $query->orderBy('name')->get();
+
+        return \App\Models\Filial::query()
+            ->whereIn('id', $ids)
+            ->orderBy('name')
+            ->get();
     }
 }

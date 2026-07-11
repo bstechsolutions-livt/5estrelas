@@ -45,6 +45,7 @@ class FinanceiroDashboardService
             'conciliacao' => $canConciliacao ? $this->conciliacaoResumo() : null,
             'department' => $lockedDepartment ? ['id' => $lockedDepartment->id, 'name' => $lockedDepartment->name] : null,
             'branches' => $branchScope['locked_branches'],
+            'no_branch_access' => $branchScope['no_branch_access'],
             'permissions' => [
                 'borderos' => $canBorderos,
                 'conciliacao' => $canConciliacao,

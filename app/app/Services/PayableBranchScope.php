@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class PayableBranchScope
 {
+    public const NO_BRANCH_ACCESS_MESSAGE = 'Você não tem permissão para acessar nenhuma filial. Solicite ao administrador do sistema a liberação das filiais necessárias.';
+
     public function canBypass(User $user): bool
     {
         return $user->hasPermission('*')
@@ -19,6 +21,7 @@ class PayableBranchScope
     /**
      * @return array{
      *     restricted: bool,
+     *     no_branch_access: bool,
      *     branch_ids: int[],
      *     codfils: array<int|string>,
      *     codemps: int[],
@@ -30,6 +33,7 @@ class PayableBranchScope
         if ($this->canBypass($user)) {
             return [
                 'restricted' => false,
+                'no_branch_access' => false,
                 'branch_ids' => [],
                 'codfils' => [],
                 'codemps' => [],
@@ -44,7 +48,8 @@ class PayableBranchScope
 
         if ($branches->isEmpty()) {
             return [
-                'restricted' => false,
+                'restricted' => true,
+                'no_branch_access' => true,
                 'branch_ids' => [],
                 'codfils' => [],
                 'codemps' => [],
@@ -60,6 +65,7 @@ class PayableBranchScope
 
         return [
             'restricted' => true,
+            'no_branch_access' => false,
             'branch_ids' => $branchIds,
             'codfils' => $codfils,
             'codemps' => $codemps,
@@ -111,6 +117,10 @@ class PayableBranchScope
             return true;
         }
 
+        if ($scope['no_branch_access']) {
+            return false;
+        }
+
         if ($payable->branch_id && in_array((int) $payable->branch_id, $scope['branch_ids'], true)) {
             return true;
         }
@@ -132,8 +142,12 @@ class PayableBranchScope
         $options = ComercialFilial::selectOptions();
         $scope = $this->resolve($user);
 
-        if (!$scope['restricted'] || $scope['codemps'] === []) {
+        if (!$scope['restricted']) {
             return $options;
+        }
+
+        if ($scope['no_branch_access'] || $scope['codemps'] === []) {
+            return [];
         }
 
         $allowed = array_flip($scope['codemps']);

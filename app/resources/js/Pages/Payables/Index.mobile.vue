@@ -8,6 +8,7 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
+import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 
 const props = defineProps({
     payables: Object,
@@ -20,6 +21,7 @@ const props = defineProps({
     canChangeDepartmentFilter: { type: Boolean, default: true },
     lockedDepartment: { type: Object, default: null },
     lockedBranches: { type: Array, default: () => [] },
+    noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
 })
 
@@ -237,6 +239,10 @@ const currentTotal = computed(() => {
 
 <template>
     <AppLayoutMobile title="Contas a Pagar">
+        <div v-if="noBranchAccess" class="px-4 pt-3">
+            <BranchAccessBlocked />
+        </div>
+
         <!-- Tabs de status (scroll horizontal) -->
         <div class="px-4 pt-3 pb-2 overflow-x-auto">
             <div class="flex gap-2 min-w-max">

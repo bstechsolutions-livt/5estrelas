@@ -122,14 +122,14 @@ function cancel() {
                             :options="branchOptions"
                             option-label="label"
                             option-value="value"
-                            placeholder="Todas as filiais (sem restrição)"
+                            placeholder="Selecione as filiais liberadas"
                             display="chip"
                             filter
                             class="w-full"
                             dusk="user-branch-ids"
                         />
                         <p class="text-xs text-gray-500 mt-1">
-                            Vazio = acesso a todas as filiais no financeiro e solicitações. Selecione para restringir Contas a Pagar, borderôs e dashboard.
+                            Selecione as filiais que o usuário pode acessar no financeiro e solicitações. Vazio = sem permissão para nenhuma filial.
                         </p>
                     </div>
 

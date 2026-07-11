@@ -91,12 +91,12 @@ function cancel() {
                         :options="branchOptions"
                         option-label="label"
                         option-value="value"
-                        placeholder="Todas (sem restrição)"
+                        placeholder="Selecione as filiais"
                         display="chip"
                         filter
                         class="w-full"
                     />
-                    <p class="text-[11px] text-gray-500 mt-1">Vazio = todas. Selecione para restringir o financeiro.</p>
+                    <p class="text-[11px] text-gray-500 mt-1">Vazio = sem permissão para nenhuma filial.</p>
                 </div>
                 <div class="flex items-center gap-3 pt-1">
                     <ToggleSwitch v-model="form.is_active" inputId="active" />

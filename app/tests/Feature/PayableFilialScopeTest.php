@@ -46,7 +46,7 @@ class PayableFilialScopeTest extends TestCase
         ], $attrs));
     }
 
-    public function test_usuario_sem_filiais_ve_todos_os_titulos(): void
+    public function test_usuario_sem_filiais_nao_ve_titulos(): void
     {
         $this->makePayable(['supplier_name' => 'TituloA', 'codemp' => 1]);
         $this->makePayable(['supplier_name' => 'TituloB', 'codemp' => 2]);
@@ -56,7 +56,15 @@ class PayableFilialScopeTest extends TestCase
             ->get('/financeiro/contas-pagar?status=pendente')
             ->assertOk();
 
-        $this->assertCount(2, $resp->json('data'));
+        $this->assertCount(0, $resp->json('data'));
+    }
+
+    public function test_usuario_sem_filiais_recebe_alerta_na_lista(): void
+    {
+        $this->actingAs($this->cpUser())
+            ->get('/financeiro/contas-pagar?status=pendente')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('noBranchAccess', true));
     }
 
     public function test_usuario_com_filiais_ve_apenas_titulos_liberados(): void

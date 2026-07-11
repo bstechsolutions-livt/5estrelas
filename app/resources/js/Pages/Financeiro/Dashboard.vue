@@ -5,6 +5,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import Chart from 'primevue/chart'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 
 const props = defineProps({
     kpis: Object,
@@ -16,6 +17,7 @@ const props = defineProps({
     conciliacao: Object,
     department: Object,
     permissions: Object,
+    no_branch_access: { type: Boolean, default: false },
 })
 
 const fmt = (v) => v != null && v > 0
@@ -126,6 +128,8 @@ function formatDate(d) {
                     />
                 </div>
             </div>
+
+            <BranchAccessBlocked v-if="no_branch_access" />
 
             <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-8 gap-3">
                 <button

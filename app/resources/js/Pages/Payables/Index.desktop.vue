@@ -11,6 +11,7 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
+import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 
 const props = defineProps({
     payables: Object,
@@ -23,6 +24,7 @@ const props = defineProps({
     canChangeDepartmentFilter: { type: Boolean, default: true },
     lockedDepartment: { type: Object, default: null },
     lockedBranches: { type: Array, default: () => [] },
+    noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
 })
 
@@ -269,7 +271,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                 <p class="text-sm text-gray-500 mt-1">Gerencie títulos, anexe documentos e envie para aprovação.</p>
             </div>
 
-            <!-- Tabs de status -->
+            <BranchAccessBlocked v-if="noBranchAccess" />
             <div class="flex flex-wrap gap-2 mb-5">
                 <button
                     v-for="s in statusList"

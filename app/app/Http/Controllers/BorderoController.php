@@ -21,6 +21,7 @@ class BorderoController extends Controller
     {
         $user = $request->user();
         $branchScope = app(PayableBranchScope::class);
+        $scope = $branchScope->resolve($user);
 
         $query = Bordero::query()
             ->with('creator:id,name')
@@ -30,7 +31,7 @@ class BorderoController extends Controller
         $status = $request->input('status') ?: 'aguardando_aprovacao';
         $query->where('status', $status);
 
-        if ($branchScope->resolve($user)['restricted']) {
+        if ($scope['restricted']) {
             $query->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));
         }
 
@@ -45,7 +46,7 @@ class BorderoController extends Controller
         $borderos = $query->paginate($request->input('per_page', 20))->withQueryString();
 
         $totalsQuery = Bordero::query();
-        if ($branchScope->resolve($user)['restricted']) {
+        if ($scope['restricted']) {
             $totalsQuery->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));
         }
         $totals = $totalsQuery
@@ -62,6 +63,7 @@ class BorderoController extends Controller
                 ['status' => $status],
             ),
             'statusOptions' => Bordero::STATUS_LABELS,
+            'noBranchAccess' => $scope['no_branch_access'],
         ]);
     }
 
@@ -76,7 +78,10 @@ class BorderoController extends Controller
         $user = $request->user();
         $branchScope = app(PayableBranchScope::class);
         if (!$bordero->payables->contains(fn (Payable $p) => $branchScope->canAccessPayable($user, $p))) {
-            abort(403, 'Você não tem acesso a este borderô.');
+            $scope = $branchScope->resolve($user);
+            abort(403, $scope['no_branch_access']
+                ? PayableBranchScope::NO_BRANCH_ACCESS_MESSAGE
+                : 'Você não tem acesso a este borderô.');
         }
 
         Payable::attachEmpresaNome($bordero->payables);

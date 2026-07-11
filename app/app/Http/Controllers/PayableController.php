@@ -124,6 +124,7 @@ class PayableController extends Controller
             'canChangeDepartmentFilter' => $departmentContext['can_change'],
             'lockedDepartment' => $departmentContext['locked_department'],
             'lockedBranches' => $branchScope['locked_branches'],
+            'noBranchAccess' => $branchScope['no_branch_access'],
             'canManageClassification' => $user?->hasPermission('financeiro.contas_pagar.classificacao_gerenciar') ?? false,
             'priorityOptions' => Payable::PRIORITY_LABELS,
         ]);
@@ -171,7 +172,10 @@ class PayableController extends Controller
         $user = $user ?? request()->user();
 
         if ($user && !app(PayableBranchScope::class)->canAccessPayable($user, $payable)) {
-            abort(403, 'Você não tem acesso a títulos desta filial.');
+            $scope = app(PayableBranchScope::class)->resolve($user);
+            abort(403, $scope['no_branch_access']
+                ? PayableBranchScope::NO_BRANCH_ACCESS_MESSAGE
+                : 'Você não tem acesso a títulos desta filial.');
         }
 
         return $payable;
