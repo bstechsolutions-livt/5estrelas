@@ -45,6 +45,11 @@ class FinanceiroRoutesSmokeTest extends TestCase
         $this->actingAs($user)->get('/financeiro/contas-pagar/alcada')->assertOk();
     }
 
+    public function test_dashboard(): void
+    {
+        $this->actingAs($this->admin())->get('/financeiro/dashboard')->assertOk();
+    }
+
     public function test_pendencias(): void
     {
         $this->actingAs($this->admin())->get('/financeiro/pendencias')->assertOk();
