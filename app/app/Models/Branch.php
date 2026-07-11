@@ -29,13 +29,15 @@ class Branch extends Model
     {
         $filial = $this->resolveComercialFilial();
         if ($filial !== null) {
-            return filled($filial->apelido) ? $filial->apelido : $filial->label;
+            $apelido = filled($filial->apelido) ? $filial->apelido : $filial->label;
+
+            return $this->appendFilialSuffix($apelido);
         }
 
         return \App\Models\Comercial\Filial::gerarApelido($this->name);
     }
 
-    /** Filial Senior espelhada (match por CNPJ, cod_fil ou cod_emp único). */
+    /** Filial Senior espelhada (CNPJ, nome da empresa, cod_fil ou cod_emp). */
     public function resolveComercialFilial(): ?\App\Models\Comercial\Filial
     {
         $query = \App\Models\Comercial\Filial::query()->where('ativo', true);
@@ -48,6 +50,11 @@ class Branch extends Model
             if ($byCnpj !== null) {
                 return $byCnpj;
             }
+        }
+
+        $byName = $this->matchComercialFilialByBranchName((clone $query)->get());
+        if ($byName !== null) {
+            return $byName;
         }
 
         if (! is_numeric($this->code)) {
@@ -70,12 +77,75 @@ class Branch extends Model
             }
         }
 
-        $byCodEmp = (clone $query)->where('cod_emp', $code)->get();
-        if ($byCodEmp->count() === 1) {
-            return $byCodEmp->first();
+        if ($this->extractFilialSuffixFromName() === null) {
+            $byCodEmp = (clone $query)->where('cod_emp', $code)->get();
+            if ($byCodEmp->count() === 1) {
+                return $byCodEmp->first();
+            }
         }
 
         return null;
+    }
+
+    private function appendFilialSuffix(string $apelido): string
+    {
+        $suffix = $this->extractFilialSuffixFromName();
+        if ($suffix === null) {
+            return $apelido;
+        }
+
+        if (preg_match('/\b'.preg_quote($suffix, '/').'\b/iu', $apelido)) {
+            return $apelido;
+        }
+
+        return trim($apelido.' '.$suffix);
+    }
+
+    private function extractFilialSuffixFromName(): ?string
+    {
+        if (preg_match('/FILIAL\s+([A-ZÀ-Ú]{2,})\b/iu', $this->name, $match)) {
+            return mb_strtoupper(trim($match[1]));
+        }
+
+        if (preg_match('/\bMATRIZ\b/iu', $this->name)) {
+            return 'MATRIZ';
+        }
+
+        if (preg_match('/\bGERENCIAL\b/iu', $this->name)) {
+            return 'GERENCIAL';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Comercial\Filial>  $filiais
+     */
+    private function matchComercialFilialByBranchName(\Illuminate\Support\Collection $filiais): ?\App\Models\Comercial\Filial
+    {
+        $name = mb_strtoupper($this->name);
+        $best = null;
+        $bestLen = 0;
+
+        foreach ($filiais as $filial) {
+            foreach ([$filial->nome, $filial->fantasia] as $candidate) {
+                if (! filled($candidate)) {
+                    continue;
+                }
+
+                $normalized = mb_strtoupper(preg_replace('/\s+/', ' ', trim($candidate)) ?? '');
+                if ($normalized === '' || ! str_contains($name, $normalized)) {
+                    continue;
+                }
+
+                if (mb_strlen($normalized) > $bestLen) {
+                    $best = $filial;
+                    $bestLen = mb_strlen($normalized);
+                }
+            }
+        }
+
+        return $best;
     }
 
     private function normalizedCnpj(): ?string

@@ -11,42 +11,77 @@ class BranchDisplayNameTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_resolve_display_name_pelo_cod_fil_e_apelido(): void
+    private function seedEmpresaSeguranca(): Filial
     {
-        Filial::create([
-            'cod_emp' => 2,
-            'cod_fil' => 3,
-            'senior_id' => '2-3',
-            'nome' => '5 ESTRELAS SISTEMA DE SEGURANCA LTDA',
-            'fantasia' => '5 ESTRELAS',
-            'apelido' => '5 ESTRELAS GO',
-            'ativo' => true,
-        ]);
-
-        Filial::create([
+        return Filial::create([
             'cod_emp' => 2,
             'cod_fil' => 1,
             'senior_id' => '2-1',
             'nome' => '5 ESTRELAS SISTEMA DE SEGURANCA LTDA',
             'fantasia' => '5 ESTRELAS',
-            'apelido' => '5 ESTRELAS MATRIZ',
+            'apelido' => '5 ESTRELAS',
             'ativo' => true,
         ]);
+    }
+
+    public function test_filial_regional_usa_apelido_da_empresa_mais_sufixo(): void
+    {
+        $this->seedEmpresaSeguranca();
 
         $branchGo = Branch::create([
-            'name' => '5 ESTRELAS FILIAL GO',
-            'code' => '3',
+            'name' => '5 ESTRELAS SISTEMA DE SEGURANCA LTDA - FILIAL GO',
+            'code' => '2',
+            'cnpj' => '72591894000223',
             'is_active' => true,
         ]);
 
-        $branchMatriz = Branch::create([
-            'name' => '5 ESTRELAS MATRIZ',
-            'code' => '1',
+        $branchMt = Branch::create([
+            'name' => '5 ESTRELAS SISTEMA DE SEGURANCA LTDA - FILIAL MT',
+            'code' => '15',
+            'cnpj' => '72591894000304',
             'is_active' => true,
         ]);
 
         $this->assertSame('5 ESTRELAS GO', $branchGo->resolveDisplayName());
-        $this->assertSame('5 ESTRELAS MATRIZ', $branchMatriz->resolveDisplayName());
+        $this->assertSame('5 ESTRELAS MT', $branchMt->resolveDisplayName());
+    }
+
+    public function test_cod_fil_nao_confunde_com_cod_emp_de_outra_empresa(): void
+    {
+        $this->seedEmpresaSeguranca();
+
+        Filial::create([
+            'cod_emp' => 6,
+            'cod_fil' => 1,
+            'senior_id' => '6-1',
+            'nome' => '5 ESTRELAS SERVICOS ESPECIALIZADOS',
+            'fantasia' => 'SRV ESPEC',
+            'apelido' => 'SRV ESPEC',
+            'ativo' => true,
+        ]);
+
+        $branchSp = Branch::create([
+            'name' => '5 ESTRELAS SISTEMA DE SEGURANCA LTDA - FILIAL SP',
+            'code' => '6',
+            'cnpj' => '72591894000576',
+            'is_active' => true,
+        ]);
+
+        $this->assertSame('5 ESTRELAS SP', $branchSp->resolveDisplayName());
+    }
+
+    public function test_matriz_gerencial_da_empresa_seguranca(): void
+    {
+        $this->seedEmpresaSeguranca();
+
+        $branch = Branch::create([
+            'name' => '5 ESTRELAS SISTEMA DE SEGURANCA LTDA - MATRIZ GERENCIAL',
+            'code' => '5',
+            'cnpj' => '72591894000142',
+            'is_active' => true,
+        ]);
+
+        $this->assertSame('5 ESTRELAS MATRIZ', $branch->resolveDisplayName());
     }
 
     public function test_resolve_display_name_por_cnpj_quando_cod_fil_ambiguo(): void
