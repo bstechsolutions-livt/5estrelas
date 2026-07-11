@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ApprovalWorkflowService;
 use App\Services\PayableAlcadaService;
+use App\Services\PayableBranchScope;
 use App\Services\PayableDepartmentClassifier;
 use App\Services\PayableDocumentPairAlert;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class PayableController extends Controller
     {
         $user = $request->user();
         $departmentContext = $this->resolveDepartmentFilter($request);
+        $branchScope = app(PayableBranchScope::class)->resolve($user);
 
         $query = Payable::query()
             ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number'])
@@ -73,6 +75,7 @@ class PayableController extends Controller
             $query->where('payment_priority', $request->payment_priority);
         }
         $this->applyDepartmentScope($query, $departmentContext['department_id']);
+        app(PayableBranchScope::class)->applyFilter($query, $user);
 
         $payables = $query->paginate($request->input('per_page', 20))->withQueryString();
 
@@ -95,6 +98,7 @@ class PayableController extends Controller
                     ->orWhereNull('bordero_id');
             });
         $this->applyDepartmentScope($totalsQuery, $departmentContext['department_id']);
+        app(PayableBranchScope::class)->applyFilter($totalsQuery, $user);
         $totals = $totalsQuery
             ->selectRaw("status, count(*) as count, coalesce(sum(amount), 0) as total")
             ->groupBy('status')
@@ -113,12 +117,13 @@ class PayableController extends Controller
                     'department_id' => $effectiveDepartmentId,
                 ],
             ),
-            'empresas' => ComercialFilial::selectOptions(),
+            'empresas' => app(PayableBranchScope::class)->empresaOptionsForUser($user),
             'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
             'statusOptions' => Payable::STATUS_LABELS,
             'canChangeDepartmentFilter' => $departmentContext['can_change'],
             'lockedDepartment' => $departmentContext['locked_department'],
+            'lockedBranches' => $branchScope['locked_branches'],
             'canManageClassification' => $user?->hasPermission('financeiro.contas_pagar.classificacao_gerenciar') ?? false,
             'priorityOptions' => Payable::PRIORITY_LABELS,
         ]);
@@ -160,9 +165,22 @@ class PayableController extends Controller
         }
     }
 
+    private function findPayableForUser(int $id, ?User $user = null): Payable
+    {
+        $payable = Payable::findOrFail($id);
+        $user = $user ?? request()->user();
+
+        if ($user && !app(PayableBranchScope::class)->canAccessPayable($user, $payable)) {
+            abort(403, 'Você não tem acesso a títulos desta filial.');
+        }
+
+        return $payable;
+    }
+
     public function show(int $id, PayableAlcadaService $alcada)
     {
-        $payable = Payable::with([
+        $payable = $this->findPayableForUser($id);
+        $payable->load([
             'branch:id,name',
             'preparer:id,name',
             'approver:id,name',
@@ -171,7 +189,7 @@ class PayableController extends Controller
             'prioritySetter:id,name',
             'documents.uploader:id,name',
             'comments.user:id,name,avatar_path',
-        ])->findOrFail($id);
+        ]);
 
         $user = request()->user();
         $isPagador = $user ? $alcada->isAssigned($user, 'pagador') : false;
@@ -224,7 +242,7 @@ class PayableController extends Controller
 
     public function addComment(Request $request, int $id)
     {
-        $payable = Payable::findOrFail($id);
+        $payable = $this->findPayableForUser($id);
 
         $data = $request->validate([
             'body' => ['required', 'string', 'max:2000'],
@@ -253,7 +271,7 @@ class PayableController extends Controller
 
     public function addDocument(Request $request, int $id)
     {
-        $payable = Payable::findOrFail($id);
+        $payable = $this->findPayableForUser($id);
 
         $request->validate([
             'file' => ['nullable', 'file', 'max:10240'],
@@ -315,7 +333,7 @@ class PayableController extends Controller
 
     public function sendForApproval(Request $request, int $id)
     {
-        $payable = Payable::findOrFail($id);
+        $payable = $this->findPayableForUser($id);
 
         if (!in_array($payable->status, ['pendente', 'em_preparacao', 'reprovado'])) {
             return back()->with('error', 'Este título não pode ser enviado para aprovação.');
@@ -345,7 +363,7 @@ class PayableController extends Controller
 
     public function approve(Request $request, int $id)
     {
-        $payable = Payable::findOrFail($id);
+        $payable = $this->findPayableForUser($id);
 
         if ($payable->status !== 'aguardando_aprovacao') {
             return back()->with('error', 'Este título não está aguardando aprovação.');
@@ -378,7 +396,7 @@ class PayableController extends Controller
 
     public function reject(Request $request, int $id)
     {
-        $payable = Payable::findOrFail($id);
+        $payable = $this->findPayableForUser($id);
 
         if ($payable->status !== 'aguardando_aprovacao') {
             return back()->with('error', 'Este título não está aguardando aprovação.');
@@ -404,7 +422,7 @@ class PayableController extends Controller
      */
     public function pay(Request $request, int $id, PayableAlcadaService $alcada)
     {
-        $payable = Payable::findOrFail($id);
+        $payable = $this->findPayableForUser($id);
         $user = $request->user();
 
         // Elegibilidade pela alçada (segregação de função). Não checamos permissão aqui.
@@ -494,7 +512,7 @@ class PayableController extends Controller
      */
     public function conciliate(Request $request, int $id, PayableAlcadaService $alcada)
     {
-        $payable = Payable::findOrFail($id);
+        $payable = $this->findPayableForUser($id);
         $user = $request->user();
 
         if (! $alcada->isAssigned($user, 'conciliador')) {
@@ -573,7 +591,7 @@ class PayableController extends Controller
      */
     public function diverge(Request $request, int $id, PayableAlcadaService $alcada)
     {
-        $payable = Payable::findOrFail($id);
+        $payable = $this->findPayableForUser($id);
         $user = $request->user();
 
         if (! $alcada->isAssigned($user, 'conciliador')) {
@@ -636,7 +654,7 @@ class PayableController extends Controller
      */
     public function updateDueDate(Request $request, int $id)
     {
-        $payable = Payable::findOrFail($id);
+        $payable = $this->findPayableForUser($id);
         $user = $request->user();
 
         if (! $user?->hasPermission('financeiro.contas_pagar.editar_vencimento')) {
@@ -674,7 +692,7 @@ class PayableController extends Controller
 
     public function updatePaymentPriority(Request $request, int $id)
     {
-        $payable = Payable::findOrFail($id);
+        $payable = $this->findPayableForUser($id);
         $user = $request->user();
 
         if (! $user?->hasPermission('financeiro.contas_pagar.prioridade_gerenciar')) {
@@ -735,6 +753,7 @@ class PayableController extends Controller
 
     public function removeDocument(int $payableId, int $docId)
     {
+        $this->findPayableForUser($payableId);
         $doc = PayableDocument::where('payable_id', $payableId)->findOrFail($docId);
         Storage::disk('public')->delete($doc->path);
         $doc->delete();
@@ -748,7 +767,7 @@ class PayableController extends Controller
      */
     public function finalSign(Request $request, int $id, PayableAlcadaService $alcada)
     {
-        $payable = Payable::findOrFail($id);
+        $payable = $this->findPayableForUser($id);
         $user = $request->user();
 
         // Só quem está na alçada como 'assinante' pode dar a 2ª assinatura

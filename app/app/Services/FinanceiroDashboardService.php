@@ -8,6 +8,7 @@ use App\Models\Bordero;
 use App\Models\Department;
 use App\Models\Payable;
 use App\Models\User;
+use App\Services\PayableBranchScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
@@ -26,6 +27,7 @@ class FinanceiroDashboardService
     public function build(User $user): array
     {
         $departmentId = $this->resolveDepartmentScope($user);
+        $branchScope = app(PayableBranchScope::class)->resolve($user);
         $lockedDepartment = $departmentId
             ? Department::whereKey($departmentId)->first(['id', 'name'])
             : null;
@@ -35,13 +37,14 @@ class FinanceiroDashboardService
 
         return [
             'kpis' => $this->kpis($user, $departmentId, $canBorderos),
-            'payables_by_status' => $this->payablesByStatus($departmentId),
-            'borderos_by_status' => $canBorderos ? $this->borderosByStatus() : null,
-            'vencimentos_semanas' => $this->vencimentosPorSemana($departmentId),
-            'proximos_vencimentos' => $this->proximosVencimentos($departmentId),
+            'payables_by_status' => $this->payablesByStatus($departmentId, $user),
+            'borderos_by_status' => $canBorderos ? $this->borderosByStatus($user) : null,
+            'vencimentos_semanas' => $this->vencimentosPorSemana($departmentId, $user),
+            'proximos_vencimentos' => $this->proximosVencimentos($departmentId, $user),
             'minhas_aprovacoes' => $this->minhasAprovacoes($user),
             'conciliacao' => $canConciliacao ? $this->conciliacaoResumo() : null,
             'department' => $lockedDepartment ? ['id' => $lockedDepartment->id, 'name' => $lockedDepartment->name] : null,
+            'branches' => $branchScope['locked_branches'],
             'permissions' => [
                 'borderos' => $canBorderos,
                 'conciliacao' => $canConciliacao,
@@ -65,10 +68,11 @@ class FinanceiroDashboardService
         }
     }
 
-    private function payableQuery(?int $departmentId): Builder
+    private function payableQuery(?int $departmentId, User $user): Builder
     {
         $query = Payable::query();
         $this->applyDepartmentScope($query, $departmentId);
+        app(PayableBranchScope::class)->applyFilter($query, $user);
 
         return $query;
     }
@@ -79,7 +83,7 @@ class FinanceiroDashboardService
         $in7 = now()->addDays(7)->toDateString();
         $monthStart = now()->startOfMonth()->toDateString();
 
-        $emAbertoQuery = $this->payableQuery($departmentId)
+        $emAbertoQuery = $this->payableQuery($departmentId, $user)
             ->where(function (Builder $q) {
                 $q->where('status', 'em_preparacao')
                     ->orWhere(function (Builder $q2) {
@@ -87,18 +91,18 @@ class FinanceiroDashboardService
                     });
             });
 
-        $aguardandoQuery = $this->payableQuery($departmentId)->where('status', 'aguardando_aprovacao');
-        $aprovadoQuery = $this->payableQuery($departmentId)->where('status', 'aprovado');
+        $aguardandoQuery = $this->payableQuery($departmentId, $user)->where('status', 'aguardando_aprovacao');
+        $aprovadoQuery = $this->payableQuery($departmentId, $user)->where('status', 'aprovado');
 
-        $vencidosQuery = $this->payableQuery($departmentId)
+        $vencidosQuery = $this->payableQuery($departmentId, $user)
             ->whereIn('status', self::OPEN_STATUSES)
             ->where('due_date', '<', $today);
 
-        $vencendo7Query = $this->payableQuery($departmentId)
+        $vencendo7Query = $this->payableQuery($departmentId, $user)
             ->whereIn('status', self::OPEN_STATUSES)
             ->whereBetween('due_date', [$today, $in7]);
 
-        $pagosMesQuery = $this->payableQuery($departmentId)
+        $pagosMesQuery = $this->payableQuery($departmentId, $user)
             ->where('status', 'pago')
             ->where('paid_at', '>=', $monthStart);
 
@@ -107,17 +111,22 @@ class FinanceiroDashboardService
 
         $borderosAbertos = null;
         if ($canBorderos) {
-            $borderosAbertos = Bordero::query()
-                ->whereIn('status', ['rascunho', 'aguardando_aprovacao'])
+            $borderosQuery = Bordero::query()
+                ->whereIn('status', ['rascunho', 'aguardando_aprovacao']);
+            $branchScope = app(PayableBranchScope::class);
+            if ($branchScope->resolve($user)['restricted']) {
+                $borderosQuery->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));
+            }
+            $borderosAbertos = $borderosQuery
                 ->selectRaw('count(*) as count, coalesce(sum(total_amount), 0) as total')
                 ->first();
         }
 
-        $urgentesQuery = $this->payableQuery($departmentId)
+        $urgentesQuery = $this->payableQuery($departmentId, $user)
             ->where('payment_priority', 'urgente')
             ->whereIn('status', self::OPEN_STATUSES);
 
-        $slaEstouradoQuery = $this->payableQuery($departmentId)
+        $slaEstouradoQuery = $this->payableQuery($departmentId, $user)
             ->whereNotNull('payment_sla_date')
             ->where('payment_sla_date', '<', $today)
             ->whereIn('status', self::OPEN_STATUSES);
@@ -163,9 +172,9 @@ class FinanceiroDashboardService
         ];
     }
 
-    private function payablesByStatus(?int $departmentId): array
+    private function payablesByStatus(?int $departmentId, User $user): array
     {
-        $rows = $this->payableQuery($departmentId)
+        $rows = $this->payableQuery($departmentId, $user)
             ->where(function (Builder $q) {
                 $q->where('status', '!=', 'pendente')
                     ->orWhereNull('bordero_id');
@@ -190,9 +199,14 @@ class FinanceiroDashboardService
         return $result;
     }
 
-    private function borderosByStatus(): array
+    private function borderosByStatus(User $user): array
     {
-        $rows = Bordero::query()
+        $query = Bordero::query();
+        $branchScope = app(PayableBranchScope::class);
+        if ($branchScope->resolve($user)['restricted']) {
+            $query->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));
+        }
+        $rows = $query
             ->selectRaw('status, count(*) as count, coalesce(sum(total_amount), 0) as total')
             ->groupBy('status')
             ->get()
@@ -212,7 +226,7 @@ class FinanceiroDashboardService
         return $result;
     }
 
-    private function vencimentosPorSemana(?int $departmentId): array
+    private function vencimentosPorSemana(?int $departmentId, User $user): array
     {
         $today = Carbon::today();
         $weeks = [];
@@ -221,7 +235,7 @@ class FinanceiroDashboardService
             $start = $today->copy()->addDays($w * 7);
             $end = $today->copy()->addDays(($w + 1) * 7 - 1);
 
-            $query = $this->payableQuery($departmentId)
+            $query = $this->payableQuery($departmentId, $user)
                 ->whereIn('status', self::OPEN_STATUSES)
                 ->whereBetween('due_date', [$start->toDateString(), $end->toDateString()]);
 
@@ -237,11 +251,11 @@ class FinanceiroDashboardService
         return $weeks;
     }
 
-    private function proximosVencimentos(?int $departmentId): array
+    private function proximosVencimentos(?int $departmentId, User $user): array
     {
         $today = now()->toDateString();
 
-        $items = $this->payableQuery($departmentId)
+        $items = $this->payableQuery($departmentId, $user)
             ->whereIn('status', self::OPEN_STATUSES)
             ->where('due_date', '>=', $today)
             ->orderBy('due_date')

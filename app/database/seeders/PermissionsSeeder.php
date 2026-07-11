@@ -43,6 +43,7 @@ class PermissionsSeeder extends Seeder
             ['key' => 'financeiro.contas_pagar.alcada_gerenciar', 'label' => 'Gerenciar alçada do contas a pagar', 'module' => 'financeiro'],
             ['key' => 'financeiro.contas_pagar.classificacao_gerenciar', 'label' => 'Gerenciar classificação por departamento (CP)', 'module' => 'financeiro'],
             ['key' => 'financeiro.contas_pagar.ver_todos_departamentos', 'label' => 'Ver e filtrar títulos de todos os departamentos (CP)', 'module' => 'financeiro'],
+            ['key' => 'financeiro.contas_pagar.ver_todas_filiais', 'label' => 'Ver títulos de todas as filiais (CP)', 'module' => 'financeiro'],
             ['key' => 'financeiro.contas_pagar.editar_vencimento', 'label' => 'Editar vencimento de contas a pagar (financeiro)', 'module' => 'financeiro'],
             ['key' => 'financeiro.contas_pagar.prioridade_gerenciar', 'label' => 'Gerenciar prioridade e SLA de pagamento (CP)', 'module' => 'financeiro'],
             ['key' => 'financeiro.borderos.visualizar', 'label' => 'Ver borderôs', 'module' => 'financeiro'],

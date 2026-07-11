@@ -19,6 +19,7 @@ const props = defineProps({
     statusOptions: Object,
     canChangeDepartmentFilter: { type: Boolean, default: true },
     lockedDepartment: { type: Object, default: null },
+    lockedBranches: { type: Array, default: () => [] },
     canManageClassification: { type: Boolean, default: false },
 })
 

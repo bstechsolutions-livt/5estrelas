@@ -9,6 +9,7 @@ use App\Models\Payable;
 use App\Models\PayableComment;
 use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogger;
+use App\Services\PayableBranchScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -18,6 +19,9 @@ class BorderoController extends Controller
 {
     public function index(Request $request)
     {
+        $user = $request->user();
+        $branchScope = app(PayableBranchScope::class);
+
         $query = Bordero::query()
             ->with('creator:id,name')
             ->orderByDesc('created_at');
@@ -25,6 +29,10 @@ class BorderoController extends Controller
         // Sempre filtra por um status (default: aguardando_aprovacao). Não existe "ver todos".
         $status = $request->input('status') ?: 'aguardando_aprovacao';
         $query->where('status', $status);
+
+        if ($branchScope->resolve($user)['restricted']) {
+            $query->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));
+        }
 
         if ($request->filled('search')) {
             $s = $request->search;
@@ -36,7 +44,11 @@ class BorderoController extends Controller
 
         $borderos = $query->paginate($request->input('per_page', 20))->withQueryString();
 
-        $totals = Bordero::query()
+        $totalsQuery = Bordero::query();
+        if ($branchScope->resolve($user)['restricted']) {
+            $totalsQuery->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));
+        }
+        $totals = $totalsQuery
             ->selectRaw("status, count(*) as count, coalesce(sum(total_amount), 0) as total")
             ->groupBy('status')
             ->get()
@@ -61,10 +73,15 @@ class BorderoController extends Controller
             'payables' => fn ($q) => $q->with('branch:id,name')->withCount('documents')->orderBy('due_date'),
         ])->findOrFail($id);
 
+        $user = $request->user();
+        $branchScope = app(PayableBranchScope::class);
+        if (!$bordero->payables->contains(fn (Payable $p) => $branchScope->canAccessPayable($user, $p))) {
+            abort(403, 'Você não tem acesso a este borderô.');
+        }
+
         Payable::attachEmpresaNome($bordero->payables);
         Payable::attachFilialNome($bordero->payables);
 
-        $user = $request->user();
         $workflow = app(ApprovalWorkflowService::class);
 
         $payableIds = $bordero->payables->pluck('id');
@@ -113,11 +130,15 @@ class BorderoController extends Controller
             'description' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $user = $request->user();
+        $branchScope = app(PayableBranchScope::class);
+
         // Valida que os títulos estão em status que permite agrupar
-        $payables = Payable::whereIn('id', $data['payable_ids'])
+        $payablesQuery = Payable::whereIn('id', $data['payable_ids'])
             ->whereIn('status', ['pendente', 'em_preparacao', 'reprovado'])
-            ->whereNull('bordero_id')
-            ->get();
+            ->whereNull('bordero_id');
+        $branchScope->applyFilter($payablesQuery, $user);
+        $payables = $payablesQuery->get();
 
         if ($payables->isEmpty()) {
             return back()->with('error', 'Nenhum título válido para agrupar (devem estar pendentes e fora de outro borderô).');

@@ -22,6 +22,7 @@ const props = defineProps({
     statusOptions: Object,
     canChangeDepartmentFilter: { type: Boolean, default: true },
     lockedDepartment: { type: Object, default: null },
+    lockedBranches: { type: Array, default: () => [] },
     canManageClassification: { type: Boolean, default: false },
 })
 
@@ -313,6 +314,9 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             {{ lockedDepartment?.name || 'Sem departamento vinculado' }}
                         </div>
                         <p v-if="!canChangeDepartmentFilter" class="text-[11px] text-gray-400 mt-1">Exibindo apenas títulos do seu departamento.</p>
+                        <p v-if="lockedBranches?.length" class="text-[11px] text-amber-700 mt-1" dusk="locked-branches-hint">
+                            Filiais liberadas: {{ lockedBranches.map(b => b.name).join(', ') }}
+                        </p>
                         <a
                             v-if="canManageClassification"
                             href="/financeiro/contas-pagar/classificacao-departamentos"

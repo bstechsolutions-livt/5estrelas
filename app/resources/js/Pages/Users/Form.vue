@@ -7,6 +7,7 @@ defineProps({
     mode: { type: String, required: true },
     user: Object,
     departments: { type: Array, default: () => [] },
+    branches: { type: Array, default: () => [] },
 })
 
 const { isMobile } = useDevice()

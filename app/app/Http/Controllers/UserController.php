@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Branch;
 use App\Models\Department;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -46,6 +47,7 @@ class UserController extends Controller
             'mode' => 'create',
             'user' => null,
             'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'branches' => $this->branchOptions(),
         ]);
     }
 
@@ -57,9 +59,11 @@ class UserController extends Controller
             'password' => ['required', 'string', new \App\Rules\StrongPassword()],
             'is_active' => ['boolean'],
             'department_id' => ['nullable', 'exists:departments,id'],
+            'branch_ids' => ['nullable', 'array'],
+            'branch_ids.*' => ['integer', 'exists:branches,id'],
         ]);
 
-        User::create([
+        $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => bcrypt($data['password']),
@@ -67,12 +71,15 @@ class UserController extends Controller
             'department_id' => $data['department_id'] ?? null,
         ]);
 
+        $user->branches()->sync($data['branch_ids'] ?? []);
+
         return redirect('/usuarios')->with('success', 'Usuário criado com sucesso.');
     }
 
     public function edit(int $id)
     {
-        $user = User::findOrFail($id);
+        $user = User::with('branches:id')->findOrFail($id);
+
         return Inertia::render('Users/Form', [
             'mode' => 'edit',
             'user' => [
@@ -81,8 +88,10 @@ class UserController extends Controller
                 'email' => $user->email,
                 'is_active' => (bool) $user->is_active,
                 'department_id' => $user->department_id,
+                'branch_ids' => $user->branches->pluck('id')->all(),
             ],
             'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'branches' => $this->branchOptions(),
         ]);
     }
 
@@ -96,6 +105,8 @@ class UserController extends Controller
             'password' => ['nullable', 'string', new \App\Rules\StrongPassword()],
             'is_active' => ['boolean'],
             'department_id' => ['nullable', 'exists:departments,id'],
+            'branch_ids' => ['nullable', 'array'],
+            'branch_ids.*' => ['integer', 'exists:branches,id'],
         ]);
 
         $user->name = $data['name'];
@@ -106,8 +117,24 @@ class UserController extends Controller
         $user->is_active = $data['is_active'] ?? $user->is_active;
         $user->department_id = $data['department_id'] ?? $user->department_id;
         $user->save();
+        $user->branches()->sync($data['branch_ids'] ?? []);
 
         return redirect('/usuarios')->with('success', 'Usuário atualizado com sucesso.');
+    }
+
+    /** @return array<int, array{id:int,name:string,code:?string}> */
+    private function branchOptions(): array
+    {
+        return Branch::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code'])
+            ->map(fn (Branch $b) => [
+                'id' => $b->id,
+                'name' => $b->display_name,
+                'code' => $b->code,
+            ])
+            ->values()
+            ->all();
     }
 
     public function toggleActive(int $id, Request $request)
