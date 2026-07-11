@@ -13,6 +13,7 @@ import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
+import { formatApiDate } from '@/utils/apiDate'
 
 const props = defineProps({
     payables: Object,
@@ -250,8 +251,7 @@ function formatMoney(val) {
 }
 
 function formatDate(d) {
-    if (!d) return '—'
-    return new Date(d).toLocaleDateString('pt-BR')
+    return formatApiDate(d)
 }
 
 function wasRejectedBack(payable) {
