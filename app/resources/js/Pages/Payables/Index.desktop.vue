@@ -17,6 +17,7 @@ const props = defineProps({
     totals: Object,
     filters: Object,
     empresas: Array,
+    departments: Array,
     branches: Array,
     statusOptions: Object,
 })
@@ -29,6 +30,7 @@ const STORAGE_KEY = 'payables_filters'
 const search = ref(props.filters?.search || '')
 const status = ref(props.filters?.status || 'pendente')
 const codemp = ref(props.filters?.codemp ? Number(props.filters.codemp) : null)
+const departmentId = ref(props.filters?.department_id ? Number(props.filters.department_id) : null)
 const amountMin = ref(props.filters?.amount_min ? Number(props.filters.amount_min) : null)
 const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_max) : null)
 const dueFrom = ref(props.filters?.due_from || '')
@@ -47,12 +49,18 @@ const empresaList = computed(() => [
     ...(props.empresas || []).map(e => ({ label: e.label, value: e.value })),
 ])
 
+const departmentList = computed(() => [
+    { label: 'Todos os departamentos', value: null },
+    ...(props.departments || []).map(d => ({ label: d.name, value: d.id })),
+])
+
 let timer = null
 function currentFilters() {
     return {
         search: search.value || undefined,
         status: status.value || undefined,
         codemp: codemp.value || undefined,
+        department_id: departmentId.value || undefined,
         amount_min: amountMin.value || undefined,
         amount_max: amountMax.value || undefined,
         due_from: dueFrom.value || undefined,
@@ -77,13 +85,14 @@ function selectStatus(s) {
 }
 
 const hasActiveFilters = computed(() => {
-    return !!(search.value || codemp.value || amountMin.value || amountMax.value || dueFrom.value || dueTo.value)
+    return !!(search.value || codemp.value || departmentId.value || amountMin.value || amountMax.value || dueFrom.value || dueTo.value)
 })
 
 const activeFilterCount = computed(() => {
     let c = 0
     if (search.value) c++
     if (codemp.value) c++
+    if (departmentId.value) c++
     if (amountMin.value) c++
     if (amountMax.value) c++
     if (dueFrom.value) c++
@@ -94,6 +103,7 @@ const activeFilterCount = computed(() => {
 function clearFilters() {
     search.value = ''
     codemp.value = null
+    departmentId.value = null
     amountMin.value = ''
     amountMax.value = ''
     dueFrom.value = ''
@@ -106,6 +116,7 @@ function onPage(event) {
         search: search.value || undefined,
         status: status.value || undefined,
         codemp: codemp.value || undefined,
+        department_id: departmentId.value || undefined,
         amount_min: amountMin.value || undefined,
         amount_max: amountMax.value || undefined,
         due_from: dueFrom.value || undefined,
@@ -132,12 +143,13 @@ onMounted(() => {
                 status.value = f.status === 'reprovado' ? 'pendente' : (f.status || 'pendente')
                 search.value = f.search || ''
                 codemp.value = f.codemp ? Number(f.codemp) : null
+                departmentId.value = f.department_id ? Number(f.department_id) : null
                 amountMin.value = f.amount_min ? Number(f.amount_min) : null
                 amountMax.value = f.amount_max ? Number(f.amount_max) : null
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
                 const serverStatus = props.filters?.status || 'pendente'
-                const differs = status.value !== serverStatus || f.search || f.codemp || f.amount_min || f.amount_max || f.due_from || f.due_to
+                const differs = status.value !== serverStatus || f.search || f.codemp || f.department_id || f.amount_min || f.amount_max || f.due_from || f.due_to
                 if (differs) {
                     applyFilters()
                     return
@@ -261,6 +273,10 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                         <Select v-model="codemp" :options="empresaList" option-label="label" option-value="value" placeholder="Todas" class="w-full" />
                     </div>
                     <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Departamento</label>
+                        <Select v-model="departmentId" :options="departmentList" option-label="label" option-value="value" placeholder="Todos" class="w-full" />
+                    </div>
+                    <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Valor mínimo</label>
                         <InputNumber v-model="amountMin" mode="currency" currency="BRL" locale="pt-BR" placeholder="R$ 0,00" class="w-full" :input-class="'w-full'" />
                     </div>
@@ -327,17 +343,22 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             </div>
                         </template>
                     </Column>
-                    <Column header="Empresa" style="width: 9%" dusk="col-empresa">
+                    <Column header="Empresa" style="width: 8%" dusk="col-empresa">
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs text-gray-700" :title="data.empresa_nome" @click="goShow(data.id)">{{ data.empresa_nome || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '26%' : '22%' }">
+                    <Column header="Depto" style="width: 8%" dusk="col-departamento">
+                        <template #body="{ data }">
+                            <span class="cell-truncate text-xs text-gray-600" :title="data.department_nome" @click="goShow(data.id)">{{ data.department_nome || '—' }}</span>
+                        </template>
+                    </Column>
+                    <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '22%' : '18%' }">
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs" :title="data.supplier_name" @click="goShow(data.id)">{{ data.supplier_name }}</span>
                         </template>
                     </Column>
-                    <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '26%' : '22%' }">
+                    <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '22%' : '18%' }">
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs text-gray-600" :title="data.description" @click="goShow(data.id)">{{ data.description || '—' }}</span>
                         </template>

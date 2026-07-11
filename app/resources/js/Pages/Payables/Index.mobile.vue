@@ -14,6 +14,7 @@ const props = defineProps({
     totals: Object,
     filters: Object,
     empresas: Array,
+    departments: Array,
     branches: Array,
     statusOptions: Object,
 })
@@ -27,6 +28,7 @@ const search = ref(props.filters?.search || '')
 const status = ref(props.filters?.status || 'pendente')
 const filtersOpen = ref(false)
 const codemp = ref(props.filters?.codemp ? Number(props.filters.codemp) : null)
+const departmentId = ref(props.filters?.department_id ? Number(props.filters.department_id) : null)
 const amountMin = ref(props.filters?.amount_min ? Number(props.filters.amount_min) : null)
 const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_max) : null)
 const dueFrom = ref(props.filters?.due_from || '')
@@ -45,11 +47,17 @@ const empresaList = computed(() => [
     ...(props.empresas || []).map(e => ({ label: e.label, value: e.value })),
 ])
 
+const departmentList = computed(() => [
+    { label: 'Todos os departamentos', value: null },
+    ...(props.departments || []).map(d => ({ label: d.name, value: d.id })),
+])
+
 function currentFilters() {
     return {
         search: search.value || undefined,
         status: status.value || undefined,
         codemp: codemp.value || undefined,
+        department_id: departmentId.value || undefined,
         amount_min: amountMin.value || undefined,
         amount_max: amountMax.value || undefined,
         due_from: dueFrom.value || undefined,
@@ -100,12 +108,13 @@ onMounted(() => {
                 status.value = f.status === 'reprovado' ? 'pendente' : (f.status || 'pendente')
                 search.value = f.search || ''
                 codemp.value = f.codemp ? Number(f.codemp) : null
+                departmentId.value = f.department_id ? Number(f.department_id) : null
                 amountMin.value = f.amount_min ? Number(f.amount_min) : null
                 amountMax.value = f.amount_max ? Number(f.amount_max) : null
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
                 const serverStatus = props.filters?.status || 'pendente'
-                const differs = status.value !== serverStatus || f.search || f.codemp || f.amount_min || f.amount_max || f.due_from || f.due_to
+                const differs = status.value !== serverStatus || f.search || f.codemp || f.department_id || f.amount_min || f.amount_max || f.due_from || f.due_to
                 setTimeout(() => { restoring = false }, 400)
                 if (differs) applyFilters()
             } catch (e) { restoring = false }
@@ -121,6 +130,7 @@ function applyAndClose() {
 function clearFilters() {
     search.value = ''
     codemp.value = null
+    departmentId.value = null
     amountMin.value = null
     amountMax.value = null
     dueFrom.value = ''
@@ -133,6 +143,7 @@ function clearFilters() {
 const activeFilterCount = computed(() => {
     let c = 0
     if (codemp.value) c++
+    if (departmentId.value) c++
     if (amountMin.value) c++
     if (amountMax.value) c++
     if (dueFrom.value) c++
@@ -263,6 +274,7 @@ const currentTotal = computed(() => {
             <button v-for="p in payables.data" :key="p.id" @click="onCardTap(p)"
                 :class="['w-full bg-white rounded-xl border p-3 text-left active:bg-gray-50 transition-colors',
                     selectionMode && isSelected(p.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200']">
+                <p v-if="p.department_nome" class="text-[11px] text-gray-500 truncate mb-0.5" dusk="m-departamento">{{ p.department_nome }}</p>
                 <p v-if="p.empresa_nome" class="text-[11px] font-semibold text-blue-600 truncate mb-0.5" dusk="m-empresa">{{ p.empresa_nome }}</p>
                 <div class="flex items-start justify-between gap-2 mb-1">
                     <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -324,6 +336,10 @@ const currentTotal = computed(() => {
                 <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Empresa</label>
                     <Select v-model="codemp" :options="empresaList" option-label="label" option-value="value" class="w-full" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Departamento</label>
+                    <Select v-model="departmentId" :options="departmentList" option-label="label" option-value="value" class="w-full" />
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>

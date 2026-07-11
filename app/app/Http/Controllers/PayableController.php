@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\Comercial\Filial as ComercialFilial;
+use App\Models\Department;
 use App\Models\Payable;
 use App\Models\PayableComment;
 use App\Models\PayableDocument;
@@ -11,6 +12,7 @@ use App\Models\ApprovalStep;
 use App\Services\AuditLogger;
 use App\Services\ApprovalWorkflowService;
 use App\Services\PayableAlcadaService;
+use App\Services\PayableDepartmentClassifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -60,12 +62,19 @@ class PayableController extends Controller
         if ($request->filled('amount_max')) {
             $query->where('amount', '<=', (float) $request->amount_max);
         }
+        if ($request->filled('department_id')) {
+            app(PayableDepartmentClassifier::class)->applyDepartmentFilter(
+                $query,
+                (int) $request->department_id,
+            );
+        }
 
         $payables = $query->paginate($request->input('per_page', 20))->withQueryString();
 
         // A3: resolve o NOME da empresa (nunca código) para cada título da página.
         Payable::attachEmpresaNome($payables->getCollection());
         Payable::attachFilialNome($payables->getCollection());
+        Payable::attachDepartmentNome($payables->getCollection());
 
         if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
             return response()->json($payables);
@@ -86,10 +95,11 @@ class PayableController extends Controller
             'payables' => $payables,
             'totals' => $totals,
             'filters' => array_merge(
-                $request->only(['search', 'due_from', 'due_to', 'codemp', 'branch_id', 'amount_min', 'amount_max']),
+                $request->only(['search', 'due_from', 'due_to', 'codemp', 'branch_id', 'amount_min', 'amount_max', 'department_id']),
                 ['status' => $status],
             ),
             'empresas' => ComercialFilial::selectOptions(),
+            'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
             'statusOptions' => Payable::STATUS_LABELS,
         ]);

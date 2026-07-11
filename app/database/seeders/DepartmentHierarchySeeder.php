@@ -30,6 +30,7 @@ class DepartmentHierarchySeeder extends Seeder
             'alexyxandra' => $this->findUser('alexyxandra@grupo5estrelas.com.br'),
             'dionei' => $this->findUser('dionei@grupo5estrelas.com.br'),
             'ana_paula' => $this->findUser('anapaula@grupo5estrelas.com.br'),
+            'karen' => $this->findUser('karen@grupo5estrelas.com.br'),
         ];
 
         $departments = [
@@ -47,6 +48,7 @@ class DepartmentHierarchySeeder extends Seeder
             ['multi', 'Multi', 'multi_star', 'luiz', null],
             ['star', 'Star', 'multi_star', 'luiz', null],
             ['baluarte', 'Baluarte', 'baluarte', 'erismar', 'ana_paula'],
+            ['financeiro', 'Financeiro', 'financeiro', 'karen', 'dionei'],
         ];
 
         $activeSlugs = [];
@@ -83,7 +85,7 @@ class DepartmentHierarchySeeder extends Seeder
             $this->purgeLegacyDepartment($legacy, $canonicalDpRh);
         }
 
-        foreach (['diretoria', 'financeiro', 'matriz-operacoes', 'modernizacao-ti'] as $legacySlug) {
+        foreach (['diretoria', 'matriz-operacoes', 'modernizacao-ti'] as $legacySlug) {
             $legacy = Department::where('slug', $legacySlug)->first();
             if ($legacy) {
                 $this->purgeLegacyDepartment($legacy);

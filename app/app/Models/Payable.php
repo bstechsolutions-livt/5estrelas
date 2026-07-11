@@ -334,4 +334,46 @@ class Payable extends Model
             $p->setAttribute('filial_nome', $filial ?: $p->getAttribute('empresa_nome'));
         }
     }
+
+    /**
+     * Nome do departamento (workflow ou classificação Senior por codCcu/descrição).
+     *
+     * @param iterable<Payable> $payables
+     */
+    public static function attachDepartmentNome(iterable $payables): void
+    {
+        $items = collect($payables);
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $classifier = app(\App\Services\PayableDepartmentClassifier::class);
+        $bySlug = Department::query()
+            ->whereIn('slug', array_keys($classifier->rules()))
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('slug');
+
+        $explicitIds = $items->map(fn (Payable $p) => $p->department_id)->filter()->unique()->values();
+        $byId = $explicitIds->isEmpty()
+            ? collect()
+            : Department::whereIn('id', $explicitIds)->get()->keyBy('id');
+
+        foreach ($items as $p) {
+            if ($p->relationLoaded('department') && $p->department) {
+                $p->setAttribute('department_nome', $p->department->name);
+
+                continue;
+            }
+
+            if ($p->department_id && isset($byId[$p->department_id])) {
+                $p->setAttribute('department_nome', $byId[$p->department_id]->name);
+
+                continue;
+            }
+
+            $slug = $classifier->slugForPayable($p);
+            $p->setAttribute('department_nome', $slug ? ($bySlug[$slug]->name ?? null) : null);
+        }
+    }
 }

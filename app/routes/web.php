@@ -11,6 +11,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BankConciliationController;
 use App\Http\Controllers\PayableController;
 use App\Http\Controllers\PayableAlcadaController;
+use App\Http\Controllers\PayableDepartmentRulesController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DeviceTokenController;
 use App\Http\Controllers\NotificationController;
@@ -156,6 +157,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [PayableAlcadaController::class, 'index'])->name('payables.alcada.index');
         Route::post('/', [PayableAlcadaController::class, 'store'])->name('payables.alcada.store');
         Route::delete('/{role}/{userId}', [PayableAlcadaController::class, 'destroy'])->whereNumber('userId')->name('payables.alcada.destroy');
+    });
+    Route::prefix('financeiro/contas-pagar/classificacao-departamentos')->middleware('permission:financeiro.contas_pagar.classificacao_gerenciar')->group(function () {
+        Route::get('/', [PayableDepartmentRulesController::class, 'index'])->name('payables.department-rules.index');
+        Route::post('/', [PayableDepartmentRulesController::class, 'update'])->name('payables.department-rules.update');
     });
 
     // Financeiro - Conciliação Bancária (OFX) — ANTES do grupo genérico /financeiro/contas-pagar
