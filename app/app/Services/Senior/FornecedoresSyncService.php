@@ -64,7 +64,14 @@ class FornecedoresSyncService
         $maxPages = max(1, (int) config('senior.fornecedor_max_pages', 500));
 
         foreach ($missingByEmp as $codEmp => $missingList) {
-            $pending = array_fill_keys($missingList, true);
+            $catalogMax = max(1, (int) config('senior.fornecedor_catalog_max_cod', 120));
+            $pending = array_fill_keys(
+                array_values(array_filter($missingList, fn ($cod) => $cod <= $catalogMax)),
+                true,
+            );
+            if ($pending === []) {
+                continue;
+            }
             $page = 1;
 
             while ($page <= $maxPages && $pending !== []) {
