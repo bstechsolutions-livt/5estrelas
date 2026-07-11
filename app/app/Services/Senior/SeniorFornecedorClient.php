@@ -209,28 +209,37 @@ XML;
         return $this->callOnce($params);
     }
 
-    /** Busca um fornecedor específico pelo codFor (lookup pontual). */
+    /**
+     * Busca um fornecedor pelo codFor varrendo páginas do ConsultarGeral.
+     * A Senior ignora o parâmetro codFor no envelope — não dá pra filtrar direto.
+     */
     public function consultarPorCodFor(int $codEmp, int $codFor, int $codFil = 1): ?array
     {
-        $params = [
-            'codEmp' => $codEmp,
-            'codFil' => $codFil,
-            'codFor' => $codFor,
-            'identificadorSistema' => $this->config['identificador_sistema'] ?? 'EASYTECH',
-            'indicePagina' => 1,
-            'limitePagina' => 1,
-        ];
+        $pageSize = max(10, (int) ($this->config['fornecedor_page_size'] ?? 100));
+        $maxPages = max(1, (int) ($this->config['fornecedor_max_pages'] ?? 500));
 
-        try {
-            $rows = $this->callOnce($params);
-
-            return $rows[0] ?? null;
-        } catch (SeniorException $e) {
-            if ($e->kind === SeniorException::KIND_BUSINESS) {
-                return null;
+        for ($page = 1; $page <= $maxPages; $page++) {
+            try {
+                $rows = $this->consultarGeral($codEmp, $codFil, $page, $pageSize);
+            } catch (SeniorException $e) {
+                if ($e->kind === SeniorException::KIND_BUSINESS) {
+                    break;
+                }
+                throw $e;
             }
-            throw $e;
+
+            if ($rows === []) {
+                break;
+            }
+
+            foreach ($rows as $row) {
+                if ((int) ($row['codFor'] ?? 0) === $codFor) {
+                    return $row;
+                }
+            }
         }
+
+        return null;
     }
 
     private function callOnce(array $params): array

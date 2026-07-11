@@ -12,16 +12,21 @@ class FornecedoresSyncService
     public function __construct(
         private SeniorFornecedorClient $client,
         private FornecedorMapper $mapper,
+        private SupplierDisplayNameResolver $displayNameResolver,
     ) {
     }
 
     public static function make(): self
     {
-        return new self(SeniorFornecedorClient::fromConfig(), new FornecedorMapper());
+        return new self(
+            SeniorFornecedorClient::fromConfig(),
+            new FornecedorMapper(),
+            new SupplierDisplayNameResolver(),
+        );
     }
 
     /**
-     * @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, message:?string, looked_up:int}
+     * @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, enriched_desc:int, message:?string, looked_up:int}
      */
     public function run(string $trigger = 'manual', bool $fullCatalog = false): array
     {
@@ -37,9 +42,9 @@ class FornecedoresSyncService
     }
 
     /**
-     * Delta: busca na Senior só os codFor dos títulos que ainda não estão no cache local.
+     * Delta: pagina cad_fornecedor por empresa e casa codFor ausentes no cache.
      *
-     * @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, message:?string, looked_up:int}
+     * @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, enriched_desc:int, message:?string, looked_up:int}
      */
     public function syncMissingFromPayables(string $trigger = 'manual'): array
     {
@@ -47,42 +52,65 @@ class FornecedoresSyncService
             return $this->skippedResult();
         }
 
-        $pairs = $this->missingSupplierPairs();
+        $missingByEmp = $this->missingSupplierPairs()
+            ->groupBy(fn ($pair) => (int) $pair->codemp)
+            ->map(fn ($rows) => $rows->pluck('codfor')->map(fn ($v) => (int) $v)->unique()->values()->all());
+
         $inserted = 0;
         $updated = 0;
         $errors = 0;
-        $lookedUp = 0;
+        $lookedUp = count($missingByEmp->flatten());
+        $pageSize = max(10, (int) config('senior.fornecedor_page_size', 100));
+        $maxPages = max(1, (int) config('senior.fornecedor_max_pages', 500));
 
-        foreach ($pairs as $pair) {
-            $lookedUp++;
-            try {
-                $fornecedor = $this->client->consultarPorCodFor((int) $pair->codemp, (int) $pair->codfor);
-                if ($fornecedor === null) {
-                    continue;
+        foreach ($missingByEmp as $codEmp => $missingList) {
+            $pending = array_fill_keys($missingList, true);
+            $page = 1;
+
+            while ($page <= $maxPages && $pending !== []) {
+                try {
+                    $fornecedores = $this->client->consultarGeral((int) $codEmp, 1, $page, $pageSize);
+                } catch (SeniorException $e) {
+                    $errors++;
+                    Log::warning('[senior-fornecedor] delta paginação falhou', [
+                        'codEmp' => $codEmp,
+                        'page' => $page,
+                        'erro' => $e->getMessage(),
+                    ]);
+                    break;
                 }
-                $fornecedor['codEmp'] ??= (int) $pair->codemp;
-                DB::transaction(function () use ($fornecedor, &$inserted, &$updated) {
-                    $this->upsert($fornecedor, $inserted, $updated);
-                });
-            } catch (SeniorException $e) {
-                $errors++;
-                Log::warning('[senior-fornecedor] lookup delta falhou', [
-                    'codEmp' => $pair->codemp,
-                    'codFor' => $pair->codfor,
-                    'erro' => $e->getMessage(),
-                ]);
+
+                if ($fornecedores === []) {
+                    break;
+                }
+
+                foreach ($fornecedores as $fornecedor) {
+                    $codFor = (int) ($fornecedor['codFor'] ?? 0);
+                    if ($codFor < 1 || !isset($pending[$codFor])) {
+                        continue;
+                    }
+                    unset($pending[$codFor]);
+                    $fornecedor['codEmp'] ??= (int) $codEmp;
+                    DB::transaction(function () use ($fornecedor, &$inserted, &$updated) {
+                        $this->upsert($fornecedor, $inserted, $updated);
+                    });
+                }
+
+                $page++;
             }
         }
 
         $enriched = $this->enrichPayables();
+        $enrichedDesc = $this->enrichFromDescriptions();
 
-        if ($lookedUp > 0 || $enriched > 0) {
+        if ($lookedUp > 0 || $enriched > 0 || $enrichedDesc > 0) {
             Log::info('[senior-fornecedor] sync delta concluído', [
                 'trigger' => $trigger,
                 'looked_up' => $lookedUp,
                 'inserted' => $inserted,
                 'updated' => $updated,
                 'enriched' => $enriched,
+                'enriched_desc' => $enrichedDesc,
                 'errors' => $errors,
             ]);
         }
@@ -93,6 +121,7 @@ class FornecedoresSyncService
             'updated' => $updated,
             'errors' => $errors,
             'enriched' => $enriched,
+            'enriched_desc' => $enrichedDesc,
             'looked_up' => $lookedUp,
             'message' => null,
         ];
@@ -101,7 +130,7 @@ class FornecedoresSyncService
     /**
      * Full: pagina o catálogo inteiro via ConsultarGeral (bootstrap / manutenção noturna).
      *
-     * @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, message:?string, looked_up:int}
+     * @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, enriched_desc:int, message:?string, looked_up:int}
      */
     public function syncFullCatalog(string $trigger = 'manual'): array
     {
@@ -138,12 +167,14 @@ class FornecedoresSyncService
         }
 
         $enriched = $this->enrichPayables();
+        $enrichedDesc = $this->enrichFromDescriptions();
 
         Log::info('[senior-fornecedor] sync full concluído', [
             'trigger' => $trigger,
             'inserted' => $inserted,
             'updated' => $updated,
             'enriched' => $enriched,
+            'enriched_desc' => $enrichedDesc,
             'errors' => $errors,
         ]);
 
@@ -153,6 +184,7 @@ class FornecedoresSyncService
             'updated' => $updated,
             'errors' => $errors,
             'enriched' => $enriched,
+            'enriched_desc' => $enrichedDesc,
             'looked_up' => 0,
             'message' => null,
         ];
@@ -184,7 +216,7 @@ class FornecedoresSyncService
     {
         return [
             'status' => 'skipped', 'inserted' => 0, 'updated' => 0, 'errors' => 0,
-            'enriched' => 0, 'looked_up' => 0,
+            'enriched' => 0, 'enriched_desc' => 0, 'looked_up' => 0,
             'message' => 'Integração Senior desabilitada por configuração.',
         ];
     }
@@ -215,7 +247,7 @@ class FornecedoresSyncService
         $updated++;
     }
 
-    /** Atualiza supplier_name/cnpj dos títulos já importados. */
+    /** Atualiza supplier_name/cnpj dos títulos a partir do cache senior_suppliers. */
     public function enrichPayables(): int
     {
         $count = 0;
@@ -243,6 +275,28 @@ class FornecedoresSyncService
                         $payable->save();
                         $count++;
                     }
+                }
+            });
+
+        return $count;
+    }
+
+    /** Preenche nomes genéricos a partir de obsTcp (GFD, TRCT, VT, etc.). */
+    public function enrichFromDescriptions(): int
+    {
+        $count = 0;
+        Payable::query()
+            ->where('supplier_name', 'like', 'Fornecedor %')
+            ->whereNotNull('description')
+            ->chunkById(200, function ($payables) use (&$count) {
+                foreach ($payables as $payable) {
+                    $name = $this->displayNameResolver->fromDescription($payable->description);
+                    if ($name === null || $name === $payable->supplier_name) {
+                        continue;
+                    }
+                    $payable->supplier_name = $name;
+                    $payable->save();
+                    $count++;
                 }
             });
 

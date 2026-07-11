@@ -23,7 +23,7 @@ class SyncSeniorFornecedores extends Command
 
         $mode = $full ? 'full' : 'delta';
         $this->info(sprintf(
-            'Sync fornecedores [%s/%s]: %d consultados, %d inseridos, %d atualizados, %d erros, %d títulos enriquecidos.',
+            'Sync fornecedores [%s/%s]: %d pendentes, %d inseridos, %d atualizados, %d erros, %d enriquecidos (cache), %d enriquecidos (descrição).',
             $r['status'],
             $mode,
             $r['looked_up'] ?? 0,
@@ -31,6 +31,7 @@ class SyncSeniorFornecedores extends Command
             $r['updated'],
             $r['errors'],
             $r['enriched'],
+            $r['enriched_desc'] ?? 0,
         ));
 
         if ($r['status'] === 'failed') {

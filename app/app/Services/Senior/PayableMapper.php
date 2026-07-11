@@ -77,7 +77,7 @@ class PayableMapper
         return $out;
     }
 
-    /** Nome de exibição do fornecedor (cache local ou docIdeFav da Senior). */
+    /** Nome de exibição do fornecedor (cache local, descrição ou docIdeFav da Senior). */
     private function supplierName(array $titulo): string
     {
         $codEmp = isset($titulo['codEmp']) ? (int) $titulo['codEmp'] : null;
@@ -87,6 +87,13 @@ class PayableMapper
             if ($cached) {
                 return $cached;
             }
+        }
+
+        $fromDescription = (new SupplierDisplayNameResolver())->fromDescription(
+            isset($titulo['obsTcp']) ? (string) $titulo['obsTcp'] : null,
+        );
+        if ($fromDescription) {
+            return $fromDescription;
         }
 
         $doc = trim((string) ($titulo['docIdeFav'] ?? ''));
