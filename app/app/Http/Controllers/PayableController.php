@@ -13,6 +13,7 @@ use App\Services\AuditLogger;
 use App\Services\ApprovalWorkflowService;
 use App\Services\PayableAlcadaService;
 use App\Services\PayableDepartmentClassifier;
+use App\Services\PayableDocumentPairAlert;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -73,6 +74,7 @@ class PayableController extends Controller
         Payable::attachEmpresaNome($payables->getCollection());
         Payable::attachFilialNome($payables->getCollection());
         Payable::attachDepartmentNome($payables->getCollection());
+        PayableDocumentPairAlert::attachToPayables($payables->getCollection());
 
         if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
             return response()->json($payables);
@@ -168,6 +170,10 @@ class PayableController extends Controller
         // A3: nome da empresa (nunca código) também no detalhe.
         Payable::attachEmpresaNome([$payable]);
         Payable::attachFilialNome([$payable]);
+        $payable->setAttribute(
+            'document_pair_alert',
+            PayableDocumentPairAlert::resolveFromDocuments($payable->documents, $payable->status),
+        );
 
         // Approval steps (workflow multinível)
         $approvalSteps = ApprovalStep::where('payable_id', $id)

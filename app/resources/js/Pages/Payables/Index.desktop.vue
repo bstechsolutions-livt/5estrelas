@@ -231,6 +231,11 @@ function wasRejectedBack(payable) {
     return payable.status === 'pendente' && !!payable.rejection_reason
 }
 
+function documentPairAlertTag(alert) {
+    if (!alert) return null
+    return alert.code === 'missing_nota' ? 'Falta NF' : 'Falta boleto'
+}
+
 const statusSeverity = {
     pendente: 'warn',
     em_preparacao: 'info',
@@ -375,6 +380,14 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                                     value="Recusado"
                                     severity="danger"
                                     class="!text-[9px] !px-1.5 !py-0 leading-tight"
+                                />
+                                <Tag
+                                    v-if="data.document_pair_alert"
+                                    :value="documentPairAlertTag(data.document_pair_alert)"
+                                    severity="warn"
+                                    class="!text-[9px] !px-1.5 !py-0 leading-tight"
+                                    :title="data.document_pair_alert.message"
+                                    dusk="doc-pair-alert"
                                 />
                             </div>
                         </template>

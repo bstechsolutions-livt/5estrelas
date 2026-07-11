@@ -347,6 +347,19 @@ function submitDueDate() {
             </div>
 
             <div
+                v-if="payable.document_pair_alert"
+                class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4"
+                dusk="payable-doc-pair-alert"
+            >
+                <h3 class="text-sm font-semibold text-amber-800 mb-1 flex items-center gap-2">
+                    <i class="pi pi-exclamation-triangle"></i>
+                    Documentação incompleta
+                </h3>
+                <p class="text-sm text-amber-700">{{ payable.document_pair_alert.message }}</p>
+                <p class="text-xs text-amber-600 mt-1">Anexe o par boleto + nota fiscal antes de enviar para aprovação.</p>
+            </div>
+
+            <div
                 v-if="wasRejectedBack"
                 class="bg-red-50 border border-red-200 rounded-xl p-4 mb-4"
                 dusk="payable-rejection-alert"
