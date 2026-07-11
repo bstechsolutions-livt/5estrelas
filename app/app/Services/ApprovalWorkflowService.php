@@ -248,6 +248,11 @@ class ApprovalWorkflowService
             ->first();
     }
 
+    public function isFinanceStep(?ApprovalStep $step): bool
+    {
+        return $step !== null && $step->level_name === 'financeiro';
+    }
+
     public function canUserApprove(Payable $payable, User $user): bool
     {
         if ($payable->status !== 'aguardando_aprovacao') {

@@ -127,7 +127,7 @@ function formatDate(d) {
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+            <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-8 gap-3">
                 <button
                     class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 text-left hover:border-amber-400 transition-colors"
                     @click="go('/financeiro/contas-pagar?status=pendente')"
@@ -173,6 +173,19 @@ function formatDate(d) {
                     <div class="text-2xl font-bold text-emerald-600 mt-1">{{ kpis?.minhas_aprovacoes ?? 0 }}</div>
                     <div class="text-xs text-slate-400 mt-1">pendentes comigo</div>
                 </button>
+                <button
+                    class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 text-left hover:border-red-500 transition-colors"
+                    @click="go('/financeiro/contas-pagar?status=aprovado')"
+                >
+                    <div class="text-xs text-slate-500 uppercase tracking-wide">Urgentes</div>
+                    <div class="text-2xl font-bold text-red-600 mt-1">{{ kpis?.urgentes?.count ?? 0 }}</div>
+                    <div class="text-xs text-slate-400 mt-1">{{ fmtK(kpis?.urgentes?.total) }}</div>
+                </button>
+                <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                    <div class="text-xs text-slate-500 uppercase tracking-wide">SLA estourado</div>
+                    <div class="text-2xl font-bold text-orange-600 mt-1">{{ kpis?.sla_estourado?.count ?? 0 }}</div>
+                    <div class="text-xs text-slate-400 mt-1">{{ fmtK(kpis?.sla_estourado?.total) }}</div>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">

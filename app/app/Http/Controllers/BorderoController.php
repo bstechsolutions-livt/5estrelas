@@ -11,6 +11,7 @@ use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class BorderoController extends Controller
@@ -98,6 +99,8 @@ class BorderoController extends Controller
             'canApproveStep' => $canApproveStep,
             'approvableCount' => $approvableCount,
             'currentStepLabel' => $currentStepLabel,
+            'requiresPriorityOnApprove' => $canApproveStep && $currentStepLabel === 'financeiro',
+            'priorityOptions' => Payable::PRIORITY_LABELS,
             'approvalPreview' => $workflow->buildPreviewStepsForSender($user),
         ]);
     }
@@ -231,10 +234,34 @@ class BorderoController extends Controller
         }
 
         $workflow = app(ApprovalWorkflowService::class);
+        $user = $request->user();
+
+        $samplePayable = $bordero->payables->first(
+            fn (Payable $p) => $workflow->canUserApprove($p, $user)
+        );
+        if ($samplePayable && $workflow->isFinanceStep($workflow->currentStep($samplePayable))) {
+            $priorityData = $request->validate([
+                'payment_priority' => ['required', Rule::in(Payable::PRIORITY_VALUES)],
+                'payment_sla_date' => ['nullable', 'date'],
+            ]);
+
+            foreach ($bordero->payables as $payable) {
+                if (! $workflow->canUserApprove($payable, $user)) {
+                    continue;
+                }
+                $payable->update([
+                    'payment_priority' => $priorityData['payment_priority'],
+                    'payment_sla_date' => $priorityData['payment_sla_date'] ?? $payable->due_date?->toDateString(),
+                    'priority_set_by' => $user->id,
+                    'priority_set_at' => now(),
+                ]);
+            }
+        }
+
         $result = $workflow->approveEligibleInBordero(
             $bordero->payables,
-            $request->user(),
-            $request->input('comment')
+            $user,
+            $request->input('comment'),
         );
 
         if ($result['error']) {

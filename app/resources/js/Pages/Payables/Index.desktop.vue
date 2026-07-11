@@ -245,6 +245,12 @@ const statusSeverity = {
     pago: 'success',
 }
 
+const prioritySeverity = {
+    normal: 'secondary',
+    alta: 'warn',
+    urgente: 'danger',
+}
+
 // Cards de resumo
 const totalPendente = computed(() => props.totals?.pendente?.total || 0)
 const totalAguardando = computed(() => props.totals?.aguardando_aprovacao?.total || 0)
@@ -428,6 +434,18 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     <Column field="due_date" header="Vencimento" style="width: 8%">
                         <template #body="{ data }">
                             <span class="text-xs whitespace-nowrap" @click="goShow(data.id)">{{ formatDate(data.due_date) }}</span>
+                        </template>
+                    </Column>
+                    <Column v-if="status !== 'pendente'" header="Prioridade" style="width: 7%">
+                        <template #body="{ data }">
+                            <Tag
+                                v-if="data.payment_priority"
+                                :value="data.priority_label"
+                                :severity="prioritySeverity[data.payment_priority] || 'secondary'"
+                                class="!text-[10px] whitespace-nowrap"
+                                @click="goShow(data.id)"
+                            />
+                            <span v-else class="text-xs text-gray-300" @click="goShow(data.id)">—</span>
                         </template>
                     </Column>
                     <Column v-if="status !== 'pendente' && canBorderos" header="Borderô" style="width: 7%">

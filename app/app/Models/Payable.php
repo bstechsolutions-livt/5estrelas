@@ -48,6 +48,7 @@ class Payable extends Model
         'status', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'department_id',
         'paid_at', 'payment_method', 'paid_by',
+        'payment_priority', 'payment_sla_date', 'priority_set_by', 'priority_set_at',
         'conciliated_at', 'conciliated_by', 'conciliation_notes', 'divergence_reason',
     ];
 
@@ -131,6 +132,7 @@ class Payable extends Model
         'branch_id', 'department_id', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'senior_id',
         'paid_at', 'payment_method', 'paid_by',
+        'payment_priority', 'payment_sla_date', 'priority_set_by', 'priority_set_at',
         'conciliated_at', 'conciliated_by', 'conciliation_notes', 'divergence_reason',
         'senior_situacao_original', 'senior_missing_at', 'senior_raw',
         'senior_synced_at',
@@ -154,6 +156,8 @@ class Payable extends Model
             'sent_for_approval_at' => 'datetime',
             'approved_at' => 'datetime',
             'paid_at' => 'date',
+            'payment_sla_date' => 'date',
+            'priority_set_at' => 'datetime',
             'conciliated_at' => 'date',
             'senior_missing_at' => 'datetime',
             'senior_synced_at' => 'datetime',
@@ -213,6 +217,20 @@ class Payable extends Model
         'encerrado' => 'info',
     ];
 
+    public const PRIORITY_LABELS = [
+        'normal' => 'Normal',
+        'alta' => 'Alta',
+        'urgente' => 'Urgente',
+    ];
+
+    public const PRIORITY_VALUES = ['normal', 'alta', 'urgente'];
+
+    public const PRIORITY_COLORS = [
+        'normal' => 'secondary',
+        'alta' => 'warn',
+        'urgente' => 'danger',
+    ];
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
@@ -241,6 +259,11 @@ class Payable extends Model
     public function conciliator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'conciliated_by');
+    }
+
+    public function prioritySetter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'priority_set_by');
     }
 
     public function bordero(): BelongsTo
@@ -400,6 +423,47 @@ class Payable extends Model
 
             $slug = $classifier->slugForPayable($p);
             $p->setAttribute('department_nome', $slug ? ($bySlug[$slug]->name ?? null) : null);
+        }
+    }
+
+    /** ok | warning (≤3 dias) | overdue — null se sem SLA ou já pago/encerrado. */
+    public static function resolveSlaStatus(Payable $payable): ?string
+    {
+        if (! $payable->payment_sla_date) {
+            return null;
+        }
+
+        if (in_array($payable->status, ['pago', 'conciliado', 'encerrado'], true)) {
+            return null;
+        }
+
+        $today = now()->startOfDay();
+        $sla = $payable->payment_sla_date->copy()->startOfDay();
+
+        if ($sla->lt($today)) {
+            return 'overdue';
+        }
+
+        if ($sla->lte($today->copy()->addDays(3))) {
+            return 'warning';
+        }
+
+        return 'ok';
+    }
+
+    /**
+     * @param iterable<Payable> $payables
+     */
+    public static function attachPriorityMeta(iterable $payables): void
+    {
+        foreach ($payables as $payable) {
+            $payable->setAttribute(
+                'priority_label',
+                $payable->payment_priority
+                    ? (self::PRIORITY_LABELS[$payable->payment_priority] ?? $payable->payment_priority)
+                    : null,
+            );
+            $payable->setAttribute('sla_status', self::resolveSlaStatus($payable));
         }
     }
 }

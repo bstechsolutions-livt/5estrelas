@@ -30,6 +30,10 @@ const props = defineProps({
     canApproveStep: { type: Boolean, default: false },
     canFinalSign: { type: Boolean, default: false },
     canEditDueDate: { type: Boolean, default: false },
+    canManagePriority: { type: Boolean, default: false },
+    requiresPriorityOnApprove: { type: Boolean, default: false },
+    priorityLabels: { type: Object, default: () => ({}) },
+    priorityColors: { type: Object, default: () => ({}) },
     mentionableUsers: { type: Array, default: () => [] },
     approvalPreview: { type: Object, default: () => ({ ok: false, errors: [], steps: [] }) },
 })
@@ -201,6 +205,48 @@ function removeDoc(docId) {
     })
 }
 
+const showPriorityDialog = ref(false)
+const approvePriorityForm = useForm({
+    payment_priority: 'normal',
+    payment_sla_date: null,
+})
+
+function defaultSlaDate() {
+    if (props.payable.payment_sla_date) {
+        return new Date(props.payable.payment_sla_date + 'T12:00:00')
+    }
+    if (props.payable.due_date) {
+        return new Date(props.payable.due_date + 'T12:00:00')
+    }
+    return null
+}
+
+const priorityOptions = computed(() =>
+    Object.entries(props.priorityLabels || {}).map(([value, label]) => ({ value, label }))
+)
+
+function openApprove() {
+    if (props.requiresPriorityOnApprove) {
+        approvePriorityForm.payment_priority = props.payable.payment_priority || 'normal'
+        approvePriorityForm.payment_sla_date = defaultSlaDate()
+        showPriorityDialog.value = true
+        return
+    }
+    approve()
+}
+
+function confirmApproveWithPriority() {
+    approvePriorityForm
+        .transform((data) => ({
+            payment_priority: data.payment_priority,
+            payment_sla_date: data.payment_sla_date ? toYmd(data.payment_sla_date) : null,
+        }))
+        .post(`/financeiro/contas-pagar/${props.payable.id}/aprovar`, {
+            preserveScroll: true,
+            onSuccess: () => { showPriorityDialog.value = false },
+        })
+}
+
 function approve() {
     router.post(`/financeiro/contas-pagar/${props.payable.id}/aprovar`, {}, { preserveScroll: true })
 }
@@ -259,6 +305,7 @@ const showSidebar = computed(() =>
     props.canConciliate ||
     props.payable.status === 'conciliado' || props.payable.status === 'divergente' ||
     (props.payable.status === 'pago' && !props.conciliadorConfigured) ||
+    props.canManagePriority || !!props.payable.payment_priority ||
     !!(props.payable.preparer || props.payable.approver || props.payable.approved_at)
 )
 
@@ -317,6 +364,26 @@ function submitDueDate() {
             onSuccess: () => { showDueDate.value = false },
         })
 }
+
+const priorityForm = useForm({
+    payment_priority: props.payable.payment_priority || 'normal',
+    payment_sla_date: defaultSlaDate(),
+})
+
+function submitPriority() {
+    priorityForm
+        .transform((data) => ({
+            payment_priority: data.payment_priority,
+            payment_sla_date: data.payment_sla_date ? toYmd(data.payment_sla_date) : null,
+        }))
+        .post(`/financeiro/contas-pagar/${props.payable.id}/prioridade`, { preserveScroll: true })
+}
+
+const slaAlertClass = computed(() => {
+    if (props.payable.sla_status === 'overdue') return 'text-red-600'
+    if (props.payable.sla_status === 'warning') return 'text-amber-600'
+    return 'text-gray-600'
+})
 </script>
 
 <template>
@@ -334,6 +401,13 @@ function submitDueDate() {
                             {{ payable.supplier_name }}
                         </h1>
                         <Tag :value="statusLabels[payable.status]" :severity="statusColors[payable.status]" />
+                        <Tag
+                            v-if="payable.payment_priority"
+                            :value="payable.priority_label || priorityLabels[payable.payment_priority]"
+                            :severity="priorityColors[payable.payment_priority] || 'secondary'"
+                            class="!text-xs"
+                            dusk="payable-priority-badge"
+                        />
                         <Tag v-if="payable.origem_hub" value="Hub" severity="info" class="!text-xs" dusk="origem-hub-badge" title="Criado na intranet (não importado da Senior)" />
                     </div>
                     <p class="text-sm text-gray-500 mt-1">
@@ -539,7 +613,7 @@ function submitDueDate() {
                         <!-- Botões de ação se o usuário pode aprovar o step atual -->
                         <div v-if="canApproveStep" class="space-y-2">
                             <p class="text-xs text-blue-600 font-medium mb-2">Sua vez: {{ currentStep?.level_name }}</p>
-                            <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="approve" />
+                            <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="openApprove" />
                             <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="showRejectDialog = true" />
                         </div>
                     </div>
@@ -548,7 +622,7 @@ function submitDueDate() {
                     <div v-else-if="canApprove && !approvalSteps?.length" class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Aprovação</h3>
                         <div class="space-y-2">
-                            <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="approve" />
+                            <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="openApprove" />
                             <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="showRejectDialog = true" />
                         </div>
                     </div>
@@ -624,6 +698,49 @@ function submitDueDate() {
                         <p class="text-xs text-green-600">Título finalizado com 2ª assinatura da Presidência.</p>
                     </div>
 
+                    <!-- Prioridade de pagamento -->
+                    <div
+                        v-if="canManagePriority || payable.payment_priority"
+                        class="bg-white rounded-xl border border-gray-100 p-4"
+                        dusk="payable-priority-section"
+                    >
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Prioridade de pagamento</h3>
+                        <template v-if="canManagePriority && payable.status !== 'encerrado'">
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Prioridade</label>
+                                    <Select v-model="priorityForm.payment_priority" :options="priorityOptions" option-label="label" option-value="value" class="w-full" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Prazo (SLA)</label>
+                                    <DatePicker v-model="priorityForm.payment_sla_date" date-format="dd/mm/yy" class="w-full" show-icon />
+                                </div>
+                                <Button label="Salvar prioridade" icon="pi pi-save" size="small" class="w-full" :loading="priorityForm.processing" @click="submitPriority" />
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div class="text-sm space-y-2">
+                                <div>
+                                    <p class="text-xs text-gray-500">Prioridade</p>
+                                    <Tag
+                                        v-if="payable.payment_priority"
+                                        :value="payable.priority_label"
+                                        :severity="priorityColors[payable.payment_priority]"
+                                    />
+                                    <p v-else class="text-gray-400">Não definida</p>
+                                </div>
+                                <div v-if="payable.payment_sla_date">
+                                    <p class="text-xs text-gray-500">Prazo (SLA)</p>
+                                    <p :class="slaAlertClass">{{ formatDate(payable.payment_sla_date) }}</p>
+                                </div>
+                                <div v-if="payable.priority_setter">
+                                    <p class="text-xs text-gray-500">Definida por</p>
+                                    <p class="text-gray-800">{{ payable.priority_setter.name }}</p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
                     <!-- Info lateral -->
                     <div v-if="payable.preparer || payable.approver || payable.approved_at" class="bg-white rounded-xl border border-gray-100 p-4 text-sm">
                         <div v-if="payable.preparer" class="mb-2">
@@ -663,6 +780,26 @@ function submitDueDate() {
             <template #footer>
                 <Button label="Cancelar" severity="secondary" text @click="showPayment = false" />
                 <Button label="Confirmar pagamento" icon="pi pi-check" severity="success" :loading="paymentForm.processing" dusk="confirm-payment" @click="submitPayment" />
+            </template>
+        </Dialog>
+
+        <!-- Prioridade na aprovação do Financeiro -->
+        <Dialog v-model:visible="showPriorityDialog" modal header="Prioridade de pagamento" :style="{ width: '420px' }" dusk="priority-approve-dialog">
+            <p class="text-sm text-gray-600 mb-4">Defina a prioridade e o prazo antes de aprovar esta etapa.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Prioridade *</label>
+                    <Select v-model="approvePriorityForm.payment_priority" :options="priorityOptions" option-label="label" option-value="value" class="w-full" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Prazo (SLA)</label>
+                    <DatePicker v-model="approvePriorityForm.payment_sla_date" date-format="dd/mm/yy" class="w-full" show-icon />
+                    <p class="text-[11px] text-gray-400 mt-1">Sugestão: vencimento do título ({{ formatDate(payable.due_date) }})</p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Cancelar" severity="secondary" text @click="showPriorityDialog = false" />
+                <Button label="Aprovar" icon="pi pi-check" severity="success" :loading="approvePriorityForm.processing" @click="confirmApproveWithPriority" />
             </template>
         </Dialog>
 

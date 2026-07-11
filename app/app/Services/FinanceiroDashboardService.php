@@ -113,6 +113,15 @@ class FinanceiroDashboardService
                 ->first();
         }
 
+        $urgentesQuery = $this->payableQuery($departmentId)
+            ->where('payment_priority', 'urgente')
+            ->whereIn('status', self::OPEN_STATUSES);
+
+        $slaEstouradoQuery = $this->payableQuery($departmentId)
+            ->whereNotNull('payment_sla_date')
+            ->where('payment_sla_date', '<', $today)
+            ->whereIn('status', self::OPEN_STATUSES);
+
         return [
             'em_aberto' => [
                 'count' => (int) (clone $emAbertoQuery)->count(),
@@ -139,6 +148,14 @@ class FinanceiroDashboardService
                 'total' => (float) (clone $pagosMesQuery)->sum('amount'),
             ],
             'minhas_aprovacoes' => $minhasAprovacoes,
+            'urgentes' => [
+                'count' => (int) (clone $urgentesQuery)->count(),
+                'total' => (float) (clone $urgentesQuery)->sum('amount'),
+            ],
+            'sla_estourado' => [
+                'count' => (int) (clone $slaEstouradoQuery)->count(),
+                'total' => (float) (clone $slaEstouradoQuery)->sum('amount'),
+            ],
             'borderos_abertos' => $borderosAbertos ? [
                 'count' => (int) $borderosAbertos->count,
                 'total' => (float) $borderosAbertos->total,

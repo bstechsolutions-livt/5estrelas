@@ -9,6 +9,7 @@ use App\Models\Payable;
 use App\Models\PayableComment;
 use App\Models\PayableDocument;
 use App\Models\ApprovalStep;
+use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ApprovalWorkflowService;
 use App\Services\PayableAlcadaService;
@@ -30,6 +31,8 @@ class PayableController extends Controller
 
         $query = Payable::query()
             ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number'])
+            ->orderByRaw("CASE COALESCE(payment_priority, '') WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END")
+            ->orderBy('payment_sla_date')
             ->orderByDesc('due_date');
 
         // Sempre filtra por um status (default: pendente). Não existe "ver todos".
@@ -66,6 +69,9 @@ class PayableController extends Controller
         if ($request->filled('amount_max')) {
             $query->where('amount', '<=', (float) $request->amount_max);
         }
+        if ($request->filled('payment_priority')) {
+            $query->where('payment_priority', $request->payment_priority);
+        }
         $this->applyDepartmentScope($query, $departmentContext['department_id']);
 
         $payables = $query->paginate($request->input('per_page', 20))->withQueryString();
@@ -76,6 +82,7 @@ class PayableController extends Controller
         Payable::attachDepartmentNome($payables->getCollection());
         PayableDocumentPairAlert::attachToPayables($payables->getCollection());
         Payable::attachOrigemHub($payables->getCollection());
+        Payable::attachPriorityMeta($payables->getCollection());
 
         if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
             return response()->json($payables);
@@ -113,6 +120,7 @@ class PayableController extends Controller
             'canChangeDepartmentFilter' => $departmentContext['can_change'],
             'lockedDepartment' => $departmentContext['locked_department'],
             'canManageClassification' => $user?->hasPermission('financeiro.contas_pagar.classificacao_gerenciar') ?? false,
+            'priorityOptions' => Payable::PRIORITY_LABELS,
         ]);
     }
 
@@ -160,6 +168,7 @@ class PayableController extends Controller
             'approver:id,name',
             'payer:id,name',
             'conciliator:id,name',
+            'prioritySetter:id,name',
             'documents.uploader:id,name',
             'comments.user:id,name,avatar_path',
         ])->findOrFail($id);
@@ -178,6 +187,7 @@ class PayableController extends Controller
         if ($payable->isHubManual()) {
             $payable->setAttribute('origem_hub', true);
         }
+        Payable::attachPriorityMeta([$payable]);
 
         // Approval steps (workflow multinível)
         $approvalSteps = ApprovalStep::where('payable_id', $id)
@@ -193,6 +203,8 @@ class PayableController extends Controller
             'payable' => $payable,
             'statusLabels' => Payable::STATUS_LABELS,
             'statusColors' => Payable::STATUS_COLORS,
+            'priorityLabels' => Payable::PRIORITY_LABELS,
+            'priorityColors' => Payable::PRIORITY_COLORS,
             'canPay' => $isPagador && $payable->status === 'aprovado',
             'paymentMethods' => Payable::PAYMENT_METHODS,
             'pagadorConfigured' => $alcada->hasRole('pagador'),
@@ -200,6 +212,8 @@ class PayableController extends Controller
             'conciliadorConfigured' => $alcada->hasRole('conciliador'),
             'canFinalSign' => $alcada->isAssigned($user, 'assinante') && $payable->status === 'conciliado',
             'canEditDueDate' => $user?->hasPermission('financeiro.contas_pagar.editar_vencimento') ?? false,
+            'canManagePriority' => $user?->hasPermission('financeiro.contas_pagar.prioridade_gerenciar') ?? false,
+            'requiresPriorityOnApprove' => $canApproveStep && $workflow->isFinanceStep($currentStep),
             'approvalSteps' => $approvalSteps,
             'currentStep' => $currentStep,
             'canApproveStep' => $canApproveStep,
@@ -322,6 +336,15 @@ class PayableController extends Controller
         }
 
         $workflow = app(ApprovalWorkflowService::class);
+        $currentStep = $workflow->currentStep($payable);
+        if ($workflow->isFinanceStep($currentStep)) {
+            $priorityData = $request->validate([
+                'payment_priority' => ['required', Rule::in(Payable::PRIORITY_VALUES)],
+                'payment_sla_date' => ['nullable', 'date'],
+            ]);
+            $this->applyPaymentPriority($payable, $request->user(), $priorityData);
+        }
+
         $result = $workflow->approve($payable, $request->user(), $request->input('comment'));
 
         if (!$result['success']) {
@@ -625,6 +648,67 @@ class PayableController extends Controller
         );
 
         return back()->with('success', 'Vencimento atualizado.');
+    }
+
+    public function updatePaymentPriority(Request $request, int $id)
+    {
+        $payable = Payable::findOrFail($id);
+        $user = $request->user();
+
+        if (! $user?->hasPermission('financeiro.contas_pagar.prioridade_gerenciar')) {
+            abort(403, 'Você não tem permissão para alterar a prioridade de pagamento.');
+        }
+
+        if ($payable->status === 'encerrado') {
+            return back()->with('error', 'Títulos encerrados não podem ter prioridade alterada.');
+        }
+
+        $data = $request->validate([
+            'payment_priority' => ['required', Rule::in(Payable::PRIORITY_VALUES)],
+            'payment_sla_date' => ['nullable', 'date'],
+        ]);
+
+        $oldLabel = $payable->payment_priority
+            ? (Payable::PRIORITY_LABELS[$payable->payment_priority] ?? $payable->payment_priority)
+            : '—';
+        $newLabel = Payable::PRIORITY_LABELS[$data['payment_priority']];
+
+        $payable->update([
+            'payment_priority' => $data['payment_priority'],
+            'payment_sla_date' => $data['payment_sla_date'] ?? $payable->payment_sla_date,
+            'priority_set_by' => $user->id,
+            'priority_set_at' => now(),
+        ]);
+
+        $slaText = $payable->payment_sla_date
+            ? $payable->payment_sla_date->format('d/m/Y')
+            : '—';
+
+        PayableComment::create([
+            'payable_id' => $payable->id,
+            'user_id' => $user->id,
+            'body' => "Prioridade alterada de {$oldLabel} para {$newLabel} (SLA: {$slaText})",
+            'type' => 'status_change',
+        ]);
+
+        AuditLogger::log(
+            event: 'contas_pagar.prioridade_atualizada',
+            module: 'financeiro.contas_pagar',
+            description: "Título {$payable->title_number}: prioridade {$newLabel}, SLA {$slaText}",
+            auditable: $payable,
+        );
+
+        return back()->with('success', 'Prioridade de pagamento atualizada.');
+    }
+
+    private function applyPaymentPriority(Payable $payable, User $user, array $data): void
+    {
+        $payable->update([
+            'payment_priority' => $data['payment_priority'],
+            'payment_sla_date' => $data['payment_sla_date'] ?? $payable->due_date?->toDateString(),
+            'priority_set_by' => $user->id,
+            'priority_set_at' => now(),
+        ]);
     }
 
     public function removeDocument(int $payableId, int $docId)

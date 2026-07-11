@@ -1,11 +1,14 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
+import Dialog from 'primevue/dialog'
+import Select from 'primevue/select'
+import DatePicker from 'primevue/datepicker'
 import ApprovalFlowPreview from '@/Components/Financeiro/ApprovalFlowPreview.vue'
 import { useDevice } from '@/composables/useDevice'
 
@@ -17,12 +20,32 @@ const props = defineProps({
     canApproveStep: { type: Boolean, default: false },
     approvableCount: { type: Number, default: 0 },
     currentStepLabel: { type: String, default: null },
+    requiresPriorityOnApprove: { type: Boolean, default: false },
+    priorityOptions: { type: Object, default: () => ({}) },
     approvalPreview: { type: Object, default: () => ({ ok: false, errors: [], steps: [] }) },
 })
 
 const { isMobile } = useDevice()
 const showReject = ref(false)
 const rejectReason = ref('')
+const showPriorityDialog = ref(false)
+const approveForm = useForm({
+    payment_priority: 'normal',
+    payment_sla_date: null,
+})
+
+const prioritySelectOptions = computed(() =>
+    Object.entries(props.priorityOptions || {}).map(([value, label]) => ({ value, label }))
+)
+
+function toYmd(d) {
+    if (!d) return null
+    const dt = d instanceof Date ? d : new Date(d)
+    const y = dt.getFullYear()
+    const m = String(dt.getMonth() + 1).padStart(2, '0')
+    const day = String(dt.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+}
 
 function goBack() { window.history.back() }
 
@@ -39,6 +62,28 @@ function sendForApproval() {
 const canSubmitApproval = computed(() =>
     props.approvalPreview?.ok && allHaveDocuments.value
 )
+
+function openApprove() {
+    if (props.requiresPriorityOnApprove) {
+        approveForm.payment_priority = 'normal'
+        approveForm.payment_sla_date = null
+        showPriorityDialog.value = true
+        return
+    }
+    approve()
+}
+
+function confirmApproveWithPriority() {
+    approveForm
+        .transform((data) => ({
+            payment_priority: data.payment_priority,
+            payment_sla_date: data.payment_sla_date ? toYmd(data.payment_sla_date) : null,
+        }))
+        .post(`/financeiro/borderos/${props.bordero.id}/aprovar`, {
+            preserveScroll: true,
+            onSuccess: () => { showPriorityDialog.value = false },
+        })
+}
 
 function approve() {
     router.post(`/financeiro/borderos/${props.bordero.id}/aprovar`, {}, { preserveScroll: true })
@@ -151,7 +196,7 @@ onMounted(reloadIfStale)
                 </p>
                 <p v-else class="text-xs text-gray-500 mb-3">Aguardando outros aprovadores na cadeia configurada.</p>
                 <div v-if="canApproveStep" class="flex flex-wrap gap-2">
-                    <Button label="Aprovar etapa" icon="pi pi-check" severity="success" dusk="btn-bordero-approve" @click="approve" />
+                    <Button label="Aprovar etapa" icon="pi pi-check" severity="success" dusk="btn-bordero-approve" @click="openApprove" />
                     <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined @click="showReject = !showReject" />
                 </div>
             </div>
@@ -239,5 +284,23 @@ onMounted(reloadIfStale)
                 </div>
             </div>
         </div>
+
+        <Dialog v-model:visible="showPriorityDialog" modal header="Prioridade de pagamento" :style="{ width: '420px' }">
+            <p class="text-sm text-gray-600 mb-4">A prioridade será aplicada a todos os títulos aprovados nesta etapa do Financeiro.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Prioridade *</label>
+                    <Select v-model="approveForm.payment_priority" :options="prioritySelectOptions" option-label="label" option-value="value" class="w-full" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Prazo (SLA)</label>
+                    <DatePicker v-model="approveForm.payment_sla_date" date-format="dd/mm/yy" class="w-full" show-icon />
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Cancelar" severity="secondary" text @click="showPriorityDialog = false" />
+                <Button label="Aprovar etapa" icon="pi pi-check" severity="success" :loading="approveForm.processing" @click="confirmApproveWithPriority" />
+            </template>
+        </Dialog>
     </component>
 </template>
