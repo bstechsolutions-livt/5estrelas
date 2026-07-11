@@ -804,7 +804,7 @@ const slaAlertClass = computed(() => {
         </Dialog>
 
         <!-- Registrar pagamento — Bottom sheet no mobile -->
-        <BottomSheet v-else v-model="showPayment" title="Registrar pagamento">
+        <BottomSheet v-if="isMobile" v-model="showPayment" title="Registrar pagamento">
             <div class="space-y-4" dusk="payment-sheet">
                 <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Data do pagamento *</label>
