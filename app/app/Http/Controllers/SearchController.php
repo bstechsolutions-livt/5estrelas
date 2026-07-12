@@ -138,13 +138,17 @@ class SearchController extends Controller
 
         // Contas a Pagar
         if ($user->hasPermission('financeiro.contas_pagar.visualizar')) {
-            $payables = \App\Models\Payable::query()
+            $payablesQuery = \App\Models\Payable::query()
                 ->excludeMissingInSenior()
                 ->where(function ($qq) use ($q) {
                     $qq->where('supplier_name', 'ilike', "%{$q}%")
                         ->orWhere('title_number', 'ilike', "%{$q}%")
                         ->orWhere('nickname', 'ilike', "%{$q}%");
-                })
+                });
+            app(\App\Services\FinanceiroDepartmentScope::class)->applyPayableFilter($payablesQuery, $user);
+            app(\App\Services\PayableBranchScope::class)->applyFilter($payablesQuery, $user);
+
+            $payables = $payablesQuery
                 ->limit(5)
                 ->get(['id', 'supplier_name', 'title_number', 'nickname', 'amount', 'status'])
                 ->map(fn ($p) => [
@@ -162,11 +166,17 @@ class SearchController extends Controller
             }
 
             // Borderôs
-            $borderos = \App\Models\Bordero::query()
+            $borderosQuery = \App\Models\Bordero::query()
                 ->where(function ($qq) use ($q) {
                     $qq->where('number', 'ilike', "%{$q}%")
                         ->orWhere('description', 'ilike', "%{$q}%");
-                })
+                });
+            app(\App\Services\FinanceiroDepartmentScope::class)->applyBorderoFilter($borderosQuery, $user);
+            if (app(\App\Services\PayableBranchScope::class)->resolve($user)['restricted']) {
+                $borderosQuery->whereHas('payables', fn ($pq) => app(\App\Services\PayableBranchScope::class)->applyFilter($pq, $user));
+            }
+
+            $borderos = $borderosQuery
                 ->limit(5)
                 ->get(['id', 'number', 'description', 'total_amount', 'items_count'])
                 ->map(fn ($b) => [

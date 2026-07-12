@@ -8,7 +8,6 @@ use App\Models\Bordero;
 use App\Models\Department;
 use App\Models\Payable;
 use App\Models\User;
-use App\Services\PayableBranchScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
@@ -26,7 +25,7 @@ class FinanceiroDashboardService
 
     public function build(User $user): array
     {
-        $departmentId = $this->resolveDepartmentScope($user);
+        $departmentId = app(FinanceiroDepartmentScope::class)->resolve($user);
         $branchScope = app(PayableBranchScope::class)->resolve($user);
         $lockedDepartment = $departmentId
             ? Department::whereKey($departmentId)->first(['id', 'name'])
@@ -53,26 +52,10 @@ class FinanceiroDashboardService
         ];
     }
 
-    private function resolveDepartmentScope(User $user): ?int
-    {
-        if ($user->hasPermission('*') || $user->hasPermission('financeiro.contas_pagar.ver_todos_departamentos')) {
-            return null;
-        }
-
-        return $user->department_id ? (int) $user->department_id : null;
-    }
-
-    private function applyDepartmentScope(Builder $query, ?int $departmentId): void
-    {
-        if ($departmentId) {
-            app(PayableDepartmentClassifier::class)->applyDepartmentFilter($query, $departmentId);
-        }
-    }
-
     private function payableQuery(?int $departmentId, User $user): Builder
     {
         $query = Payable::query();
-        $this->applyDepartmentScope($query, $departmentId);
+        app(FinanceiroDepartmentScope::class)->applyFilter($query, $departmentId);
         app(PayableBranchScope::class)->applyFilter($query, $user);
 
         return $query;
@@ -118,6 +101,7 @@ class FinanceiroDashboardService
             if ($branchScope->resolve($user)['restricted']) {
                 $borderosQuery->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));
             }
+            app(FinanceiroDepartmentScope::class)->applyBorderoFilter($borderosQuery, $user);
             $borderosAbertos = $borderosQuery
                 ->selectRaw('count(*) as count, coalesce(sum(total_amount), 0) as total')
                 ->first();

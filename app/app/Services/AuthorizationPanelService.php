@@ -12,7 +12,7 @@ class AuthorizationPanelService
 {
     public function build(User $user): array
     {
-        $departmentId = $this->resolveDepartmentScope($user);
+        $departmentId = app(FinanceiroDepartmentScope::class)->resolve($user);
         $canBorderos = $user->hasPermission('*') || $user->hasPermission('financeiro.borderos.visualizar');
         $workflow = app(ApprovalWorkflowService::class);
 
@@ -32,21 +32,10 @@ class AuthorizationPanelService
         ];
     }
 
-    private function resolveDepartmentScope(User $user): ?int
-    {
-        if ($user->hasPermission('*') || $user->hasPermission('financeiro.contas_pagar.ver_todos_departamentos')) {
-            return null;
-        }
-
-        return $user->department_id ? (int) $user->department_id : null;
-    }
-
     private function payableQuery(?int $departmentId, User $user): Builder
     {
         $query = Payable::query();
-        if ($departmentId) {
-            app(PayableDepartmentClassifier::class)->applyDepartmentFilter($query, $departmentId);
-        }
+        app(FinanceiroDepartmentScope::class)->applyFilter($query, $departmentId);
         app(PayableBranchScope::class)->applyFilter($query, $user);
 
         return $query;
@@ -59,6 +48,7 @@ class AuthorizationPanelService
         if ($branchScope->resolve($user)['restricted']) {
             $query->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));
         }
+        app(FinanceiroDepartmentScope::class)->applyBorderoFilter($query, $user);
 
         return $query;
     }

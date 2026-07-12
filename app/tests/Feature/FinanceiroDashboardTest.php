@@ -17,9 +17,11 @@ class FinanceiroDashboardTest extends TestCase
     private function userWithPermission(string $key = 'financeiro.contas_pagar.visualizar'): User
     {
         $user = User::factory()->create(['is_active' => true]);
-        $user->permissions()->attach(
-            Permission::firstOrCreate(['key' => $key], ['label' => $key, 'module' => 'financeiro'])->id
-        );
+        foreach ([$key, 'financeiro.contas_pagar.ver_todas_filiais'] as $perm) {
+            $user->permissions()->attach(
+                Permission::firstOrCreate(['key' => $perm], ['label' => $perm, 'module' => 'financeiro'])->id
+            );
+        }
 
         return $user;
     }
@@ -86,6 +88,46 @@ class FinanceiroDashboardTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('kpis.em_aberto.count', 1)
                 ->where('department.id', $deptA->id)
+            );
+    }
+
+    public function test_user_with_module_permission_sees_all_departments(): void
+    {
+        $deptA = Department::create(['name' => 'Dept A', 'is_active' => true]);
+        $deptB = Department::create(['name' => 'Dept B', 'is_active' => true]);
+
+        Payable::create([
+            'title_number' => 'A1',
+            'supplier_name' => 'Fornecedor A',
+            'amount' => 100,
+            'due_date' => now()->toDateString(),
+            'status' => 'pendente',
+            'department_id' => $deptA->id,
+        ]);
+        Payable::create([
+            'title_number' => 'B1',
+            'supplier_name' => 'Fornecedor B',
+            'amount' => 200,
+            'due_date' => now()->toDateString(),
+            'status' => 'pendente',
+            'department_id' => $deptB->id,
+        ]);
+
+        $user = $this->userWithPermission('financeiro.contas_pagar.visualizar');
+        $user->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.ver_todos_departamentos'],
+                ['label' => 'Ver todos deptos', 'module' => 'financeiro'],
+            )->id,
+        );
+        $user->update(['department_id' => $deptA->id]);
+
+        $this->actingAs($user)
+            ->get('/financeiro/dashboard')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('kpis.em_aberto.count', 2)
+                ->where('department', null)
             );
     }
 

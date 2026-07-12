@@ -8,6 +8,7 @@ use App\Models\Payable;
 use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogger;
 use App\Services\BorderoActionService;
+use App\Services\FinanceiroDepartmentScope;
 use App\Services\PayableBranchScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ class BorderoController extends Controller
     {
         $user = $request->user();
         $branchScope = app(PayableBranchScope::class);
+        $departmentScope = app(FinanceiroDepartmentScope::class);
         $scope = $branchScope->resolve($user);
 
         $query = Bordero::query()
@@ -32,6 +34,7 @@ class BorderoController extends Controller
         if ($scope['restricted']) {
             $query->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));
         }
+        $departmentScope->applyBorderoFilter($query, $user);
 
         if ($request->filled('search')) {
             $s = $request->search;
@@ -47,6 +50,7 @@ class BorderoController extends Controller
         if ($scope['restricted']) {
             $totalsQuery->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));
         }
+        $departmentScope->applyBorderoFilter($totalsQuery, $user);
         $totals = $totalsQuery
             ->selectRaw("status, count(*) as count, coalesce(sum(total_amount), 0) as total")
             ->groupBy('status')
