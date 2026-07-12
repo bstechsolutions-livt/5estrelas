@@ -409,16 +409,6 @@ function submitPriority() {
         .post(`/financeiro/contas-pagar/${props.payable.id}/prioridade`, { preserveScroll: true })
 }
 
-const nicknameForm = useForm({
-    nickname: props.payable.nickname || '',
-})
-
-function submitNickname() {
-    nicknameForm
-        .transform(data => ({ nickname: data.nickname?.trim() || null }))
-        .post(`/financeiro/contas-pagar/${props.payable.id}/apelido`, { preserveScroll: true })
-}
-
 const slaAlertClass = computed(() => {
     if (props.payable.sla_status === 'overdue') return 'text-red-600'
     if (props.payable.sla_status === 'warning') return 'text-amber-600'
@@ -480,27 +470,6 @@ const isFromSenior = computed(() => !!props.payable.origem_senior)
                             <i class="pi pi-pencil text-xs"></i>
                         </button>
                     </p>
-                    <div class="mt-2 flex flex-wrap items-center gap-2 max-w-xl">
-                        <PayableFieldOriginLabel v-if="fieldOrigins" label="Apelido:" field="nickname" :field-origins="fieldOrigins" />
-                        <label v-else class="text-xs text-gray-500 shrink-0" for="payable-nickname">Apelido:</label>
-                        <InputText
-                            id="payable-nickname"
-                            v-model="nicknameForm.nickname"
-                            class="flex-1 min-w-[180px] !text-sm"
-                            placeholder="Ex: Energia jul, Aluguel filial 2"
-                            dusk="payable-nickname-input"
-                        />
-                        <Button
-                            label="Salvar"
-                            size="small"
-                            severity="secondary"
-                            outlined
-                            :loading="nicknameForm.processing"
-                            :disabled="nicknameForm.nickname === (payable.nickname || '')"
-                            dusk="payable-nickname-save"
-                            @click="submitNickname"
-                        />
-                    </div>
                 </div>
                 <div class="text-right">
                     <PayableFieldOriginLabel v-if="fieldOrigins" label="Valor" field="amount" :field-origins="fieldOrigins" class="justify-end mb-0.5" />
@@ -522,7 +491,7 @@ const isFromSenior = computed(() => !!props.payable.origem_senior)
                     <span class="ml-1">Dados do ERP (fornecedor, valor, vencimento, nº título, empresa)</span>
                     <span class="mx-2">·</span>
                     <i class="pi pi-pencil text-[10px] text-blue-400"></i>
-                    <span class="ml-1">Campos da intranet (apelido, prioridade, SLA, anexos, comentários, status)</span>
+                    <span class="ml-1">Campos da intranet (prioridade, SLA, anexos, comentários, status)</span>
                 </p>
             </div>
 

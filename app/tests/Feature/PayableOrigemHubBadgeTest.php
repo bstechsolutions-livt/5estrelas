@@ -99,7 +99,7 @@ class PayableOrigemHubBadgeTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('payable.origem_senior', true)
                 ->where('payable.field_origins.supplier_name', 'senior')
-                ->where('payable.field_origins.nickname', 'hub')
+                ->where('payable.field_origins.payment_priority', 'hub')
                 ->missing('payable.origem_hub'));
     }
 

@@ -368,7 +368,7 @@ const currentTotal = computed(() => {
                 <div class="flex items-start justify-between gap-2 mb-1">
                     <div class="flex items-center gap-2 flex-1 min-w-0">
                         <i v-if="selectionMode" :class="['pi', isSelected(p.id) ? 'pi-check-circle text-blue-600' : 'pi-circle text-gray-300']"></i>
-                        <p class="text-sm font-medium text-gray-800 truncate flex-1">{{ p.nickname || p.supplier_name }}</p>
+                        <p class="text-sm font-medium text-gray-800 truncate flex-1">{{ p.supplier_name }}</p>
                     </div>
                     <Tag :value="statusOptions[p.status]" :severity="statusSeverity[p.status]" class="text-[10px]" />
                 </div>
@@ -377,7 +377,6 @@ const currentTotal = computed(() => {
                     <span class="text-xs text-gray-400">Venc: {{ formatDate(p.due_date) }}</span>
                 </div>
                 <p v-if="p.description" class="text-[11px] text-gray-500 truncate mt-1">{{ p.description }}</p>
-                <p v-if="p.nickname" class="text-[11px] text-gray-500 truncate">{{ p.supplier_name }}</p>
                 <p v-if="p.title_number" class="text-[11px] text-gray-500 mt-1 flex items-center gap-1.5">
                     <span class="whitespace-nowrap">{{ p.title_number }}</span>
                     <span v-if="p.empresa_nome" class="text-gray-400">· {{ p.empresa_nome }}</span>

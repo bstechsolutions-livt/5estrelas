@@ -392,7 +392,6 @@ class Payable extends Model
             'issue_date' => 'senior',
             'category' => 'senior',
             'description' => 'senior',
-            'nickname' => 'hub',
             'payment_priority' => 'hub',
             'payment_sla_date' => 'hub',
             'documents' => 'hub',

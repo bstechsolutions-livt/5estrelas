@@ -384,26 +384,6 @@ function batchApprove() {
     })
 }
 
-const showNicknameDialog = ref(false)
-const batchNickname = ref('')
-
-function openNicknameDialog() {
-    batchNickname.value = ''
-    showNicknameDialog.value = true
-}
-
-function applyBatchNickname() {
-    const nickname = batchNickname.value?.trim() || null
-    router.post('/financeiro/contas-pagar/lote/apelidos', {
-        items: selected.value.map(id => ({ id, nickname })),
-    }, {
-        onSuccess: () => {
-            showNicknameDialog.value = false
-            clearSelection()
-        },
-    })
-}
-
 const showPriorityDialog = ref(false)
 const batchPriorityForm = useForm({
     payment_priority: 'normal',
@@ -571,7 +551,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                         <div class="md:col-span-5">
                             <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
-                            <InputText v-model="search" placeholder="Fornecedor, título ou apelido" class="w-full" @keyup.enter="applyFilters" />
+                            <InputText v-model="search" placeholder="Fornecedor, título ou descrição" class="w-full" @keyup.enter="applyFilters" />
                         </div>
                         <div class="md:col-span-3">
                             <label class="block text-xs font-medium text-gray-500 mb-1">Empresa</label>
@@ -691,8 +671,6 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             dusk="btn-batch-approve" @click="openBatchApprove" />
                         <Button v-if="canSelectBordero" label="Criar borderô" icon="pi pi-list-check" size="small" class="batch-bar-btn-primary"
                             dusk="btn-batch-bordero" @click="startBordero" />
-                        <Button label="Definir apelido" icon="pi pi-tag" size="small" class="batch-bar-btn-primary"
-                            dusk="btn-batch-nickname" @click="openNicknameDialog" />
                         <Button v-if="canManagePriority" label="Definir prioridade" icon="pi pi-flag" size="small" class="batch-bar-btn-primary"
                             dusk="btn-batch-priority" @click="openPriorityDialog" />
                         <Button icon="pi pi-times" text size="small" class="batch-bar-btn-ghost" title="Limpar seleção" @click="clearSelection" />
@@ -832,15 +810,6 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </template>
                 </DataTable>
             </div>
-
-            <Dialog v-model:visible="showNicknameDialog" header="Apelido em lote" modal :style="{ width: '28rem' }">
-                <p class="text-sm text-gray-600 mb-3">Aplicar o mesmo apelido em {{ selected.length }} título(s).</p>
-                <InputText v-model="batchNickname" placeholder="Apelido (deixe vazio para remover)" class="w-full" dusk="batch-nickname-input" />
-                <template #footer>
-                    <Button label="Cancelar" severity="secondary" text @click="showNicknameDialog = false" />
-                    <Button label="Aplicar" icon="pi pi-check" dusk="batch-nickname-confirm" @click="applyBatchNickname" />
-                </template>
-            </Dialog>
 
             <Dialog v-model:visible="showPriorityDialog" header="Prioridade em lote" modal :style="{ width: '28rem' }">
                 <p class="text-sm text-gray-600 mb-3">Definir prioridade em {{ selected.length }} título(s).</p>
