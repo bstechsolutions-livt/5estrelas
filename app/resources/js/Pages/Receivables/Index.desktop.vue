@@ -116,7 +116,7 @@ function openReceivable(id) {
                         <template #body="{ data }">{{ data.empresa_nome || data.codemp || '—' }}</template>
                     </Column>
                     <Column header="Vencimento">
-                        <template #body="{ data }">{{ data.due_date ? new Date(data.due_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—' }}</template>
+                        <template #body="{ data }">{{ formatApiDate(data.due_date) }}</template>
                     </Column>
                     <Column header="Valor">
                         <template #body="{ data }">{{ formatMoney(data.amount) }}</template>

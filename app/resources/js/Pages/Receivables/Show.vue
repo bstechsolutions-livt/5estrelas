@@ -5,6 +5,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import { formatApiDate } from '@/utils/apiDate'
 import { useDevice } from '@/composables/useDevice'
 
 const props = defineProps({
@@ -25,8 +26,7 @@ function formatMoney(v) {
 }
 
 function formatDate(v) {
-    if (!v) return '—'
-    return new Date(String(v).includes('T') ? v : v + 'T12:00:00').toLocaleDateString('pt-BR')
+    return formatApiDate(v)
 }
 
 const Layout = computed(() => isMobile.value ? AppLayoutMobile : AppLayout)

@@ -6,7 +6,7 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
-import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
+import { formatApiDate } from '@/utils/apiDate'
 
 const props = defineProps({
     receivables: Object,
@@ -61,7 +61,7 @@ function formatMoney(v) {
                         </div>
                         <div class="text-sm text-surface-500">{{ item.title_number }}</div>
                         <div class="text-sm font-semibold mt-1">{{ formatMoney(item.amount) }}</div>
-                        <div class="text-xs text-surface-500">{{ item.situacao_label || item.senior_situacao_original }}</div>
+                        <div class="text-xs text-surface-500 mt-1">{{ formatApiDate(item.due_date) }} · {{ item.situacao_label || item.senior_situacao_original }}</div>
                     </button>
                 </div>
             </template>
