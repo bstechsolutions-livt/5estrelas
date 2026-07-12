@@ -24,6 +24,7 @@ const form = useForm({
     password: '',
     is_active: props.user?.is_active ?? true,
     department_id: props.user?.department_id || null,
+    senior_cod_usu: props.user?.senior_cod_usu || null,
     branch_ids: props.user?.branch_ids || [],
 })
 
@@ -113,6 +114,22 @@ function cancel() {
                             placeholder="Selecione..."
                             class="w-full"
                         />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Código usuário Senior (codUsu)</label>
+                        <InputText
+                            v-model="form.senior_cod_usu"
+                            type="number"
+                            min="1"
+                            placeholder="Ex.: 42"
+                            class="w-full"
+                            :invalid="!!form.errors.senior_cod_usu"
+                        />
+                        <p class="text-xs text-gray-500 mt-1">
+                            Usado para classificar títulos CP pelo usuário que lançou na Senior. Preencha manualmente se o backfill automático não encontrar.
+                        </p>
+                        <small v-if="form.errors.senior_cod_usu" class="text-red-500 text-xs mt-1 block">{{ form.errors.senior_cod_usu }}</small>
                     </div>
 
                     <div>

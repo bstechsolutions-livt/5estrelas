@@ -60,11 +60,37 @@ class PayableMapper
         $codTns = $this->asString($titulo['codTns'] ?? null);
         $out['category'] = $codTns !== null ? 'Transação ' . $codTns : null;
 
+        // Usuário que lançou o título na Senior (codUsu/codFav quando > 0).
+        $out['senior_cod_usu'] = self::resolveLauncherCodUsu($titulo);
+
         // Metadados de origem.
         $out['senior_situacao_original'] = $this->asString($titulo['sitTit'] ?? null);
         $out['senior_raw'] = $titulo;
 
         return $out;
+    }
+
+    /**
+     * Extrai o código do usuário lançador do título Senior.
+     * ConsultarTitulosAbertosCP v3 não documenta codUsu; em produção codFav vem 0.0.
+     */
+    public static function resolveLauncherCodUsu(array $titulo): ?int
+    {
+        foreach (['codUsu', 'codFav'] as $key) {
+            $raw = $titulo[$key] ?? null;
+            if ($raw === null || $raw === '' || (is_array($raw) && $raw === [])) {
+                continue;
+            }
+            if (is_array($raw)) {
+                $raw = reset($raw);
+            }
+            $n = is_numeric($raw) ? (int) (float) $raw : null;
+            if ($n !== null && $n > 0) {
+                return $n;
+            }
+        }
+
+        return null;
     }
 
     /** Mapeia um rateio (Apêndice A.3) para colunas de payable_rateios. */

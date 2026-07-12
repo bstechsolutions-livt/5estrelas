@@ -74,7 +74,7 @@ class Payable extends Model
     public const SENIOR_FIELD_GROUPS = [
         'identificacao' => [
             'codEmp' => 'int', 'codFil' => 'int', 'numTit' => 'string', 'codTpt' => 'string',
-            'codFor' => 'int', 'codTns' => 'string', 'codNtg' => 'int', 'docIdeFav' => 'string',
+            'codFor' => 'int', 'codFav' => 'int', 'codTns' => 'string', 'codNtg' => 'int', 'docIdeFav' => 'string',
             'codDfs' => 'int', 'codFrj' => 'string', 'cpgSub' => 'string', 'gerTep' => 'string',
             'seqCgt' => 'int', 'seqImo' => 'int', 'tipEfe' => 'string',
         ],
@@ -130,7 +130,7 @@ class Payable extends Model
     protected $fillable = [
         'title_number', 'nickname', 'supplier_name', 'supplier_cnpj', 'amount',
         'due_date', 'issue_date', 'description', 'category', 'status',
-        'branch_id', 'department_id', 'prepared_by', 'approved_by', 'sent_for_approval_at',
+        'branch_id', 'department_id', 'senior_cod_usu', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'senior_id',
         'paid_at', 'payment_method', 'paid_by',
         'payment_priority', 'payment_sla_date', 'priority_set_by', 'priority_set_at',
@@ -163,6 +163,7 @@ class Payable extends Model
             'senior_missing_at' => 'datetime',
             'senior_synced_at' => 'datetime',
             'senior_raw' => 'array',
+            'senior_cod_usu' => 'integer',
         ];
 
         foreach (self::seniorHeaderFields() as $code => $type) {
@@ -472,7 +473,7 @@ class Payable extends Model
     }
 
     /**
-     * Nome do departamento (workflow ou classificação Senior por codCcu/descrição).
+     * Nome do departamento (workflow, lançador Senior ou fallback codCcu/descrição).
      *
      * @param iterable<Payable> $payables
      */
@@ -484,32 +485,10 @@ class Payable extends Model
         }
 
         $classifier = app(\App\Services\PayableDepartmentClassifier::class);
-        $bySlug = Department::query()
-            ->whereIn('slug', array_keys($classifier->rules()))
-            ->where('is_active', true)
-            ->get()
-            ->keyBy('slug');
-
-        $explicitIds = $items->map(fn (Payable $p) => $p->department_id)->filter()->unique()->values();
-        $byId = $explicitIds->isEmpty()
-            ? collect()
-            : Department::whereIn('id', $explicitIds)->get()->keyBy('id');
 
         foreach ($items as $p) {
-            if ($p->relationLoaded('department') && $p->department) {
-                $p->setAttribute('department_nome', $p->department->name);
-
-                continue;
-            }
-
-            if ($p->department_id && isset($byId[$p->department_id])) {
-                $p->setAttribute('department_nome', $byId[$p->department_id]->name);
-
-                continue;
-            }
-
-            $slug = $classifier->slugForPayable($p);
-            $p->setAttribute('department_nome', $slug ? ($bySlug[$slug]->name ?? null) : null);
+            $dept = $classifier->departmentForPayable($p);
+            $p->setAttribute('department_nome', $dept?->name);
         }
     }
 

@@ -574,18 +574,11 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             </div>
                         </div>
                     </div>
-                    <div v-if="!canChangeDepartmentFilter || lockedBranches?.length || canManageClassification" class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500">
+                    <div v-if="!canChangeDepartmentFilter || lockedBranches?.length" class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500">
                         <span v-if="!canChangeDepartmentFilter">Exibindo apenas títulos do seu departamento.</span>
                         <span v-if="lockedBranches?.length" class="text-amber-700" dusk="locked-branches-hint">
                             Filiais liberadas: {{ lockedBranches.map(b => b.name).join(', ') }}
                         </span>
-                        <a
-                            v-if="canManageClassification"
-                            href="/financeiro/contas-pagar/classificacao-departamentos"
-                            class="text-blue-600 hover:underline"
-                        >
-                            Configurar regras de classificação →
-                        </a>
                     </div>
                 </div>
 

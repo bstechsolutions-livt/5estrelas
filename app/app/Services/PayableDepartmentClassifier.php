@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Department;
 use App\Models\Payable;
 use App\Models\PayableDepartmentRule;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 class PayableDepartmentClassifier
@@ -37,6 +38,11 @@ class PayableDepartmentClassifier
             return Department::whereKey($payable->department_id)->value('slug');
         }
 
+        $dept = $this->departmentFromSeniorCodUsu($payable->senior_cod_usu);
+        if ($dept) {
+            return $dept->slug;
+        }
+
         $codccu = trim((string) ($payable->codccu ?? ''));
         $description = (string) ($payable->description ?? '');
 
@@ -64,12 +70,17 @@ class PayableDepartmentClassifier
             return Department::find($payable->department_id);
         }
 
+        $fromLauncher = $this->departmentFromSeniorCodUsu($payable->senior_cod_usu);
+        if ($fromLauncher) {
+            return $fromLauncher;
+        }
+
         $slug = $this->slugForPayable($payable);
 
         return $slug ? Department::where('slug', $slug)->where('is_active', true)->first() : null;
     }
 
-    /** Restringe a query aos títulos do departamento (workflow + regras Senior). */
+    /** Restringe a query aos títulos do departamento (workflow + lançador Senior + fallback). */
     public function applyDepartmentFilter(Builder $query, int $departmentId): void
     {
         $department = Department::find($departmentId);
@@ -79,10 +90,31 @@ class PayableDepartmentClassifier
             return;
         }
 
-        $query->where(function (Builder $q) use ($department) {
+        $launcherCodUsus = User::query()
+            ->where('department_id', $department->id)
+            ->whereNotNull('senior_cod_usu')
+            ->pluck('senior_cod_usu')
+            ->map(fn ($v) => (int) $v)
+            ->filter(fn (int $v) => $v > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        $query->where(function (Builder $q) use ($department, $launcherCodUsus) {
             $q->where('department_id', $department->id);
-            $q->orWhere(function (Builder $inner) use ($department) {
+
+            if ($launcherCodUsus !== []) {
+                $q->orWhere(function (Builder $inner) use ($launcherCodUsus) {
+                    $inner->whereNull('department_id')
+                        ->whereIn('senior_cod_usu', $launcherCodUsus);
+                });
+            }
+
+            $q->orWhere(function (Builder $inner) use ($department, $launcherCodUsus) {
                 $inner->whereNull('department_id');
+                if ($launcherCodUsus !== []) {
+                    $inner->whereNull('senior_cod_usu');
+                }
                 $this->applyRuleMatch($inner, $department->slug);
             });
         });
@@ -121,6 +153,25 @@ class PayableDepartmentClassifier
                 }
             }
         });
+    }
+
+    private function departmentFromSeniorCodUsu(?int $codUsu): ?Department
+    {
+        if (!$codUsu || $codUsu <= 0) {
+            return null;
+        }
+
+        $user = User::query()
+            ->where('senior_cod_usu', $codUsu)
+            ->whereNotNull('department_id')
+            ->with('department:id,slug,name,is_active')
+            ->first();
+
+        if (!$user?->department || !$user->department->is_active) {
+            return null;
+        }
+
+        return $user->department;
     }
 
     private function applyDescriptionLike(Builder $query, string $pattern, bool $or = false): void

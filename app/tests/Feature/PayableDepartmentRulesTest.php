@@ -59,7 +59,7 @@ class PayableDepartmentRulesTest extends TestCase
         $this->assertSame(['%GFD%', '%TRCT%'], $rule->description_patterns);
     }
 
-    public function test_regras_do_banco_alimentam_classificador(): void
+    public function test_regras_do_banco_alimentam_classificador_fallback(): void
     {
         $dept = Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
         PayableDepartmentRule::create([
@@ -74,6 +74,37 @@ class PayableDepartmentRulesTest extends TestCase
             'amount' => 100,
             'due_date' => now()->addDay(),
             'status' => 'pendente',
+            'description' => 'TAXA SERASA MENSAL',
+        ]);
+
+        $resolved = app(PayableDepartmentClassifier::class)->departmentForPayable($payable);
+
+        $this->assertSame($dept->id, $resolved->id);
+    }
+
+    public function test_senior_cod_usu_tem_prioridade_sobre_regras_fallback(): void
+    {
+        $dept = Department::create(['name' => 'Compras', 'slug' => 'compras', 'is_active' => true]);
+        Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
+
+        User::factory()->create([
+            'department_id' => $dept->id,
+            'senior_cod_usu' => 55,
+        ]);
+
+        PayableDepartmentRule::create([
+            'department_id' => Department::where('slug', 'financeiro')->value('id'),
+            'codccu' => [],
+            'description_patterns' => ['%SERASA%'],
+        ]);
+
+        $payable = Payable::create([
+            'title_number' => 'T-2',
+            'supplier_name' => 'Teste',
+            'amount' => 100,
+            'due_date' => now()->addDay(),
+            'status' => 'pendente',
+            'senior_cod_usu' => 55,
             'description' => 'TAXA SERASA MENSAL',
         ]);
 

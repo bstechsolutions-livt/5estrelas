@@ -37,6 +37,9 @@ return [
     // Servlet SOAP do serviço de Cadastro de Filial (cad_filial / ConsultarGeral).
     'filial_service' => 'sapiens_Synccom_senior_g5_co_cad_filial',
 
+    // Servlet SOAP do cadastro de usuários (cad_usuario / ExportarAbrangencia).
+    'usuario_service' => 'sapiens_Synccom_senior_g5_co_ger_cad_usuario',
+
     // Servlet SOAP do serviço de Cadastro de Fornecedor (cad_fornecedor / ConsultarGeral).
     'fornecedor_service' => 'sapiens_Synccom_senior_g5_co_cad_fornecedor',
     'fornecedor_page_size' => (int) env('SENIOR_FORNECEDOR_PAGE_SIZE', 100),

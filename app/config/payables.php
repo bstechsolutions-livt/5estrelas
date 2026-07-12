@@ -1,10 +1,10 @@
 <?php
 
 /**
- * Regras de classificação de títulos por departamento (Senior → CP).
+ * Regras de classificação de títulos por departamento (fallback legado).
  *
- * Títulos importados não trazem department_id; usamos codCcu + padrões em obsTcp
- * até existir mapeamento oficial centro-de-custo → departamento.
+ * Classificação primária: senior_cod_usu do lançador → departamento do usuário.
+ * Fallback quando senior_cod_usu ausente: codCcu + padrões em obsTcp.
  *
  * Chave = slug do departamento (departments.slug).
  */

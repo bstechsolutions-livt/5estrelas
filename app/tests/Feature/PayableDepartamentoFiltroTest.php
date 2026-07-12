@@ -23,6 +23,12 @@ class PayableDepartamentoFiltroTest extends TestCase
                 ['label' => 'Visualizar CP', 'module' => 'financeiro'],
             )->id,
         );
+        $user->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.ver_todas_filiais'],
+                ['label' => 'Ver todas filiais', 'module' => 'financeiro'],
+            )->id,
+        );
 
         return $user;
     }
@@ -95,6 +101,58 @@ class PayableDepartamentoFiltroTest extends TestCase
         $resolved = app(PayableDepartmentClassifier::class)->departmentForPayable($payable);
 
         $this->assertSame($dept->id, $resolved->id);
+    }
+
+    public function test_classifica_por_senior_cod_usu_do_lancador(): void
+    {
+        $dept = $this->financeiroDepartment();
+        $this->dpRhDepartment();
+
+        User::factory()->create([
+            'department_id' => $dept->id,
+            'senior_cod_usu' => 77,
+        ]);
+
+        $payable = $this->makePayable([
+            'supplier_name' => 'TituloLancador',
+            'senior_cod_usu' => 77,
+            'description' => 'GFD JUNHO 2026 - FOLHA',
+        ]);
+
+        $resolved = app(PayableDepartmentClassifier::class)->departmentForPayable($payable);
+
+        $this->assertSame($dept->id, $resolved->id);
+    }
+
+    public function test_filtro_por_departamento_inclui_titulos_por_senior_cod_usu(): void
+    {
+        $dept = $this->financeiroDepartment();
+        $this->dpRhDepartment();
+
+        User::factory()->create([
+            'department_id' => $dept->id,
+            'senior_cod_usu' => 88,
+        ]);
+
+        $this->makePayable([
+            'supplier_name' => 'MatchFinanceiroLauncher',
+            'senior_cod_usu' => 88,
+            'description' => 'Despesa operacional',
+        ]);
+        $this->makePayable([
+            'supplier_name' => 'MatchDpRhFallback',
+            'description' => 'TRCT FUNCIONARIO 123',
+        ]);
+
+        $resp = $this->actingAs($this->userComTodosDepartamentos())
+            ->withHeaders(['X-Json-Only' => '1'])
+            ->get("/financeiro/contas-pagar?status=pendente&department_id={$dept->id}")
+            ->assertOk();
+
+        $names = collect($resp->json('data'))->pluck('supplier_name')->all();
+
+        $this->assertContains('MatchFinanceiroLauncher', $names);
+        $this->assertNotContains('MatchDpRhFallback', $names);
     }
 
     public function test_filtro_por_departamento_inclui_titulos_senior_sem_department_id(): void
@@ -184,6 +242,12 @@ class PayableDepartamentoFiltroTest extends TestCase
                 ['label' => 'Visualizar CP', 'module' => 'financeiro'],
             )->id,
         );
+        $user->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.ver_todas_filiais'],
+                ['label' => 'Ver todas filiais', 'module' => 'financeiro'],
+            )->id,
+        );
 
         $this->makePayable(['supplier_name' => 'DoDpRh', 'description' => 'GFD JULHO']);
         $this->makePayable(['supplier_name' => 'DoFinanceiro', 'description' => 'TAXA SERASA']);
@@ -215,6 +279,12 @@ class PayableDepartamentoFiltroTest extends TestCase
             Permission::firstOrCreate(
                 ['key' => 'financeiro.contas_pagar.visualizar'],
                 ['label' => 'Visualizar CP', 'module' => 'financeiro'],
+            )->id,
+        );
+        $user->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => 'financeiro.contas_pagar.ver_todas_filiais'],
+                ['label' => 'Ver todas filiais', 'module' => 'financeiro'],
             )->id,
         );
 

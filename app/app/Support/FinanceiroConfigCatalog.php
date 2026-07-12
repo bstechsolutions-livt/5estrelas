@@ -21,14 +21,6 @@ class FinanceiroConfigCatalog
                 'permission' => 'financeiro.contas_pagar.alcada_gerenciar',
             ],
             [
-                'key' => 'classificacao',
-                'label' => 'Classificação por Departamento',
-                'description' => 'Regras de classificação automática de títulos por departamento.',
-                'icon' => 'pi pi-tags',
-                'href' => '/financeiro/contas-pagar/classificacao-departamentos',
-                'permission' => 'financeiro.contas_pagar.classificacao_gerenciar',
-            ],
-            [
                 'key' => 'fluxos',
                 'label' => 'Fluxos de Aprovação',
                 'description' => 'Configure trilhas e etapas de aprovação por área.',

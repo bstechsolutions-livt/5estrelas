@@ -85,6 +85,19 @@ function cancel() {
                     <Select v-model="form.department_id" :options="departmentOptions" option-label="label" option-value="value" placeholder="Selecione..." class="w-full" />
                 </div>
                 <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Cód. usuário Senior</label>
+                    <InputText
+                        v-model="form.senior_cod_usu"
+                        type="number"
+                        min="1"
+                        placeholder="codUsu"
+                        class="w-full"
+                        :invalid="!!form.errors.senior_cod_usu"
+                        style="height: 44px"
+                    />
+                    <small v-if="form.errors.senior_cod_usu" class="text-red-500 text-xs mt-1 block">{{ form.errors.senior_cod_usu }}</small>
+                </div>
+                <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Filiais liberadas</label>
                     <MultiSelect
                         v-model="form.branch_ids"
