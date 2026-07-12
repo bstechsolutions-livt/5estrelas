@@ -51,6 +51,7 @@ class Payable extends Model
         'paid_at', 'payment_method', 'paid_by',
         'payment_priority', 'payment_sla_date', 'priority_set_by', 'priority_set_at',
         'conciliated_at', 'conciliated_by', 'conciliation_notes', 'divergence_reason',
+        'allocation_imported_at', 'allocation_imported_by', 'allocation_source_file',
     ];
 
     /** Formas de pagamento aceitas no registro de pagamento (Spec alçada+pagamento). */
@@ -135,6 +136,7 @@ class Payable extends Model
         'paid_at', 'payment_method', 'paid_by',
         'payment_priority', 'payment_sla_date', 'priority_set_by', 'priority_set_at',
         'conciliated_at', 'conciliated_by', 'conciliation_notes', 'divergence_reason',
+        'allocation_imported_at', 'allocation_imported_by', 'allocation_source_file',
         'senior_situacao_original', 'senior_missing_at', 'senior_raw',
         'senior_synced_at',
     ];
@@ -160,6 +162,7 @@ class Payable extends Model
             'payment_sla_date' => 'date',
             'priority_set_at' => 'datetime',
             'conciliated_at' => 'date',
+            'allocation_imported_at' => 'datetime',
             'senior_missing_at' => 'datetime',
             'senior_synced_at' => 'datetime',
             'senior_raw' => 'array',
@@ -286,6 +289,16 @@ class Payable extends Model
     public function rateios(): HasMany
     {
         return $this->hasMany(PayableRateio::class);
+    }
+
+    public function allocationLines(): HasMany
+    {
+        return $this->hasMany(PayableAllocationLine::class)->orderBy('line_order')->orderBy('id');
+    }
+
+    public function allocationImporter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'allocation_imported_by');
     }
 
     /** Título existe localmente mas não consta mais na Senior (baixado/excluído). */

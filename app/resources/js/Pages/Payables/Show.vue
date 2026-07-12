@@ -39,6 +39,7 @@ const props = defineProps({
     priorityColors: { type: Object, default: () => ({}) },
     mentionableUsers: { type: Array, default: () => [] },
     approvalPreview: { type: Object, default: () => ({ ok: false, errors: [], steps: [] }) },
+    canImportAllocations: { type: Boolean, default: false },
 })
 
 const DOCS_VIEW_STORAGE_KEY = 'payable_docs_view_mode'
@@ -203,6 +204,9 @@ watch(() => page.props.flash?.success, (msg) => {
 watch(() => page.props.flash?.error, (msg) => {
     if (msg) toast.add({ severity: 'error', summary: 'Erro', detail: msg, life: 5000 })
 })
+watch(() => page.props.flash?.warning, (msg) => {
+    if (msg) toast.add({ severity: 'warn', summary: 'Atenção', detail: msg, life: 6000 })
+})
 
 function uploadDoc(event, type = 'outro') {
     const files = [...(event.files || [])]
@@ -238,6 +242,22 @@ function removeDoc(docId) {
     router.delete(`/financeiro/contas-pagar/${props.payable.id}/documentos/${docId}`, {
         preserveScroll: true,
         onSuccess: () => markBorderoStale(),
+    })
+}
+
+const allocationTotal = computed(() => {
+    const lines = props.payable.allocation_lines || []
+    return lines.reduce((sum, line) => sum + Number(line.amount || 0), 0)
+})
+
+function uploadAllocation(event) {
+    const file = event.files?.[0]
+    if (!file) return
+    const formData = new FormData()
+    formData.append('file', file)
+    router.post(`/financeiro/contas-pagar/${props.payable.id}/rateio/importar`, formData, {
+        preserveScroll: true,
+        forceFormData: true,
     })
 }
 
@@ -623,6 +643,73 @@ const isFromSenior = computed(() => !!props.payable.origem_senior)
                             </div>
                         </div>
                         <p v-if="canPrepare" class="text-[11px] text-gray-400 mt-2 text-center">Tamanho máximo por arquivo: 10 MB.</p>
+                    </div>
+
+                    <!-- Rateio (planilha) -->
+                    <div class="bg-white rounded-xl border border-gray-100 p-4" dusk="payable-allocation-section">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                                Rateio para conciliação
+                                <i class="pi pi-table text-[10px] text-blue-400" title="Detalhamento importado por planilha" />
+                            </h3>
+                            <FileUpload
+                                v-if="canImportAllocations"
+                                mode="basic"
+                                :auto="true"
+                                accept=".xlsx,.xls,.csv"
+                                choose-label="Importar planilha"
+                                :max-file-size="10485760"
+                                @select="uploadAllocation"
+                                dusk="payable-allocation-upload"
+                            />
+                        </div>
+                        <p class="text-xs text-gray-500 mb-3">
+                            Use quando um título no Senior cobre vários pagamentos (ex.: folha/quadro fixo).
+                            Reimportar substitui o rateio anterior.
+                        </p>
+                        <p v-if="!payable.allocation_lines?.length" class="text-sm text-gray-400">
+                            Nenhum rateio importado.
+                        </p>
+                        <div v-else class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="text-left text-xs text-gray-500 border-b border-gray-100">
+                                        <th class="py-2 pr-2">#</th>
+                                        <th class="py-2 pr-2">Nome</th>
+                                        <th class="py-2 pr-2">CPF</th>
+                                        <th class="py-2 pr-2">Função</th>
+                                        <th class="py-2 pr-2">PIX</th>
+                                        <th class="py-2 pr-2 text-right">Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="line in payable.allocation_lines"
+                                        :key="line.id"
+                                        class="border-b border-gray-50"
+                                        dusk="payable-allocation-line"
+                                    >
+                                        <td class="py-2 pr-2 text-gray-500">{{ line.line_order ?? '—' }}</td>
+                                        <td class="py-2 pr-2">{{ line.person_name || '—' }}</td>
+                                        <td class="py-2 pr-2 font-mono text-xs">{{ line.document_id || '—' }}</td>
+                                        <td class="py-2 pr-2">{{ line.role_label || '—' }}</td>
+                                        <td class="py-2 pr-2 text-xs">{{ line.pix_key || '—' }}</td>
+                                        <td class="py-2 pr-2 text-right font-medium">{{ formatMoney(line.amount) }}</td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="text-sm font-semibold text-gray-700">
+                                        <td colspan="5" class="py-2 text-right">Total</td>
+                                        <td class="py-2 text-right">{{ formatMoney(allocationTotal) }}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <p v-if="payable.allocation_source_file" class="text-[11px] text-gray-400 mt-2">
+                                Arquivo: {{ payable.allocation_source_file }}
+                                <span v-if="payable.allocation_importer"> · {{ payable.allocation_importer.name }}</span>
+                                <span v-if="payable.allocation_imported_at"> · {{ formatDateTime(payable.allocation_imported_at) }}</span>
+                            </p>
+                        </div>
                     </div>
 
                     <!-- Timeline/Comentários -->

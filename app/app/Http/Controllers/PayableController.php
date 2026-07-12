@@ -16,6 +16,7 @@ use App\Services\FinanceiroDepartmentScope;
 use App\Services\PayableAlcadaService;
 use App\Services\PayableBranchScope;
 use App\Services\PayableDepartmentClassifier;
+use App\Services\PayableAllocationImportService;
 use App\Services\PayableDocumentPairAlert;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -26,6 +27,11 @@ use Inertia\Inertia;
 
 class PayableController extends Controller
 {
+    private const ALLOCATION_IMPORT_STATUSES = [
+        'pendente', 'em_preparacao', 'aguardando_aprovacao', 'aprovado',
+        'pago', 'conciliado', 'divergente',
+    ];
+
     public function index(Request $request)
     {
         $pageData = $this->resolvePayablesPageData($request, defaultPerPage: 20);
@@ -443,6 +449,8 @@ class PayableController extends Controller
             'prioritySetter:id,name',
             'documents.uploader:id,name',
             'comments.user:id,name,avatar_path',
+            'allocationLines',
+            'allocationImporter:id,name',
         ]);
 
         $user = request()->user();
@@ -494,7 +502,37 @@ class PayableController extends Controller
             'canApproveStep' => $canApproveStep,
             'mentionableUsers' => app(\App\Services\MentionService::class)->mentionableUsers($user, $id),
             'approvalPreview' => $workflow->buildPreviewStepsForSender($user),
+            'canImportAllocations' => in_array($payable->status, self::ALLOCATION_IMPORT_STATUSES, true),
         ]);
+    }
+
+    public function importAllocations(Request $request, int $id, PayableAllocationImportService $importService)
+    {
+        $payable = $this->findPayableForUser($id);
+
+        if (! in_array($payable->status, self::ALLOCATION_IMPORT_STATUSES, true)) {
+            return back()->with('error', 'Rateio por planilha não permitido neste status do título.');
+        }
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:10240'],
+        ]);
+
+        $result = $importService->import($payable, $request->file('file'), $request->user()->id);
+
+        $message = sprintf(
+            'Rateio importado: %d linha(s), total R$ %s.',
+            $result['lines'],
+            number_format($result['total'], 2, ',', '.'),
+        );
+
+        if ($result['warnings'] !== []) {
+            return back()
+                ->with('success', $message)
+                ->with('warning', implode(' ', $result['warnings']));
+        }
+
+        return back()->with('success', $message);
     }
 
     public function addComment(Request $request, int $id)
