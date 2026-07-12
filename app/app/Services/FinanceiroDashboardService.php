@@ -191,6 +191,7 @@ class FinanceiroDashboardService
         if ($branchScope->resolve($user)['restricted']) {
             $query->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));
         }
+        app(FinanceiroDepartmentScope::class)->applyBorderoFilter($query, $user);
         $rows = $query
             ->selectRaw('status, count(*) as count, coalesce(sum(total_amount), 0) as total')
             ->groupBy('status')
