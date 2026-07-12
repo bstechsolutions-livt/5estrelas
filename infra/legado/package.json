@@ -1,0 +1,7 @@
+{
+  "name": "gestor-conciliacoes-legado",
+  "private": true,
+  "dependencies": {
+    "convex": "^1.42.1"
+  }
+}
