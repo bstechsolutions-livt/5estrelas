@@ -129,7 +129,6 @@ class PayablesSyncService
             'missing_count' => $missing,
         ]);
 
-        // req 9.3: auditoria quando houve inserção/atualização.
         if ($inserted + $updated > 0) {
             AuditLogger::log(
                 event: 'contas_pagar.sync.concluido',
@@ -137,9 +136,10 @@ class PayablesSyncService
                 description: "Sync Contas a Pagar: {$inserted} inseridos, {$updated} atualizados, {$missing} ausentes",
                 metadata: ['sync_run_id' => $run->id, 'inserted' => $inserted, 'updated' => $updated, 'missing' => $missing],
             );
-
-            $this->syncMissingSuppliersAfterPayables();
         }
+
+        // Sempre após sync OK: resolve fornecedores que aparecem nos títulos mas ainda não estão no cache.
+        $this->syncMissingSuppliersAfterPayables();
 
         return $run->fresh();
     }
@@ -158,21 +158,49 @@ class PayablesSyncService
     }
 
     /**
-     * Varre as empresas (cod_emps) × fornecedores (cod_for_start..cod_for_end) e
-     * coleta os títulos abertos de cada (codEmp, codFor). codFor é OBRIGATÓRIO no
-     * contrato real da Senior, por isso a consulta é por fornecedor.
-     *
-     * - Erro de NEGÓCIO num codFor específico (ex.: fornecedor inexistente) é
-     *   ignorado e a varredura continua.
-     * - Falha de TRANSPORTE (timeout/indisponível) repetida aborta a execução
-     *   inteira (relança SeniorException → run() marca FAILED, sem tocar nos dados).
+     * Coleta títulos conforme a estratégia configurada (bulk ou sweep).
      */
     private function collectTitulos(?Carbon $vctIni, ?Carbon $vctFim): array
     {
-        $codEmps = config('senior.cod_emps');
-        if (empty($codEmps)) {
-            $codEmps = [(int) config('senior.cod_emp', 1)];
+        if (config('senior.cp_strategy', 'bulk') === 'bulk') {
+            return $this->collectTitulosBulk($vctIni, $vctFim);
         }
+
+        return $this->collectTitulosSweep($vctIni, $vctFim);
+    }
+
+    /**
+     * Bulk (CliOpcAbr): 1 chamada SOAP por (codEmp, codFil) — sem codFor.
+     */
+    private function collectTitulosBulk(?Carbon $vctIni, ?Carbon $vctFim): array
+    {
+        $codFil = (int) config('senior.cod_fil', 1);
+        $all = [];
+
+        foreach ($this->activeCodEmps() as $codEmp) {
+            Log::info('[senior-cp] bulk', ['codEmp' => $codEmp, 'codFil' => $codFil]);
+            $titulos = $this->client->consultarTitulosAbertosPorEmpresaFilial((int) $codEmp, $codFil, $vctIni, $vctFim);
+            foreach ($titulos as $t) {
+                $all[] = $t;
+            }
+            Log::info('[senior-cp] bulk concluído', [
+                'codEmp' => $codEmp,
+                'codFil' => $codFil,
+                'titulos' => count($titulos),
+                'total' => count($all),
+            ]);
+        }
+
+        return $this->dedupTitulos($all);
+    }
+
+    /**
+     * Varre as empresas (cod_emps) × fornecedores (cod_for_start..cod_for_end).
+     * Fallback quando CliOpcAbr não está ativo.
+     */
+    private function collectTitulosSweep(?Carbon $vctIni, ?Carbon $vctFim): array
+    {
+        $codEmps = $this->activeCodEmps();
         $forStart = (int) config('senior.cod_for_start', 1);
         $forEnd = (int) config('senior.cod_for_end', 9999);
         $delayMs = (int) config('senior.sweep_delay_ms', 0);
@@ -249,11 +277,35 @@ class PayablesSyncService
         return $out;
     }
 
+    /** Empresas ativas no sync (rollout gradual via SENIOR_EMP_ENABLED). */
+    private function activeCodEmps(): array
+    {
+        $enabled = config('senior.emp_enabled', []);
+        if (!empty($enabled)) {
+            return $enabled;
+        }
+
+        $codEmps = config('senior.cod_emps');
+        if (!empty($codEmps)) {
+            return $codEmps;
+        }
+
+        return [(int) config('senior.cod_emp', 1)];
+    }
+
     /** Janela de vencimento [ini, fim] conforme o modo (req 5). */
     private function window(string $mode, ?Carbon $overrideFrom = null, ?Carbon $overrideTo = null): array
     {
         if ($overrideFrom && $overrideTo) {
             return [$overrideFrom->copy()->startOfDay(), $overrideTo->copy()->endOfDay()];
+        }
+
+        // Bulk: sempre janela ampla (100% dos títulos a cada ciclo — rápido com CliOpcAbr).
+        if (config('senior.cp_strategy', 'bulk') === 'bulk') {
+            return [
+                Carbon::parse(config('senior.bulk_vct_ini', '2020-01-01'))->startOfDay(),
+                Carbon::parse(config('senior.bulk_vct_fim', '2030-12-31'))->endOfDay(),
+            ];
         }
 
         if ($mode === PayableSyncRun::MODE_FULL) {
@@ -332,11 +384,20 @@ class PayablesSyncService
         if ($businessKeys !== []) {
             $query->whereNotIn('senior_id', array_values(array_unique($businessKeys)));
         }
-        if ($vctIni !== null) {
-            $query->where('due_date', '>=', $vctIni);
+
+        $emps = $this->activeCodEmps();
+        if ($emps !== []) {
+            $query->whereIn('codemp', $emps);
         }
-        if ($vctFim !== null) {
-            $query->where('due_date', '<=', $vctFim);
+
+        // No modo bulk a janela é sempre ampla — marca ausentes de toda a empresa ativa.
+        if (config('senior.cp_strategy', 'bulk') !== 'bulk') {
+            if ($vctIni !== null) {
+                $query->where('due_date', '>=', $vctIni);
+            }
+            if ($vctFim !== null) {
+                $query->where('due_date', '<=', $vctFim);
+            }
         }
 
         return $query->update(['senior_missing_at' => now()]);

@@ -307,12 +307,36 @@ XML;
         return $this->callOnce($params);
     }
 
+    /**
+     * Consulta todos os títulos abertos de uma empresa/filial em uma chamada (bulk).
+     * Requer parâmetro global CliOpcAbr ativo na Senior (F000PGS) — validado em PRD 12/07/2026.
+     * Params: codEmp + codFil + retRat (+ janela vctIni/vctFim); codFor omitido.
+     *
+     * @return array lista de títulos (cada um com 'rateios')
+     */
+    public function consultarTitulosAbertosPorEmpresaFilial(int $codEmp, int $codFil, ?Carbon $vctIni, ?Carbon $vctFim): array
+    {
+        $params = [
+            'codEmp' => $codEmp,
+            'codFil' => $codFil,
+            'retRat' => $this->config['ret_rat'] ?? 'N',
+        ];
+        if ($vctIni) {
+            $params['vctIni'] = $vctIni->format('d/m/Y');
+        }
+        if ($vctFim) {
+            $params['vctFim'] = $vctFim->format('d/m/Y');
+        }
+
+        return $this->callOnce($params, (int) ($this->config['cp_timeout_response'] ?? $this->config['timeout_response'] ?? 60));
+    }
+
     /** Uma chamada HTTP com timeout + retry (backoff 2/4/8s). */
-    private function callOnce(array $params): array
+    private function callOnce(array $params, ?int $responseTimeout = null): array
     {
         $envelope = $this->buildEnvelope($params);
         $connect = $this->clamp((int) ($this->config['timeout_connect'] ?? 60), 5, 300);
-        $response = $this->clamp((int) ($this->config['timeout_response'] ?? 60), 5, 300);
+        $response = $this->clamp($responseTimeout ?? (int) ($this->config['timeout_response'] ?? 60), 5, 300);
         $maxRetries = (int) ($this->config['max_retries'] ?? 3);
 
         $attempt = 0;

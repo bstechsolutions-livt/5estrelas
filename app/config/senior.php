@@ -8,11 +8,10 @@
  * + liberação de firewall do cliente não estiverem prontas, o sync conclui sem
  * invocar a Senior e o DemoSeeder popula a massa (requirement 12).
  *
- * CONTRATO REAL validado em produção (22-23/06/2026):
- *  - `ConsultarTitulosAbertosCP` exige codEmp + codFor + retRat (+ janela vctIni/vctFim).
- *  - codFor é OBRIGATÓRIO; para puxar todos os títulos varremos codFor por empresa.
- *  - Datas vão no formato dd/MM/yyyy (ISO yyyy-MM-dd é rejeitado pela Senior).
- *  - Empresas operacionais com títulos confirmados: codEmp 2 e 3 (codFil=1).
+ * CONTRATO REAL validado em produção:
+ *  - Modo sweep (legado): codEmp + codFor + retRat — varredura codFor 1..N.
+ *  - Modo bulk (CliOpcAbr ativo, 12/07/2026): codEmp + codFil + retRat, SEM codFor.
+ *  - Datas no formato dd/MM/yyyy (ISO yyyy-MM-dd é rejeitado pela Senior).
  *  - tipoRetorno=1 = sucesso.
  */
 return [
@@ -57,12 +56,30 @@ return [
         'encryption' => env('SENIOR_ENCRYPTION', '0'),
     ],
 
-    // Empresas operacionais a varrer (codEmp). Confirmadas com títulos em aberto: 2 e 3.
-    // Lista separada por vírgula no env (ex.: "2,3,4").
+    // Empresas alvo (codEmp). Lista separada por vírgula (ex.: "2,3,4").
     'cod_emps' => array_values(array_filter(
         array_map('intval', explode(',', (string) env('SENIOR_COD_EMPS', '2,3'))),
         fn ($v) => $v > 0,
     )),
+
+    // Rollout gradual: só sincroniza estas empresas quando preenchido (ex.: "2" ou "2,3").
+    'emp_enabled' => array_values(array_filter(
+        array_map('intval', explode(',', (string) env('SENIOR_EMP_ENABLED', '2'))),
+        fn ($v) => $v > 0,
+    )),
+
+    // Estratégia CP: bulk (1 chamada/empresa+filial, CliOpcAbr) ou sweep (varredura codFor).
+    'cp_strategy' => env('SENIOR_CP_STRATEGY', 'bulk'),
+
+    // Filial padrão na consulta bulk (matriz = 1).
+    'cod_fil' => (int) env('SENIOR_COD_FIL', 1),
+
+    // Janela de vencimento no modo bulk (sync agendado puxa 100% nesta faixa).
+    'bulk_vct_ini' => env('SENIOR_BULK_VCT_INI', '2020-01-01'),
+    'bulk_vct_fim' => env('SENIOR_BULK_VCT_FIM', '2030-12-31'),
+
+    // Timeout maior para resposta bulk (muitos títulos em uma chamada).
+    'cp_timeout_response' => (int) env('SENIOR_CP_TIMEOUT_RESPONSE', 180),
 
     // Compat: codEmp único (fallback usado quando cod_emps fica vazio e pelo DemoSeeder).
     'cod_emp' => (int) env('SENIOR_COD_EMP', 1),

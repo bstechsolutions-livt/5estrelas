@@ -58,7 +58,6 @@ class MenuCatalog
             ['key' => 'financeiro_pendencias', 'label' => 'Minhas Dependências', 'icon' => 'pi pi-clock', 'href' => '/financeiro/pendencias', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
             ['key' => 'contas_pagar', 'label' => 'Contas a Pagar', 'icon' => 'pi pi-wallet', 'href' => '/financeiro/contas-pagar', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
             ['key' => 'contas_receber', 'label' => 'Contas a Receber', 'icon' => 'pi pi-money-bill', 'href' => '/financeiro/contas-receber', 'permission' => 'financeiro.contas_receber.visualizar', 'group' => 'Financeiro'],
-            ['key' => 'plano_contas', 'label' => 'Plano de Contas', 'icon' => 'pi pi-book', 'href' => '/financeiro/plano-de-contas', 'permission' => 'financeiro.plano_contas.visualizar', 'group' => 'Financeiro'],
             ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.borderos.visualizar', 'group' => 'Financeiro'],
             ['key' => 'contas_pagar_conciliacao', 'label' => 'Conciliação Bancária', 'icon' => 'pi pi-file-import', 'href' => '/financeiro/contas-pagar/conciliacao', 'permission' => 'financeiro.conciliacao.visualizar', 'group' => 'Financeiro'],
             ['key' => 'financeiro_configuracao', 'label' => 'Configuração', 'icon' => 'pi pi-cog', 'href' => '/financeiro/configuracao', 'any_permissions' => FinanceiroConfigCatalog::permissionKeys(), 'group' => 'Financeiro'],

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Instruções Luan — Integração EASYTECH (Hub 5 Estrelas)</title>
+  <style>
+    @page { margin: 2cm; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #1a1a1a;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 { font-size: 18pt; color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; }
+    h2 { font-size: 13pt; color: #2c5282; margin-top: 24px; }
+    h3 { font-size: 11.5pt; color: #2d3748; margin-top: 16px; }
+    .meta { color: #555; font-size: 10pt; margin-bottom: 20px; }
+    .box { background: #f0f4f8; border-left: 4px solid #2c5282; padding: 12px 16px; margin: 16px 0; }
+    .ok { color: #276749; font-weight: bold; }
+    .skip { color: #975a16; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; }
+    th, td { border: 1px solid #cbd5e0; padding: 8px 10px; text-align: left; }
+    th { background: #edf2f7; }
+    ol, ul { padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    .step-num { display: inline-block; background: #2c5282; color: white; width: 22px; height: 22px; text-align: center; border-radius: 50%; font-size: 10pt; line-height: 22px; margin-right: 6px; }
+    .summary { background: #e6fffa; border: 1px solid #81e6d9; padding: 14px; border-radius: 4px; font-family: monospace; font-size: 10pt; white-space: pre-line; }
+    .footer { margin-top: 30px; font-size: 9pt; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+  </style>
+</head>
+<body>
+
+<h1>Instruções — Integração EASYTECH (Hub 5 Estrelas)</h1>
+<p class="meta">
+  <strong>Para:</strong> Luan &nbsp;|&nbsp;
+  <strong>Data:</strong> 12/07/2026 &nbsp;|&nbsp;
+  <strong>Preparado por:</strong> Easytech
+</p>
+
+<div class="box">
+  <strong>Objetivo:</strong> Liberar consulta de <strong>Fornecedor</strong>, <strong>Filial</strong> e <strong>Centro de Custo</strong> via webservice para o sistema integrado <strong>EASYTECH</strong>, em cada empresa do grupo.<br><br>
+  <strong>Já feito e validado:</strong> Empresa <strong>2</strong> (5 ESTRELAS). Replicar o mesmo nas demais.<br>
+  <strong>Não precisa fazer:</strong> Empresa 1 (Modelo) e Empresa 12.
+</div>
+
+<h2>1. Conferência única (antes de começar)</h2>
+<p><strong>Tela: Cadastro de Sistemas Integrados</strong></p>
+<p>Deve existir o registro:</p>
+<ul>
+  <li><strong>Sigla:</strong> EASYTECH</li>
+  <li><strong>Tipo:</strong> 99 - Outros</li>
+  <li><strong>Situação:</strong> A - Ativo</li>
+</ul>
+<p>Se já existir, não alterar.</p>
+
+<h2>2. Rotina por empresa</h2>
+<p>Repetir os passos abaixo para <strong>cada empresa</strong> da lista (seção 4).</p>
+
+<h3><span class="step-num">1</span> Selecionar a empresa</h3>
+<p><strong>Tela: Seleção de Empresa</strong></p>
+<ol>
+  <li>Abrir a tela <strong>Seleção de Empresa</strong></li>
+  <li>Selecionar a empresa na lista</li>
+  <li>Clicar <strong>Ok</strong></li>
+  <li>Confirmar no canto superior direito que aparece a empresa correta (ex.: <em>0003 SERV APOIO</em>)</li>
+</ol>
+
+<h3><span class="step-num">2</span> Ativar tipos de informação</h3>
+<p><strong>Tela: Configuração de Tipos de Informação</strong></p>
+<p>Menu: <strong>Cadastros → Integrações → Configuração de Tipos de Informação</strong></p>
+<ol>
+  <li><strong>Sistema:</strong> EASYTECH</li>
+  <li><strong>Filial:</strong> 1</li>
+  <li><strong>Informação:</strong> deixar em branco</li>
+  <li>Clicar <strong>Mostrar</strong></li>
+  <li>Na grade, mudar <strong>Situação</strong> para <strong>A - Ativo</strong></li>
+  <li>Na confirmação, escolher <strong>Todos os Itens</strong></li>
+  <li>Marcar os registros</li>
+  <li>Clicar <strong>Processar</strong></li>
+</ol>
+<p><em>Se a empresa tiver mais de uma filial:</em> usar <strong>Duplicar</strong> para replicar da Filial 1 para as demais.</p>
+
+<h3><span class="step-num">3</span> Webservice: Fornecedor</h3>
+<p><strong>Tela: Configuração de web services</strong></p>
+<p>Menu: <strong>Cadastros → Integrações → Configuração de web services</strong></p>
+<ol>
+  <li>Clicar <strong>Tab</strong> no campo <strong>Código</strong> (gera código novo — não reutilizar)</li>
+  <li><strong>Empresa:</strong> a empresa logada</li>
+  <li><strong>Filial:</strong> 1</li>
+  <li><strong>Sistema:</strong> EASYTECH</li>
+  <li><strong>Web service:</strong> <strong>Cadastro - Fornecedor</strong></li>
+  <li><strong>Porta:</strong> <strong>Consultar Geral</strong></li>
+  <li>Marcar <strong>todos</strong> os campos em "Campos exportados pelo web service"</li>
+  <li>Clicar <strong>Processar</strong></li>
+</ol>
+
+<h3><span class="step-num">4</span> Webservice: Filial</h3>
+<p><strong>Tela: Configuração de web services</strong> (mesma tela)</p>
+<ol>
+  <li><strong>Código:</strong> Tab (novo código)</li>
+  <li><strong>Empresa / Filial / Sistema:</strong> mesmos valores</li>
+  <li><strong>Web service:</strong> <strong>Cadastro - Filial</strong></li>
+  <li><strong>Porta:</strong> <strong>Consultar Geral</strong></li>
+  <li>Marcar todos os campos → <strong>Processar</strong></li>
+</ol>
+
+<h3><span class="step-num">5</span> Webservice: Centro de Custo</h3>
+<p><strong>Tela: Configuração de web services</strong> (mesma tela)</p>
+<ol>
+  <li><strong>Código:</strong> Tab (novo código)</li>
+  <li><strong>Empresa / Filial / Sistema:</strong> mesmos valores</li>
+  <li><strong>Web service:</strong> <strong>Cadastro - Centro de Custo</strong><br>
+      <em>(Se o nome for diferente, ex.: Gerencial - Centro de Custo, usar o que tiver porta Consultar Geral)</em></li>
+  <li><strong>Porta:</strong> <strong>Consultar Geral</strong></li>
+  <li>Marcar todos os campos → <strong>Processar</strong></li>
+</ol>
+
+<h3><span class="step-num">6</span> Plano de Contas — pular</h3>
+<p class="skip">Não configurar. Esse webservice não existe no ambiente. O hub usa plano de contas provisório a partir dos títulos de CP/CR.</p>
+
+<h3><span class="step-num">7</span> Outras filiais (somente se existir)</h3>
+<p>Se a empresa tiver Filial 2, 3, etc.:</p>
+<ul>
+  <li>Em <strong>Configuração de web services</strong>: após cada webservice na Filial 1, usar <strong>Duplicar</strong></li>
+  <li>Em <strong>Configuração de Tipos de Informação</strong>: idem — <strong>Duplicar</strong></li>
+</ul>
+<p>Se só tem Filial 1 (matriz): <strong>não precisa duplicar</strong>.</p>
+
+<h2>3. Resumo por empresa</h2>
+<div class="summary">Seleção de Empresa → Ok
+Configuração de Tipos de Informação → Processar (1×)
+Configuração de web services → Processar (3×):
+   1. Cadastro - Fornecedor / Consultar Geral
+   2. Cadastro - Filial / Consultar Geral
+   3. Cadastro - Centro de Custo / Consultar Geral
+
+Total: 4 Processar por empresa (1 + 3)</div>
+
+<h2>4. Lista de empresas</h2>
+<table>
+  <thead>
+    <tr><th>#</th><th>Empresa</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>2</td><td>5 ESTRELAS SISTEMA DE SEGURANCA LTDA</td><td class="ok">✓ Feito e validado</td></tr>
+    <tr><td>3</td><td>5 ESTRELAS SERVICOS DE APOIO ADMINISTRATIVO LTDA</td><td>☐ Pendente</td></tr>
+    <tr><td>4</td><td>LRB CONSTRUTORA E ADMINISTRADORA LTDA</td><td>☐ Pendente</td></tr>
+    <tr><td>5</td><td>5 ESTRELAS REFEICOES COLETIVAS</td><td>☐ Pendente</td></tr>
+    <tr><td>6</td><td>5 ESTRELAS SERVICOS ESPECIALIZADOS</td><td>☐ Pendente</td></tr>
+    <tr><td>7</td><td>BEST SERVICE - ADMINISTRACAO E EVENTOS EMPRESARIAIS LTDA</td><td>☐ Pendente</td></tr>
+    <tr><td>8</td><td>SS SERVICOS DE MANUTENCAO E LIMPEZA LTDA</td><td>☐ Pendente</td></tr>
+    <tr><td>9</td><td>BALUARTE VIGILANCIA PATRIMONIAL LTDA</td><td>☐ Pendente</td></tr>
+    <tr><td>10</td><td>MULTI SEGURANCA ELETRONICA E PATRIMONIAL LTDA</td><td>☐ Pendente</td></tr>
+    <tr><td>11</td><td>STAR SEGURANCA ELETRONICA LTDA</td><td>☐ Pendente</td></tr>
+    <tr><td>—</td><td>Empresa 1 (Modelo) e Empresa 12</td><td class="skip">Não precisa</td></tr>
+  </tbody>
+</table>
+
+<h2>5. O que NÃO precisa fazer</h2>
+<ul>
+  <li><strong>Contas a Pagar</strong> e <strong>Contas a Receber</strong> — já funcionam sem essa configuração</li>
+  <li><strong>Empresa 1</strong> (Modelo) — ignorar</li>
+  <li><strong>Empresa 12</strong> — não precisa</li>
+  <li><strong>Plano de Contas</strong> — webservice não disponível no ambiente</li>
+</ul>
+
+<h2>6. Após concluir cada empresa</h2>
+<p>Avisar a Easytech com o <strong>número da empresa</strong> (ex.: "fechou emp 5") para validação via SOAP.</p>
+
+<div class="footer">
+  Easytech — Integração Senior ERP · Hub 5 Estrelas · Documento gerado em 12/07/2026
+</div>
+
+</body>
+</html>

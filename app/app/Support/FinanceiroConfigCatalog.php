@@ -44,6 +44,14 @@ class FinanceiroConfigCatalog
                 'href' => '/financeiro/borderos/automatico',
                 'permission' => 'financeiro.borderos.automatico_gerenciar',
             ],
+            [
+                'key' => 'plano_contas',
+                'label' => 'Plano de Contas',
+                'description' => 'Contas financeiras e centros de custo derivados de CP/CR (base para DRE e relatórios).',
+                'icon' => 'pi pi-book',
+                'href' => '/financeiro/plano-de-contas',
+                'permission' => 'financeiro.plano_contas.visualizar',
+            ],
         ];
     }
 

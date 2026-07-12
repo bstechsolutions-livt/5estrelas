@@ -120,7 +120,7 @@ class FinanceiroRoutesSmokeTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Financeiro/Configuracao/Index', false)
-                ->has('items', 4));
+                ->has('items', 5));
     }
 
     public function test_configuracao_hub_forbidden_without_permissions(): void
@@ -130,5 +130,20 @@ class FinanceiroRoutesSmokeTest extends TestCase
             Permission::firstOrCreate(['key' => 'financeiro.contas_pagar.visualizar'], ['label' => 'x', 'module' => 'financeiro'])->id
         );
         $this->actingAs($user)->get('/financeiro/configuracao')->assertForbidden();
+    }
+
+    public function test_configuracao_hub_acessivel_com_permissao_plano_contas(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->permissions()->attach(
+            Permission::firstOrCreate(['key' => 'financeiro.plano_contas.visualizar'], ['label' => 'x', 'module' => 'financeiro'])->id
+        );
+        $this->actingAs($user)
+            ->get('/financeiro/configuracao')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Financeiro/Configuracao/Index', false)
+                ->has('items', 1)
+                ->where('items.0.key', 'plano_contas'));
     }
 }

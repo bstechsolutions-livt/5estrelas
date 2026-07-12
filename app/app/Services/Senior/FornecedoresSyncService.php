@@ -42,9 +42,7 @@ class FornecedoresSyncService
     }
 
     /**
-     * Delta: pagina cad_fornecedor por empresa e casa codFor ausentes no cache.
-     *
-     * @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, enriched_desc:int, message:?string, looked_up:int}
+     * Delta: busca na Senior só os codFor que aparecem em títulos e ainda não estão no cache.
      */
     public function syncMissingFromPayables(string $trigger = 'manual'): array
     {
@@ -59,51 +57,35 @@ class FornecedoresSyncService
         $inserted = 0;
         $updated = 0;
         $errors = 0;
-        $lookedUp = count($missingByEmp->flatten());
-        $pageSize = max(10, (int) config('senior.fornecedor_page_size', 100));
-        $maxPages = max(1, (int) config('senior.fornecedor_max_pages', 500));
+        $lookedUp = 0;
+        $codFil = (int) config('senior.cod_fil', 1);
 
         foreach ($missingByEmp as $codEmp => $missingList) {
-            $catalogMax = max(1, (int) config('senior.fornecedor_catalog_max_cod', 120));
-            $pending = array_fill_keys(
-                array_values(array_filter($missingList, fn ($cod) => $cod <= $catalogMax)),
-                true,
-            );
-            if ($pending === []) {
-                continue;
-            }
-            $page = 1;
-
-            while ($page <= $maxPages && $pending !== []) {
+            foreach ($missingList as $codFor) {
+                if ($codFor < 1) {
+                    continue;
+                }
+                $lookedUp++;
                 try {
-                    $fornecedores = $this->client->consultarGeral((int) $codEmp, 1, $page, $pageSize);
+                    $fornecedor = $this->client->consultarPorCodFor((int) $codEmp, (int) $codFor, $codFil);
                 } catch (SeniorException $e) {
                     $errors++;
-                    Log::warning('[senior-fornecedor] delta paginação falhou', [
+                    Log::debug('[senior-fornecedor] codFor não resolvido', [
                         'codEmp' => $codEmp,
-                        'page' => $page,
+                        'codFor' => $codFor,
                         'erro' => $e->getMessage(),
                     ]);
-                    break;
+                    continue;
                 }
 
-                if ($fornecedores === []) {
-                    break;
+                if ($fornecedor === null) {
+                    continue;
                 }
 
-                foreach ($fornecedores as $fornecedor) {
-                    $codFor = (int) ($fornecedor['codFor'] ?? 0);
-                    if ($codFor < 1 || !isset($pending[$codFor])) {
-                        continue;
-                    }
-                    unset($pending[$codFor]);
-                    $fornecedor['codEmp'] ??= (int) $codEmp;
-                    DB::transaction(function () use ($fornecedor, &$inserted, &$updated) {
-                        $this->upsert($fornecedor, $inserted, $updated);
-                    });
-                }
-
-                $page++;
+                $fornecedor['codEmp'] ??= (int) $codEmp;
+                DB::transaction(function () use ($fornecedor, &$inserted, &$updated) {
+                    $this->upsert($fornecedor, $inserted, $updated);
+                });
             }
         }
 

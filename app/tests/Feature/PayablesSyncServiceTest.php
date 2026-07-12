@@ -36,6 +36,8 @@ class PayablesSyncServiceTest extends TestCase
         // Faixa de varredura mínima cobrindo os codFor usados pelos títulos de teste.
         config([
             'senior.cod_emps' => [1],
+            'senior.emp_enabled' => [],
+            'senior.cp_strategy' => 'sweep',
             'senior.cod_for_start' => 1000,
             'senior.cod_for_end' => 1001,
         ]);
@@ -62,6 +64,8 @@ class PayablesSyncServiceTest extends TestCase
     {
         config([
             'senior.cod_emps' => [1],
+            'senior.emp_enabled' => [],
+            'senior.cp_strategy' => 'sweep',
             'senior.cod_for_start' => 1000,
             'senior.cod_for_end' => 1002,
             'senior.sweep_max_transport_failures' => 3,
@@ -246,6 +250,8 @@ class PayablesSyncServiceTest extends TestCase
     {
         config([
             'senior.enabled' => true,
+            'senior.cp_strategy' => 'sweep',
+            'senior.emp_enabled' => [],
             'senior.cod_emps' => [3],
             'senior.cod_for_start' => 1,
             'senior.cod_for_end' => 3,
@@ -286,6 +292,8 @@ class PayablesSyncServiceTest extends TestCase
         // A varredura deve IGNORAR esse codFor e seguir, gravando os títulos do codFor válido.
         config([
             'senior.enabled' => true,
+            'senior.cp_strategy' => 'sweep',
+            'senior.emp_enabled' => [],
             'senior.cod_emps' => [3],
             'senior.cod_for_start' => 1,
             'senior.cod_for_end' => 5,
@@ -317,5 +325,42 @@ class PayablesSyncServiceTest extends TestCase
         $this->assertEquals(PayableSyncRun::STATUS_SUCCESS, $run->status);
         $this->assertEquals(2, $run->inserted_count);
         $this->assertEquals(2, Payable::count());
+    }
+
+    public function test_bulk_por_empresa_filial_upserta_titulos(): void
+    {
+        config([
+            'senior.enabled' => true,
+            'senior.cp_strategy' => 'bulk',
+            'senior.emp_enabled' => [2],
+            'senior.cod_fil' => 1,
+        ]);
+
+        $titulos = [
+            $this->titulo('BULK-1', 'AB', 100),
+            $this->titulo('BULK-2', 'AB', 200),
+        ];
+        $titulos[0]['codEmp'] = 2;
+        $titulos[1]['codEmp'] = 2;
+        $titulos[1]['codFor'] = 2000;
+
+        $fake = new class($titulos) extends SeniorCpClient {
+            public function __construct(private array $fakeTitulos)
+            {
+                parent::__construct(config('senior'));
+            }
+
+            public function consultarTitulosAbertosPorEmpresaFilial(int $codEmp, int $codFil, ?Carbon $vctIni, ?Carbon $vctFim): array
+            {
+                return $codEmp === 2 && $codFil === 1 ? $this->fakeTitulos : [];
+            }
+        };
+
+        $run = (new PayablesSyncService($fake, new PayableMapper(), new StatusMapper()))
+            ->run(PayableSyncRun::MODE_INCREMENTAL);
+
+        $this->assertEquals(PayableSyncRun::STATUS_SUCCESS, $run->status);
+        $this->assertEquals(2, $run->inserted_count);
+        $this->assertEquals(2, Payable::where('codemp', 2)->count());
     }
 }

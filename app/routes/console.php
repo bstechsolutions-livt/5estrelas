@@ -35,15 +35,7 @@ if (config('senior.enabled', false)) {
         ->dailyAt('03:20')
         ->withoutOverlapping();
 
-    // Delta de fornecedores: só os codFor dos títulos sem cache local (a cada sync CP).
-    Schedule::command('senior:sync-fornecedores --missing --scheduled')
-        ->cron($cron)
-        ->withoutOverlapping();
-
-    // Catálogo completo de fornecedores — bootstrap/manutenção noturna.
-    Schedule::command('senior:sync-fornecedores --full --scheduled')
-        ->dailyAt('03:30')
-        ->withoutOverlapping();
+    // Fornecedores: on-demand no pós-sync de CP (syncMissingFromPayables) — sem catálogo full.
 
     Schedule::command('senior:sync-receivables --scheduled')
         ->cron($cron)
