@@ -108,4 +108,27 @@ class FinanceiroRoutesSmokeTest extends TestCase
         );
         $this->actingAs($user)->get('/financeiro/plano-de-contas')->assertOk();
     }
+
+    public function test_configuracao_hub(): void
+    {
+        $user = $this->admin();
+        $user->permissions()->attach(
+            Permission::firstOrCreate(['key' => 'financeiro.contas_pagar.alcada_gerenciar'], ['label' => 'x', 'module' => 'financeiro'])->id
+        );
+        $this->actingAs($user)
+            ->get('/financeiro/configuracao')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Financeiro/Configuracao/Index', false)
+                ->has('items', 4));
+    }
+
+    public function test_configuracao_hub_forbidden_without_permissions(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->permissions()->attach(
+            Permission::firstOrCreate(['key' => 'financeiro.contas_pagar.visualizar'], ['label' => 'x', 'module' => 'financeiro'])->id
+        );
+        $this->actingAs($user)->get('/financeiro/configuracao')->assertForbidden();
+    }
 }

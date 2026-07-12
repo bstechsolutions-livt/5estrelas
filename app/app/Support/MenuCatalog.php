@@ -61,10 +61,7 @@ class MenuCatalog
             ['key' => 'plano_contas', 'label' => 'Plano de Contas', 'icon' => 'pi pi-book', 'href' => '/financeiro/plano-de-contas', 'permission' => 'financeiro.plano_contas.visualizar', 'group' => 'Financeiro'],
             ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.borderos.visualizar', 'group' => 'Financeiro'],
             ['key' => 'contas_pagar_conciliacao', 'label' => 'Conciliação Bancária', 'icon' => 'pi pi-file-import', 'href' => '/financeiro/contas-pagar/conciliacao', 'permission' => 'financeiro.conciliacao.visualizar', 'group' => 'Financeiro'],
-            ['key' => 'contas_pagar_alcada', 'label' => 'Alçada (Contas a Pagar)', 'icon' => 'pi pi-sitemap', 'href' => '/financeiro/contas-pagar/alcada', 'permission' => 'financeiro.contas_pagar.alcada_gerenciar', 'group' => 'Financeiro'],
-            ['key' => 'contas_pagar_classificacao', 'label' => 'Classificação Dept.', 'icon' => 'pi pi-tags', 'href' => '/financeiro/contas-pagar/classificacao-departamentos', 'permission' => 'financeiro.contas_pagar.classificacao_gerenciar', 'group' => 'Financeiro'],
-            ['key' => 'financeiro_fluxos', 'label' => 'Configurar Fluxos', 'icon' => 'pi pi-sliders-h', 'href' => '/financeiro/fluxos-aprovacao', 'permission' => 'financeiro.workflows.configurar', 'group' => 'Financeiro'],
-            ['key' => 'borderos_auto', 'label' => 'Regras Borderô Auto', 'icon' => 'pi pi-bolt', 'href' => '/financeiro/borderos/automatico', 'permission' => 'financeiro.borderos.automatico_gerenciar', 'group' => 'Financeiro'],
+            ['key' => 'financeiro_configuracao', 'label' => 'Configuração', 'icon' => 'pi pi-cog', 'href' => '/financeiro/configuracao', 'any_permissions' => FinanceiroConfigCatalog::permissionKeys(), 'group' => 'Financeiro'],
             // Tickets (portado da Biglar)
             ['key' => 'sol_nova', 'label' => 'Novo Ticket', 'icon' => 'pi pi-plus-circle', 'href' => '/solicitacoes/nova', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
             ['key' => 'sol_lista', 'label' => 'Acompanhar', 'icon' => 'pi pi-list', 'href' => '/solicitacoes/lista', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
@@ -83,7 +80,7 @@ class MenuCatalog
     public static function availableTo(User $user): array
     {
         return collect(self::all())
-            ->filter(fn ($i) => !$i['permission'] || $user->hasPermission($i['permission']))
+            ->filter(fn ($i) => self::isAccessible($i, $user))
             ->values()
             ->all();
     }
@@ -101,7 +98,7 @@ class MenuCatalog
     public static function groupedFor(User $user): array
     {
         $items = collect(self::all())
-            ->filter(fn ($i) => !$i['permission'] || $user->hasPermission($i['permission']));
+            ->filter(fn ($i) => self::isAccessible($i, $user));
 
         $result = [];
         $groups = [];
@@ -128,5 +125,14 @@ class MenuCatalog
     public static function findByKey(string $key): ?array
     {
         return collect(self::all())->firstWhere('key', $key);
+    }
+
+    private static function isAccessible(array $item, User $user): bool
+    {
+        if (! empty($item['any_permissions'])) {
+            return collect($item['any_permissions'])->contains(fn (string $p) => $user->hasPermission($p));
+        }
+
+        return ! $item['permission'] || $user->hasPermission($item['permission']);
     }
 }
