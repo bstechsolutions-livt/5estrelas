@@ -365,6 +365,7 @@ const currentTotal = computed(() => {
                     selectionMode && isSelected(p.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200']">
                 <p v-if="p.department_nome" class="text-[11px] text-gray-500 truncate mb-0.5" dusk="m-departamento">{{ p.department_nome }}</p>
                 <p v-if="p.empresa_nome" class="text-[11px] font-semibold text-blue-600 truncate mb-0.5" dusk="m-empresa">{{ p.empresa_nome }}</p>
+                <p v-if="p.filial_nome && p.filial_nome !== p.empresa_nome" class="text-[11px] text-gray-600 truncate mb-0.5" dusk="m-filial">{{ p.filial_nome }}</p>
                 <div class="flex items-start justify-between gap-2 mb-1">
                     <div class="flex items-center gap-2 flex-1 min-w-0">
                         <i v-if="selectionMode" :class="['pi', isSelected(p.id) ? 'pi-check-circle text-blue-600' : 'pi-circle text-gray-300']"></i>

@@ -310,8 +310,7 @@ class Payable extends Model
      * nunca por código. O nome vem da tabela de filiais/empresas espelhada da
      * Senior (bs_comercial_filiais), resolvida pelo codEmp do título.
      *
-     * Resolve em LOTE (uma query só) e injeta o atributo `empresa_nome` em cada
-     * título, evitando N+1 na listagem. Preferimos fantasia; cai pra razão social.
+     * Resolve em LOTE e injeta `empresa_nome` (apelido da empresa / cod_emp).
      *
      * @param iterable<Payable> $payables
      */
@@ -328,9 +327,14 @@ class Payable extends Model
         $map = $codEmps->isEmpty()
             ? collect()
             : \App\Models\Comercial\Filial::whereIn('cod_emp', $codEmps)
-                ->get(['cod_emp', 'nome', 'fantasia', 'apelido'])
+                ->where('ativo', true)
+                ->get(['cod_emp', 'cod_fil', 'nome', 'fantasia', 'apelido'])
                 ->groupBy('cod_emp')
-                ->map(fn ($grupo) => $grupo->first()->apelido ?: $grupo->first()->fantasia ?: $grupo->first()->nome);
+                ->map(function ($grupo) {
+                    $row = $grupo->firstWhere('cod_fil', 1) ?? $grupo->first();
+
+                    return $row->apelido ?: $row->fantasia ?: $row->nome;
+                });
 
         foreach ($items as $p) {
             $p->setAttribute('empresa_nome', $p->codemp ? ($map[$p->codemp] ?? null) : null);
@@ -411,7 +415,7 @@ class Payable extends Model
     }
 
     /**
-     * ou resolve pelo codFil via tabela branches, ou cai no apelido da empresa.
+     * Apelido da filial operacional (cod_emp + cod_fil), foco da intranet.
      *
      * @param iterable<Payable> $payables
      */
@@ -422,27 +426,27 @@ class Payable extends Model
             return;
         }
 
-        if ($items->first(fn (Payable $p) => ! $p->getAttribute('empresa_nome') && $p->codemp)) {
-            self::attachEmpresaNome($items);
-        }
+        $pairs = $items
+            ->filter(fn (Payable $p) => $p->codemp && $p->codfil)
+            ->map(fn (Payable $p) => (int) $p->codemp . '-' . (int) $p->codfil)
+            ->unique()
+            ->values();
 
-        $codFils = $items->map(fn (Payable $p) => $p->codfil)->filter()->unique()->values();
-
-        $branchMap = $codFils->isEmpty()
+        $branchByPair = $pairs->isEmpty()
             ? collect()
-            : Branch::whereIn('code', $codFils->map(fn ($c) => (string) $c))->get()
-                ->keyBy(fn (Branch $b) => (string) $b->code)
-                ->map(fn (Branch $b) => $b->display_name);
+            : Branch::query()
+                ->where('is_active', true)
+                ->whereNotNull('cod_emp')
+                ->whereNotNull('cod_fil')
+                ->get()
+                ->keyBy(fn (Branch $b) => $b->cod_emp . '-' . $b->cod_fil);
 
-        $codEmps = $items->map(fn (Payable $p) => $p->codemp)->filter()->unique()->values();
-        $comercialMap = $codEmps->isEmpty()
+        $comercialByPair = $pairs->isEmpty()
             ? collect()
             : \App\Models\Comercial\Filial::query()
-                ->whereIn('cod_emp', $codEmps)
                 ->where('ativo', true)
                 ->get(['cod_emp', 'cod_fil', 'apelido', 'nome', 'fantasia'])
-                ->keyBy(fn (\App\Models\Comercial\Filial $f) => $f->cod_emp . '-' . $f->cod_fil)
-                ->map(fn (\App\Models\Comercial\Filial $f) => $f->apelido ?: $f->fantasia ?: $f->nome);
+                ->keyBy(fn ($f) => $f->cod_emp . '-' . $f->cod_fil);
 
         foreach ($items as $p) {
             if ($p->relationLoaded('branch') && $p->branch) {
@@ -451,13 +455,19 @@ class Payable extends Model
                 continue;
             }
 
-            $nome = $p->codfil ? ($branchMap[(string) $p->codfil] ?? null) : null;
+            $key = ($p->codemp && $p->codfil) ? ((int) $p->codemp . '-' . (int) $p->codfil) : null;
+            $nome = null;
 
-            if ($nome === null && $p->codemp && $p->codfil) {
-                $nome = $comercialMap[$p->codemp . '-' . $p->codfil] ?? null;
+            if ($key && $branchByPair->has($key)) {
+                $nome = $branchByPair[$key]->display_name;
+            } elseif ($key && $comercialByPair->has($key)) {
+                $f = $comercialByPair[$key];
+                $nome = $f->apelido ?: $f->fantasia ?: $f->nome;
+            } elseif ($p->codemp && $p->codfil) {
+                $nome = \App\Models\Comercial\Filial::apelidoFilial((int) $p->codemp, (int) $p->codfil);
             }
 
-            $p->setAttribute('filial_nome', $nome ?: $p->getAttribute('empresa_nome'));
+            $p->setAttribute('filial_nome', $nome);
         }
     }
 

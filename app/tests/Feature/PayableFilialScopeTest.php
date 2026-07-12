@@ -68,6 +68,32 @@ class PayableFilialScopeTest extends TestCase
             ->assertInertia(fn ($page) => $page->where('noBranchAccess', true));
     }
 
+    public function test_usuario_com_cod_emp_filial_ve_titulo_da_filial(): void
+    {
+        $filialGo = Branch::create([
+            'name' => '5 ESTRELAS - FILIAL GO',
+            'apelido' => 'GO',
+            'cod_emp' => 2,
+            'cod_fil' => 5,
+            'code' => '15',
+            'is_active' => true,
+        ]);
+
+        $user = $this->cpUser();
+        $user->branches()->attach([$filialGo->id]);
+
+        $this->makePayable(['supplier_name' => 'TituloGO', 'codemp' => 2, 'codfil' => 5]);
+        $this->makePayable(['supplier_name' => 'TituloSP', 'codemp' => 2, 'codfil' => 6]);
+
+        $resp = $this->actingAs($user)
+            ->withHeaders(['X-Json-Only' => '1'])
+            ->get('/financeiro/contas-pagar?status=pendente')
+            ->assertOk();
+
+        $names = collect($resp->json('data'))->pluck('supplier_name')->all();
+        $this->assertSame(['TituloGO'], $names);
+    }
+
     public function test_usuario_com_filiais_ve_apenas_titulos_liberados(): void
     {
         $filialA = $this->makeBranch('Filial A', '10');

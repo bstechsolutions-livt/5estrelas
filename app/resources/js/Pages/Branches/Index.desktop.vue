@@ -40,7 +40,7 @@ function formatCnpj(raw) {
             <div class="flex items-center justify-between mb-6">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-800">Filiais</h1>
-                    <p class="text-sm text-gray-500 mt-1">Empresas e filiais do grupo.</p>
+                    <p class="text-sm text-gray-500 mt-1">Filiais operacionais de todas as empresas do grupo.</p>
                 </div>
                 <Button label="Nova filial" icon="pi pi-plus" @click="goCreate" />
             </div>
@@ -51,8 +51,23 @@ function formatCnpj(raw) {
 
             <div class="bg-white rounded-xl shadow-sm border border-gray-100">
                 <DataTable :value="branches.data" striped-rows>
-                    <Column field="code" header="Código" style="width: 80px" sortable />
+                    <Column field="empresa_apelido" header="Empresa" style="width: 140px" sortable>
+                        <template #body="{ data }">
+                            <span class="text-xs text-gray-600">{{ data.empresa_apelido || '—' }}</span>
+                        </template>
+                    </Column>
+                    <Column field="apelido" header="Apelido filial" style="width: 140px" sortable>
+                        <template #body="{ data }">
+                            <span class="text-xs font-medium text-gray-800">{{ data.apelido || data.display_name || '—' }}</span>
+                        </template>
+                    </Column>
                     <Column field="name" header="Nome" sortable />
+                    <Column header="Senior" style="width: 90px">
+                        <template #body="{ data }">
+                            <span v-if="data.cod_emp && data.cod_fil" class="font-mono text-[11px] text-gray-500">{{ data.cod_emp }}/{{ data.cod_fil }}</span>
+                            <span v-else class="text-gray-300">—</span>
+                        </template>
+                    </Column>
                     <Column field="cnpj" header="CNPJ" style="width: 200px">
                         <template #body="{ data }">
                             <span class="font-mono text-xs">{{ formatCnpj(data.cnpj) }}</span>

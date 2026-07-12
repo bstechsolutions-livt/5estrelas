@@ -43,8 +43,14 @@ function confirmDelete() {
                     <i class="pi pi-map-marker text-blue-500"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-800 truncate">{{ b.name }}</p>
-                    <p class="text-xs text-gray-500 mt-0.5">Cód: {{ b.code || '—' }} · {{ b.users_count }} usuário(s)</p>
+                    <p class="text-sm font-medium text-gray-800 truncate">{{ b.apelido || b.display_name || b.name }}</p>
+                    <p class="text-xs text-gray-500 mt-0.5 truncate">
+                        <span v-if="b.empresa_apelido">{{ b.empresa_apelido }}</span>
+                        <span v-if="b.empresa_apelido && b.cod_emp"> · </span>
+                        <span v-if="b.cod_emp && b.cod_fil">Senior {{ b.cod_emp }}/{{ b.cod_fil }}</span>
+                        <span v-else-if="!b.empresa_apelido">Cód: {{ b.code || '—' }}</span>
+                        · {{ b.users_count }} usuário(s)
+                    </p>
                 </div>
                 <Tag :value="b.is_active ? 'Ativo' : 'Inativo'" :severity="b.is_active ? 'success' : 'secondary'" />
             </button>

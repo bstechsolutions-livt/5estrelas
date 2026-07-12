@@ -24,6 +24,32 @@ class BranchDisplayNameTest extends TestCase
         ]);
     }
 
+    public function test_apelido_local_tem_prioridade_sobre_senior(): void
+    {
+        $this->seedEmpresaSeguranca();
+
+        Filial::create([
+            'cod_emp' => 2,
+            'cod_fil' => 5,
+            'senior_id' => '2-5',
+            'nome' => '5 ESTRELAS SISTEMA DE SEGURANCA LTDA - FILIAL GO',
+            'apelido' => '5 ESTRELAS GO',
+            'ativo' => true,
+        ]);
+
+        $branch = Branch::create([
+            'name' => '5 ESTRELAS SISTEMA DE SEGURANCA LTDA - FILIAL GO',
+            'apelido' => 'GOIANIA',
+            'cod_emp' => 2,
+            'cod_fil' => 5,
+            'code' => '15',
+            'is_active' => true,
+        ]);
+
+        $this->assertSame('GOIANIA', $branch->resolveDisplayName());
+        $this->assertSame('5 ESTRELAS', $branch->empresaApelido());
+    }
+
     public function test_filial_regional_usa_apelido_da_empresa_mais_sufixo(): void
     {
         $this->seedEmpresaSeguranca();

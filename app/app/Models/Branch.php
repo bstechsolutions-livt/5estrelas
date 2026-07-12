@@ -11,10 +11,12 @@ class Branch extends Model
 {
     use Auditable;
 
-    protected $fillable = ['name', 'cnpj', 'code', 'is_active'];
+    protected $fillable = ['name', 'apelido', 'cnpj', 'code', 'cod_emp', 'cod_fil', 'is_active'];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'cod_emp' => 'integer',
+        'cod_fil' => 'integer',
     ];
 
     protected $appends = ['display_name'];
@@ -25,9 +27,13 @@ class Branch extends Model
         return $this->resolveDisplayName();
     }
 
-    /** Apelido da filial comercial vinculada a este cadastro local. */
+    /** Nome curto para exibição: apelido local, depois vínculo Senior/CNPJ. */
     public function resolveDisplayName(): string
     {
+        if (filled($this->apelido)) {
+            return trim($this->apelido);
+        }
+
         $filial = $this->resolveComercialFilial();
         if ($filial !== null) {
             $apelido = filled($filial->apelido) ? $filial->apelido : $filial->label;
@@ -42,6 +48,17 @@ class Branch extends Model
     public function resolveComercialFilial(): ?\App\Models\Comercial\Filial
     {
         $query = \App\Models\Comercial\Filial::query()->where('ativo', true);
+
+        if ($this->cod_emp && $this->cod_fil) {
+            $exact = (clone $query)
+                ->where('cod_emp', (int) $this->cod_emp)
+                ->where('cod_fil', (int) $this->cod_fil)
+                ->first();
+            if ($exact !== null) {
+                return $exact;
+            }
+        }
+
         $cnpj = $this->normalizedCnpj();
 
         if ($cnpj !== null) {
@@ -192,5 +209,24 @@ class Branch extends Model
         $cnpj = preg_replace('/\D/', '', $this->cnpj ?? '');
         if (strlen($cnpj) !== 14) return $this->cnpj;
         return substr($cnpj, 0, 2) . '.' . substr($cnpj, 2, 3) . '.' . substr($cnpj, 5, 3) . '/' . substr($cnpj, 8, 4) . '-' . substr($cnpj, 12, 2);
+    }
+
+    /** Apelido da empresa-mãe (cod_emp), via cadastro Senior/comercial. */
+    public function empresaApelido(): ?string
+    {
+        if ($this->cod_emp) {
+            return \App\Models\Comercial\Filial::apelidoEmpresa((int) $this->cod_emp);
+        }
+
+        return $this->resolveComercialFilial()?->apelido
+            ?: $this->resolveComercialFilial()?->label;
+    }
+
+    /** @param iterable<Branch> $branches */
+    public static function attachEmpresaApelido(iterable $branches): void
+    {
+        foreach ($branches as $branch) {
+            $branch->setAttribute('empresa_apelido', $branch->empresaApelido());
+        }
     }
 }

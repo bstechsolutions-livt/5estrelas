@@ -25,6 +25,7 @@ class PayableBranchScope
      *     branch_ids: int[],
      *     codfils: array<int|string>,
      *     codemps: int[],
+     *     cod_pairs: array<int, array{0:int,1:int}>,
      *     locked_branches: array<int, array{id:int,name:string}>
      * }
      */
@@ -37,6 +38,7 @@ class PayableBranchScope
                 'branch_ids' => [],
                 'codfils' => [],
                 'codemps' => [],
+                'cod_pairs' => [],
                 'locked_branches' => [],
             ];
         }
@@ -44,7 +46,7 @@ class PayableBranchScope
         $branches = $user->branches()
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+            ->get(['id', 'name', 'code', 'cod_emp', 'cod_fil']);
 
         if ($branches->isEmpty()) {
             return [
@@ -53,15 +55,33 @@ class PayableBranchScope
                 'branch_ids' => [],
                 'codfils' => [],
                 'codemps' => [],
+                'cod_pairs' => [],
                 'locked_branches' => [],
             ];
         }
 
         $branchIds = $branches->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $codes = $branches->pluck('code')->filter()->map(fn ($c) => trim((string) $c))->unique()->values();
+        $codfils = [];
+        $codemps = [];
+        $codPairs = [];
 
-        $codfils = $codes->filter(fn ($c) => is_numeric($c))->map(fn ($c) => (int) $c)->values()->all();
-        $codemps = $codfils;
+        foreach ($branches as $branch) {
+            if ($branch->cod_emp !== null && $branch->cod_fil !== null) {
+                $codPairs[] = [(int) $branch->cod_emp, (int) $branch->cod_fil];
+
+                continue;
+            }
+
+            $code = trim((string) ($branch->code ?? ''));
+            if ($code !== '' && is_numeric($code)) {
+                $c = (int) $code;
+                $codfils[] = $c;
+                $codemps[] = $c;
+            }
+        }
+
+        $codfils = array_values(array_unique($codfils));
+        $codemps = array_values(array_unique($codemps));
 
         return [
             'restricted' => true,
@@ -69,6 +89,7 @@ class PayableBranchScope
             'branch_ids' => $branchIds,
             'codfils' => $codfils,
             'codemps' => $codemps,
+            'cod_pairs' => $codPairs,
             'locked_branches' => $branches->map(fn (Branch $b) => [
                 'id' => $b->id,
                 'name' => $b->display_name,
@@ -88,6 +109,12 @@ class PayableBranchScope
 
             if ($scope['branch_ids'] !== []) {
                 $q->whereIn('branch_id', $scope['branch_ids']);
+                $applied = true;
+            }
+
+            foreach ($scope['cod_pairs'] as [$codemp, $codfil]) {
+                $clause = fn (Builder $sub) => $sub->where('codemp', $codemp)->where('codfil', $codfil);
+                $applied ? $q->orWhere($clause) : $q->where($clause);
                 $applied = true;
             }
 
@@ -123,6 +150,12 @@ class PayableBranchScope
 
         if ($payable->branch_id && in_array((int) $payable->branch_id, $scope['branch_ids'], true)) {
             return true;
+        }
+
+        foreach ($scope['cod_pairs'] as [$codemp, $codfil]) {
+            if ((int) $payable->codemp === $codemp && (int) $payable->codfil === $codfil) {
+                return true;
+            }
         }
 
         if ($payable->codfil && in_array((int) $payable->codfil, $scope['codfils'], true)) {

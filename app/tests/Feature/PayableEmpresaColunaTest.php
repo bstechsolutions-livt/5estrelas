@@ -101,7 +101,28 @@ class PayableEmpresaColunaTest extends TestCase
         $this->assertNull($row['empresa_nome']);
     }
 
-    public function test_index_exibe_apelido_da_filial_na_coluna_apelido(): void
+    public function test_index_exibe_empresa_e_filial_separadas(): void
+    {
+        $this->makeFilial(2, '5 ESTRELAS SISTEMA DE SEGURANCA LTDA', '5 ESTRELAS', '5 ESTRELAS');
+        Filial::create([
+            'cod_emp' => 2,
+            'cod_fil' => 5,
+            'senior_id' => '2-5',
+            'nome' => '5 ESTRELAS SISTEMA DE SEGURANCA LTDA - FILIAL GO',
+            'fantasia' => '5 ESTRELAS GO',
+            'apelido' => '5 ESTRELAS GO',
+            'ativo' => true,
+        ]);
+        $this->makePayable(['codemp' => 2, 'codfil' => 5, 'supplier_name' => 'FornecedorFilialCol']);
+
+        $resp = $this->indexJson($this->activeUser())->assertOk();
+        $row = collect($resp->json('data'))->firstWhere('supplier_name', 'FornecedorFilialCol');
+
+        $this->assertSame('5 ESTRELAS', $row['empresa_nome']);
+        $this->assertSame('5 ESTRELAS GO', $row['filial_nome']);
+    }
+
+    public function test_index_exibe_filial_na_coluna_filial_quando_matriz(): void
     {
         $this->makeFilial(2, '5 ESTRELAS SISTEMA DE SEGURANCA LTDA', '5 ESTRELAS', '5 ESTRELAS');
         $this->makePayable(['codemp' => 2, 'codfil' => 1, 'supplier_name' => 'FornecedorApelidoCol']);

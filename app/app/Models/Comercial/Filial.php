@@ -68,6 +68,65 @@ class Filial extends Model
         return mb_substr($base, 0, 100) ?: 'Filial';
     }
 
+    /** Opções de empresas (cod_emp + apelido da matriz) para vínculo no cadastro de filiais. */
+    public static function empresaOptions(): array
+    {
+        return static::query()
+            ->where('ativo', true)
+            ->whereNotNull('cod_emp')
+            ->orderBy('apelido')
+            ->orderBy('nome')
+            ->get(['cod_emp', 'cod_fil', 'apelido', 'nome', 'fantasia'])
+            ->groupBy('cod_emp')
+            ->map(function ($rows, $codEmp) {
+                $matriz = $rows->firstWhere('cod_fil', 1) ?? $rows->first();
+
+                return [
+                    'label' => $matriz->apelido ?: $matriz->fantasia ?: $matriz->nome,
+                    'value' => (int) $codEmp,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /** Apelido curto da empresa (cod_emp), preferindo registro matriz cod_fil=1. */
+    public static function apelidoEmpresa(int $codEmp): ?string
+    {
+        $rows = static::query()
+            ->where('cod_emp', $codEmp)
+            ->where('ativo', true)
+            ->get(['cod_fil', 'apelido', 'nome', 'fantasia']);
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $row = $rows->firstWhere('cod_fil', 1) ?? $rows->first();
+
+        return $row->apelido ?: $row->fantasia ?: $row->nome;
+    }
+
+    /** Apelido da filial operacional (par cod_emp + cod_fil). */
+    public static function apelidoFilial(?int $codEmp, ?int $codFil): ?string
+    {
+        if ($codEmp === null || $codFil === null) {
+            return null;
+        }
+
+        $row = static::query()
+            ->where('cod_emp', $codEmp)
+            ->where('cod_fil', $codFil)
+            ->where('ativo', true)
+            ->first(['apelido', 'nome', 'fantasia']);
+
+        if ($row === null) {
+            return null;
+        }
+
+        return $row->apelido ?: $row->fantasia ?: $row->nome;
+    }
+
     /** Valor (string) usado nos selects de empresa — o cod_emp da Senior como string. */
     public function getCodigoAttribute(): ?string
     {
