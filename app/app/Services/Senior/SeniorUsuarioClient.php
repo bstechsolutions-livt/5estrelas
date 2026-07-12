@@ -195,7 +195,14 @@ XML;
             if ($value === []) {
                 return '';
             }
-            foreach ($value as $v) {
+            $attrs = $value['@attributes'] ?? null;
+            if (is_array($attrs) && ($attrs['nil'] ?? $attrs['xsi:nil'] ?? null) === 'true') {
+                return '';
+            }
+            foreach ($value as $k => $v) {
+                if ($k === '@attributes') {
+                    continue;
+                }
                 $s = $this->scalarString($v);
                 if ($s !== '') {
                     return $s;
