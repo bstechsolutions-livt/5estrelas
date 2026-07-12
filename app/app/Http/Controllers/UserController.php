@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Department;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\DefaultUserPassword;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -69,6 +70,7 @@ class UserController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => bcrypt($data['password']),
+            'must_change_password' => DefaultUserPassword::is($data['password']),
             'is_active' => $data['is_active'] ?? true,
             'department_id' => $data['department_id'] ?? null,
             'senior_cod_usu' => $data['senior_cod_usu'] ?? null,
@@ -130,6 +132,9 @@ class UserController extends Controller
         $user->email = $data['email'];
         if (!empty($data['password'])) {
             $user->password = bcrypt($data['password']);
+            if (DefaultUserPassword::is($data['password'])) {
+                $user->must_change_password = true;
+            }
         }
         $user->is_active = $data['is_active'] ?? $user->is_active;
         $user->department_id = $data['department_id'] ?? $user->department_id;

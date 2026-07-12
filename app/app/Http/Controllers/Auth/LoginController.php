@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\LoginThrottle;
+use App\Support\DefaultUserPassword;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -72,6 +73,16 @@ class LoginController extends Controller
                 module: 'auth',
                 description: 'Login efetuado',
             );
+
+            $user = Auth::user();
+            if (DefaultUserPassword::is($request->password)) {
+                if (!$user->must_change_password) {
+                    $user->must_change_password = true;
+                    $user->saveQuietly();
+                }
+
+                return redirect()->route('password.force-change');
+            }
 
             return redirect()->intended('/dashboard');
         }

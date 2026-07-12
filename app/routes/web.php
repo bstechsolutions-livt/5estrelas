@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\ForcePasswordChangeController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
@@ -53,6 +54,9 @@ Route::middleware('guest')->group(function () {
 // Authenticated routes
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
+
+    Route::get('/trocar-senha', [ForcePasswordChangeController::class, 'show'])->name('password.force-change');
+    Route::post('/trocar-senha', [ForcePasswordChangeController::class, 'store'])->name('password.force-change.store');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
