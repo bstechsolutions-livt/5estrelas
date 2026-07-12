@@ -419,6 +419,14 @@ class Payable extends Model
     public static function attachFilialNome(iterable $payables): void
     {
         $items = collect($payables);
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        if ($items->first(fn (Payable $p) => ! $p->getAttribute('empresa_nome') && $p->codemp)) {
+            self::attachEmpresaNome($items);
+        }
+
         $codFils = $items->map(fn (Payable $p) => $p->codfil)->filter()->unique()->values();
 
         $branchMap = $codFils->isEmpty()
@@ -427,14 +435,30 @@ class Payable extends Model
                 ->keyBy(fn (Branch $b) => (string) $b->code)
                 ->map(fn (Branch $b) => $b->display_name);
 
+        $codEmps = $items->map(fn (Payable $p) => $p->codemp)->filter()->unique()->values();
+        $comercialMap = $codEmps->isEmpty()
+            ? collect()
+            : \App\Models\Comercial\Filial::query()
+                ->whereIn('cod_emp', $codEmps)
+                ->where('ativo', true)
+                ->get(['cod_emp', 'cod_fil', 'apelido', 'nome', 'fantasia'])
+                ->keyBy(fn (\App\Models\Comercial\Filial $f) => $f->cod_emp . '-' . $f->cod_fil)
+                ->map(fn (\App\Models\Comercial\Filial $f) => $f->apelido ?: $f->fantasia ?: $f->nome);
+
         foreach ($items as $p) {
             if ($p->relationLoaded('branch') && $p->branch) {
                 $p->setAttribute('filial_nome', $p->branch->display_name);
 
                 continue;
             }
-            $filial = $p->codfil ? ($branchMap[(string) $p->codfil] ?? null) : null;
-            $p->setAttribute('filial_nome', $filial ?: $p->getAttribute('empresa_nome'));
+
+            $nome = $p->codfil ? ($branchMap[(string) $p->codfil] ?? null) : null;
+
+            if ($nome === null && $p->codemp && $p->codfil) {
+                $nome = $comercialMap[$p->codemp . '-' . $p->codfil] ?? null;
+            }
+
+            $p->setAttribute('filial_nome', $nome ?: $p->getAttribute('empresa_nome'));
         }
     }
 

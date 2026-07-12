@@ -23,7 +23,7 @@ class PayableEmpresaColunaTest extends TestCase
     private function activeUser(array $keys = ['financeiro.contas_pagar.visualizar']): User
     {
         $user = User::factory()->create(['is_active' => true]);
-        foreach ($keys as $key) {
+        foreach (array_merge($keys, ['financeiro.contas_pagar.ver_todas_filiais']) as $key) {
             $user->permissions()->attach(
                 Permission::firstOrCreate(['key' => $key], ['label' => $key, 'module' => 'financeiro'])->id
             );
@@ -99,6 +99,18 @@ class PayableEmpresaColunaTest extends TestCase
         $row = collect($resp->json('data'))->firstWhere('supplier_name', 'FornecedorSemEmpresa');
 
         $this->assertNull($row['empresa_nome']);
+    }
+
+    public function test_index_exibe_apelido_da_filial_na_coluna_apelido(): void
+    {
+        $this->makeFilial(2, '5 ESTRELAS SISTEMA DE SEGURANCA LTDA', '5 ESTRELAS', '5 ESTRELAS');
+        $this->makePayable(['codemp' => 2, 'codfil' => 1, 'supplier_name' => 'FornecedorApelidoCol']);
+
+        $resp = $this->indexJson($this->activeUser())->assertOk();
+        $row = collect($resp->json('data'))->firstWhere('supplier_name', 'FornecedorApelidoCol');
+
+        $this->assertSame('5 ESTRELAS', $row['empresa_nome']);
+        $this->assertSame('5 ESTRELAS', $row['filial_nome']);
     }
 
     public function test_show_expoe_nome_da_empresa(): void

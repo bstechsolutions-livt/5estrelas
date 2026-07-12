@@ -775,10 +775,10 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span class="cell-truncate text-xs text-gray-600" :title="data.department_nome" @click="goShow(data.id)">{{ data.department_nome || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="nickname" header="Apelido" style="width: 10%" sortable>
+                    <Column field="filial_nome" header="Apelido" style="width: 10%" sortable dusk="col-apelido">
                         <template #body="{ data }">
-                            <span class="cell-truncate text-xs font-medium text-gray-800" :title="data.nickname"
-                                @click="goShow(data.id)">{{ data.nickname || '—' }}</span>
+                            <span class="cell-truncate text-xs font-medium text-gray-800" :title="data.filial_nome"
+                                @click="goShow(data.id)">{{ data.filial_nome || '—' }}</span>
                         </template>
                     </Column>
                     <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '18%' : '16%' }" sortable>
