@@ -140,6 +140,11 @@ watch(() => page.props.flash?.error, (msg) => {
                                     <span class="text-xs font-semibold text-gray-700">{{ data.name?.charAt(0)?.toUpperCase() }}</span>
                                 </div>
                                 <span>{{ data.name }}</span>
+                                <i
+                                    v-if="!data.senior_cod_usu"
+                                    class="pi pi-exclamation-triangle text-amber-500 text-sm shrink-0"
+                                    v-tooltip.top="'Código usuário Senior não cadastrado'"
+                                />
                             </div>
                         </template>
                     </Column>

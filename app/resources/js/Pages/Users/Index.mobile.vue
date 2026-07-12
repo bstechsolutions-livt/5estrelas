@@ -156,7 +156,15 @@ const hasMore = computed(() => currentPage.value < lastPage.value)
                     <span class="text-sm font-semibold text-gray-700">{{ userInitial(u) }}</span>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-800 truncate">{{ u.name }} <span class="text-xs text-gray-400 font-normal">#{{ u.id }}</span></p>
+                    <p class="text-sm font-medium text-gray-800 truncate flex items-center gap-1.5">
+                        <span class="truncate">{{ u.name }}</span>
+                        <i
+                            v-if="!u.senior_cod_usu"
+                            class="pi pi-exclamation-triangle text-amber-500 text-xs shrink-0"
+                            title="Código usuário Senior não cadastrado"
+                        />
+                        <span class="text-xs text-gray-400 font-normal shrink-0">#{{ u.id }}</span>
+                    </p>
                     <p class="text-xs text-gray-500 truncate">{{ u.email }}</p>
                     <p v-if="u.branches?.length" class="text-[10px] text-blue-600 mt-1 truncate"
                         :title="branchAccessSummary(u.branches, totalBranches).title || undefined">
