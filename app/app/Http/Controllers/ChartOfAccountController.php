@@ -28,6 +28,9 @@ class ChartOfAccountController extends Controller
 
         $accounts = $query->orderBy('account_type')->orderBy('code')->paginate(50)->withQueryString();
 
+        ChartOfAccount::attachEmpresaNome($accounts->getCollection());
+        ChartOfAccount::attachDerivedDescriptions($accounts->getCollection());
+
         return Inertia::render('ChartOfAccounts/Index', [
             'accounts' => $accounts,
             'filters' => $request->only(['search', 'account_type', 'codemp']),

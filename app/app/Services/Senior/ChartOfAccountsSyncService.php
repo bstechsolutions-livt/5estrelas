@@ -155,7 +155,7 @@ class ChartOfAccountsSyncService
             }
             $accounts[$key] = [
                 'code' => $code,
-                'description' => null,
+                'description' => ChartOfAccount::deriveDescription($type, $code, $codemp),
                 'account_type' => $type,
                 'codemp' => $codemp,
                 'source' => 'derived',

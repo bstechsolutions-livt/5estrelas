@@ -68,8 +68,8 @@ function applyFilters() {
                         <Tag :value="typeOptions?.[data.account_type] || data.account_type" severity="secondary" />
                     </template>
                 </Column>
-                <Column field="codemp" header="Empresa">
-                    <template #body="{ data }">{{ data.codemp || '—' }}</template>
+                <Column field="empresa_nome" header="Empresa">
+                    <template #body="{ data }">{{ data.empresa_nome || '—' }}</template>
                 </Column>
                 <Column header="Origem">
                     <template #body="{ data }">
