@@ -216,7 +216,7 @@ class ApprovalWorkflowService
         ];
     }
 
-    /** Após reprovação, borderô com títulos pendentes volta para rascunho. */
+    /** Após reprovação avulsa de título ainda no borderô (legado); expulsão usa BorderoActionService. */
     private function syncBorderoAfterPayableReject(Payable $payable, User $rejector, string $reason): void
     {
         if (! $payable->bordero_id) {
@@ -230,7 +230,7 @@ class ApprovalWorkflowService
 
         $bordero->syncStatusFromPayables();
 
-        if ($bordero->status === 'rascunho') {
+        if ($bordero->status === Bordero::STATUS_PENDENTE) {
             $bordero->update([
                 'rejection_reason' => $reason,
                 'approved_by' => $rejector->id,

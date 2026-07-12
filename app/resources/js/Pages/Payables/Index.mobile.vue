@@ -203,7 +203,7 @@ function goShow(id) {
 }
 
 // Seleção pra criar borderô (mobile)
-const selectableStatuses = ['pendente', 'em_preparacao', 'reprovado']
+const selectableStatuses = ['pendente', 'em_preparacao']
 const canSelect = computed(() => selectableStatuses.includes(status.value))
 const canSelectBordero = computed(() => canSelect.value && canBorderos.value)
 const selectionMode = ref(false)

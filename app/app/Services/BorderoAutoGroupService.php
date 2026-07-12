@@ -149,7 +149,7 @@ class BorderoAutoGroupService
             foreach ($groups as $group) {
                 $payables = Payable::whereIn('id', $group['payable_ids'])
                     ->whereNull('bordero_id')
-                    ->whereIn('status', ['pendente', 'em_preparacao', 'reprovado'])
+                    ->whereIn('status', ['pendente', 'em_preparacao'])
                     ->get();
 
                 if ($payables->count() < max(2, (int) $rule->min_titles_per_group)) {
@@ -159,7 +159,7 @@ class BorderoAutoGroupService
                 $bordero = Bordero::create([
                     'number' => Bordero::generateNumber(),
                     'description' => $group['bordero_description'],
-                    'status' => 'rascunho',
+                    'status' => 'pendente',
                     'created_by' => $user?->id,
                     'auto_rule_id' => $rule->id ?: null,
                 ]);

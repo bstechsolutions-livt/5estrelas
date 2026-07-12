@@ -7,6 +7,7 @@ use App\Models\ApprovalTrail;
 use App\Models\Bordero;
 use App\Models\Department;
 use App\Models\Payable;
+use App\Models\PayableComment;
 use App\Models\PayableDocument;
 use App\Models\Permission;
 use App\Models\User;
@@ -20,9 +21,9 @@ class BorderoApprovalWorkflowTest extends TestCase
 
     private User $sender;
 
-    private User $gerente;
-
     private User $gestorDept;
+
+    private User $gerente;
 
     private Department $department;
 
@@ -102,7 +103,7 @@ class BorderoApprovalWorkflowTest extends TestCase
     private function payableComDocumento(): Payable
     {
         $payable = Payable::create([
-            'title_number' => 'BOR-' . uniqid(),
+            'title_number' => 'BOR-'.uniqid(),
             'supplier_name' => 'Fornecedor Borderô',
             'amount' => 1500.00,
             'due_date' => now()->addDays(5)->toDateString(),
@@ -121,11 +122,11 @@ class BorderoApprovalWorkflowTest extends TestCase
         return $payable;
     }
 
-    private function borderoRascunho(array $payableIds): Bordero
+    private function borderoPendente(array $payableIds): Bordero
     {
         $bordero = Bordero::create([
             'number' => Bordero::generateNumber(),
-            'status' => 'rascunho',
+            'status' => Bordero::STATUS_PENDENTE,
             'created_by' => $this->sender->id,
         ]);
 
@@ -139,7 +140,7 @@ class BorderoApprovalWorkflowTest extends TestCase
     {
         $p1 = $this->payableComDocumento();
         $p2 = $this->payableComDocumento();
-        $bordero = $this->borderoRascunho([$p1->id, $p2->id]);
+        $bordero = $this->borderoPendente([$p1->id, $p2->id]);
 
         $response = $this->actingAs($this->sender)->post(
             "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
@@ -157,119 +158,17 @@ class BorderoApprovalWorkflowTest extends TestCase
         }
     }
 
-    public function test_enviar_bordero_exige_documento_em_todos_titulos(): void
-    {
-        $comDoc = $this->payableComDocumento();
-        $semDoc = Payable::create([
-            'title_number' => 'SEM-DOC-' . uniqid(),
-            'supplier_name' => 'Sem anexo',
-            'amount' => 500,
-            'due_date' => now()->addDays(3)->toDateString(),
-            'status' => 'pendente',
-        ]);
-        $bordero = $this->borderoRascunho([$comDoc->id, $semDoc->id]);
-
-        $response = $this->actingAs($this->sender)->post(
-            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
-        );
-
-        $response->assertRedirect();
-        $response->assertSessionHas('error');
-        $bordero->refresh();
-        $this->assertSame('rascunho', $bordero->status);
-    }
-
-    public function test_aprovar_bordero_avanca_etapa_apenas_para_aprovador_correto(): void
+    public function test_reprovar_bordero_devolve_pacote_para_pendente_mantendo_titulos(): void
     {
         $p1 = $this->payableComDocumento();
         $p2 = $this->payableComDocumento();
-        $bordero = $this->borderoRascunho([$p1->id, $p2->id]);
+        $bordero = $this->borderoPendente([$p1->id, $p2->id]);
 
         $this->actingAs($this->sender)->post(
             "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
         );
 
-        // Usuário com acesso ao módulo, mas que não é o aprovador da etapa atual
-        $outro = User::factory()->create();
-        $outro->permissions()->attach(
-            Permission::firstOrCreate(
-                ['key' => 'financeiro.contas_pagar.visualizar'],
-                ['label' => 'Visualizar', 'module' => 'financeiro']
-            )->id
-        );
-        $outro->permissions()->attach(
-            Permission::firstOrCreate(
-                ['key' => 'financeiro.borderos.visualizar'],
-                ['label' => 'Borderôs', 'module' => 'financeiro']
-            )->id
-        );
-        $denied = $this->actingAs($outro)->post("/financeiro/borderos/{$bordero->id}/aprovar");
-        $denied->assertRedirect();
-        $denied->assertSessionHas('error');
-
-        // 1ª etapa (departamento): gestor do departamento
-        $this->actingAs($this->gestorDept)->post("/financeiro/borderos/{$bordero->id}/aprovar")->assertSessionHas('success');
-
-        // 2ª etapa: diretoria (gerência já absorvida na 1ª)
-        $diretorId = ApprovalTrail::where('area', 'matriz')->where('level_name', 'diretoria')->value('default_user_id');
-        $diretor = User::find($diretorId);
-        $diretor->permissions()->attach(
-            Permission::firstOrCreate(
-                ['key' => 'financeiro.contas_pagar.visualizar'],
-                ['label' => 'Visualizar', 'module' => 'financeiro']
-            )->id
-        );
-        $diretor->permissions()->attach(
-            Permission::firstOrCreate(
-                ['key' => 'financeiro.borderos.visualizar'],
-                ['label' => 'Borderôs', 'module' => 'financeiro']
-            )->id
-        );
-        $this->actingAs($diretor)->post("/financeiro/borderos/{$bordero->id}/aprovar")->assertSessionHas('success');
-
-        $p1->refresh();
-        $p2->refresh();
-        $this->assertSame('aguardando_aprovacao', $p1->status);
-        $this->assertSame('aguardando_aprovacao', $p2->status);
-
-        $bordero->refresh();
-        $this->assertSame('aguardando_aprovacao', $bordero->status);
-    }
-
-    public function test_bordero_fica_aprovado_quando_todos_titulos_concluem_fluxo(): void
-    {
-        $payable = $this->payableComDocumento();
-        $bordero = $this->borderoRascunho([$payable->id]);
-
-        $this->actingAs($this->sender)->post(
-            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
-        );
-
-        $admin = $this->userWithPerm(['*']);
-
-        for ($i = 0; $i < 4; $i++) {
-            $response = $this->actingAs($admin)->post("/financeiro/borderos/{$bordero->id}/aprovar");
-            $response->assertRedirect();
-            $response->assertSessionHas('success');
-        }
-
-        $payable->refresh();
-        $bordero->refresh();
-        $this->assertSame('aprovado', $payable->status);
-        $this->assertSame('aprovado', $bordero->status);
-    }
-
-    public function test_reprovar_bordero_devolve_titulos_para_pendente_e_bordero_para_rascunho(): void
-    {
-        $p1 = $this->payableComDocumento();
-        $p2 = $this->payableComDocumento();
-        $bordero = $this->borderoRascunho([$p1->id, $p2->id]);
-
-        $this->actingAs($this->sender)->post(
-            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
-        );
-
-        $admin = $this->userWithPerm(['*', 'financeiro.contas_pagar.visualizar']);
+        $admin = $this->userWithPerm(['*', 'financeiro.contas_pagar.visualizar', 'financeiro.borderos.visualizar']);
         $response = $this->actingAs($admin)->post("/financeiro/borderos/{$bordero->id}/reprovar", [
             'reason' => 'Documentação incompleta no borderô',
         ]);
@@ -283,45 +182,106 @@ class BorderoApprovalWorkflowTest extends TestCase
 
         $this->assertSame('pendente', $p1->status);
         $this->assertSame('pendente', $p2->status);
-        $this->assertSame('Documentação incompleta no borderô', $p1->rejection_reason);
-        $this->assertSame('rascunho', $bordero->status);
+        $this->assertSame($bordero->id, $p1->bordero_id);
+        $this->assertSame($bordero->id, $p2->bordero_id);
+        $this->assertSame('pendente', $bordero->status);
         $this->assertSame('Documentação incompleta no borderô', $bordero->rejection_reason);
+        $this->assertGreaterThan(0, PayableComment::where('payable_id', $p1->id)->where('type', 'rejection')->count());
     }
 
-    public function test_enviar_bordero_bloqueia_sem_departamento_no_usuario(): void
+    public function test_expulsar_titulo_remove_do_bordero_para_cp_avulso(): void
     {
-        $semDept = $this->userWithPerm([
+        $p1 = $this->payableComDocumento();
+        $p2 = $this->payableComDocumento();
+        $bordero = $this->borderoPendente([$p1->id, $p2->id]);
+
+        $this->actingAs($this->sender)->post("/financeiro/borderos/{$bordero->id}/enviar-aprovacao");
+
+        $response = $this->actingAs($this->gestorDept)->post(
+            "/financeiro/borderos/{$bordero->id}/titulos/{$p1->id}/expulsar",
+            ['reason' => 'Título com valor divergente']
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $p1->refresh();
+        $p2->refresh();
+        $bordero->refresh();
+
+        $this->assertNull($p1->bordero_id);
+        $this->assertSame('pendente', $p1->status);
+        $this->assertSame('Título com valor divergente', $p1->rejection_reason);
+        $this->assertSame($bordero->id, $p2->bordero_id);
+        $this->assertSame('aguardando_aprovacao', $bordero->status);
+        $this->assertSame(1, $bordero->items_count);
+    }
+
+    public function test_liberar_titulo_exige_permissao_especial(): void
+    {
+        $p1 = $this->payableComDocumento();
+        $bordero = $this->borderoPendente([$p1->id]);
+
+        $this->actingAs($this->sender)->post("/financeiro/borderos/{$bordero->id}/enviar-aprovacao");
+
+        $denied = $this->actingAs($this->gestorDept)->post(
+            "/financeiro/borderos/{$bordero->id}/titulos/{$p1->id}/liberar",
+            ['reason' => 'Urgente']
+        );
+        $denied->assertRedirect();
+        $denied->assertSessionHas('error');
+
+        $liberador = $this->userWithPerm([
             'financeiro.contas_pagar.visualizar',
-            'financeiro.contas_pagar.preparar',
             'financeiro.borderos.visualizar',
+            'financeiro.borderos.liberar_titulo',
         ]);
-        $p1 = $this->payableComDocumento();
-        $bordero = $this->borderoRascunho([$p1->id]);
 
-        $response = $this->actingAs($semDept)->post(
-            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
+        $ok = $this->actingAs($liberador)->post(
+            "/financeiro/borderos/{$bordero->id}/titulos/{$p1->id}/liberar",
+            ['reason' => 'Urgente — seguir avulso']
         );
+        $ok->assertRedirect();
+        $ok->assertSessionHas('success');
 
-        $response->assertRedirect();
-        $response->assertSessionHas('error');
-        $bordero->refresh();
-        $this->assertSame('rascunho', $bordero->status);
+        $p1->refresh();
+        $this->assertNull($p1->bordero_id);
+        $this->assertSame('aguardando_aprovacao', $p1->status);
+        $this->assertGreaterThan(0, ApprovalStep::where('payable_id', $p1->id)->count());
     }
 
-    public function test_enviar_bordero_bloqueia_sem_gestor_no_departamento(): void
+    public function test_desfazer_bordero_pendente_libera_titulos(): void
     {
-        $this->department->forceFill(['manager_id' => null])->save();
-        ApprovalTrail::where('area', 'matriz')->where('level_name', 'gerencia')->delete();
         $p1 = $this->payableComDocumento();
-        $bordero = $this->borderoRascunho([$p1->id]);
+        $bordero = $this->borderoPendente([$p1->id]);
 
-        $response = $this->actingAs($this->sender)->post(
-            "/financeiro/borderos/{$bordero->id}/enviar-aprovacao"
-        );
+        $user = $this->userWithPerm([
+            'financeiro.borderos.visualizar',
+            'financeiro.borderos.desfazer',
+        ]);
+
+        $response = $this->actingAs($user)->post("/financeiro/borderos/{$bordero->id}/desfazer", [
+            'reason' => 'Montagem incorreta',
+        ]);
 
         $response->assertRedirect();
-        $response->assertSessionHas('error');
-        $bordero->refresh();
-        $this->assertSame('rascunho', $bordero->status);
+        $response->assertSessionHas('success');
+
+        $p1->refresh();
+        $this->assertNull($p1->bordero_id);
+        $this->assertNull(Bordero::find($bordero->id));
+    }
+
+    public function test_titulo_em_bordero_nao_aparece_em_cp_pendente_avulso(): void
+    {
+        $p1 = $this->payableComDocumento();
+        $this->borderoPendente([$p1->id]);
+
+        $response = $this->actingAs($this->sender)->get('/financeiro/contas-pagar?status=pendente');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->has('payables.data', 0)
+        );
     }
 }

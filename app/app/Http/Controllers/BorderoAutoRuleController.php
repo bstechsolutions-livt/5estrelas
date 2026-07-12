@@ -177,10 +177,10 @@ class BorderoAutoRuleController extends Controller
             }
 
             $msg = $created
-                ? "Regra criada e {$result['created']} borderô(s) gerado(s) em rascunho."
-                : "Regra atualizada e {$result['created']} borderô(s) gerado(s) em rascunho.";
+                ? "Regra criada e {$result['created']} borderô(s) gerado(s) em pendente."
+                : "Regra atualizada e {$result['created']} borderô(s) gerado(s) em pendente.";
 
-            return redirect('/financeiro/borderos?status=rascunho')->with('success', $msg);
+            return redirect('/financeiro/borderos?status=pendente')->with('success', $msg);
         }
 
         $msg = $created

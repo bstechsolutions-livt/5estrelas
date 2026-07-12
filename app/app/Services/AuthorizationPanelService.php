@@ -87,7 +87,7 @@ class AuthorizationPanelService
             $aguardandoBorderos = (clone $this->borderoQuery($user))->where('status', 'aguardando_aprovacao');
             $aprovadoBorderos = (clone $this->borderoQuery($user))->where('status', 'aprovado');
             $recusadoBorderos = (clone $this->borderoQuery($user))
-                ->where('status', 'rascunho')
+                ->where('status', 'pendente')
                 ->whereNotNull('rejection_reason');
         }
 

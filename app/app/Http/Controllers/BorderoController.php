@@ -4,11 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\ApprovalStep;
 use App\Models\Bordero;
-use App\Models\Department;
 use App\Models\Payable;
-use App\Models\PayableComment;
 use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogger;
+use App\Services\BorderoActionService;
 use App\Services\PayableBranchScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +26,6 @@ class BorderoController extends Controller
             ->with('creator:id,name')
             ->orderByDesc('created_at');
 
-        // Sempre filtra por um status (default: aguardando_aprovacao). Não existe "ver todos".
         $status = $request->input('status') ?: 'aguardando_aprovacao';
         $query->where('status', $status);
 
@@ -78,7 +76,7 @@ class BorderoController extends Controller
 
         $user = $request->user();
         $branchScope = app(PayableBranchScope::class);
-        if (!$bordero->payables->contains(fn (Payable $p) => $branchScope->canAccessPayable($user, $p))) {
+        if (! $bordero->payables->contains(fn (Payable $p) => $branchScope->canAccessPayable($user, $p))) {
             $scope = $branchScope->resolve($user);
             abort(403, $scope['no_branch_access']
                 ? PayableBranchScope::NO_BRANCH_ACCESS_MESSAGE
@@ -89,6 +87,7 @@ class BorderoController extends Controller
         Payable::attachFilialNome($bordero->payables);
 
         $workflow = app(ApprovalWorkflowService::class);
+        $actions = app(BorderoActionService::class);
 
         $payableIds = $bordero->payables->pluck('id');
         $stepsByPayable = ApprovalStep::whereIn('payable_id', $payableIds)
@@ -97,7 +96,7 @@ class BorderoController extends Controller
             ->get()
             ->groupBy('payable_id');
 
-        $payablesWithWorkflow = $bordero->payables->map(function (Payable $payable) use ($workflow, $stepsByPayable, $user) {
+        $payablesWithWorkflow = $bordero->payables->map(function (Payable $payable) use ($workflow, $stepsByPayable, $user, $actions) {
             $steps = $stepsByPayable->get($payable->id, collect());
             $currentStep = $workflow->currentStep($payable);
 
@@ -106,6 +105,7 @@ class BorderoController extends Controller
                 'approval_steps' => $steps,
                 'current_step' => $currentStep,
                 'can_approve' => $workflow->canUserApprove($payable, $user),
+                'can_expulsar' => $actions->canExpulsarTitulo($user, $payable),
             ];
         });
 
@@ -120,6 +120,9 @@ class BorderoController extends Controller
             'statusColors' => Bordero::STATUS_COLORS,
             'payablesWorkflow' => $payablesWithWorkflow,
             'canApproveStep' => $canApproveStep,
+            'canReprovarBordero' => $actions->canReprovarBordero($bordero, $user),
+            'canLiberarTitulo' => $actions->canLiberarTitulo($user),
+            'canDesfazer' => $actions->canDesfazer($user) && $bordero->isEditable(),
             'approvableCount' => $approvableCount,
             'currentStepLabel' => $currentStepLabel,
             'requiresPriorityOnApprove' => $canApproveStep && $currentStepLabel === 'financeiro',
@@ -139,10 +142,9 @@ class BorderoController extends Controller
         $user = $request->user();
         $branchScope = app(PayableBranchScope::class);
 
-        // Valida que os títulos estão em status que permite agrupar
         $payablesQuery = Payable::whereIn('id', $data['payable_ids'])
             ->excludeMissingInSenior()
-            ->whereIn('status', ['pendente', 'em_preparacao', 'reprovado'])
+            ->whereIn('status', ['pendente', 'em_preparacao'])
             ->whereNull('bordero_id');
         $branchScope->applyFilter($payablesQuery, $user);
         $payables = $payablesQuery->get();
@@ -155,7 +157,7 @@ class BorderoController extends Controller
             $bordero = Bordero::create([
                 'number' => Bordero::generateNumber(),
                 'description' => $data['description'] ?? null,
-                'status' => 'rascunho',
+                'status' => Bordero::STATUS_PENDENTE,
                 'created_by' => $request->user()->id,
             ]);
 
@@ -183,8 +185,8 @@ class BorderoController extends Controller
     {
         $bordero = Bordero::findOrFail($borderoId);
 
-        if ($bordero->status !== 'rascunho') {
-            return back()->with('error', 'Só é possível alterar borderôs em rascunho.');
+        if (! $bordero->isEditable()) {
+            return back()->with('error', 'Só é possível alterar borderôs pendentes ou em preparação.');
         }
 
         Payable::where('id', $payableId)->where('bordero_id', $borderoId)
@@ -194,8 +196,11 @@ class BorderoController extends Controller
 
         if ($bordero->items_count === 0) {
             $bordero->delete();
+
             return redirect('/financeiro/borderos')->with('success', 'Borderô removido (ficou vazio).');
         }
+
+        $bordero->syncStatusFromPayables();
 
         return back()->with('success', 'Título removido do borderô.');
     }
@@ -204,7 +209,7 @@ class BorderoController extends Controller
     {
         $bordero = Bordero::with('payables')->findOrFail($id);
 
-        if ($bordero->status !== 'rascunho') {
+        if (! in_array($bordero->status, [Bordero::STATUS_PENDENTE, Bordero::STATUS_EM_PREPARACAO], true)) {
             return back()->with('error', 'Este borderô não pode ser enviado.');
         }
 
@@ -232,7 +237,7 @@ class BorderoController extends Controller
                 }
 
                 $bordero->update([
-                    'status' => 'aguardando_aprovacao',
+                    'status' => Bordero::STATUS_AGUARDANDO_APROVACAO,
                     'sent_for_approval_at' => now(),
                     'rejection_reason' => null,
                     'approved_by' => null,
@@ -257,7 +262,7 @@ class BorderoController extends Controller
     {
         $bordero = Bordero::with('payables')->findOrFail($id);
 
-        if ($bordero->status !== 'aguardando_aprovacao') {
+        if ($bordero->status !== Bordero::STATUS_AGUARDANDO_APROVACAO) {
             return back()->with('error', 'Este borderô não está aguardando aprovação.');
         }
 
@@ -300,7 +305,7 @@ class BorderoController extends Controller
         $bordero->load('payables');
         $bordero->syncStatusFromPayables();
 
-        if ($bordero->status === 'aprovado') {
+        if ($bordero->status === Bordero::STATUS_APROVADO) {
             $bordero->update(['approved_by' => $request->user()->id]);
         }
 
@@ -316,38 +321,83 @@ class BorderoController extends Controller
 
     public function reject(Request $request, int $id)
     {
-        $bordero = Bordero::with('payables')->findOrFail($id);
-
-        if ($bordero->status !== 'aguardando_aprovacao') {
-            return back()->with('error', 'Este borderô não está aguardando aprovação.');
-        }
-
         $data = $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        $workflow = app(ApprovalWorkflowService::class);
-        $result = $workflow->rejectEligibleInBordero(
-            $bordero->payables,
-            $request->user(),
-            $data['reason']
-        );
+        $bordero = Bordero::with('payables')->findOrFail($id);
+        $actions = app(BorderoActionService::class);
 
-        if ($result['error']) {
-            return back()->with('error', $result['error']);
+        try {
+            $actions->reprovarBordero($bordero, $request->user(), $data['reason']);
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
         }
 
-        $bordero->refresh();
-        $bordero->load('payables');
-        $bordero->syncStatusFromPayables();
+        return back()->with('success', 'Borderô reprovado e devolvido para pendente.');
+    }
 
-        AuditLogger::log(
-            event: 'bordero.reprovado',
-            module: 'financeiro.contas_pagar',
-            description: "Borderô {$bordero->number}: {$result['count']} título(s) reprovado(s): {$data['reason']}",
-            auditable: $bordero,
-        );
+    public function liberarTitulo(Request $request, int $borderoId, int $payableId)
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
 
-        return back()->with('success', "{$result['count']} título(s) reprovado(s).");
+        $bordero = Bordero::findOrFail($borderoId);
+        $payable = Payable::where('id', $payableId)->where('bordero_id', $borderoId)->firstOrFail();
+        $actions = app(BorderoActionService::class);
+
+        try {
+            $actions->liberarTitulo($bordero, $payable, $request->user(), $data['reason']);
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        if ($bordero->fresh()?->items_count === 0) {
+            return redirect('/financeiro/borderos')->with('success', 'Título liberado. Borderô encerrado (sem títulos restantes).');
+        }
+
+        return back()->with('success', 'Título liberado do borderô e seguirá o fluxo avulso.');
+    }
+
+    public function expulsarTitulo(Request $request, int $borderoId, int $payableId)
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $bordero = Bordero::findOrFail($borderoId);
+        $payable = Payable::where('id', $payableId)->where('bordero_id', $borderoId)->firstOrFail();
+        $actions = app(BorderoActionService::class);
+
+        try {
+            $actions->expulsarTitulo($bordero, $payable, $request->user(), $data['reason']);
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        if (! Bordero::find($borderoId)) {
+            return redirect('/financeiro/borderos')->with('success', 'Título expulso. Borderô encerrado (sem títulos restantes).');
+        }
+
+        return back()->with('success', 'Título expulso do borderô e devolvido para CP pendente avulso.');
+    }
+
+    public function desfazer(Request $request, int $id)
+    {
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $bordero = Bordero::with('payables')->findOrFail($id);
+        $actions = app(BorderoActionService::class);
+
+        try {
+            $actions->desfazer($bordero, $request->user(), $data['reason'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect('/financeiro/borderos?status=pendente')->with('success', 'Borderô desfeito. Títulos devolvidos para CP pendente avulso.');
     }
 }

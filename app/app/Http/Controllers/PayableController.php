@@ -122,7 +122,7 @@ class PayableController extends Controller
             try {
                 $payable = $this->findPayableForUser((int) $id, $user);
 
-                if (! in_array($payable->status, ['pendente', 'em_preparacao', 'reprovado'], true)) {
+                if (! in_array($payable->status, ['pendente', 'em_preparacao'], true)) {
                     $skipped++;
                     continue;
                 }
@@ -622,7 +622,7 @@ class PayableController extends Controller
     {
         $payable = $this->findPayableForUser($id);
 
-        if (!in_array($payable->status, ['pendente', 'em_preparacao', 'reprovado'])) {
+        if (!in_array($payable->status, ['pendente', 'em_preparacao'])) {
             return back()->with('error', 'Este título não pode ser enviado para aprovação.');
         }
 

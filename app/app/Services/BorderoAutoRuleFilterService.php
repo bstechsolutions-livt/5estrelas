@@ -21,7 +21,7 @@ class BorderoAutoRuleFilterService
     {
         $query = Payable::query()
             ->whereNull('bordero_id')
-            ->whereIn('status', ['pendente', 'em_preparacao', 'reprovado']);
+            ->whereIn('status', ['pendente', 'em_preparacao']);
 
         if ($user) {
             $this->branchScope->applyFilter($query, $user);

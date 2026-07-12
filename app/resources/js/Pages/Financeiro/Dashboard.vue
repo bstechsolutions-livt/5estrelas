@@ -37,8 +37,8 @@ const statusColors = {
     aguardando_aprovacao: '#f97316',
     aprovado: '#22c55e',
     pago: '#10b981',
-    rascunho: '#94a3b8',
-    reprovado: '#ef4444',
+    pendente: '#94a3b8',
+    em_preparacao: '#60a5fa',
 }
 
 const chartStatusData = computed(() => {

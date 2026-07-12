@@ -260,7 +260,7 @@ function goShow(id) {
 // Seleção e ações em lote
 const selected = ref([])
 
-const prepareStatuses = ['pendente', 'em_preparacao', 'reprovado']
+const prepareStatuses = ['pendente', 'em_preparacao']
 const canSelect = computed(() => [...prepareStatuses, 'aguardando_aprovacao'].includes(status.value))
 const canSelectBordero = computed(() => prepareStatuses.includes(status.value) && canBorderos.value)
 const canBatchSend = computed(() => prepareStatuses.includes(status.value))

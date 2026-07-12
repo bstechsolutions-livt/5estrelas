@@ -254,9 +254,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [BorderoController::class, 'store'])->name('borderos.store');
         Route::get('/{id}', [BorderoController::class, 'show'])->name('borderos.show');
         Route::delete('/{borderoId}/titulos/{payableId}', [BorderoController::class, 'removePayable'])->name('borderos.remove_payable');
+        Route::post('/{borderoId}/titulos/{payableId}/liberar', [BorderoController::class, 'liberarTitulo'])->name('borderos.liberar_titulo');
+        Route::post('/{borderoId}/titulos/{payableId}/expulsar', [BorderoController::class, 'expulsarTitulo'])->name('borderos.expulsar_titulo');
         Route::post('/{id}/enviar-aprovacao', [BorderoController::class, 'sendForApproval'])->name('borderos.send_approval');
         Route::post('/{id}/aprovar', [BorderoController::class, 'approve'])->name('borderos.approve');
         Route::post('/{id}/reprovar', [BorderoController::class, 'reject'])->name('borderos.reject');
+        Route::post('/{id}/desfazer', [BorderoController::class, 'desfazer'])->name('borderos.desfazer');
     });
 
     // Notificações (do usuário autenticado, sem permissão extra)

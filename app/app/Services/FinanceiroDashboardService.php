@@ -113,7 +113,7 @@ class FinanceiroDashboardService
         $borderosAbertos = null;
         if ($canBorderos) {
             $borderosQuery = Bordero::query()
-                ->whereIn('status', ['rascunho', 'aguardando_aprovacao']);
+                ->whereIn('status', ['pendente', 'em_preparacao']);
             $branchScope = app(PayableBranchScope::class);
             if ($branchScope->resolve($user)['restricted']) {
                 $borderosQuery->whereHas('payables', fn ($q) => $branchScope->applyFilter($q, $user));

@@ -11,6 +11,15 @@ class Bordero extends Model
 {
     use Auditable;
 
+    public const STATUS_PENDENTE = 'pendente';
+    public const STATUS_EM_PREPARACAO = 'em_preparacao';
+    public const STATUS_AGUARDANDO_APROVACAO = 'aguardando_aprovacao';
+    public const STATUS_APROVADO = 'aprovado';
+    public const STATUS_PAGO = 'pago';
+
+    /** @deprecated use STATUS_PENDENTE — alias para compatibilidade temporária */
+    public const STATUS_RASCUNHO = 'pendente';
+
     protected $fillable = [
         'number', 'description', 'status', 'total_amount', 'items_count',
         'created_by', 'auto_rule_id', 'approved_by', 'sent_for_approval_at', 'approved_at', 'rejection_reason',
@@ -27,19 +36,19 @@ class Bordero extends Model
     protected array $auditableEvents = ['created', 'updated', 'deleted'];
 
     public const STATUS_LABELS = [
-        'rascunho' => 'Rascunho',
-        'aguardando_aprovacao' => 'Aguardando Aprovação',
-        'aprovado' => 'Aprovado',
-        'reprovado' => 'Reprovado',
-        'pago' => 'Pago',
+        self::STATUS_PENDENTE => 'Pendente',
+        self::STATUS_EM_PREPARACAO => 'Em Preparação',
+        self::STATUS_AGUARDANDO_APROVACAO => 'Aguardando Aprovação',
+        self::STATUS_APROVADO => 'Aprovado',
+        self::STATUS_PAGO => 'Pago',
     ];
 
     public const STATUS_COLORS = [
-        'rascunho' => 'secondary',
-        'aguardando_aprovacao' => 'warn',
-        'aprovado' => 'success',
-        'reprovado' => 'danger',
-        'pago' => 'success',
+        self::STATUS_PENDENTE => 'secondary',
+        self::STATUS_EM_PREPARACAO => 'info',
+        self::STATUS_AGUARDANDO_APROVACAO => 'warn',
+        self::STATUS_APROVADO => 'success',
+        self::STATUS_PAGO => 'success',
     ];
 
     public function auditDescription(string $action): ?string
@@ -74,7 +83,7 @@ class Bordero extends Model
         $this->save();
     }
 
-    /** Mantém o status do borderô alinhado ao estado dos títulos (workflow multinível). */
+    /** Mantém o status do borderô alinhado ao estado dos títulos. */
     public function syncStatusFromPayables(): void
     {
         $payables = $this->payables()->get(['id', 'status']);
@@ -84,7 +93,7 @@ class Bordero extends Model
 
         if ($payables->every(fn ($p) => $p->status === 'aprovado')) {
             $this->update([
-                'status' => 'aprovado',
+                'status' => self::STATUS_APROVADO,
                 'approved_at' => $this->approved_at ?? now(),
             ]);
 
@@ -92,14 +101,20 @@ class Bordero extends Model
         }
 
         if ($payables->contains(fn ($p) => $p->status === 'aguardando_aprovacao')) {
-            $this->update(['status' => 'aguardando_aprovacao']);
+            $this->update(['status' => self::STATUS_AGUARDANDO_APROVACAO]);
 
             return;
         }
 
-        if ($payables->every(fn ($p) => in_array($p->status, ['pendente', 'em_preparacao'], true))) {
+        if ($payables->contains(fn ($p) => $p->status === 'em_preparacao')) {
+            $this->update(['status' => self::STATUS_EM_PREPARACAO]);
+
+            return;
+        }
+
+        if ($payables->every(fn ($p) => $p->status === 'pendente')) {
             $this->update([
-                'status' => 'rascunho',
+                'status' => self::STATUS_PENDENTE,
                 'sent_for_approval_at' => null,
                 'approved_at' => null,
             ]);
@@ -108,13 +123,19 @@ class Bordero extends Model
 
     public function wasRejectedBack(): bool
     {
-        return $this->status === 'rascunho' && filled($this->rejection_reason);
+        return $this->status === self::STATUS_PENDENTE && filled($this->rejection_reason);
+    }
+
+    public function isEditable(): bool
+    {
+        return in_array($this->status, [self::STATUS_PENDENTE, self::STATUS_EM_PREPARACAO], true);
     }
 
     public static function generateNumber(): string
     {
         $last = static::orderByDesc('id')->first();
         $next = $last ? ((int) str_replace('BORD-', '', $last->number)) + 1 : 1;
-        return 'BORD-' . str_pad($next, 4, '0', STR_PAD_LEFT);
+
+        return 'BORD-'.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 }

@@ -102,7 +102,7 @@ class BorderoAutoRuleTest extends TestCase
                 'eligibility_mode' => BorderoAutoRule::ELIGIBILITY_ALL,
                 'apply_mode' => 'now',
             ])
-            ->assertRedirect('/financeiro/borderos?status=rascunho');
+            ->assertRedirect('/financeiro/borderos?status=pendente');
 
         $this->assertSame(1, Bordero::count());
         $this->assertSame(2, Payable::whereNotNull('bordero_id')->count());

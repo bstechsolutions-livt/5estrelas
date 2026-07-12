@@ -9,7 +9,7 @@ class GenerateAutoBorderos extends Command
 {
     protected $signature = 'borderos:auto-generate {--scheduled : Execução agendada (cron)}';
 
-    protected $description = 'Gera borderôs automáticos em rascunho conforme as regras ativas';
+    protected $description = 'Gera borderôs automáticos em pendente conforme as regras ativas';
 
     public function handle(BorderoAutoGroupService $grouper): int
     {
@@ -26,7 +26,7 @@ class GenerateAutoBorderos extends Command
         }
 
         $this->info(sprintf(
-            'Borderô automático: %d borderô(s) criado(s) em rascunho (%d regra(s) executada(s)).',
+            'Borderô automático: %d borderô(s) criado(s) em pendente (%d regra(s) executada(s)).',
             $result['created'],
             count($result['rules']),
         ));

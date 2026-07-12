@@ -67,7 +67,7 @@ watch(() => page.props.flash?.error, (msg) => {
                     <Button label="Nova regra" icon="pi pi-plus" size="small"
                         @click="router.visit('/financeiro/borderos/automatico/criar')" />
                     <Button label="Ver borderôs" icon="pi pi-list-check" severity="secondary" outlined size="small"
-                        @click="router.visit('/financeiro/borderos?status=rascunho')" />
+                        @click="router.visit('/financeiro/borderos?status=pendente')" />
                 </div>
             </div>
 
@@ -84,7 +84,7 @@ watch(() => page.props.flash?.error, (msg) => {
                         </div>
                         <p class="text-xs text-gray-500 mt-1 max-w-2xl leading-relaxed">
                             <strong>O que é:</strong> todo dia às <strong>6h</strong> o sistema verifica títulos abertos
-                            e cria borderôs em rascunho conforme as <strong>regras ativas</strong> abaixo.
+                            e cria borderôs em pendente conforme as <strong>regras ativas</strong> abaixo.
                             Não precisa clicar em nada — roda sozinho no servidor.
                         </p>
                     </div>

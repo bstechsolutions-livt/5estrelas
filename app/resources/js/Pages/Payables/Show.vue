@@ -306,7 +306,7 @@ function formatDateTime(d) {
     return new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-const canPrepare = ['pendente', 'em_preparacao', 'reprovado'].includes(props.payable.status)
+const canPrepare = ['pendente', 'em_preparacao'].includes(props.payable.status)
 // Se está num borderô, não pode enviar individual — o borderô controla o envio
 const inBordero = !!props.payable.bordero_id
 const canSendIndividual = canPrepare && !inBordero
