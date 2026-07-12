@@ -90,4 +90,22 @@ class FinanceiroRoutesSmokeTest extends TestCase
         $p = Payable::create(['title_number' => 'T2', 'supplier_name' => 'F', 'amount' => 100, 'due_date' => now()->toDateString(), 'status' => 'pendente']);
         $this->actingAs($this->admin())->get("/financeiro/contas-pagar/{$p->id}/mentionable-users")->assertOk();
     }
+
+    public function test_contas_receber_index(): void
+    {
+        $user = $this->admin();
+        $user->permissions()->attach(
+            Permission::firstOrCreate(['key' => 'financeiro.contas_receber.visualizar'], ['label' => 'x', 'module' => 'financeiro'])->id
+        );
+        $this->actingAs($user)->get('/financeiro/contas-receber')->assertOk();
+    }
+
+    public function test_plano_de_contas_index(): void
+    {
+        $user = $this->admin();
+        $user->permissions()->attach(
+            Permission::firstOrCreate(['key' => 'financeiro.plano_contas.visualizar'], ['label' => 'x', 'module' => 'financeiro'])->id
+        );
+        $this->actingAs($user)->get('/financeiro/plano-de-contas')->assertOk();
+    }
 }

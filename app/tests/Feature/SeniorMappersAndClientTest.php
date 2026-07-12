@@ -263,4 +263,38 @@ XML;
         // Garante que NÃO há data em formato ISO.
         $this->assertStringNotContainsString('2025-06-22', $envelope);
     }
+
+    // ─── Senior CR Client + Receivable Mapper ───────────────────────────────────
+
+    public function test_cr_business_key_usa_cod_cli(): void
+    {
+        $m = new \App\Services\Senior\ReceivableMapper();
+        $this->assertEquals('3-1-2705_01-NFS-10', $m->businessKey([
+            'codEmp' => 3, 'codFil' => 1, 'numTit' => '2705_01', 'codTpt' => 'NFS', 'codCli' => 10,
+        ]));
+    }
+
+    public function test_cr_parse_fixture_real(): void
+    {
+        $xml = file_get_contents(base_path('tests/fixtures/senior/titulos-abertos-cr-emp3-cli10.xml'));
+        $client = new \App\Services\Senior\SeniorCrClient(config('senior'));
+        $titulos = $client->parseResponse($xml)['titulos'];
+
+        $this->assertCount(1, $titulos);
+        $this->assertEquals('2705_01', $titulos[0]['numTit']);
+        $this->assertEquals('AB', $titulos[0]['sitTit']);
+        $this->assertNotEmpty($titulos[0]['rateios']);
+    }
+
+    public function test_cr_envelope_usa_cod_cli(): void
+    {
+        $client = new \App\Services\Senior\SeniorCrClient(config('senior'));
+        $envelope = $client->buildEnvelope([
+            'codEmp' => 3, 'codCli' => 10, 'retRat' => 'S',
+            'vctIni' => '01/01/2025', 'vctFim' => '31/12/2026',
+        ]);
+
+        $this->assertStringContainsString('<codCli>10</codCli>', $envelope);
+        $this->assertStringContainsString('ConsultarTitulosAbertosCR', $envelope);
+    }
 }

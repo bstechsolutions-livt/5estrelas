@@ -182,6 +182,16 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{importId}', [BankConciliationController::class, 'destroy'])->whereNumber('importId')->name('bank-conciliation.destroy');
     });
 
+    // Financeiro - Contas a Receber (read-only Senior)
+    Route::prefix('financeiro/contas-receber')->middleware('permission:financeiro.contas_receber.visualizar')->group(function () {
+        Route::get('/', [\App\Http\Controllers\ReceivableController::class, 'index'])->name('receivables.index');
+        Route::get('/{id}', [\App\Http\Controllers\ReceivableController::class, 'show'])->whereNumber('id')->name('receivables.show');
+    });
+
+    Route::get('financeiro/plano-de-contas', [\App\Http\Controllers\ChartOfAccountController::class, 'index'])
+        ->middleware('permission:financeiro.plano_contas.visualizar')
+        ->name('chart-of-accounts.index');
+
     // Financeiro - Contas a Pagar
     Route::prefix('financeiro/contas-pagar')->middleware('permission:financeiro.contas_pagar.visualizar')->group(function () {
         Route::get('/', [PayableController::class, 'index'])->name('payables.index');

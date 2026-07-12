@@ -44,6 +44,14 @@ if (config('senior.enabled', false)) {
     Schedule::command('senior:sync-fornecedores --full --scheduled')
         ->dailyAt('03:30')
         ->withoutOverlapping();
+
+    Schedule::command('senior:sync-receivables --scheduled')
+        ->cron($cron)
+        ->withoutOverlapping();
+
+    Schedule::command('senior:sync-chart-of-accounts')
+        ->dailyAt('03:45')
+        ->withoutOverlapping();
 }
 
 // Borderôs automáticos — regras ativas rodam diariamente às 6h.

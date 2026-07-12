@@ -32,6 +32,9 @@ return [
     // Servlet SOAP do serviço de Contas a Pagar (sapiens_Sync + nome do serviço).
     'cp_service' => 'sapiens_Synccom_senior_g5_co_mfi_cpa_titulos',
 
+    // Servlet SOAP do serviço de Contas a Receber (ConsultarTitulosAbertosCR).
+    'cr_service' => 'sapiens_Synccom_senior_g5_co_mfi_cre_titulos',
+
     // Servlet SOAP do serviço de Cadastro de Filial (cad_filial / ConsultarGeral).
     'filial_service' => 'sapiens_Synccom_senior_g5_co_cad_filial',
 
@@ -70,6 +73,10 @@ return [
     // fica abaixo de 2000 — use SENIOR_CODFOR_END para ajustar (ex.: 2000).
     'cod_for_start' => (int) env('SENIOR_CODFOR_START', 1),
     'cod_for_end' => (int) env('SENIOR_CODFOR_END', 2000),
+
+    // Varredura de clientes (codCli é OBRIGATÓRIO no contrato real da Senior CR).
+    'cod_cli_start' => (int) env('SENIOR_CODCLI_START', 1),
+    'cod_cli_end' => (int) env('SENIOR_CODCLI_END', 9999),
 
     // Pausa (ms) entre as chamadas da varredura, para não martelar a Senior.
     // 0 = sem pausa. Útil quando a faixa de codFor é grande.
