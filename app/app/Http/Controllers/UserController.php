@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\Branch;
 use App\Models\Department;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -38,6 +39,7 @@ class UserController extends Controller
         return Inertia::render('Users/Index', [
             'users' => $users,
             'filters' => ['search' => $search, 'per_page' => $perPage],
+            'totalBranches' => Branch::where('is_active', true)->count(),
         ]);
     }
 
@@ -59,6 +61,7 @@ class UserController extends Controller
             'password' => ['required', 'string', new \App\Rules\StrongPassword()],
             'is_active' => ['boolean'],
             'department_id' => ['nullable', 'exists:departments,id'],
+            'senior_cod_usu' => ['nullable', 'integer', 'min:1'],
             'branch_ids' => ['nullable', 'array'],
             'branch_ids.*' => ['integer', 'exists:branches,id'],
         ]);
@@ -69,6 +72,7 @@ class UserController extends Controller
             'password' => bcrypt($data['password']),
             'is_active' => $data['is_active'] ?? true,
             'department_id' => $data['department_id'] ?? null,
+            'senior_cod_usu' => $data['senior_cod_usu'] ?? null,
         ]);
 
         $newBranchIds = $this->normalizeBranchIds($data['branch_ids'] ?? []);
@@ -100,6 +104,7 @@ class UserController extends Controller
                 'email' => $user->email,
                 'is_active' => (bool) $user->is_active,
                 'department_id' => $user->department_id,
+                'senior_cod_usu' => $user->senior_cod_usu,
                 'branch_ids' => $user->branches->pluck('id')->all(),
             ],
             'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
@@ -117,6 +122,7 @@ class UserController extends Controller
             'password' => ['nullable', 'string', new \App\Rules\StrongPassword()],
             'is_active' => ['boolean'],
             'department_id' => ['nullable', 'exists:departments,id'],
+            'senior_cod_usu' => ['nullable', 'integer', 'min:1'],
             'branch_ids' => ['nullable', 'array'],
             'branch_ids.*' => ['integer', 'exists:branches,id'],
         ]);
@@ -128,6 +134,9 @@ class UserController extends Controller
         }
         $user->is_active = $data['is_active'] ?? $user->is_active;
         $user->department_id = $data['department_id'] ?? $user->department_id;
+        $user->senior_cod_usu = array_key_exists('senior_cod_usu', $data)
+            ? ($data['senior_cod_usu'] ?: null)
+            : $user->senior_cod_usu;
         $user->save();
 
         $oldBranchIds = $this->normalizeBranchIds($user->branches()->pluck('branches.id')->all());

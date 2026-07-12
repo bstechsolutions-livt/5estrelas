@@ -6,6 +6,7 @@ import UsersMobile from './Index.mobile.vue'
 defineProps({
     users: Object,
     filters: Object,
+    totalBranches: { type: Number, default: 0 },
 })
 
 const { isMobile } = useDevice()

@@ -13,9 +13,12 @@ import ConfirmDialog from 'primevue/confirmdialog'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 
+import { branchAccessSummary } from '@/utils/branchAccessLabel'
+
 const props = defineProps({
     users: Object,
     filters: Object,
+    totalBranches: { type: Number, default: 0 },
 })
 
 const page = usePage()
@@ -146,16 +149,16 @@ watch(() => page.props.flash?.error, (msg) => {
                             <span class="text-sm text-gray-600">{{ data.department?.name || '—' }}</span>
                         </template>
                     </Column>
-                    <Column header="Filiais">
+                    <Column header="Filiais" style="width: 140px">
                         <template #body="{ data }">
-                            <div v-if="data.branches?.length" class="flex flex-wrap gap-1 max-w-xs">
+                            <template v-if="data.branches?.length">
                                 <Tag
-                                    v-for="b in data.branches"
-                                    :key="b.id"
-                                    :value="b.display_name || b.name"
-                                    severity="info"
+                                    :value="branchAccessSummary(data.branches, totalBranches).label"
+                                    :severity="branchAccessSummary(data.branches, totalBranches).severity"
+                                    class="text-xs whitespace-nowrap max-w-[130px] truncate"
+                                    :title="branchAccessSummary(data.branches, totalBranches).title || undefined"
                                 />
-                            </div>
+                            </template>
                             <span v-else class="text-xs text-gray-400">Nenhuma</span>
                         </template>
                     </Column>

@@ -12,9 +12,12 @@ import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useAuth } from '@/composables/useAuth'
 
+import { branchAccessSummary } from '@/utils/branchAccessLabel'
+
 const props = defineProps({
     users: Object,
     filters: Object,
+    totalBranches: { type: Number, default: 0 },
 })
 
 const page = usePage()
@@ -155,15 +158,10 @@ const hasMore = computed(() => currentPage.value < lastPage.value)
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-gray-800 truncate">{{ u.name }} <span class="text-xs text-gray-400 font-normal">#{{ u.id }}</span></p>
                     <p class="text-xs text-gray-500 truncate">{{ u.email }}</p>
-                    <div v-if="u.branches?.length" class="flex flex-wrap gap-1 mt-1.5">
-                        <Tag
-                            v-for="b in u.branches"
-                            :key="b.id"
-                            :value="b.display_name || b.name"
-                            severity="info"
-                            class="!text-[10px]"
-                        />
-                    </div>
+                    <p v-if="u.branches?.length" class="text-[10px] text-blue-600 mt-1 truncate"
+                        :title="branchAccessSummary(u.branches, totalBranches).title || undefined">
+                        {{ branchAccessSummary(u.branches, totalBranches).label }}
+                    </p>
                     <p v-else class="text-[10px] text-gray-400 mt-1">Sem filiais liberadas</p>
                 </div>
                 <Tag :value="u.is_active ? 'Ativo' : 'Inativo'" :severity="u.is_active ? 'success' : 'secondary'" />
