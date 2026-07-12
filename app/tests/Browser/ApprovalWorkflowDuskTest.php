@@ -53,7 +53,7 @@ class ApprovalWorkflowDuskTest extends DuskTestCase
         $this->browse(function (Browser $browser) {
             $browser->loginAs($this->bruno())
                 ->visit('/financeiro/pendencias')
-                ->waitForText('Dependências', 10)
+                ->waitForText('Pendências', 10)
                 ->assertSee('aprovação');
         });
     }

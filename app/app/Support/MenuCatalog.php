@@ -55,7 +55,7 @@ class MenuCatalog
 
             // Financeiro
             ['key' => 'financeiro_dashboard', 'label' => 'Dashboard', 'icon' => 'pi pi-chart-pie', 'href' => '/financeiro/dashboard', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
-            ['key' => 'financeiro_pendencias', 'label' => 'Minhas Dependências', 'icon' => 'pi pi-clock', 'href' => '/financeiro/pendencias', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
+            ['key' => 'financeiro_pendencias', 'label' => 'Pendências', 'icon' => 'pi pi-clock', 'href' => '/financeiro/pendencias', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
             ['key' => 'contas_pagar', 'label' => 'Contas a Pagar', 'icon' => 'pi pi-wallet', 'href' => '/financeiro/contas-pagar', 'permission' => 'financeiro.contas_pagar.visualizar', 'group' => 'Financeiro'],
             ['key' => 'contas_receber', 'label' => 'Contas a Receber', 'icon' => 'pi pi-money-bill', 'href' => '/financeiro/contas-receber', 'permission' => 'financeiro.contas_receber.visualizar', 'group' => 'Financeiro'],
             ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.borderos.visualizar', 'group' => 'Financeiro'],
