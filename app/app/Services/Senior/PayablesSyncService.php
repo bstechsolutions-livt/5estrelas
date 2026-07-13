@@ -5,6 +5,7 @@ namespace App\Services\Senior;
 use App\Models\Payable;
 use App\Models\PayableSyncRun;
 use App\Services\AuditLogger;
+use App\Support\SeniorDueDatePolicy;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -300,10 +301,10 @@ class PayablesSyncService
             return [$overrideFrom->copy()->startOfDay(), $overrideTo->copy()->endOfDay()];
         }
 
-        // Bulk: sempre janela ampla (100% dos títulos a cada ciclo — rápido com CliOpcAbr).
+        // Bulk: janela configurada, respeitando corte mínimo de vencimento.
         if (config('senior.cp_strategy', 'bulk') === 'bulk') {
             return [
-                Carbon::parse(config('senior.bulk_vct_ini', '2020-01-01'))->startOfDay(),
+                SeniorDueDatePolicy::windowFrom(Carbon::parse(config('senior.bulk_vct_ini', '2026-01-01'))),
                 Carbon::parse(config('senior.bulk_vct_fim', '2030-12-31'))->endOfDay(),
             ];
         }
@@ -315,8 +316,8 @@ class PayablesSyncService
         $forward = $this->clamp((int) config('senior.window_days_forward', 90), 1, 3650);
         $base = config('senior.vct_base_date');
         $ini = $base
-            ? Carbon::parse($base)->startOfDay()
-            : now()->subDays($this->clamp((int) config('senior.window_days_back', 90), 1, 3650))->startOfDay();
+            ? SeniorDueDatePolicy::windowFrom(Carbon::parse($base))
+            : SeniorDueDatePolicy::windowFrom(now()->subDays($this->clamp((int) config('senior.window_days_back', 90), 1, 3650)));
 
         return [$ini, now()->addDays($forward)->endOfDay()];
     }
@@ -325,6 +326,16 @@ class PayablesSyncService
     private function upsertTitulo(string $bk, array $titulo, int &$inserted, int &$updated): void
     {
         $attrs = $this->mapper->mapHeader($titulo);
+        $dueDate = isset($attrs['due_date']) ? Carbon::parse($attrs['due_date']) : null;
+        if (!SeniorDueDatePolicy::isAllowed($dueDate)) {
+            Log::debug('[senior-cp] título ignorado por vencimento anterior ao corte', [
+                'business_key' => $bk,
+                'due_date' => $dueDate?->toDateString(),
+            ]);
+
+            return;
+        }
+
         $existing = Payable::where('senior_id', $bk)->first();
 
         if (!$existing) {
@@ -390,11 +401,16 @@ class PayablesSyncService
             $query->whereIn('codemp', $emps);
         }
 
-        // No modo bulk a janela é sempre ampla — marca ausentes de toda a empresa ativa.
+        // No modo bulk a janela respeita o corte mínimo — marca ausentes só na faixa válida.
         if (config('senior.cp_strategy', 'bulk') !== 'bulk') {
             if ($vctIni !== null) {
                 $query->where('due_date', '>=', $vctIni);
             }
+            if ($vctFim !== null) {
+                $query->where('due_date', '<=', $vctFim);
+            }
+        } else {
+            $query->where('due_date', '>=', SeniorDueDatePolicy::minDueDate());
             if ($vctFim !== null) {
                 $query->where('due_date', '<=', $vctFim);
             }

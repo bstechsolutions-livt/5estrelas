@@ -5,6 +5,7 @@ namespace App\Services\Senior;
 use App\Models\Receivable;
 use App\Models\ReceivableSyncRun;
 use App\Services\AuditLogger;
+use App\Support\SeniorDueDatePolicy;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -190,8 +191,8 @@ class ReceivablesSyncService
         $forward = max(1, min(3650, (int) config('senior.window_days_forward', 90)));
         $base = config('senior.vct_base_date');
         $ini = $base
-            ? Carbon::parse($base)->startOfDay()
-            : now()->subDays(max(1, min(3650, (int) config('senior.window_days_back', 90))))->startOfDay();
+            ? SeniorDueDatePolicy::windowFrom(Carbon::parse($base))
+            : SeniorDueDatePolicy::windowFrom(now()->subDays(max(1, min(3650, (int) config('senior.window_days_back', 90)))));
 
         return [$ini, now()->addDays($forward)->endOfDay()];
     }
@@ -199,6 +200,16 @@ class ReceivablesSyncService
     private function upsertTitulo(string $bk, array $titulo, int &$inserted, int &$updated): void
     {
         $attrs = $this->mapper->mapHeader($titulo);
+        $dueDate = isset($attrs['due_date']) ? Carbon::parse($attrs['due_date']) : null;
+        if (!SeniorDueDatePolicy::isAllowed($dueDate)) {
+            Log::debug('[senior-cr] título ignorado por vencimento anterior ao corte', [
+                'business_key' => $bk,
+                'due_date' => $dueDate?->toDateString(),
+            ]);
+
+            return;
+        }
+
         $existing = Receivable::where('senior_id', $bk)->first();
 
         if (!$existing) {
@@ -249,7 +260,9 @@ class ReceivablesSyncService
             $query->whereNotIn('senior_id', array_values(array_unique($businessKeys)));
         }
         if ($vctIni !== null) {
-            $query->where('due_date', '>=', $vctIni);
+            $query->where('due_date', '>=', SeniorDueDatePolicy::windowFrom($vctIni));
+        } else {
+            $query->where('due_date', '>=', SeniorDueDatePolicy::minDueDate());
         }
         if ($vctFim !== null) {
             $query->where('due_date', '<=', $vctFim);

@@ -77,9 +77,12 @@ return [
     // Filial padrão na consulta bulk (matriz = 1).
     'cod_fil' => (int) env('SENIOR_COD_FIL', 1),
 
-    // Janela de vencimento no modo bulk (sync agendado puxa 100% nesta faixa).
-    'bulk_vct_ini' => env('SENIOR_BULK_VCT_INI', '2020-01-01'),
+    // Janela de vencimento no modo bulk (sync agendado puxa nesta faixa).
+    'bulk_vct_ini' => env('SENIOR_BULK_VCT_INI', '2026-01-01'),
     'bulk_vct_fim' => env('SENIOR_BULK_VCT_FIM', '2030-12-31'),
+
+    // Títulos com vencimento anterior a esta data não são importados nem mantidos no sync.
+    'min_due_date' => env('SENIOR_MIN_DUE_DATE', '2026-01-01'),
 
     // Timeout maior para resposta bulk (muitos títulos em uma chamada).
     'cp_timeout_response' => (int) env('SENIOR_CP_TIMEOUT_RESPONSE', 180),
@@ -118,7 +121,7 @@ return [
 
     // Data-base da janela de vencimento (vctIni) no sync incremental.
     // Títulos com vencimento a partir desta data entram na varredura a cada ciclo.
-    'vct_base_date' => env('SENIOR_VCT_BASE', '2026-06-01'),
+    'vct_base_date' => env('SENIOR_VCT_BASE', '2026-01-01'),
 
     // Janela do sync incremental em dias (requirement 5.1): default 90/90, faixa 1..3650.
     'window_days_back' => (int) env('SENIOR_WINDOW_BACK', 90),
