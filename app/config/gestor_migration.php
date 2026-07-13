@@ -28,7 +28,7 @@ return [
     'status_map' => [
         'awaiting-analysis' => 'em_preparacao',
         'awaiting-reanalysis' => 'em_preparacao',
-        'awaiting-receipt' => 'em_preparacao',
+        'awaiting-receipt' => 'aprovado',
         'awaiting-approval' => 'aguardando_aprovacao',
         'awaiting-inclusion' => 'aprovado',
         'awaiting-rectification' => 'pendente',
