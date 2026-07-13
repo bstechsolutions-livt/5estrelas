@@ -4,6 +4,7 @@ namespace App\Services\Senior;
 
 use App\Models\Payable;
 use App\Models\SeniorSupplier;
+use App\Support\PayableEmpresaExclusion;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -124,6 +125,7 @@ class FornecedoresSyncService
     public function syncFullCatalog(string $trigger = 'manual'): array
     {
         $codEmps = config('senior.cod_emps') ?: [(int) config('senior.cod_emp', 2)];
+        $codEmps = PayableEmpresaExclusion::filterCodEmps($codEmps);
         $inserted = 0;
         $updated = 0;
         $errors = 0;

@@ -363,4 +363,40 @@ class PayablesSyncServiceTest extends TestCase
         $this->assertEquals(2, $run->inserted_count);
         $this->assertEquals(2, Payable::where('codemp', 2)->count());
     }
+
+    public function test_sync_nao_varre_empresas_excluidas_do_cp(): void
+    {
+        config([
+            'senior.enabled' => true,
+            'senior.cp_strategy' => 'sweep',
+            'senior.cod_emps' => [2, 4, 9],
+            'senior.cod_for_start' => 1,
+            'senior.cod_for_end' => 1,
+            'payables.excluded_cod_emp' => [4, 9, 12],
+        ]);
+
+        $tracker = new class {
+            /** @var int[] */
+            public array $emps = [];
+        };
+
+        $fake = new class($tracker) extends SeniorCpClient {
+            public function __construct(private object $tracker)
+            {
+                parent::__construct(config('senior'));
+            }
+
+            public function consultarTitulosPorFornecedor(int $codEmp, int $codFor, ?Carbon $vctIni, ?Carbon $vctFim): array
+            {
+                $this->tracker->emps[] = $codEmp;
+
+                return [];
+            }
+        };
+
+        (new PayablesSyncService($fake, new PayableMapper(), new StatusMapper()))
+            ->run(PayableSyncRun::MODE_FULL);
+
+        $this->assertSame([2], array_values(array_unique($tracker->emps)));
+    }
 }

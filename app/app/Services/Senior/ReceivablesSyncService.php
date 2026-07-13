@@ -5,6 +5,7 @@ namespace App\Services\Senior;
 use App\Models\Receivable;
 use App\Models\ReceivableSyncRun;
 use App\Services\AuditLogger;
+use App\Support\PayableEmpresaExclusion;
 use App\Support\SeniorDueDatePolicy;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -127,6 +128,7 @@ class ReceivablesSyncService
         if (empty($codEmps)) {
             $codEmps = [(int) config('senior.cod_emp', 1)];
         }
+        $codEmps = PayableEmpresaExclusion::filterCodEmps($codEmps);
         $cliStart = (int) config('senior.cod_cli_start', 1);
         $cliEnd = (int) config('senior.cod_cli_end', 9999);
         $delayMs = (int) config('senior.sweep_delay_ms', 0);

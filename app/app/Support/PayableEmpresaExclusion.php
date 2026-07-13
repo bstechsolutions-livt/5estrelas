@@ -26,6 +26,22 @@ class PayableEmpresaExclusion
         return $codemp !== null && in_array($codemp, self::excludedCodEmps(), true);
     }
 
+    /**
+     * Remove empresas excluídas do CP antes de varreduras/cron Senior.
+     *
+     * @param  int[]  $codEmps
+     * @return int[]
+     */
+    public static function filterCodEmps(array $codEmps): array
+    {
+        $excluded = array_flip(self::excludedCodEmps());
+
+        return array_values(array_filter(
+            $codEmps,
+            fn (int $cod) => ! isset($excluded[$cod]),
+        ));
+    }
+
     public static function applyToQuery(Builder $query, string $column = 'codemp'): void
     {
         $excluded = self::excludedCodEmps();

@@ -3,10 +3,11 @@
 namespace App\Services\Senior;
 
 use App\Models\Branch;
-use App\Models\Branch;
 use App\Models\Payable;
 use App\Models\PayableSyncRun;
+use App\Support\PayableEmpresaExclusion;
 use App\Services\AuditLogger;
+use App\Support\PayableEmpresaExclusion;
 use App\Support\SeniorDueDatePolicy;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -296,15 +297,15 @@ class PayablesSyncService
     {
         $enabled = config('senior.emp_enabled', []);
         if (!empty($enabled)) {
-            return $enabled;
+            return PayableEmpresaExclusion::filterCodEmps($enabled);
         }
 
         $codEmps = config('senior.cod_emps');
         if (!empty($codEmps)) {
-            return $codEmps;
+            return PayableEmpresaExclusion::filterCodEmps($codEmps);
         }
 
-        return [(int) config('senior.cod_emp', 1)];
+        return PayableEmpresaExclusion::filterCodEmps([(int) config('senior.cod_emp', 1)]);
     }
 
     /**
@@ -375,6 +376,9 @@ class PayablesSyncService
     private function upsertTitulo(string $bk, array $titulo, int &$inserted, int &$updated): void
     {
         $attrs = $this->mapper->mapHeader($titulo);
+        if (PayableEmpresaExclusion::isExcluded(isset($attrs['codemp']) ? (int) $attrs['codemp'] : null)) {
+            return;
+        }
         $attrs['branch_id'] = Branch::idForSeniorPair(
             isset($attrs['codemp']) ? (int) $attrs['codemp'] : null,
             isset($attrs['codfil']) ? (int) $attrs['codfil'] : null,

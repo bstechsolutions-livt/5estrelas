@@ -55,6 +55,11 @@ class PayableExcludedEmpresaTest extends TestCase
         ], $attrs));
     }
 
+    public function test_filter_cod_emps_remove_excluidas(): void
+    {
+        $this->assertSame([2, 3], PayableEmpresaExclusion::filterCodEmps([2, 3, 4, 9, 12]));
+    }
+
     public function test_config_exclui_ari_adm_baluarte_e_lsr(): void
     {
         $this->assertSame([4, 9, 12], PayableEmpresaExclusion::excludedCodEmps());

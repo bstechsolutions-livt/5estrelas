@@ -4,6 +4,7 @@ namespace App\Services\Senior;
 
 use App\Models\Comercial\Filial;
 use App\Services\AuditLogger;
+use App\Support\PayableEmpresaExclusion;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -53,6 +54,7 @@ class FiliaisSyncService
         if (empty($codEmps)) {
             $codEmps = range(2, 12); // empresas operacionais do grupo
         }
+        $codEmps = PayableEmpresaExclusion::filterCodEmps($codEmps);
 
         $inserted = 0;
         $updated = 0;
