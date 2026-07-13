@@ -13,6 +13,7 @@ class MigrateGestorConciliacoes extends Command
         {--confidence=high : Nível mínimo de confiança para migrar (high|medium|low)}
         {--skip-comments : Não importa comentários}
         {--skip-files : Não baixa anexos do Convex}
+        {--files-only : Importa apenas anexos (não altera status/comentários)}
         {--report= : Caminho do relatório JSON (default: storage/app/gestor-migration-report.json)}';
 
     protected $description = 'Migra workflow, comentários e anexos do Gestor de Conciliações (Convex legado) para payables';
@@ -52,6 +53,7 @@ class MigrateGestorConciliacoes extends Command
             execute: $execute,
             skipComments: (bool) $this->option('skip-comments'),
             skipFiles: (bool) $this->option('skip-files'),
+            filesOnly: (bool) $this->option('files-only'),
             reportPath: $reportPath,
         );
 

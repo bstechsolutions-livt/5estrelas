@@ -39,6 +39,7 @@ class GestorConciliacoesMigrationService
         private readonly bool $execute = false,
         private readonly bool $skipComments = false,
         private readonly bool $skipFiles = false,
+        private readonly bool $filesOnly = false,
         private readonly ?string $reportPath = null,
     ) {}
 
@@ -277,20 +278,22 @@ class GestorConciliacoesMigrationService
 
         if ($this->execute) {
             DB::transaction(function () use ($payable, $workflow, $match, &$out, &$result) {
-                $old = $payable->only(array_merge(Payable::WORKFLOW_FIELDS, ['id', 'senior_id']));
-                $payable->update($workflow);
+                if (! $this->filesOnly) {
+                    $old = $payable->only(array_merge(Payable::WORKFLOW_FIELDS, ['id', 'senior_id']));
+                    $payable->update($workflow);
 
-                AuditLogger::log(
-                    event: 'financeiro.contas_pagar.gestor_migration.updated',
-                    module: 'financeiro.contas_pagar',
-                    description: "Migração gestor → payable #{$payable->id} ({$match['status']})",
-                    auditable: $payable,
-                    oldValues: $old,
-                    newValues: $workflow,
-                    metadata: ['gestor_id' => $match['gestor_id'], 'strategy' => $match['strategy'] ?? null],
-                );
+                    AuditLogger::log(
+                        event: 'financeiro.contas_pagar.gestor_migration.updated',
+                        module: 'financeiro.contas_pagar',
+                        description: "Migração gestor → payable #{$payable->id} ({$match['status']})",
+                        auditable: $payable,
+                        oldValues: $old,
+                        newValues: $workflow,
+                        metadata: ['gestor_id' => $match['gestor_id'], 'strategy' => $match['strategy'] ?? null],
+                    );
+                }
 
-                if (! $this->skipComments) {
+                if (! $this->filesOnly && ! $this->skipComments) {
                     $result['comments']['attempted'] += count($match['comments'] ?? []) + $this->extraCommentsCount($match);
                     $out['comments_imported'] = $this->importComments($payable, $match);
                     $result['comments']['imported'] += $out['comments_imported'];
