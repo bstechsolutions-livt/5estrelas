@@ -491,6 +491,15 @@ const prioritySeverity = {
     urgente: 'danger',
 }
 
+function workflowMomentTextClass(data) {
+    const tone = data.workflow_moment_tone
+    if (tone === 'danger') return 'text-red-700'
+    if (tone === 'success') return 'text-green-700'
+    if (tone === 'warn') return 'text-amber-800'
+    if (tone === 'info') return 'text-blue-700'
+    return 'text-gray-800'
+}
+
 // Cards de resumo
 const totalPendente = computed(() => props.totals?.pendente?.total || 0)
 const totalAguardando = computed(() => props.totals?.aguardando_aprovacao?.total || 0)
@@ -838,20 +847,21 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span v-else class="text-xs text-gray-300" @click="goShow(data.id)">—</span>
                         </template>
                     </Column>
-                    <Column v-if="!['pago', 'aguardando_conciliacao', 'conciliado'].includes(status)" header="Aprovador" style="width: 10%" dusk="col-etapa">
+                    <Column v-if="!['pago', 'aguardando_conciliacao', 'conciliado'].includes(status)" header="Aprovador" style="width: 14%; min-width: 8.5rem" dusk="col-etapa">
                         <template #body="{ data }">
                             <div class="flex flex-col gap-0.5 min-w-0" @click="goShow(data.id)">
-                                <Tag
-                                    :value="data.workflow_moment"
-                                    :severity="data.workflow_moment_tone || 'secondary'"
-                                    class="!text-[10px] whitespace-nowrap"
-                                    :title="data.workflow_moment_detail || data.workflow_moment"
-                                />
                                 <span
+                                    class="cell-truncate text-xs font-medium"
+                                    :class="workflowMomentTextClass(data)"
+                                    :title="data.workflow_moment"
+                                >{{ data.workflow_moment }}</span>
+                                <Tag
                                     v-if="data.workflow_moment_detail"
-                                    class="text-[10px] text-gray-500 truncate"
+                                    :value="data.workflow_moment_detail"
+                                    :severity="data.workflow_moment_tone || 'secondary'"
+                                    class="approver-step-tag !text-[10px]"
                                     :title="data.workflow_moment_detail"
-                                >{{ data.workflow_moment_detail }}</span>
+                                />
                             </div>
                         </template>
                     </Column>
@@ -925,6 +935,16 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
     white-space: nowrap;
     max-width: 100%;
     min-width: 0;
+}
+.approver-step-tag {
+    align-self: flex-start;
+    max-width: 100%;
+}
+.approver-step-tag :deep(.p-tag-label) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
 }
 .batch-action-bar :deep(.batch-bar-btn-primary.p-button) {
     background: #fff;
