@@ -57,12 +57,12 @@ class PayableExcludedEmpresaTest extends TestCase
 
     public function test_filter_cod_emps_remove_excluidas(): void
     {
-        $this->assertSame([2, 3], PayableEmpresaExclusion::filterCodEmps([2, 3, 4, 9, 12]));
+        $this->assertSame([2, 3, 9], PayableEmpresaExclusion::filterCodEmps([2, 3, 4, 9, 12]));
     }
 
-    public function test_config_exclui_ari_adm_baluarte_e_lsr(): void
+    public function test_config_exclui_ari_adm_e_lsr(): void
     {
-        $this->assertSame([4, 9, 12], PayableEmpresaExclusion::excludedCodEmps());
+        $this->assertSame([4, 12], PayableEmpresaExclusion::excludedCodEmps());
     }
 
     public function test_empresa_options_nao_incluem_excluidas(): void
@@ -77,8 +77,9 @@ class PayableExcludedEmpresaTest extends TestCase
 
         $values = array_column($options, 'value');
         $this->assertContains(2, $values);
+        $this->assertContains(9, $values);
         $this->assertNotContains(4, $values);
-        $this->assertNotContains(9, $values);
+        $this->assertNotContains(12, $values);
     }
 
     public function test_receivable_empresa_options_tambem_excluem(): void
@@ -117,7 +118,7 @@ class PayableExcludedEmpresaTest extends TestCase
             ->assertOk();
 
         $names = collect($resp->json('data'))->pluck('supplier_name')->all();
-        $this->assertSame(['TituloValido'], $names);
+        $this->assertEqualsCanonicalizing(['TituloValido', 'TituloBaluarte'], $names);
     }
 
     public function test_filtro_codemp_excluido_retorna_vazio(): void
@@ -153,8 +154,9 @@ class PayableExcludedEmpresaTest extends TestCase
             ->get('/financeiro/contas-pagar?status=pendente')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('empresas', 1)
-                ->where('empresas.0.value', 2),
+                ->has('empresas', 2)
+                ->where('empresas.0.value', 2)
+                ->where('empresas.1.value', 9),
             );
     }
 }

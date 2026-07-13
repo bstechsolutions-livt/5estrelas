@@ -62,13 +62,15 @@ class PayableFilialFilterTest extends TestCase
         $this->seedEmpresa(2, '5 ESTRELAS SISTEMA DE SEGURANCA LTDA', '5 ESTRELAS');
         $this->seedEmpresa(4, 'ARI CONSTRUTORA E ADMINISTRADORA LTDA', 'ARI ADM');
         $this->seedEmpresa(9, 'BALUARTE VIGILANCIA PATRIMONIAL LTDA', 'BALUARTE');
+        $this->seedEmpresa(12, 'LSR LTDA', 'LSR');
 
         $this->actingAs($this->activeUser())
             ->get('/financeiro/contas-pagar')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('empresas', 1)
+                ->has('empresas', 2)
                 ->where('empresas.0.label', '5 ESTRELAS')
+                ->where('empresas.1.label', 'BALUARTE')
             );
     }
 
