@@ -180,7 +180,19 @@ class PayablesSyncService
 
         foreach ($this->activeCodEmpFilPairs() as [$codEmp, $codFil]) {
             Log::info('[senior-cp] bulk', ['codEmp' => $codEmp, 'codFil' => $codFil]);
-            $titulos = $this->client->consultarTitulosAbertosPorEmpresaFilial((int) $codEmp, (int) $codFil, $vctIni, $vctFim);
+            try {
+                $titulos = $this->client->consultarTitulosAbertosPorEmpresaFilial((int) $codEmp, (int) $codFil, $vctIni, $vctFim);
+            } catch (SeniorException $e) {
+                if ($e->isTransient()) {
+                    throw $e;
+                }
+                Log::warning('[senior-cp] bulk ignorado (erro de negócio)', [
+                    'codEmp' => $codEmp,
+                    'codFil' => $codFil,
+                    'erro' => $e->getMessage(),
+                ]);
+                continue;
+            }
             foreach ($titulos as $t) {
                 $all[] = $t;
             }
