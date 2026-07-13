@@ -43,7 +43,24 @@ class SupplierDisplayNameResolver
             return null;
         }
 
+        if ($this->looksLikeObservation($firstLine)) {
+            return null;
+        }
+
         return $this->trimName($firstLine);
+    }
+
+    /** obsTcp de título manual costuma ser observação longa, não nome de fornecedor. */
+    private function looksLikeObservation(string $text): bool
+    {
+        if (mb_strlen($text) > 80) {
+            return true;
+        }
+
+        return (bool) preg_match(
+            '/^(REFERENTE|REF\.|INFRAÇÃO|INFRACAO|PLACA\s|MULTA\s|PAGAMENTO\s+DE\s)/iu',
+            $text,
+        );
     }
 
     private function trimName(string $name): string

@@ -26,6 +26,8 @@ const props = defineProps({
     requiresPriorityOnApprove: { type: Boolean, default: false },
     priorityOptions: { type: Object, default: () => ({}) },
     approvalPreview: { type: Object, default: () => ({ ok: false, errors: [], steps: [] }) },
+    canBypassApprovalDeadline: { type: Boolean, default: false },
+    minDueDateForApproval: { type: String, default: null },
 })
 
 const { isMobile } = useDevice()
@@ -66,11 +68,31 @@ function removePayable(payableId) {
 }
 
 function sendForApproval() {
-    router.post(`/financeiro/borderos/${props.bordero.id}/enviar-aprovacao`, {}, { preserveScroll: true })
+    router.post(`/financeiro/borderos/${props.bordero.id}/enviar-aprovacao`, {
+        urgente: urgentBypass.value && props.canBypassApprovalDeadline,
+    }, { preserveScroll: true })
 }
 
+function parseDueDate(val) {
+    if (!val) return null
+    const d = new Date(val)
+    return Number.isNaN(d.getTime()) ? null : d
+}
+
+const minApprovalDue = computed(() => parseDueDate(props.minDueDateForApproval))
+const urgentBypass = ref(false)
+
+const approvalDeadlineBlocked = computed(() => {
+    if (!minApprovalDue.value) return false
+    return (props.bordero.payables || []).some((p) => {
+        const due = parseDueDate(p.due_date)
+        return due && due < minApprovalDue.value
+    })
+})
+
 const canSubmitApproval = computed(() =>
-    props.approvalPreview?.ok && allHaveDocuments.value
+    props.approvalPreview?.ok && allHaveDocuments.value &&
+    (!approvalDeadlineBlocked.value || (props.canBypassApprovalDeadline && urgentBypass.value))
 )
 
 function openApprove() {
@@ -231,6 +253,17 @@ onMounted(reloadIfStale)
                     :disabled="!canSubmitApproval"
                     @click="sendForApproval"
                 />
+                <p v-if="approvalDeadlineBlocked && !canBypassApprovalDeadline" class="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
+                    <i class="pi pi-exclamation-triangle text-[10px]"></i>
+                    Há título(s) com vencimento antes do prazo de 72h. Aguarde ou solicite ao financeiro.
+                </p>
+                <label
+                    v-else-if="approvalDeadlineBlocked && canBypassApprovalDeadline"
+                    class="flex items-start gap-2 mt-2 text-[11px] text-amber-700 cursor-pointer"
+                >
+                    <input v-model="urgentBypass" type="checkbox" class="mt-0.5" dusk="urgent-bordero-bypass" />
+                    <span>Enviar mesmo assim (urgência — fora do prazo de 72h)</span>
+                </label>
                 <p v-if="!allHaveDocuments" class="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
                     <i class="pi pi-exclamation-triangle text-[10px]"></i>
                     Todos os títulos precisam de ao menos um documento anexado.

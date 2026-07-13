@@ -229,4 +229,17 @@ class Branch extends Model
             $branch->setAttribute('empresa_apelido', $branch->empresaApelido());
         }
     }
+
+    public static function idForSeniorPair(?int $codEmp, ?int $codFil): ?int
+    {
+        if (! $codEmp || ! $codFil) {
+            return null;
+        }
+
+        return static::query()
+            ->where('is_active', true)
+            ->where('cod_emp', $codEmp)
+            ->where('cod_fil', $codFil)
+            ->value('id');
+    }
 }

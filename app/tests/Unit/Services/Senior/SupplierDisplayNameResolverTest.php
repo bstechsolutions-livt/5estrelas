@@ -34,6 +34,14 @@ class SupplierDisplayNameResolverTest extends TestCase
     }
 
     #[Test]
+    public function ignora_observacao_longa_de_titulo_manual(): void
+    {
+        $this->assertNull($this->resolver->fromDescription(
+            'REFERENTE A INFRAÇÃO DE TRANSITO KK01995872 - PLACA SGT7F81- RESIDÊNCIA QL 10',
+        ));
+    }
+
+    #[Test]
     public function identifica_nome_generico(): void
     {
         $this->assertTrue($this->resolver->isGeneric('Fornecedor 2633'));

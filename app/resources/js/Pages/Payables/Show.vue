@@ -18,6 +18,7 @@ import { useDevice } from '@/composables/useDevice'
 import PayableDocumentPreviewCard from '@/Components/Financeiro/PayableDocumentPreviewCard.vue'
 import PayableFieldOriginLabel from '@/Components/Financeiro/PayableFieldOriginLabel.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
+import { formatApiDate, parseApiDate } from '@/utils/apiDate'
 
 const props = defineProps({
     payable: Object,
@@ -40,6 +41,8 @@ const props = defineProps({
     mentionableUsers: { type: Array, default: () => [] },
     approvalPreview: { type: Object, default: () => ({ ok: false, errors: [], steps: [] }) },
     canImportAllocations: { type: Boolean, default: false },
+    canBypassApprovalDeadline: { type: Boolean, default: false },
+    minDueDateForApproval: { type: String, default: null },
 })
 
 const DOCS_VIEW_STORAGE_KEY = 'payable_docs_view_mode'
@@ -142,22 +145,6 @@ const paymentForm = useForm({ paid_at: new Date(), payment_method: null, file: n
 const paymentMethodOptions = computed(() => Object.keys(props.paymentMethods || {}))
 
 function pad(n) { return String(n).padStart(2, '0') }
-
-/** Converte data da API (YYYY-MM-DD ou Date) para DatePicker sem NaN/timezone. */
-function parseApiDate(val) {
-    if (!val) return null
-    if (val instanceof Date) {
-        return Number.isNaN(val.getTime()) ? null : val
-    }
-    const s = String(val).trim()
-    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
-    if (iso) {
-        const dt = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), 12, 0, 0)
-        return Number.isNaN(dt.getTime()) ? null : dt
-    }
-    const dt = new Date(s.includes('T') ? s : `${s}T12:00:00`)
-    return Number.isNaN(dt.getTime()) ? null : dt
-}
 
 function toYmd(d) {
     const dt = parseApiDate(d)
@@ -318,8 +305,7 @@ function formatCommentBody(body) {
     return body.replace(/@\[([^\]]+)\]\((?:id:)?\d+\)/g, '<span class="inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">@$1</span>')
 }
 function formatDate(d) {
-    if (!d) return '—'
-    return new Date(d).toLocaleDateString('pt-BR')
+    return formatApiDate(d)
 }
 function formatDateTime(d) {
     if (!d) return '—'
@@ -334,17 +320,29 @@ const canApprove = props.payable.status === 'aguardando_aprovacao' && !inBordero
 
 // Trava (feedback do cliente): não envia pra aprovação sem ao menos 1 documento.
 const hasDocuments = computed(() => (props.payable.documents?.length || 0) > 0)
+const urgentBypass = ref(false)
+
+const minApprovalDue = computed(() => parseApiDate(props.minDueDateForApproval))
+const approvalDeadlineBlocked = computed(() => {
+    const due = parseApiDate(props.payable.due_date)
+    if (!due || !minApprovalDue.value) return false
+    return due < minApprovalDue.value
+})
+
 const wasRejectedBack = computed(() =>
     props.payable.status === 'pendente' && !!props.payable.rejection_reason
 )
 
 // Envio usa o departamento do usuário logado (preview em approvalPreview).
 function sendForApproval() {
-    router.post(`/financeiro/contas-pagar/${props.payable.id}/enviar-aprovacao`, {}, { preserveScroll: true })
+    router.post(`/financeiro/contas-pagar/${props.payable.id}/enviar-aprovacao`, {
+        urgente: urgentBypass.value && props.canBypassApprovalDeadline,
+    }, { preserveScroll: true })
 }
 
 const canSubmitApproval = computed(() =>
-    props.approvalPreview?.ok && hasDocuments.value
+    props.approvalPreview?.ok && hasDocuments.value &&
+    (!approvalDeadlineBlocked.value || (props.canBypassApprovalDeadline && urgentBypass.value))
 )
 
 // Sidebar de ações aparece quando há qualquer ação/condição lateral a mostrar.
@@ -802,6 +800,17 @@ const isFromSenior = computed(() => !!props.payable.origem_senior)
                             :disabled="!canSubmitApproval"
                             @click="sendForApproval"
                         />
+                        <p v-if="approvalDeadlineBlocked && !canBypassApprovalDeadline" class="text-[11px] text-amber-600 text-center mt-2 flex items-center justify-center gap-1">
+                            <i class="pi pi-exclamation-triangle text-[10px]"></i>
+                            Vencimento antes do prazo de 72h (mín. {{ formatDate(minDueDateForApproval) }}). Aguarde ou solicite ao financeiro.
+                        </p>
+                        <label
+                            v-else-if="approvalDeadlineBlocked && canBypassApprovalDeadline"
+                            class="flex items-start gap-2 mt-2 text-[11px] text-amber-700 cursor-pointer"
+                        >
+                            <input v-model="urgentBypass" type="checkbox" class="mt-0.5" dusk="urgent-approval-bypass" />
+                            <span>Enviar mesmo assim (urgência — fora do prazo de 72h)</span>
+                        </label>
                         <p v-if="!hasDocuments" dusk="no-docs-hint" class="text-[11px] text-amber-600 text-center mt-2 flex items-center justify-center gap-1">
                             <i class="pi pi-exclamation-triangle text-[10px]"></i> Anexe ao menos um documento para enviar.
                         </p>

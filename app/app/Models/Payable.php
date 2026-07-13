@@ -201,7 +201,7 @@ class Payable extends Model
     public const STATUS_LABELS = [
         'pendente' => 'Pendente',
         'em_preparacao' => 'Em Preparação',
-        'aguardando_aprovacao' => 'Aguardando Aprovação',
+        'aguardando_aprovacao' => 'Ag. Aprovação',
         'aprovado' => 'Aprovado',
         'reprovado' => 'Reprovado',
         'pago' => 'Pago',

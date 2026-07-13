@@ -19,6 +19,7 @@ use App\Services\PayableDepartmentClassifier;
 use App\Services\PayableAllocationImportService;
 use App\Services\PayableDocumentPairAlert;
 use App\Support\FilterDate;
+use App\Support\PayableApprovalDeadline;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -122,6 +123,7 @@ class PayableController extends Controller
             return back()->with('error', $preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
         }
 
+        $urgent = $request->boolean('urgente');
         $sent = 0;
         $skipped = 0;
         $errors = [];
@@ -143,7 +145,16 @@ class PayableController extends Controller
                     continue;
                 }
 
+                $deadline = PayableApprovalDeadline::validateForSend($payable, $user, $urgent);
+                if (! $deadline['ok']) {
+                    $errors[] = $deadline['error'];
+                    continue;
+                }
+
                 $workflow->sendForApproval($payable, $user);
+                if ($deadline['bypassed']) {
+                    PayableApprovalDeadline::logUrgentSend($payable, $user);
+                }
                 $sent++;
             } catch (\Throwable $e) {
                 $errors[] = $e->getMessage();
@@ -269,6 +280,8 @@ class PayableController extends Controller
             'canManageClassification' => $user?->hasPermission('financeiro.contas_pagar.classificacao_gerenciar') ?? false,
             'canManagePriority' => $user?->hasPermission('financeiro.contas_pagar.prioridade_gerenciar') ?? false,
             'priorityOptions' => Payable::PRIORITY_LABELS,
+            'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
+            'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
         ];
     }
 
@@ -506,6 +519,8 @@ class PayableController extends Controller
             'mentionableUsers' => app(\App\Services\MentionService::class)->mentionableUsers($user, $id),
             'approvalPreview' => $workflow->buildPreviewStepsForSender($user),
             'canImportAllocations' => in_array($payable->status, self::ALLOCATION_IMPORT_STATUSES, true),
+            'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
+            'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
         ]);
     }
 
@@ -650,8 +665,17 @@ class PayableController extends Controller
             return back()->with('error', $preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
         }
 
+        $urgent = $request->boolean('urgente');
+        $deadline = PayableApprovalDeadline::validateForSend($payable, $request->user(), $urgent);
+        if (! $deadline['ok']) {
+            return back()->with('error', $deadline['error']);
+        }
+
         try {
             $workflow->sendForApproval($payable, $request->user());
+            if ($deadline['bypassed']) {
+                PayableApprovalDeadline::logUrgentSend($payable, $request->user());
+            }
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }

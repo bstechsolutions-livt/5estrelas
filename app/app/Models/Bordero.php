@@ -38,7 +38,7 @@ class Bordero extends Model
     public const STATUS_LABELS = [
         self::STATUS_PENDENTE => 'Pendente',
         self::STATUS_EM_PREPARACAO => 'Em Preparação',
-        self::STATUS_AGUARDANDO_APROVACAO => 'Aguardando Aprovação',
+        self::STATUS_AGUARDANDO_APROVACAO => 'Ag. Aprovação',
         self::STATUS_APROVADO => 'Aprovado',
         self::STATUS_PAGO => 'Pago',
     ];

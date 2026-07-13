@@ -17,6 +17,8 @@ defineProps({
     noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
     priorityOptions: { type: Object, default: () => ({}) },
+    canBypassApprovalDeadline: { type: Boolean, default: false },
+    minDueDateForApproval: { type: String, default: null },
 })
 
 const { isMobile } = useDevice()

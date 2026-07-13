@@ -26,7 +26,7 @@ const status = ref(props.filters?.status || 'aguardando_aprovacao')
 const statusList = [
     { label: 'Pendentes', value: 'pendente' },
     { label: 'Em Preparação', value: 'em_preparacao' },
-    { label: 'Aguardando Aprovação', value: 'aguardando_aprovacao' },
+    { label: 'Ag. Aprovação', value: 'aguardando_aprovacao' },
     { label: 'Aprovados', value: 'aprovado' },
     { label: 'Pagos', value: 'pago' },
 ]

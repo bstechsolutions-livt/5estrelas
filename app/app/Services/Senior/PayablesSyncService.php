@@ -3,6 +3,7 @@
 namespace App\Services\Senior;
 
 use App\Models\Branch;
+use App\Models\Branch;
 use App\Models\Payable;
 use App\Models\PayableSyncRun;
 use App\Services\AuditLogger;
@@ -374,6 +375,10 @@ class PayablesSyncService
     private function upsertTitulo(string $bk, array $titulo, int &$inserted, int &$updated): void
     {
         $attrs = $this->mapper->mapHeader($titulo);
+        $attrs['branch_id'] = Branch::idForSeniorPair(
+            isset($attrs['codemp']) ? (int) $attrs['codemp'] : null,
+            isset($attrs['codfil']) ? (int) $attrs['codfil'] : null,
+        );
         $dueDate = isset($attrs['due_date']) ? Carbon::parse($attrs['due_date']) : null;
         if (!SeniorDueDatePolicy::isAllowed($dueDate)) {
             Log::debug('[senior-cp] título ignorado por vencimento anterior ao corte', [
@@ -405,6 +410,10 @@ class PayablesSyncService
         $voltouDaAusencia = $existing->senior_missing_at !== null; // req 7.4
 
         if ($semMudanca && !$voltouDaAusencia) {
+            if ($existing->branch_id === null && ! empty($attrs['branch_id'])) {
+                $existing->update(['branch_id' => $attrs['branch_id']]);
+            }
+
             return;
         }
 

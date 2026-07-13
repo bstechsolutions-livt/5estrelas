@@ -38,6 +38,8 @@ const props = defineProps({
     canManageClassification: { type: Boolean, default: false },
     canManagePriority: { type: Boolean, default: false },
     priorityOptions: { type: Object, default: () => ({}) },
+    canBypassApprovalDeadline: { type: Boolean, default: false },
+    minDueDateForApproval: { type: String, default: null },
 })
 
 const { can } = useAuth()
@@ -112,7 +114,7 @@ function selectDuePreset(key) {
 const statusList = [
     { label: 'Pendentes', value: 'pendente', color: 'amber' },
     { label: 'Em Preparação', value: 'em_preparacao', color: 'blue' },
-    { label: 'Aguardando Aprovação', value: 'aguardando_aprovacao', color: 'orange' },
+    { label: 'Ag. Aprovação', value: 'aguardando_aprovacao', color: 'orange' },
     { label: 'Aprovados', value: 'aprovado', color: 'green' },
     { label: 'Pagos', value: 'pago', color: 'emerald' },
 ]
@@ -320,6 +322,7 @@ watch(() => props.payables?.current_page, () => {
 
 const borderoMode = ref(false)
 const createBorderoForm = ref({ description: '' })
+const urgentBatchBypass = ref(false)
 
 function startBordero() {
     if (selected.value.length === 0) return
@@ -349,7 +352,8 @@ function batchSendForApproval() {
     if (selected.value.length === 0) return
     router.post('/financeiro/contas-pagar/lote/enviar-aprovacao', {
         payable_ids: selected.value,
-    }, { onSuccess: clearSelection })
+        urgente: urgentBatchBypass.value && props.canBypassApprovalDeadline,
+    }, { onSuccess: () => { clearSelection(); urgentBatchBypass.value = false } })
 }
 
 const showApproveDialog = ref(false)
@@ -672,6 +676,13 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                 <template v-else>
                     <span class="text-sm font-medium">{{ selected.length }} título(s) selecionado(s)</span>
                     <div class="flex flex-wrap items-center gap-2">
+                        <label
+                            v-if="canBatchSend && canBypassApprovalDeadline"
+                            class="flex items-center gap-1.5 text-xs text-blue-100 cursor-pointer mr-1"
+                        >
+                            <input v-model="urgentBatchBypass" type="checkbox" class="rounded" dusk="urgent-batch-bypass" />
+                            <span>Urgência (fora 72h)</span>
+                        </label>
                         <Button v-if="canBatchSend" label="Enviar para aprovação" icon="pi pi-send" size="small" class="batch-bar-btn-primary"
                             dusk="btn-batch-send-approval" @click="batchSendForApproval" />
                         <Button v-if="canBatchApprove" label="Aprovar selecionados" icon="pi pi-check" severity="success" size="small"

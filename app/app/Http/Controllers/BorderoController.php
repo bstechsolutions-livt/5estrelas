@@ -10,6 +10,7 @@ use App\Services\AuditLogger;
 use App\Services\BorderoActionService;
 use App\Services\FinanceiroDepartmentScope;
 use App\Services\PayableBranchScope;
+use App\Support\PayableApprovalDeadline;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -132,6 +133,8 @@ class BorderoController extends Controller
             'requiresPriorityOnApprove' => $canApproveStep && $currentStepLabel === 'financeiro',
             'priorityOptions' => Payable::PRIORITY_LABELS,
             'approvalPreview' => $workflow->buildPreviewStepsForSender($user),
+            'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
+            'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
         ]);
     }
 
@@ -234,10 +237,23 @@ class BorderoController extends Controller
             return back()->with('error', "Anexe ao menos um documento em cada título antes de enviar. Sem anexo: {$nums}.");
         }
 
+        $urgent = $request->boolean('urgente');
+        $user = $request->user();
+        foreach ($bordero->payables as $payable) {
+            $deadline = PayableApprovalDeadline::validateForSend($payable, $user, $urgent);
+            if (! $deadline['ok']) {
+                return back()->with('error', $deadline['error']);
+            }
+        }
+
         try {
-            DB::transaction(function () use ($bordero, $request, $workflow) {
+            DB::transaction(function () use ($bordero, $request, $workflow, $urgent, $user) {
                 foreach ($bordero->payables as $payable) {
+                    $deadline = PayableApprovalDeadline::validateForSend($payable, $user, $urgent);
                     $workflow->sendForApproval($payable, $request->user());
+                    if ($deadline['bypassed']) {
+                        PayableApprovalDeadline::logUrgentSend($payable, $user);
+                    }
                 }
 
                 $bordero->update([
