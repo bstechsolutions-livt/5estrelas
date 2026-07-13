@@ -8,9 +8,10 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
+import DatePicker from 'primevue/datepicker'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
-import { formatApiDate } from '@/utils/apiDate'
+import { formatApiDate, parseApiDate, toApiDateString } from '@/utils/apiDate'
 import { PAYABLE_SORT_GROUPS, sortQueryFromValue, sortValueFromQuery } from '@/composables/usePayableSort'
 
 const props = defineProps({
@@ -50,6 +51,20 @@ const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
 const sortValue = ref(sortValueFromQuery(props.filters?.sort, props.filters?.dir))
 const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange, presetChipClass } = useDueDatePresets(dueFrom, dueTo)
+const dueFromDate = computed({
+    get: () => parseApiDate(dueFrom.value),
+    set: (v) => {
+        dueFrom.value = v ? toApiDateString(v) : ''
+        onDueDateManualChange()
+    },
+})
+const dueToDate = computed({
+    get: () => parseApiDate(dueTo.value),
+    set: (v) => {
+        dueTo.value = v ? toApiDateString(v) : ''
+        onDueDateManualChange()
+    },
+})
 
 function selectDuePreset(key) {
     applyDuePreset(key)
@@ -546,11 +561,11 @@ const currentTotal = computed(() => {
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Vencimento de</label>
-                            <InputText v-model="dueFrom" type="date" class="w-full" @input="onDueDateManualChange" />
+                            <DatePicker v-model="dueFromDate" date-format="dd/mm/yy" placeholder="dd/mm/aaaa" show-icon class="w-full" />
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Vencimento até</label>
-                            <InputText v-model="dueTo" type="date" class="w-full" @input="onDueDateManualChange" />
+                            <DatePicker v-model="dueToDate" date-format="dd/mm/yy" placeholder="dd/mm/aaaa" show-icon class="w-full" />
                         </div>
                     </div>
                 </div>

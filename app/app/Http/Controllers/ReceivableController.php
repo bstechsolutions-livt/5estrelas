@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Receivable;
 use App\Services\ReceivableBranchScope;
+use App\Support\FilterDate;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -48,11 +49,13 @@ class ReceivableController extends Controller
                     ->orWhere('description', 'ilike', "%{$s}%");
             });
         }
-        if ($request->filled('due_from')) {
-            $query->where('due_date', '>=', $request->due_from);
+        $dueFrom = FilterDate::parse($request->input('due_from'));
+        $dueTo = FilterDate::parse($request->input('due_to'));
+        if ($dueFrom) {
+            $query->where('due_date', '>=', $dueFrom);
         }
-        if ($request->filled('due_to')) {
-            $query->where('due_date', '<=', $request->due_to);
+        if ($dueTo) {
+            $query->where('due_date', '<=', $dueTo);
         }
         if ($request->filled('codemp')) {
             $query->where('codemp', (int) $request->codemp);
@@ -66,6 +69,10 @@ class ReceivableController extends Controller
         Receivable::attachEmpresaNome($receivables->getCollection());
         Receivable::attachFilialNome($receivables->getCollection());
         Receivable::attachOrigemSenior($receivables->getCollection());
+
+        if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
+            return response()->json($receivables);
+        }
 
         $totalsQuery = Receivable::query()->excludeMissingInSenior();
         app(ReceivableBranchScope::class)->applyFilter($totalsQuery, $user);

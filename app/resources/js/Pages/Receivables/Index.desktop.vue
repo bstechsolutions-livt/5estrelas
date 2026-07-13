@@ -10,7 +10,7 @@ import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
-import { formatApiDate } from '@/utils/apiDate'
+import { formatApiDate, parseApiDate, toApiDateString } from '@/utils/apiDate'
 
 const props = defineProps({
     receivables: Object,
@@ -27,6 +27,15 @@ const status = ref(props.filters?.status || '')
 const codemp = ref(props.filters?.codemp ? Number(props.filters.codemp) : null)
 const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
+
+const dueFromDate = computed({
+    get: () => parseApiDate(dueFrom.value),
+    set: (v) => { dueFrom.value = v ? toApiDateString(v) : '' },
+})
+const dueToDate = computed({
+    get: () => parseApiDate(dueTo.value),
+    set: (v) => { dueTo.value = v ? toApiDateString(v) : '' },
+})
 
 const empresaList = computed(() => [
     { label: 'Todas as empresas', value: null },
@@ -87,11 +96,11 @@ function openReceivable(id) {
                     </div>
                     <div class="flex flex-col gap-1">
                         <label class="text-xs text-surface-500">Vencimento de</label>
-                        <DatePicker v-model="dueFrom" date-format="yy-mm-dd" show-icon fluid @update:model-value="v => dueFrom = formatApiDate(v)" />
+                        <DatePicker v-model="dueFromDate" date-format="dd/mm/yy" placeholder="dd/mm/aaaa" show-icon fluid />
                     </div>
                     <div class="flex flex-col gap-1">
                         <label class="text-xs text-surface-500">Vencimento até</label>
-                        <DatePicker v-model="dueTo" date-format="yy-mm-dd" show-icon fluid @update:model-value="v => dueTo = formatApiDate(v)" />
+                        <DatePicker v-model="dueToDate" date-format="dd/mm/yy" placeholder="dd/mm/aaaa" show-icon fluid />
                     </div>
                     <div class="lg:col-span-5 flex justify-end">
                         <Button label="Filtrar" icon="pi pi-search" @click="applyFilters" />

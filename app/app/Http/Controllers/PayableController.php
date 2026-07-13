@@ -18,6 +18,7 @@ use App\Services\PayableBranchScope;
 use App\Services\PayableDepartmentClassifier;
 use App\Services\PayableAllocationImportService;
 use App\Services\PayableDocumentPairAlert;
+use App\Support\FilterDate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -303,11 +304,13 @@ class PayableController extends Controller
                     ->orWhere('description', 'ilike', "%{$s}%");
             });
         }
-        if ($request->filled('due_from')) {
-            $query->where('due_date', '>=', $request->due_from);
+        $dueFrom = FilterDate::parse($request->input('due_from'));
+        $dueTo = FilterDate::parse($request->input('due_to'));
+        if ($dueFrom) {
+            $query->where('due_date', '>=', $dueFrom);
         }
-        if ($request->filled('due_to')) {
-            $query->where('due_date', '<=', $request->due_to);
+        if ($dueTo) {
+            $query->where('due_date', '<=', $dueTo);
         }
         if ($request->filled('codemp')) {
             $query->where('codemp', (int) $request->codemp);
