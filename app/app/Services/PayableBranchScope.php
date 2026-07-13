@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Comercial\Filial as ComercialFilial;
 use App\Models\Payable;
 use App\Models\User;
+use App\Support\PayableEmpresaExclusion;
 use Illuminate\Database\Eloquent\Builder;
 
 class PayableBranchScope
@@ -99,6 +100,8 @@ class PayableBranchScope
 
     public function applyFilter(Builder $query, User $user): void
     {
+        PayableEmpresaExclusion::applyToQuery($query);
+
         $scope = $this->resolve($user);
         if (!$scope['restricted']) {
             return;
@@ -139,6 +142,10 @@ class PayableBranchScope
 
     public function canAccessPayable(User $user, Payable $payable): bool
     {
+        if (PayableEmpresaExclusion::isExcluded($payable->codemp !== null ? (int) $payable->codemp : null)) {
+            return false;
+        }
+
         $scope = $this->resolve($user);
         if (!$scope['restricted']) {
             return true;
@@ -172,7 +179,7 @@ class PayableBranchScope
     /** @return array<int, array{label:string,value:int}> */
     public function empresaOptionsForUser(User $user): array
     {
-        $options = ComercialFilial::selectOptions();
+        $options = PayableEmpresaExclusion::filterOptions(ComercialFilial::selectOptions());
         $scope = $this->resolve($user);
 
         if (!$scope['restricted']) {
@@ -189,5 +196,110 @@ class PayableBranchScope
             $options,
             fn (array $row) => isset($allowed[(int) $row['value']]),
         ));
+    }
+
+    /**
+     * Opções de filial operacional (par codemp-codfil) para filtro da listagem.
+     *
+     * @return array<int, array{label:string,value:string,codemp:int,codfil:int}>
+     */
+    public function filialOptionsForUser(User $user): array
+    {
+        $excluded = array_flip(PayableEmpresaExclusion::excludedCodEmps());
+        $scope = $this->resolve($user);
+        $options = [];
+
+        $branches = Branch::query()
+            ->where('is_active', true)
+            ->whereNotNull('cod_emp')
+            ->whereNotNull('cod_fil')
+            ->orderBy('cod_emp')
+            ->orderBy('cod_fil')
+            ->get(['id', 'name', 'apelido', 'cod_emp', 'cod_fil']);
+
+        foreach ($branches as $branch) {
+            $codemp = (int) $branch->cod_emp;
+            $codfil = (int) $branch->cod_fil;
+
+            if (isset($excluded[$codemp])) {
+                continue;
+            }
+
+            if ($scope['restricted'] && ! $this->userCanAccessCodPair($scope, $codemp, $codfil)) {
+                continue;
+            }
+
+            $empresa = ComercialFilial::apelidoEmpresa($codemp);
+            $filial = Payable::formatFilialLabel($codfil, $branch->operationalFilialName());
+            $label = $empresa && $filial ? "{$empresa} · {$filial}" : ($filial ?: $empresa ?: "Filial {$codfil}");
+
+            $options["{$codemp}-{$codfil}"] = [
+                'label' => $label,
+                'value' => "{$codemp}-{$codfil}",
+                'codemp' => $codemp,
+                'codfil' => $codfil,
+            ];
+        }
+
+        if ($options === []) {
+            $filiais = ComercialFilial::query()
+                ->where('ativo', true)
+                ->whereNotNull('cod_emp')
+                ->whereNotNull('cod_fil')
+                ->orderBy('cod_emp')
+                ->orderBy('cod_fil')
+                ->get(['cod_emp', 'cod_fil', 'apelido', 'nome', 'fantasia']);
+
+            foreach ($filiais as $filialRow) {
+                $codemp = (int) $filialRow->cod_emp;
+                $codfil = (int) $filialRow->cod_fil;
+
+                if (isset($excluded[$codemp])) {
+                    continue;
+                }
+
+                if ($scope['restricted'] && ! $this->userCanAccessCodPair($scope, $codemp, $codfil)) {
+                    continue;
+                }
+
+                $empresa = ComercialFilial::apelidoEmpresa($codemp);
+                $filialLabel = Payable::formatFilialLabel(
+                    $codfil,
+                    $filialRow->apelido ?: $filialRow->fantasia ?: $filialRow->nome,
+                );
+                $label = $empresa && $filialLabel ? "{$empresa} · {$filialLabel}" : ($filialLabel ?: $empresa);
+
+                $options["{$codemp}-{$codfil}"] = [
+                    'label' => $label,
+                    'value' => "{$codemp}-{$codfil}",
+                    'codemp' => $codemp,
+                    'codfil' => $codfil,
+                ];
+            }
+        }
+
+        return array_values($options);
+    }
+
+    /**
+     * @param  array{
+     *     codfils: array<int|string>,
+     *     codemps: int[],
+     *     cod_pairs: array<int, array{0:int,1:int}>
+     * }  $scope
+     */
+    private function userCanAccessCodPair(array $scope, int $codemp, int $codfil): bool
+    {
+        foreach ($scope['cod_pairs'] as [$allowedEmp, $allowedFil]) {
+            if ($codemp === $allowedEmp && $codfil === $allowedFil) {
+                return true;
+            }
+        }
+
+        if (in_array($codfil, $scope['codfils'], true)) {
+            return true;
+        }
+
+        return in_array($codemp, $scope['codemps'], true);
     }
 }

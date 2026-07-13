@@ -488,6 +488,11 @@ const isFromSenior = computed(() => !!props.payable.origem_senior)
                             <i class="pi pi-pencil text-xs"></i>
                         </button>
                     </p>
+                    <p v-if="payable.filial_label" class="text-sm text-gray-600 mt-1 flex items-center gap-1.5" dusk="payable-filial-label">
+                        <i class="pi pi-building text-xs text-gray-400" aria-hidden="true" />
+                        <PayableFieldOriginLabel v-if="fieldOrigins" label="" field="filial_nome" :field-origins="fieldOrigins" class="!inline-flex shrink-0" />
+                        <span class="font-medium text-gray-700">{{ payable.filial_label }}</span>
+                    </p>
                 </div>
                 <div class="text-right">
                     <PayableFieldOriginLabel v-if="fieldOrigins" label="Valor" field="amount" :field-origins="fieldOrigins" class="justify-end mb-0.5" />
@@ -546,7 +551,7 @@ const isFromSenior = computed(() => !!props.payable.origem_senior)
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Informações</h3>
                         <div class="grid grid-cols-2 gap-3 text-sm">
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Empresa" field="empresa_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Empresa</p><p class="text-gray-800">{{ payable.empresa_nome || '—' }}</p></div>
-                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Filial" field="filial_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Filial</p><p class="text-gray-800">{{ payable.filial_nome || '—' }}</p></div>
+                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Filial" field="filial_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Filial</p><p class="text-gray-800">{{ payable.filial_label || payable.filial_nome || '—' }}</p></div>
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Categoria" field="category" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Categoria</p><p class="text-gray-800">{{ payable.category || '—' }}</p></div>
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Emissão" field="issue_date" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Emissão</p><p class="text-gray-800">{{ formatDate(payable.issue_date) }}</p></div>
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="CNPJ" field="supplier_cnpj" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">CNPJ</p><p class="text-gray-800 font-mono text-xs">{{ payable.supplier_cnpj || '—' }}</p></div>

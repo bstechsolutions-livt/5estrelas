@@ -44,6 +44,23 @@ class Branch extends Model
         return \App\Models\Comercial\Filial::gerarApelido($this->name);
     }
 
+    /**
+     * Nome operacional da filial para títulos CP (ex.: "MATRIZ GERENCIAL", "FILIAL GO").
+     * Usa o sufixo após " - " no cadastro quando existir.
+     */
+    public function operationalFilialName(): string
+    {
+        if (str_contains($this->name, ' - ')) {
+            $suffix = trim(Str::afterLast($this->name, ' - '));
+
+            if ($suffix !== '') {
+                return $suffix;
+            }
+        }
+
+        return $this->resolveDisplayName();
+    }
+
     /** Filial Senior espelhada (CNPJ, nome da empresa, cod_fil ou cod_emp). */
     public function resolveComercialFilial(): ?\App\Models\Comercial\Filial
     {

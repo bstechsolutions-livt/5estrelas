@@ -263,13 +263,14 @@ class PayableController extends Controller
             'payables' => $pageData['payables'],
             'totals' => $pageData['totals'],
             'filters' => array_merge(
-                $request->only(['search', 'due_from', 'due_to', 'codemp', 'branch_id', 'amount_min', 'amount_max', 'payment_priority', 'sort', 'dir', 'per_page']),
+                $request->only(['search', 'due_from', 'due_to', 'codemp', 'filial', 'branch_id', 'amount_min', 'amount_max', 'payment_priority', 'sort', 'dir', 'per_page']),
                 [
                     'status' => $pageData['status'],
                     'department_id' => $pageData['departmentContext']['department_id'],
                 ],
             ),
             'empresas' => app(PayableBranchScope::class)->empresaOptionsForUser($user),
+            'filiais' => app(PayableBranchScope::class)->filialOptionsForUser($user),
             'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
             'statusOptions' => Payable::STATUS_LABELS,
@@ -325,7 +326,12 @@ class PayableController extends Controller
         if ($dueTo) {
             $query->where('due_date', '<=', $dueTo);
         }
-        if ($request->filled('codemp')) {
+        if ($request->filled('filial')) {
+            $pair = $this->parseFilialFilter((string) $request->filial);
+            if ($pair !== null) {
+                $query->where('codemp', $pair[0])->where('codfil', $pair[1]);
+            }
+        } elseif ($request->filled('codemp')) {
             $query->where('codemp', (int) $request->codemp);
         } elseif ($request->filled('branch_id')) {
             $query->where('branch_id', $request->branch_id);
@@ -436,6 +442,16 @@ class PayableController extends Controller
         }
 
         $query->orderBy($sort, $direction);
+    }
+
+    /** @return array{0:int,1:int}|null */
+    private function parseFilialFilter(string $value): ?array
+    {
+        if (! preg_match('/^(\d+)-(\d+)$/', trim($value), $matches)) {
+            return null;
+        }
+
+        return [(int) $matches[1], (int) $matches[2]];
     }
 
     private function findPayableForUser(int $id, ?User $user = null): Payable

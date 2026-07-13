@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Comercial\Filial as ComercialFilial;
 use App\Models\Receivable;
 use App\Models\User;
+use App\Support\PayableEmpresaExclusion;
 use Illuminate\Database\Eloquent\Builder;
 
 class ReceivableBranchScope
@@ -129,7 +130,7 @@ class ReceivableBranchScope
     /** @return array<int, array{label:string,value:int}> */
     public function empresaOptionsForUser(User $user): array
     {
-        $options = ComercialFilial::selectOptions();
+        $options = PayableEmpresaExclusion::filterOptions(ComercialFilial::selectOptions());
         $scope = $this->resolve($user);
 
         if (!$scope['restricted']) {

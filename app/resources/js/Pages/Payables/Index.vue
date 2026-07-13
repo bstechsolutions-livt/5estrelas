@@ -8,6 +8,7 @@ defineProps({
     totals: Object,
     filters: Object,
     empresas: Array,
+    filiais: Array,
     departments: Array,
     branches: Array,
     statusOptions: Object,

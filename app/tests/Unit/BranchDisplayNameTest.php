@@ -108,6 +108,7 @@ class BranchDisplayNameTest extends TestCase
         ]);
 
         $this->assertSame('5 ESTRELAS MATRIZ', $branch->resolveDisplayName());
+        $this->assertSame('MATRIZ GERENCIAL', $branch->operationalFilialName());
     }
 
     public function test_resolve_display_name_por_cnpj_quando_cod_fil_ambiguo(): void

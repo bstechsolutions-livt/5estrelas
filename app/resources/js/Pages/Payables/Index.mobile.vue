@@ -19,6 +19,7 @@ const props = defineProps({
     totals: Object,
     filters: Object,
     empresas: Array,
+    filiais: Array,
     departments: Array,
     branches: Array,
     statusOptions: Object,
@@ -39,6 +40,7 @@ const search = ref(props.filters?.search || '')
 const status = ref(props.filters?.status || 'pendente')
 const filtersOpen = ref(false)
 const codemp = ref(props.filters?.codemp ? Number(props.filters.codemp) : null)
+const filial = ref(props.filters?.filial || null)
 const departmentId = ref(
     props.canChangeDepartmentFilter
         ? (props.filters?.department_id ? Number(props.filters.department_id) : null)
@@ -84,6 +86,11 @@ const empresaList = computed(() => [
     ...(props.empresas || []).map(e => ({ label: e.label, value: e.value })),
 ])
 
+const filialList = computed(() => [
+    { label: 'Todas as filiais', value: null },
+    ...(props.filiais || []).map(f => ({ label: f.label, value: f.value })),
+])
+
 const departmentList = computed(() => [
     { label: 'Todos os departamentos', value: null },
     ...(props.departments || []).map(d => ({ label: d.name, value: d.id })),
@@ -101,7 +108,8 @@ function currentFilters() {
     return {
         search: search.value || undefined,
         status: status.value || undefined,
-        codemp: codemp.value || undefined,
+        codemp: filial.value ? undefined : (codemp.value || undefined),
+        filial: filial.value || undefined,
         department_id: departmentId.value || undefined,
         amount_min: amountMin.value || undefined,
         amount_max: amountMax.value || undefined,
@@ -155,6 +163,7 @@ onMounted(() => {
                 status.value = f.status === 'reprovado' ? 'pendente' : (f.status || 'pendente')
                 search.value = f.search || ''
                 codemp.value = f.codemp ? Number(f.codemp) : null
+                filial.value = f.filial || null
                 if (props.canChangeDepartmentFilter) {
                     departmentId.value = f.department_id ? Number(f.department_id) : null
                 }
@@ -166,7 +175,7 @@ onMounted(() => {
                 dueTo.value = f.due_to || ''
                 onDueDateManualChange()
                 const serverStatus = props.filters?.status || 'pendente'
-                const differs = status.value !== serverStatus || f.search || f.codemp
+                const differs = status.value !== serverStatus || f.search || f.codemp || f.filial
                     || (props.canChangeDepartmentFilter && f.department_id)
                     || f.amount_min || f.amount_max || f.payment_priority || f.due_from || f.due_to
                     || (f.sort && f.sort !== 'default')
@@ -185,6 +194,7 @@ function applyAndClose() {
 function clearFilters() {
     search.value = ''
     codemp.value = null
+    filial.value = null
     if (props.canChangeDepartmentFilter) {
         departmentId.value = null
     }
@@ -465,7 +475,11 @@ const currentTotal = computed(() => {
                     <div class="space-y-3">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Empresa</label>
-                            <Select v-model="codemp" :options="empresaList" option-label="label" option-value="value" class="w-full" />
+                            <Select v-model="codemp" :options="empresaList" option-label="label" option-value="value" class="w-full" :disabled="!!filial" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Filial</label>
+                            <Select v-model="filial" :options="filialList" option-label="label" option-value="value" class="w-full" dusk="filter-filial" />
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Departamento</label>

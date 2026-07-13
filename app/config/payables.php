@@ -9,6 +9,12 @@
  * Chave = slug do departamento (departments.slug).
  */
 return [
+    /**
+     * Empresas (codEmp Senior) ocultas em Contas a Pagar — não pertencem ao fluxo do grupo.
+     * 4 = ARI ADM, 9 = BALUARTE
+     */
+    'excluded_cod_emp' => [4, 9],
+
     'department_rules' => [
         'dp_rh' => [
             'codccu' => ['2363', '2566', '2631', '2847'],

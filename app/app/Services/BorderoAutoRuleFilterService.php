@@ -7,6 +7,7 @@ use App\Models\Comercial\Filial;
 use App\Models\Department;
 use App\Models\Payable;
 use App\Models\User;
+use App\Support\PayableEmpresaExclusion;
 use Illuminate\Database\Eloquent\Builder;
 
 class BorderoAutoRuleFilterService
@@ -166,7 +167,7 @@ class BorderoAutoRuleFilterService
         if ($user) {
             $options = $this->branchScope->empresaOptionsForUser($user);
         } else {
-            $options = Filial::selectOptions();
+            $options = PayableEmpresaExclusion::filterOptions(Filial::selectOptions());
         }
 
         return array_map(fn (array $row) => [

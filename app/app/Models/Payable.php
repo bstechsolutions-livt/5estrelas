@@ -463,26 +463,43 @@ class Payable extends Model
                 ->keyBy(fn ($f) => $f->cod_emp . '-' . $f->cod_fil);
 
         foreach ($items as $p) {
-            if ($p->relationLoaded('branch') && $p->branch) {
-                $p->setAttribute('filial_nome', $p->branch->display_name);
-
-                continue;
-            }
-
-            $key = ($p->codemp && $p->codfil) ? ((int) $p->codemp . '-' . (int) $p->codfil) : null;
             $nome = null;
 
-            if ($key && $branchByPair->has($key)) {
-                $nome = $branchByPair[$key]->display_name;
-            } elseif ($key && $comercialByPair->has($key)) {
-                $f = $comercialByPair[$key];
-                $nome = $f->apelido ?: $f->fantasia ?: $f->nome;
-            } elseif ($p->codemp && $p->codfil) {
-                $nome = \App\Models\Comercial\Filial::apelidoFilial((int) $p->codemp, (int) $p->codfil);
+            if ($p->relationLoaded('branch') && $p->branch) {
+                $nome = $p->branch->operationalFilialName();
+            } else {
+                $key = ($p->codemp && $p->codfil) ? ((int) $p->codemp . '-' . (int) $p->codfil) : null;
+
+                if ($key && $branchByPair->has($key)) {
+                    $nome = $branchByPair[$key]->operationalFilialName();
+                } elseif ($key && $comercialByPair->has($key)) {
+                    $f = $comercialByPair[$key];
+                    $nome = $f->apelido ?: $f->fantasia ?: $f->nome;
+                } elseif ($p->codemp && $p->codfil) {
+                    $nome = \App\Models\Comercial\Filial::apelidoFilial((int) $p->codemp, (int) $p->codfil);
+                }
             }
 
             $p->setAttribute('filial_nome', $nome);
+            $p->setAttribute('filial_label', self::formatFilialLabel($p->codfil, $nome));
         }
+    }
+
+    public static function formatFilialLabel(?int $codFil, ?string $nome): ?string
+    {
+        $nome = filled($nome) ? trim($nome) : null;
+
+        if (! $codFil && ! $nome) {
+            return null;
+        }
+
+        if ($codFil) {
+            $cod = str_pad((string) (int) $codFil, 2, '0', STR_PAD_LEFT);
+
+            return $nome ? "Filial {$cod} — {$nome}" : "Filial {$cod}";
+        }
+
+        return $nome;
     }
 
     /**

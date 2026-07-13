@@ -120,6 +120,7 @@ class PayableEmpresaColunaTest extends TestCase
 
         $this->assertSame('5 ESTRELAS', $row['empresa_nome']);
         $this->assertSame('5 ESTRELAS GO', $row['filial_nome']);
+        $this->assertSame('Filial 05 — 5 ESTRELAS GO', $row['filial_label']);
     }
 
     public function test_index_exibe_filial_na_coluna_filial_quando_matriz(): void
@@ -132,6 +133,44 @@ class PayableEmpresaColunaTest extends TestCase
 
         $this->assertSame('5 ESTRELAS', $row['empresa_nome']);
         $this->assertSame('5 ESTRELAS', $row['filial_nome']);
+        $this->assertSame('Filial 01 — 5 ESTRELAS', $row['filial_label']);
+    }
+
+    public function test_show_exibe_filial_label_matriz_gerencial(): void
+    {
+        $this->makeFilial(2, '5 ESTRELAS SISTEMA DE SEGURANCA LTDA', '5 ESTRELAS', '5 ESTRELAS');
+        Filial::create([
+            'cod_emp' => 2,
+            'cod_fil' => 5,
+            'senior_id' => '2-5',
+            'nome' => '5 ESTRELAS SISTEMA DE SEGURANCA LTDA - MATRIZ GERENCIAL',
+            'fantasia' => '5 ESTRELAS MATRIZ',
+            'apelido' => '5 ESTRELAS MATRIZ',
+            'ativo' => true,
+        ]);
+
+        \App\Models\Branch::create([
+            'name' => '5 ESTRELAS SISTEMA DE SEGURANCA LTDA - MATRIZ GERENCIAL',
+            'apelido' => '5 ESTRELAS MATRIZ',
+            'cod_emp' => 2,
+            'cod_fil' => 5,
+            'code' => '5',
+            'is_active' => true,
+        ]);
+
+        $payable = $this->makePayable([
+            'codemp' => 2,
+            'codfil' => 5,
+            'supplier_name' => 'FornecedorGerencial',
+        ]);
+
+        $this->actingAs($this->activeUser())
+            ->get("/financeiro/contas-pagar/{$payable->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('payable.filial_nome', 'MATRIZ GERENCIAL')
+                ->where('payable.filial_label', 'Filial 05 — MATRIZ GERENCIAL')
+            );
     }
 
     public function test_show_expoe_nome_da_empresa(): void
