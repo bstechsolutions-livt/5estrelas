@@ -11,9 +11,9 @@
 return [
     /**
      * Empresas (codEmp Senior) ocultas em Contas a Pagar — não pertencem ao fluxo do grupo.
-     * 4 = ARI ADM, 9 = BALUARTE
+     * 4 = ARI ADM, 9 = BALUARTE, 12 = LSR
      */
-    'excluded_cod_emp' => [4, 9],
+    'excluded_cod_emp' => [4, 9, 12],
 
     'department_rules' => [
         'dp_rh' => [
