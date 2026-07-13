@@ -2,6 +2,7 @@
 
 namespace App\Services\Senior;
 
+use App\Models\Branch;
 use App\Models\Payable;
 use App\Models\PayableSyncRun;
 use App\Services\AuditLogger;
@@ -175,12 +176,11 @@ class PayablesSyncService
      */
     private function collectTitulosBulk(?Carbon $vctIni, ?Carbon $vctFim): array
     {
-        $codFil = (int) config('senior.cod_fil', 1);
         $all = [];
 
-        foreach ($this->activeCodEmps() as $codEmp) {
+        foreach ($this->activeCodEmpFilPairs() as [$codEmp, $codFil]) {
             Log::info('[senior-cp] bulk', ['codEmp' => $codEmp, 'codFil' => $codFil]);
-            $titulos = $this->client->consultarTitulosAbertosPorEmpresaFilial((int) $codEmp, $codFil, $vctIni, $vctFim);
+            $titulos = $this->client->consultarTitulosAbertosPorEmpresaFilial((int) $codEmp, (int) $codFil, $vctIni, $vctFim);
             foreach ($titulos as $t) {
                 $all[] = $t;
             }
@@ -292,6 +292,42 @@ class PayablesSyncService
         }
 
         return [(int) config('senior.cod_emp', 1)];
+    }
+
+    /**
+     * Pares (codEmp, codFil) para sync bulk — uma chamada SOAP por par.
+     * Usa filiais cadastradas em branches; fallback cod_fil da config.
+     *
+     * @return list<array{0: int, 1: int}>
+     */
+    private function activeCodEmpFilPairs(): array
+    {
+        $fallbackFil = (int) config('senior.cod_fil', 1);
+        $pairs = [];
+
+        foreach ($this->activeCodEmps() as $codEmp) {
+            $fils = Branch::query()
+                ->where('is_active', true)
+                ->where('cod_emp', (int) $codEmp)
+                ->whereNotNull('cod_fil')
+                ->distinct()
+                ->orderBy('cod_fil')
+                ->pluck('cod_fil')
+                ->map(fn ($f) => (int) $f)
+                ->filter(fn ($f) => $f > 0)
+                ->values()
+                ->all();
+
+            if ($fils === []) {
+                $fils = [$fallbackFil];
+            }
+
+            foreach ($fils as $codFil) {
+                $pairs[] = [(int) $codEmp, (int) $codFil];
+            }
+        }
+
+        return $pairs;
     }
 
     /** Janela de vencimento [ini, fim] conforme o modo (req 5). */

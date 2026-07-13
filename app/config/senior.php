@@ -66,8 +66,9 @@ return [
     )),
 
     // Rollout gradual: só sincroniza estas empresas quando preenchido (ex.: "2" ou "2,3").
+    // Vazio = usa todas de cod_emps.
     'emp_enabled' => array_values(array_filter(
-        array_map('intval', explode(',', (string) env('SENIOR_EMP_ENABLED', '2'))),
+        array_map('intval', explode(',', (string) env('SENIOR_EMP_ENABLED', ''))),
         fn ($v) => $v > 0,
     )),
 
