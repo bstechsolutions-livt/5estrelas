@@ -9,10 +9,9 @@ use Laravel\Dusk\Browser;
 use Tests\DuskTestCase;
 
 /**
- * A3 — Coluna Empresa (por NOME) na tela principal (browser).
+ * A3 — Empresa/filial na tela principal (browser).
  *
- * A listagem exibe o NOME da empresa (fantasia), resolvido pelo codEmp do
- * título via bs_comercial_filiais. Nunca o código.
+ * A listagem não exibe mais coluna Empresa; o nome aparece na coluna Filial.
  */
 class PayableEmpresaColunaTest extends DuskTestCase
 {
@@ -21,28 +20,29 @@ class PayableEmpresaColunaTest extends DuskTestCase
         return User::where('email', 'bruno@bstechsolutions.com')->firstOrFail();
     }
 
-    public function test_listagem_mostra_nome_da_empresa(): void
+    public function test_listagem_mostra_coluna_filial(): void
     {
         Filial::firstOrCreate(
             ['senior_id' => '777-1'],
             ['cod_emp' => 777, 'cod_fil' => 1, 'nome' => 'Empresa Teste Dusk LTDA', 'fantasia' => 'EMPRESA TESTE DUSK', 'ativo' => true]
         );
 
-        $supplier = 'FornecedorDuskEmpresa' . uniqid();
+        $supplier = 'FornecedorDuskFilial' . uniqid();
         $p = Payable::create([
-            'title_number' => 'DUSK-EMP-' . uniqid(),
+            'title_number' => 'DUSK-FIL-' . uniqid(),
             'supplier_name' => $supplier,
             'amount' => 1234.00,
             'due_date' => now()->addDays(3)->toDateString(),
             'status' => 'pendente',
             'codemp' => 777,
+            'codfil' => 1,
         ]);
 
         $this->browse(function (Browser $browser) use ($supplier) {
             $browser->loginAs($this->bruno())
-                // Query string evita a restauração de filtros do cache (onMounted).
                 ->visit('/financeiro/contas-pagar?status=pendente&search=' . urlencode($supplier))
                 ->waitForText($supplier, 10)
+                ->assertPresent('@col-filial')
                 ->assertSee('EMPRESA TESTE DUSK');
         });
 

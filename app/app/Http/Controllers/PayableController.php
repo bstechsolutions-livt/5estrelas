@@ -362,6 +362,7 @@ class PayableController extends Controller
         Payable::attachOrigemHub($payables->getCollection());
         Payable::attachOrigemSenior($payables->getCollection());
         Payable::attachPriorityMeta($payables->getCollection());
+        Payable::attachWorkflowMoment($payables->getCollection());
 
         $totalsQuery = Payable::query()
             ->excludeMissingInSenior()

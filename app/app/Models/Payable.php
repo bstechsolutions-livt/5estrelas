@@ -201,7 +201,7 @@ class Payable extends Model
     public const STATUS_LABELS = [
         'pendente' => 'Pendente',
         'em_preparacao' => 'Em Preparação',
-        'aguardando_aprovacao' => 'Ag. Aprovação',
+        'aguardando_aprovacao' => 'Em Aprovação',
         'aprovado' => 'Aprovado',
         'reprovado' => 'Reprovado',
         'pago' => 'Pago',
@@ -562,5 +562,82 @@ class Payable extends Model
             );
             $payable->setAttribute('sla_status', self::resolveSlaStatus($payable));
         }
+    }
+
+    /**
+     * Momento atual no fluxo (etapa de workflow), para a listagem de CP.
+     *
+     * @param iterable<Payable> $payables
+     */
+    public static function attachWorkflowMoment(iterable $payables): void
+    {
+        $items = collect($payables);
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $awaitingIds = $items
+            ->filter(fn (Payable $p) => $p->status === 'aguardando_aprovacao')
+            ->pluck('id')
+            ->values();
+
+        $pendingSteps = $awaitingIds->isEmpty()
+            ? collect()
+            : ApprovalStep::query()
+                ->whereIn('payable_id', $awaitingIds)
+                ->where('status', 'pendente')
+                ->with('assignee:id,name')
+                ->orderBy('order')
+                ->get()
+                ->groupBy('payable_id')
+                ->map(fn ($steps) => $steps->first());
+
+        foreach ($items as $payable) {
+            [$moment, $detail, $tone] = self::resolveWorkflowMoment(
+                $payable,
+                $pendingSteps->get($payable->id),
+            );
+            $payable->setAttribute('workflow_moment', $moment);
+            $payable->setAttribute('workflow_moment_detail', $detail);
+            $payable->setAttribute('workflow_moment_tone', $tone);
+        }
+    }
+
+    /**
+     * @return array{0: string, 1: ?string, 2: string}
+     */
+    private static function resolveWorkflowMoment(Payable $payable, ?ApprovalStep $currentStep): array
+    {
+        return match ($payable->status) {
+            'pendente' => $payable->wasRejectedBack()
+                ? ['Recusado — corrigir', null, 'danger']
+                : ($payable->bordero_id
+                    ? ['No borderô', null, 'info']
+                    : ['Aguardando envio', null, 'warn']),
+            'em_preparacao' => ['Em preparação', null, 'info'],
+            'aguardando_aprovacao' => self::workflowMomentFromApprovalStep($currentStep),
+            'aprovado' => ['Aguardando pagamento', null, 'success'],
+            'pago' => ['Pago', null, 'success'],
+            default => [
+                self::STATUS_LABELS[$payable->status] ?? $payable->status,
+                null,
+                self::STATUS_COLORS[$payable->status] ?? 'secondary',
+            ],
+        };
+    }
+
+    /**
+     * @return array{0: string, 1: ?string, 2: string}
+     */
+    private static function workflowMomentFromApprovalStep(?ApprovalStep $step): array
+    {
+        if (! $step) {
+            return ['Em Aprovação', null, 'warn'];
+        }
+
+        $label = $step->role_label
+            ?: (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name);
+
+        return [$label, $step->assignee?->name, 'warn'];
     }
 }

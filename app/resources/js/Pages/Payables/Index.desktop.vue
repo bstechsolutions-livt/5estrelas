@@ -118,10 +118,21 @@ function selectDuePreset(key) {
 const statusList = [
     { label: 'Pendentes', value: 'pendente', color: 'amber' },
     { label: 'Em Preparação', value: 'em_preparacao', color: 'blue' },
-    { label: 'Ag. Aprovação', value: 'aguardando_aprovacao', color: 'orange' },
+    { label: 'Em Aprovação', value: 'aguardando_aprovacao', color: 'orange' },
     { label: 'Aprovados', value: 'aprovado', color: 'green' },
     { label: 'Pagos', value: 'pago', color: 'emerald' },
 ]
+
+const statusTabHint = computed(() => {
+    const hints = {
+        pendente: 'Títulos que ainda não foram enviados para aprovação.',
+        em_preparacao: 'Títulos em preparação antes do envio.',
+        aguardando_aprovacao: 'Títulos em fluxo de aprovação — a coluna Etapa mostra em qual nível cada um está.',
+        aprovado: 'Títulos aprovados aguardando pagamento.',
+        pago: 'Títulos já pagos.',
+    }
+    return hints[status.value] || null
+})
 
 const empresaList = computed(() => [
     { label: 'Todas as empresas', value: null },
@@ -472,15 +483,6 @@ function documentPairAlertTag(alert) {
     return alert.code === 'missing_nota' ? 'Falta NF' : 'Falta boleto'
 }
 
-const statusSeverity = {
-    pendente: 'warn',
-    em_preparacao: 'info',
-    aguardando_aprovacao: 'warn',
-    aprovado: 'success',
-    reprovado: 'danger',
-    pago: 'success',
-}
-
 const prioritySeverity = {
     normal: 'secondary',
     alta: 'warn',
@@ -521,6 +523,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     <span v-if="totals?.[s.value]" class="ml-1.5 text-xs opacity-75">({{ totals[s.value]?.count || 0 }})</span>
                 </button>
             </div>
+            <p v-if="statusTabHint" class="text-xs text-gray-500 mb-4 -mt-3">{{ statusTabHint }}</p>
 
             <!-- Filtros -->
             <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 space-y-3">
@@ -790,12 +793,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             </div>
                         </template>
                     </Column>
-                    <Column field="codemp" header="Empresa" style="width: 8%" sortable dusk="col-empresa">
-                        <template #body="{ data }">
-                            <span class="cell-truncate text-xs text-gray-700" :title="data.empresa_nome" @click="goShow(data.id)">{{ data.empresa_nome || '—' }}</span>
-                        </template>
-                    </Column>
-                    <Column field="department_nome" header="Depto" style="width: 8%" sortable dusk="col-departamento">
+                    <Column field="department_nome" header="Depto" style="width: 9%" sortable dusk="col-departamento">
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs text-gray-600" :title="data.department_nome" @click="goShow(data.id)">{{ data.department_nome || '—' }}</span>
                         </template>
@@ -806,12 +804,12 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                                 @click="goShow(data.id)">{{ data.filial_label || data.filial_nome || '—' }}</span>
                         </template>
                     </Column>
-                    <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '18%' : '16%' }" sortable>
+                    <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '20%' : '18%' }" sortable>
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs" :title="data.supplier_name" @click="goShow(data.id)">{{ data.supplier_name }}</span>
                         </template>
                     </Column>
-                    <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '16%' : '14%' }" sortable>
+                    <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '18%' : '16%' }" sortable>
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs text-gray-600" :title="data.description" @click="goShow(data.id)">{{ data.description || '—' }}</span>
                         </template>
@@ -838,18 +836,21 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span v-else class="text-xs text-gray-300" @click="goShow(data.id)">—</span>
                         </template>
                     </Column>
-                    <Column v-if="status !== 'pendente' && canBorderos" header="Borderô" style="width: 7%">
+                    <Column v-if="status !== 'pago'" header="Etapa" style="width: 10%" dusk="col-etapa">
                         <template #body="{ data }">
-                            <button v-if="data.bordero" @click.stop="router.visit(`/financeiro/borderos/${data.bordero.id}`)"
-                                class="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded hover:bg-blue-100 cursor-pointer whitespace-nowrap max-w-full truncate">
-                                {{ data.bordero.number }}
-                            </button>
-                            <span v-else class="text-xs text-gray-300" @click="goShow(data.id)">—</span>
-                        </template>
-                    </Column>
-                    <Column field="status" header="Status" :style="{ width: status === 'pendente' ? '9%' : '8%' }">
-                        <template #body="{ data }">
-                            <Tag :value="statusOptions[data.status]" :severity="statusSeverity[data.status]" class="!text-[10px] whitespace-nowrap" />
+                            <div class="flex flex-col gap-0.5 min-w-0" @click="goShow(data.id)">
+                                <Tag
+                                    :value="data.workflow_moment"
+                                    :severity="data.workflow_moment_tone || 'secondary'"
+                                    class="!text-[10px] whitespace-nowrap"
+                                    :title="data.workflow_moment_detail || data.workflow_moment"
+                                />
+                                <span
+                                    v-if="data.workflow_moment_detail"
+                                    class="text-[10px] text-gray-500 truncate"
+                                    :title="data.workflow_moment_detail"
+                                >{{ data.workflow_moment_detail }}</span>
+                            </div>
                         </template>
                     </Column>
                     <template #empty>

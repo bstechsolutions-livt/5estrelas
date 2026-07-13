@@ -76,10 +76,21 @@ function selectDuePreset(key) {
 const statusList = [
     { label: 'Pendentes', value: 'pendente' },
     { label: 'Preparação', value: 'em_preparacao' },
-    { label: 'Aprovação', value: 'aguardando_aprovacao' },
+    { label: 'Em Aprovação', value: 'aguardando_aprovacao' },
     { label: 'Aprovados', value: 'aprovado' },
     { label: 'Pagos', value: 'pago' },
 ]
+
+const statusTabHint = computed(() => {
+    const hints = {
+        pendente: 'Títulos que ainda não foram enviados para aprovação.',
+        em_preparacao: 'Títulos em preparação antes do envio.',
+        aguardando_aprovacao: 'A etiqueta Etapa indica em qual nível de aprovação cada título está.',
+        aprovado: 'Títulos aprovados aguardando pagamento.',
+        pago: 'Títulos já pagos.',
+    }
+    return hints[status.value] || null
+})
 
 const empresaList = computed(() => [
     { label: 'Todas as empresas', value: null },
@@ -283,8 +294,6 @@ function documentPairAlertTag(alert) {
     return alert.code === 'missing_nota' ? 'Falta NF' : 'Falta boleto'
 }
 
-const statusSeverity = { pendente: 'warn', em_preparacao: 'info', aguardando_aprovacao: 'warn', aprovado: 'success', reprovado: 'danger', pago: 'success' }
-
 const currentTotal = computed(() => {
     const t = props.totals?.[status.value]
     return { count: t?.count || 0, total: t?.total || 0 }
@@ -315,6 +324,7 @@ const currentTotal = computed(() => {
                     <span v-if="totals?.[s.value]" class="ml-1 opacity-75">({{ totals[s.value]?.count || 0 }})</span>
                 </button>
             </div>
+            <p v-if="statusTabHint" class="text-[11px] text-gray-500 mt-2">{{ statusTabHint }}</p>
         </div>
 
         <!-- Resumo da aba ativa -->
@@ -389,14 +399,20 @@ const currentTotal = computed(() => {
                 :class="['w-full bg-white rounded-xl border p-3 text-left active:bg-gray-50 transition-colors',
                     selectionMode && isSelected(p.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200']">
                 <p v-if="p.department_nome" class="text-[11px] text-gray-500 truncate mb-0.5" dusk="m-departamento">{{ p.department_nome }}</p>
-                <p v-if="p.empresa_nome" class="text-[11px] font-semibold text-blue-600 truncate mb-0.5" dusk="m-empresa">{{ p.empresa_nome }}</p>
-                <p v-if="p.filial_nome && p.filial_nome !== p.empresa_nome" class="text-[11px] text-gray-600 truncate mb-0.5" dusk="m-filial">{{ p.filial_nome }}</p>
+                <p v-if="p.filial_label || p.filial_nome" class="text-[11px] text-gray-600 truncate mb-0.5" dusk="m-filial">{{ p.filial_label || p.filial_nome }}</p>
                 <div class="flex items-start justify-between gap-2 mb-1">
                     <div class="flex items-center gap-2 flex-1 min-w-0">
                         <i v-if="selectionMode" :class="['pi', isSelected(p.id) ? 'pi-check-circle text-blue-600' : 'pi-circle text-gray-300']"></i>
                         <p class="text-sm font-medium text-gray-800 truncate flex-1">{{ p.supplier_name }}</p>
                     </div>
-                    <Tag :value="statusOptions[p.status]" :severity="statusSeverity[p.status]" class="text-[10px]" />
+                    <Tag
+                        v-if="status !== 'pago' && p.workflow_moment"
+                        :value="p.workflow_moment"
+                        :severity="p.workflow_moment_tone || 'secondary'"
+                        class="text-[10px]"
+                        :title="p.workflow_moment_detail || p.workflow_moment"
+                        dusk="m-etapa"
+                    />
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-sm font-semibold text-gray-700">{{ formatMoney(p.amount) }}</span>
@@ -405,7 +421,7 @@ const currentTotal = computed(() => {
                 <p v-if="p.description" class="text-[11px] text-gray-500 truncate mt-1">{{ p.description }}</p>
                 <p v-if="p.title_number" class="text-[11px] text-gray-500 mt-1 flex items-center gap-1.5">
                     <span class="whitespace-nowrap">{{ p.title_number }}</span>
-                    <span v-if="p.empresa_nome" class="text-gray-400">· {{ p.empresa_nome }}</span>
+                    <span v-if="p.workflow_moment_detail" class="text-gray-400">· {{ p.workflow_moment_detail }}</span>
                 </p>
                 <Tag
                     v-if="wasRejectedBack(p)"
@@ -435,9 +451,6 @@ const currentTotal = computed(() => {
                     title="Importado da Senior (ERP)"
                     dusk="origem-senior-badge"
                 />
-                <span v-if="status !== 'pendente' && p.bordero" class="inline-block mt-1 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                    {{ p.bordero.number }}
-                </span>
             </button>
         </div>
         <div v-else class="text-center py-12 text-gray-400 text-sm">Nenhum título encontrado.</div>
