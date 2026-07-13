@@ -251,6 +251,11 @@ class Payable extends Model
         return $this->belongsTo(User::class, 'prepared_by');
     }
 
+    public function approvalSteps(): HasMany
+    {
+        return $this->hasMany(ApprovalStep::class);
+    }
+
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
@@ -632,12 +637,17 @@ class Payable extends Model
     private static function workflowMomentFromApprovalStep(?ApprovalStep $step): array
     {
         if (! $step) {
-            return ['Em Aprovação', null, 'warn'];
+            return ['Fluxo não iniciado', 'Etapa de aprovação ausente', 'warn'];
         }
 
-        $label = $step->role_label
+        $stepLabel = $step->role_label
             ?: (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name);
+        $assignee = $step->assignee?->name;
 
-        return [$label, $step->assignee?->name, 'warn'];
+        if ($assignee) {
+            return [$assignee, $stepLabel, 'warn'];
+        }
+
+        return [$stepLabel, 'Aguardando aprovador', 'warn'];
     }
 }

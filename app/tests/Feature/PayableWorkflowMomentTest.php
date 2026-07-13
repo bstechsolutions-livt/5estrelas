@@ -66,8 +66,8 @@ class PayableWorkflowMomentTest extends TestCase
         $row = collect($resp->json('data'))->firstWhere('supplier_name', 'FornecedorAprov');
 
         $this->assertNotNull($row);
-        $this->assertSame('Financeiro', $row['workflow_moment']);
-        $this->assertSame('Gerente Financeiro', $row['workflow_moment_detail']);
+        $this->assertSame('Gerente Financeiro', $row['workflow_moment']);
+        $this->assertSame('Financeiro', $row['workflow_moment_detail']);
         $this->assertSame('warn', $row['workflow_moment_tone']);
     }
 
@@ -118,5 +118,20 @@ class PayableWorkflowMomentTest extends TestCase
 
         $this->assertSame('Aguardando pagamento', $row['workflow_moment']);
         $this->assertSame('success', $row['workflow_moment_tone']);
+    }
+
+    public function test_attach_workflow_moment_without_step_shows_missing_flow(): void
+    {
+        $this->makePayable(['status' => 'aguardando_aprovacao', 'supplier_name' => 'FornecedorSemFluxo']);
+
+        $resp = $this->actingAs($this->activeUser())
+            ->withHeaders(['X-Json-Only' => '1'])
+            ->get('/financeiro/contas-pagar?status=aguardando_aprovacao')
+            ->assertOk();
+
+        $row = collect($resp->json('data'))->firstWhere('supplier_name', 'FornecedorSemFluxo');
+
+        $this->assertSame('Fluxo não iniciado', $row['workflow_moment']);
+        $this->assertSame('Etapa de aprovação ausente', $row['workflow_moment_detail']);
     }
 }

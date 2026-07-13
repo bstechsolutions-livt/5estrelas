@@ -61,26 +61,8 @@ class ApprovalWorkflowService
             }
         }
 
-        $trails = $this->resolveTrails($area);
-
-        DB::transaction(function () use ($payable, $sender, $trails, $area, $department) {
-            ApprovalStep::where('payable_id', $payable->id)->delete();
-
-            $order = 1;
-            foreach ($this->iterEffectiveTrailLevels($area, $department) as $item) {
-                $level = $item['level'];
-                $trailArea = $item['trail_area'];
-                ApprovalStep::create([
-                    'payable_id' => $payable->id,
-                    'order' => $order++,
-                    'level_name' => $level->level_name,
-                    'role_label' => $level->role_label,
-                    'approver_type' => $level->effectiveApproverType(),
-                    'approver_department_id' => $level->approver_department_id,
-                    'status' => 'pendente',
-                    'assigned_to' => $this->resolveAssigneeId($level, $department, $trailArea),
-                ]);
-            }
+        DB::transaction(function () use ($payable, $sender, $area, $department) {
+            $this->replaceApprovalSteps($payable, $area, $department);
 
             $payable->update([
                 'status' => 'aguardando_aprovacao',
@@ -246,6 +228,72 @@ class ApprovalWorkflowService
             ->where('status', 'pendente')
             ->orderBy('order')
             ->first();
+    }
+
+    /**
+     * Cria etapas de aprovação para títulos que estão em aguardando_aprovacao sem fluxo (ex.: migração Gestor).
+     *
+     * @return array{ok: bool, skipped?: bool, created?: int, error?: string}
+     */
+    public function ensureWorkflowSteps(Payable $payable): array
+    {
+        if ($payable->status !== 'aguardando_aprovacao') {
+            return ['ok' => false, 'error' => 'Status não é aguardando_aprovacao'];
+        }
+
+        if (ApprovalStep::where('payable_id', $payable->id)->exists()) {
+            return ['ok' => true, 'skipped' => true];
+        }
+
+        $sender = $payable->relationLoaded('preparer')
+            ? $payable->preparer
+            : ($payable->prepared_by ? User::find($payable->prepared_by) : null);
+
+        if (! $sender) {
+            return ['ok' => false, 'error' => 'Sem preparador vinculado'];
+        }
+
+        if (! $payable->department_id && $sender->department_id) {
+            $payable->update(['department_id' => $sender->department_id]);
+            $payable->refresh();
+        }
+
+        $preview = $this->buildPreviewStepsForSender($sender);
+        if (! $preview['ok']) {
+            return ['ok' => false, 'error' => implode('; ', $preview['errors'])];
+        }
+
+        $department = Department::with(['manager:id,name', 'director:id,name'])
+            ->find($preview['department']['id']);
+
+        $created = DB::transaction(function () use ($payable, $preview, $department) {
+            return $this->replaceApprovalSteps($payable, $preview['area'], $department);
+        });
+
+        return ['ok' => true, 'created' => $created];
+    }
+
+    private function replaceApprovalSteps(Payable $payable, string $area, ?Department $department): int
+    {
+        ApprovalStep::where('payable_id', $payable->id)->delete();
+
+        $order = 1;
+        foreach ($this->iterEffectiveTrailLevels($area, $department) as $item) {
+            $level = $item['level'];
+            $trailArea = $item['trail_area'];
+            ApprovalStep::create([
+                'payable_id' => $payable->id,
+                'order' => $order++,
+                'level_name' => $level->level_name,
+                'role_label' => $level->role_label,
+                'approver_type' => $level->effectiveApproverType(),
+                'approver_department_id' => $level->approver_department_id,
+                'status' => 'pendente',
+                'assigned_to' => $this->resolveAssigneeId($level, $department, $trailArea),
+            ]);
+        }
+
+        return $order - 1;
     }
 
     public function isFinanceStep(?ApprovalStep $step): bool

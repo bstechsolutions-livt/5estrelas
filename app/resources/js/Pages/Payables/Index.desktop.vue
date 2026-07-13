@@ -836,7 +836,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span v-else class="text-xs text-gray-300" @click="goShow(data.id)">—</span>
                         </template>
                     </Column>
-                    <Column v-if="status !== 'pago'" header="Etapa" style="width: 10%" dusk="col-etapa">
+                    <Column v-if="status !== 'pago'" header="Aprovador" style="width: 10%" dusk="col-etapa">
                         <template #body="{ data }">
                             <div class="flex flex-col gap-0.5 min-w-0" @click="goShow(data.id)">
                                 <Tag
