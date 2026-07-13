@@ -69,7 +69,7 @@ class PayablePagamentoTest extends TestCase
 
         $this->assertDatabaseHas('payables', [
             'id' => $payable->id,
-            'status' => 'pago',
+            'status' => 'aguardando_conciliacao',
             'paid_by' => $pagador->id,
             'payment_method' => 'PIX',
         ]);
@@ -155,7 +155,7 @@ class PayablePagamentoTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseHas('payable_documents', ['payable_id' => $payable->id, 'name' => 'comprovante.pdf']);
-        $this->assertDatabaseHas('payables', ['id' => $payable->id, 'status' => 'pago']);
+        $this->assertDatabaseHas('payables', ['id' => $payable->id, 'status' => 'aguardando_conciliacao']);
     }
 
     public function test_pagamento_e_idempotente(): void
@@ -167,7 +167,7 @@ class PayablePagamentoTest extends TestCase
         $this->actingAs($pagador)->post($url, ['paid_at' => now()->toDateString()])->assertRedirect();
         $this->actingAs($pagador)->post($url, ['paid_at' => now()->toDateString()])->assertRedirect();
 
-        $this->assertEquals('pago', $payable->fresh()->status);
+        $this->assertEquals('aguardando_conciliacao', $payable->fresh()->status);
         $this->assertEquals(1, PayableComment::where('payable_id', $payable->id)->where('type', 'payment')->count());
         $this->assertEquals(1, AuditLog::where('event', 'contas_pagar.pago')->where('auditable_id', $payable->id)->count());
     }

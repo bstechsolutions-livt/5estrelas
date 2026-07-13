@@ -54,6 +54,10 @@ function readDocsViewMode() {
 }
 
 const { isMobile } = useDevice()
+
+const isAwaitingConciliation = computed(() =>
+    ['pago', 'aguardando_conciliacao'].includes(props.payable?.status),
+)
 const docsViewMode = ref(readDocsViewMode())
 
 function setDocsViewMode(mode) {
@@ -348,11 +352,11 @@ const canSubmitApproval = computed(() =>
 // Sidebar de ações aparece quando há qualquer ação/condição lateral a mostrar.
 const showSidebar = computed(() =>
     canSendIndividual || canApprove || inBordero || showRejectDialog.value ||
-    props.canPay || props.payable.status === 'pago' ||
+    props.canPay || isAwaitingConciliation.value ||
     (props.payable.status === 'aprovado' && !props.pagadorConfigured) ||
     props.canConciliate ||
     props.payable.status === 'conciliado' || props.payable.status === 'divergente' ||
-    (props.payable.status === 'pago' && !props.conciliadorConfigured) ||
+    (isAwaitingConciliation.value && !props.conciliadorConfigured) ||
     props.canManagePriority || !!props.payable.payment_priority ||
     !!(props.payable.preparer || props.payable.approver || props.payable.approved_at)
 )
@@ -910,7 +914,7 @@ const centroCusto = computed(() => {
                     </div>
 
                     <!-- Pagamento registrado (read-only) -->
-                    <div v-if="payable.status === 'pago'" class="bg-white rounded-xl border border-gray-100 p-4 text-sm" dusk="payment-info">
+                    <div v-if="isAwaitingConciliation" class="bg-white rounded-xl border border-gray-100 p-4 text-sm" dusk="payment-info">
                         <h3 class="text-sm font-semibold text-gray-700 mb-2">Pagamento</h3>
                         <div class="mb-2"><p class="text-xs text-gray-500">Data</p><p class="text-gray-800">{{ formatDate(payable.paid_at) }}</p></div>
                         <div v-if="payable.payment_method" class="mb-2"><p class="text-xs text-gray-500">Forma</p><p class="text-gray-800">{{ payable.payment_method }}</p></div>
@@ -924,7 +928,7 @@ const centroCusto = computed(() => {
                     </div>
 
                     <!-- Hint: alçada de conciliação não configurada -->
-                    <div v-else-if="payable.status === 'pago' && !conciliadorConfigured" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div v-else-if="isAwaitingConciliation && !conciliadorConfigured" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
                         <h3 class="text-sm font-semibold text-amber-700 mb-1 flex items-center gap-2"><i class="pi pi-exclamation-triangle"></i> Alçada não configurada</h3>
                         <p class="text-xs text-amber-600">Defina um conciliador na alçada do Contas a Pagar para conciliar pagamentos.</p>
                     </div>

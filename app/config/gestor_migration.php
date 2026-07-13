@@ -28,7 +28,7 @@ return [
     /**
      * Gestor status → status intranet CP.
      *
-     * awaiting-inclusion: pago no banco, ainda não conciliado no Senior (paid_at preenchido, conciliated_at null).
+     * awaiting-inclusion: pago no banco, aguardando conciliação na Senior.
      * included: baixado/conciliado no Senior.
      */
     'status_map' => [
@@ -39,7 +39,7 @@ return [
         'awaiting-approval' => 'aguardando_aprovacao',
         'awaiting-release' => 'pendente',
         'awaiting-receipt' => 'aprovado',
-        'awaiting-inclusion' => 'pago',
+        'awaiting-inclusion' => 'aguardando_conciliacao',
         'included' => 'conciliado',
         'draft' => 'pendente',
     ],

@@ -205,6 +205,7 @@ class Payable extends Model
         'aprovado' => 'Aprovado',
         'reprovado' => 'Reprovado',
         'pago' => 'Pago',
+        'aguardando_conciliacao' => 'Aguardando Conciliação',
         'conciliado' => 'Conciliado',
         'divergente' => 'Divergente',
         'encerrado' => 'Encerrado',
@@ -217,6 +218,7 @@ class Payable extends Model
         'aprovado' => 'success',
         'reprovado' => 'danger',
         'pago' => 'success',
+        'aguardando_conciliacao' => 'warn',
         'conciliado' => 'success',
         'divergente' => 'danger',
         'encerrado' => 'info',
@@ -535,7 +537,7 @@ class Payable extends Model
             return null;
         }
 
-        if (in_array($payable->status, ['pago', 'conciliado', 'encerrado'], true)) {
+        if (in_array($payable->status, ['pago', 'aguardando_conciliacao', 'conciliado', 'encerrado'], true)) {
             return null;
         }
 
@@ -622,7 +624,7 @@ class Payable extends Model
             'em_preparacao' => ['Em preparação', null, 'info'],
             'aguardando_aprovacao' => self::workflowMomentFromApprovalStep($currentStep),
             'aprovado' => ['Aguardando pagamento', null, 'success'],
-            'pago' => ['Pago', null, 'success'],
+            'pago', 'aguardando_conciliacao' => ['Aguardando conciliação', 'Pago no banco', 'warn'],
             default => [
                 self::STATUS_LABELS[$payable->status] ?? $payable->status,
                 null,

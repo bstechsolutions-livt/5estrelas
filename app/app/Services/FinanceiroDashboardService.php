@@ -21,6 +21,7 @@ class FinanceiroDashboardService
         'aguardando_aprovacao',
         'aprovado',
         'pago',
+        'aguardando_conciliacao',
     ];
 
     public function build(User $user): array
@@ -87,7 +88,7 @@ class FinanceiroDashboardService
             ->whereBetween('due_date', [$today, $in7]);
 
         $pagosMesQuery = $this->payableQuery($departmentId, $user)
-            ->where('status', 'pago')
+            ->whereIn('status', ['pago', 'aguardando_conciliacao'])
             ->where('paid_at', '>=', $monthStart);
 
         $workflow = app(ApprovalWorkflowService::class);

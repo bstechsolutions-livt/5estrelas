@@ -31,7 +31,7 @@ class PayableController extends Controller
 {
     private const ALLOCATION_IMPORT_STATUSES = [
         'pendente', 'em_preparacao', 'aguardando_aprovacao', 'aprovado',
-        'pago', 'conciliado', 'divergente',
+        'pago', 'aguardando_conciliacao', 'conciliado', 'divergente',
     ];
 
     public function index(Request $request)
@@ -524,7 +524,7 @@ class PayableController extends Controller
             'canPay' => $isPagador && $payable->status === 'aprovado',
             'paymentMethods' => Payable::PAYMENT_METHODS,
             'pagadorConfigured' => $alcada->hasRole('pagador'),
-            'canConciliate' => $isConciliador && $payable->status === 'pago',
+            'canConciliate' => $isConciliador && in_array($payable->status, ['pago', 'aguardando_conciliacao'], true),
             'conciliadorConfigured' => $alcada->hasRole('conciliador'),
             'canFinalSign' => $alcada->isAssigned($user, 'assinante') && $payable->status === 'conciliado',
             'canEditDueDate' => $user?->hasPermission('financeiro.contas_pagar.editar_vencimento') ?? false,
@@ -779,14 +779,14 @@ class PayableController extends Controller
             // Trava o registro para evitar pagamento concorrente (idempotência).
             $fresh = Payable::whereKey($payable->id)->lockForUpdate()->first();
 
-            // Só de 'aprovado'. Um 2º request concorrente encontra 'pago' e cai aqui.
+            // Só de 'aprovado'. Um 2º request concorrente encontra status pós-pagamento e cai aqui.
             if ($fresh->status !== 'aprovado') {
                 return false;
             }
 
             $old = $fresh->status;
             $fresh->update([
-                'status' => 'pago',
+                'status' => 'aguardando_conciliacao',
                 'paid_at' => $data['paid_at'],
                 'payment_method' => $data['payment_method'] ?? null,
                 'paid_by' => $user->id,
@@ -828,7 +828,7 @@ class PayableController extends Controller
                 auditable: $fresh,
                 oldValues: ['status' => $old],
                 newValues: [
-                    'status' => 'pago',
+                    'status' => 'aguardando_conciliacao',
                     'paid_at' => $data['paid_at'],
                     'payment_method' => $forma,
                     'paid_by' => $user->id,
@@ -865,7 +865,7 @@ class PayableController extends Controller
         $done = DB::transaction(function () use ($payable, $user, $data) {
             $fresh = Payable::whereKey($payable->id)->lockForUpdate()->first();
 
-            if ($fresh->status !== 'pago') {
+            if (! in_array($fresh->status, ['pago', 'aguardando_conciliacao'], true)) {
                 return false;
             }
 
@@ -944,7 +944,7 @@ class PayableController extends Controller
         $done = DB::transaction(function () use ($payable, $user, $data) {
             $fresh = Payable::whereKey($payable->id)->lockForUpdate()->first();
 
-            if ($fresh->status !== 'pago') {
+            if (! in_array($fresh->status, ['pago', 'aguardando_conciliacao'], true)) {
                 return false;
             }
 

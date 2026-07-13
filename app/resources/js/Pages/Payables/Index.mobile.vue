@@ -78,7 +78,8 @@ const statusList = [
     { label: 'Preparação', value: 'em_preparacao' },
     { label: 'Em Aprovação', value: 'aguardando_aprovacao' },
     { label: 'Aprovados', value: 'aprovado' },
-    { label: 'Pagos', value: 'pago' },
+    { label: 'Ag. Conciliação', value: 'aguardando_conciliacao' },
+    { label: 'Conciliados', value: 'conciliado' },
 ]
 
 const statusTabHint = computed(() => {
@@ -87,7 +88,8 @@ const statusTabHint = computed(() => {
         em_preparacao: 'Títulos em preparação antes do envio.',
         aguardando_aprovacao: 'A etiqueta Etapa indica em qual nível de aprovação cada título está.',
         aprovado: 'Títulos aprovados aguardando pagamento.',
-        pago: 'Títulos já pagos.',
+        aguardando_conciliacao: 'Pagos no banco, aguardando conciliação na Senior.',
+        conciliado: 'Títulos já conciliados.',
     }
     return hints[status.value] || null
 })
@@ -406,7 +408,7 @@ const currentTotal = computed(() => {
                         <p class="text-sm font-medium text-gray-800 truncate flex-1">{{ p.supplier_name }}</p>
                     </div>
                     <Tag
-                        v-if="status !== 'pago' && p.workflow_moment"
+                        v-if="!['pago', 'aguardando_conciliacao', 'conciliado'].includes(status) && p.workflow_moment"
                         :value="p.workflow_moment"
                         :severity="p.workflow_moment_tone || 'secondary'"
                         class="text-[10px]"

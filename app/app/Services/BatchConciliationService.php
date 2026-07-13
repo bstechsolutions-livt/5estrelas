@@ -37,7 +37,7 @@ class BatchConciliationService
             $result = DB::transaction(function () use ($tx, $user, $import) {
                 $payable = Payable::whereKey($tx->matched_payable_id)->lockForUpdate()->first();
 
-                if (!$payable || $payable->status !== 'pago') {
+                if (!$payable || ! in_array($payable->status, ['pago', 'aguardando_conciliacao'], true)) {
                     $tx->update(['match_status' => 'rejected', 'raw_data' => array_merge($tx->raw_data ?? [], ['skip_reason' => 'Título não está mais com status pago'])]);
 
                     return 'skipped';

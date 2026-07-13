@@ -120,7 +120,8 @@ const statusList = [
     { label: 'Em Preparação', value: 'em_preparacao', color: 'blue' },
     { label: 'Em Aprovação', value: 'aguardando_aprovacao', color: 'orange' },
     { label: 'Aprovados', value: 'aprovado', color: 'green' },
-    { label: 'Pagos', value: 'pago', color: 'emerald' },
+    { label: 'Ag. Conciliação', value: 'aguardando_conciliacao', color: 'amber' },
+    { label: 'Conciliados', value: 'conciliado', color: 'emerald' },
 ]
 
 const statusTabHint = computed(() => {
@@ -129,7 +130,8 @@ const statusTabHint = computed(() => {
         em_preparacao: 'Títulos em preparação antes do envio.',
         aguardando_aprovacao: 'Títulos em fluxo de aprovação — a coluna Etapa mostra em qual nível cada um está.',
         aprovado: 'Títulos aprovados aguardando pagamento.',
-        pago: 'Títulos já pagos.',
+        aguardando_conciliacao: 'Pagos no banco, aguardando conciliação/baixa na Senior.',
+        conciliado: 'Títulos já conciliados e baixados.',
     }
     return hints[status.value] || null
 })
@@ -836,7 +838,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span v-else class="text-xs text-gray-300" @click="goShow(data.id)">—</span>
                         </template>
                     </Column>
-                    <Column v-if="status !== 'pago'" header="Aprovador" style="width: 10%" dusk="col-etapa">
+                    <Column v-if="!['pago', 'aguardando_conciliacao', 'conciliado'].includes(status)" header="Aprovador" style="width: 10%" dusk="col-etapa">
                         <template #body="{ data }">
                             <div class="flex flex-col gap-0.5 min-w-0" @click="goShow(data.id)">
                                 <Tag

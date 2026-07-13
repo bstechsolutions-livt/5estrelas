@@ -144,7 +144,7 @@ class GestorWorkflowMapperTest extends TestCase
                 ['type' => 'paid'],
             ]),
         ]);
-        $this->assertSame('pago', $inclusion['status']);
+        $this->assertSame('aguardando_conciliacao', $inclusion['status']);
         $this->assertNotNull($inclusion['paid_at']);
         $this->assertNull($inclusion['conciliated_at']);
     }

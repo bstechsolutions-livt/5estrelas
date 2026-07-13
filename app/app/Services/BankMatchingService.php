@@ -88,7 +88,7 @@ class BankMatchingService
             ? 'ABS(CAST(amount AS REAL) - CAST(? AS REAL)) <= CAST(? AS REAL)'
             : 'ABS(amount - ?) <= ?';
 
-        $payables = Payable::where('status', 'pago')
+        $payables = Payable::whereIn('status', ['pago', 'aguardando_conciliacao'])
             ->whereRaw($amountExpr, [$absAmount, self::AMOUNT_TOLERANCE])
             ->get(['id', 'amount', 'paid_at', 'title_number', 'supplier_name']);
 

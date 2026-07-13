@@ -59,7 +59,7 @@ class GestorWorkflowMapper
         $rejectionReason = $this->resolveRejectionReason($gestorStatus, $match, $history);
         if ($rejectionReason !== null) {
             $update['rejection_reason'] = $rejectionReason;
-        } elseif (in_array($newStatus, ['aguardando_aprovacao', 'aprovado', 'pago', 'conciliado'], true)) {
+        } elseif (in_array($newStatus, ['aguardando_aprovacao', 'aprovado', 'pago', 'aguardando_conciliacao', 'conciliado'], true)) {
             $update['rejection_reason'] = null;
         }
 
@@ -114,7 +114,7 @@ class GestorWorkflowMapper
             return ['ok' => true, 'cleared' => true];
         }
 
-        if (in_array($newStatus, ['aprovado', 'pago', 'conciliado'], true)) {
+        if (in_array($newStatus, ['aprovado', 'pago', 'aguardando_conciliacao', 'conciliado'], true)) {
             $this->clearApprovalSteps($payable);
 
             return ['ok' => true, 'cleared' => true];
