@@ -9,10 +9,10 @@ use App\Models\SeniorSupplier;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 
 class GestorConciliacoesMigrationService
@@ -144,6 +144,9 @@ class GestorConciliacoesMigrationService
             $this->openDocuments[] = [
                 'gestor_id' => $doc['_id'],
                 'status' => $doc['status'],
+                'document_number' => isset($details['documentNumber'])
+                    ? trim((string) $details['documentNumber'])
+                    : null,
                 'value' => round((float) ($details['value'] ?? 0), 2),
                 'due' => $this->msToDate($details['expirationDate'] ?? null),
                 'sup_cnpj' => $this->normalizeCnpj($supplier['cnpj'] ?? null),
@@ -216,6 +219,11 @@ class GestorConciliacoesMigrationService
      */
     private function matchDocument(array $doc): array
     {
+        $titleMatch = $this->matchByTitleNumber($doc);
+        if ($titleMatch !== null) {
+            return $titleMatch;
+        }
+
         if (! $doc['codemp']) {
             return ['confidence' => 'none', 'reason' => 'codemp_nao_mapeado'];
         }
@@ -249,6 +257,11 @@ class GestorConciliacoesMigrationService
         }
 
         if ($candidates->count() > 1) {
+            $closest = $this->closestDueCandidate($candidates, $due);
+            if ($closest) {
+                return $this->matchResult('high', $closest->id, 'codemp_amount_due_closest');
+            }
+
             return [
                 'confidence' => 'ambiguous',
                 'candidate_ids' => $candidates->pluck('id')->all(),
@@ -256,17 +269,155 @@ class GestorConciliacoesMigrationService
             ];
         }
 
+        $tolerantCandidates = $this->payables->filter(
+            fn (Payable $p) => (int) $p->codemp === $codemp
+                && $amountMatch($p)
+                && $this->dateMatches($p, $due, true)
+        );
+        if ($tolerantCandidates->count() === 1) {
+            return $this->matchResult('high', $tolerantCandidates->first()->id, 'codemp_amount_due_tolerance');
+        }
+        if ($tolerantCandidates->count() > 1) {
+            $closest = $this->closestDueCandidate($tolerantCandidates, $due);
+            if ($closest) {
+                return $this->matchResult('high', $closest->id, 'codemp_amount_due_tolerance_closest');
+            }
+        }
+
         $amountOnly = $this->payables->filter(fn (Payable $p) => (int) $p->codemp === $codemp && $amountMatch($p));
         if ($amountOnly->count() === 1) {
             return $this->matchResult('medium', $amountOnly->first()->id, 'codemp_amount_only');
         }
 
-        $dueOnly = $this->payables->filter(fn (Payable $p) => (int) $p->codemp === $codemp && $dateMatch($p));
+        $dueOnly = $this->payables->filter(fn (Payable $p) => (int) $p->codemp === $codemp && $dateMatch($p, $due));
         if ($dueOnly->count() === 1) {
             return $this->matchResult('low', $dueOnly->first()->id, 'codemp_due_only');
         }
 
         return ['confidence' => 'none', 'reason' => 'sem_correspondencia'];
+    }
+
+    /**
+     * @param  array<string, mixed>  $doc
+     * @return ?array<string, mixed>
+     */
+    private function matchByTitleNumber(array $doc): ?array
+    {
+        $gestorKey = $this->normalizeTitleNumber($doc['document_number'] ?? null);
+        if (! $gestorKey) {
+            return null;
+        }
+
+        $candidates = $this->payables->filter(
+            fn (Payable $p) => $this->payableTitleKeys($p)->contains($gestorKey)
+        );
+
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        if ($candidates->count() === 1) {
+            return $this->matchResult('high', $candidates->first()->id, 'title_number');
+        }
+
+        if (! empty($doc['codemp'])) {
+            $scoped = $candidates->filter(fn (Payable $p) => (int) $p->codemp === (int) $doc['codemp']);
+            if ($scoped->count() === 1) {
+                return $this->matchResult('high', $scoped->first()->id, 'title_number_codemp');
+            }
+        }
+
+        return [
+            'confidence' => 'ambiguous',
+            'candidate_ids' => $candidates->pluck('id')->all(),
+            'strategy' => 'multiple_title_number',
+        ];
+    }
+
+    /**
+     * @return Collection<int, string>
+     */
+    private function payableTitleKeys(Payable $payable): Collection
+    {
+        return collect(array_unique(array_filter([
+            $this->normalizeTitleNumber($payable->title_number),
+            $this->normalizeTitleNumber($payable->numtit ?? null),
+            $this->normalizeTitleNumber($this->extractTitleFromSeniorId($payable->senior_id)),
+        ])));
+    }
+
+    private function extractTitleFromSeniorId(?string $seniorId): ?string
+    {
+        if (! $seniorId) {
+            return null;
+        }
+
+        $parts = explode('-', $seniorId, 5);
+
+        return $parts[2] ?? null;
+    }
+
+    private function normalizeTitleNumber(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '' || $this->isPlaceholderTitleNumber($trimmed)) {
+            return null;
+        }
+
+        $digits = ltrim(preg_replace('/\D/', '', $trimmed) ?? '', '0');
+        if ($digits !== '') {
+            return $digits;
+        }
+
+        $slug = Str::upper(preg_replace('/\s+/', '', $trimmed) ?? '');
+
+        return $slug !== '' ? $slug : null;
+    }
+
+    private function isPlaceholderTitleNumber(string $value): bool
+    {
+        $upper = Str::upper(trim($value));
+        if (in_array($upper, ['S/N', 'SN', 'NA', 'N/A', '-'], true)) {
+            return true;
+        }
+
+        $digits = preg_replace('/\D/', '', $value) ?? '';
+
+        return $digits === '' || preg_match('/^0+$/', $digits) === 1;
+    }
+
+    /**
+     * @param  Collection<int, Payable>  $candidates
+     */
+    private function closestDueCandidate(Collection $candidates, ?string $due): ?Payable
+    {
+        if (! $due || $candidates->isEmpty()) {
+            return null;
+        }
+
+        $target = Carbon::parse($due);
+        $ranked = $candidates->map(function (Payable $payable) use ($target) {
+            $dates = array_filter([
+                $payable->due_date?->format('Y-m-d'),
+                $payable->vctori?->format('Y-m-d'),
+                $payable->vctpro?->format('Y-m-d'),
+            ]);
+            $delta = min(array_map(
+                fn (string $date) => abs($target->diffInDays(Carbon::parse($date), false)),
+                $dates,
+            ));
+
+            return ['payable' => $payable, 'delta' => $delta];
+        })->sortBy('delta')->values();
+
+        $best = $ranked->first()['delta'];
+        $bestCandidates = $ranked->where('delta', $best);
+
+        return $bestCandidates->count() === 1 ? $bestCandidates->first()['payable'] : null;
     }
 
     /**
@@ -618,7 +769,7 @@ class GestorConciliacoesMigrationService
             || round((float) ($payable->vlrori ?? 0), 2) === $value;
     }
 
-    private function dateMatches(Payable $payable, ?string $due): bool
+    private function dateMatches(Payable $payable, ?string $due, bool $allowTolerance = false): bool
     {
         if (! $due) {
             return false;
@@ -630,7 +781,30 @@ class GestorConciliacoesMigrationService
             $payable->vctpro?->format('Y-m-d'),
         ]);
 
-        return in_array($due, $dates, true);
+        foreach ($dates as $payableDate) {
+            if ($payableDate === $due) {
+                return true;
+            }
+        }
+
+        if (! $allowTolerance) {
+            return false;
+        }
+
+        $toleranceDays = (int) config('gestor_migration.due_date_tolerance_days', 1);
+        if ($toleranceDays <= 0) {
+            return false;
+        }
+
+        $target = Carbon::parse($due);
+
+        foreach ($dates as $payableDate) {
+            if (abs($target->diffInDays(Carbon::parse($payableDate), false)) <= $toleranceDays) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function resolveGestorUserId(?string $gestorAuthorId): ?int

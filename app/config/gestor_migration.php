@@ -60,6 +60,9 @@ return [
         'awaiting-approval' => 'final',
     ],
 
+    /** Tolerância (dias) entre vencimento Gestor e Senior no fallback de match. */
+    'due_date_tolerance_days' => 1,
+
     'convex' => [
         'deployment_url' => env('GESTOR_CONVEX_URL', 'https://energized-schnauzer-304.convex.cloud'),
         'deploy_key' => env('GESTOR_CONVEX_DEPLOY_KEY'),
