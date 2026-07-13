@@ -11,6 +11,8 @@ use App\Models\Payable;
 use App\Models\PayableComment;
 use App\Models\User;
 use App\Events\NotificationCreated;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -271,6 +273,108 @@ class ApprovalWorkflowService
         });
 
         return ['ok' => true, 'created' => $created];
+    }
+
+    /**
+     * Cria etapas e posiciona o fluxo conforme fase migrada do Gestor.
+     *
+     * @return array{ok: bool, phase?: string, target_order?: int, target_level?: string, created?: int, error?: string}
+     */
+    public function createStepsAtGestorPhase(
+        Payable $payable,
+        User $sender,
+        string $phase,
+        ?Carbon $priorStepsApprovedAt = null,
+    ): array {
+        if (! in_array($phase, ['department', 'analysis', 'final'], true)) {
+            return ['ok' => false, 'error' => "Fase inválida: {$phase}"];
+        }
+
+        if (! $payable->department_id && $sender->department_id) {
+            $payable->update(['department_id' => $sender->department_id]);
+            $payable->refresh();
+        }
+
+        $preview = $this->buildPreviewStepsForSender($sender);
+        if (! $preview['ok']) {
+            return ['ok' => false, 'error' => implode('; ', $preview['errors'])];
+        }
+
+        $department = Department::with(['manager:id,name', 'director:id,name'])
+            ->find($preview['department']['id']);
+
+        $resolvedAt = $priorStepsApprovedAt ?? now();
+
+        $result = DB::transaction(function () use ($payable, $preview, $department, $phase, $resolvedAt) {
+            $created = $this->replaceApprovalSteps($payable, $preview['area'], $department);
+
+            $steps = ApprovalStep::where('payable_id', $payable->id)
+                ->orderBy('order')
+                ->get();
+
+            $targetOrder = $this->resolveGestorPhaseTargetOrder($steps, $phase);
+            $targetStep = $steps->firstWhere('order', $targetOrder);
+
+            foreach ($steps as $step) {
+                if ($step->order < $targetOrder) {
+                    $step->update([
+                        'status' => 'aprovado',
+                        'resolved_at' => $resolvedAt,
+                    ]);
+                }
+            }
+
+            return [
+                'created' => $created,
+                'target_order' => $targetOrder,
+                'target_level' => $targetStep?->level_name,
+            ];
+        });
+
+        return [
+            'ok' => true,
+            'phase' => $phase,
+            'created' => $result['created'],
+            'target_order' => $result['target_order'],
+            'target_level' => $result['target_level'],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, ApprovalStep>  $steps
+     */
+    private function resolveGestorPhaseTargetOrder(Collection $steps, string $phase): int
+    {
+        if ($steps->isEmpty()) {
+            return 1;
+        }
+
+        return match ($phase) {
+            'department' => (int) $steps->first()->order,
+            'analysis' => $this->resolveAnalysisTargetOrder($steps),
+            'final' => (int) $steps->last()->order,
+            default => (int) $steps->first()->order,
+        };
+    }
+
+    /**
+     * @param  Collection<int, ApprovalStep>  $steps
+     */
+    private function resolveAnalysisTargetOrder(Collection $steps): int
+    {
+        $finance = $steps->firstWhere('level_name', 'financeiro');
+        if ($finance) {
+            return (int) $finance->order;
+        }
+
+        $department = $steps->firstWhere('level_name', 'departamento');
+        if ($department) {
+            $next = $steps->first(fn (ApprovalStep $s) => $s->order > $department->order);
+
+            return (int) ($next?->order ?? $department->order);
+        }
+
+        return (int) $steps->first()->order;
     }
 
     private function replaceApprovalSteps(Payable $payable, string $area, ?Department $department): int

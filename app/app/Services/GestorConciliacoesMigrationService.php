@@ -33,6 +33,8 @@ class GestorConciliacoesMigrationService
     /** @var list<array<string, mixed>> */
     private array $openDocuments = [];
 
+    private ?GestorWorkflowMapper $workflowMapper = null;
+
     public function __construct(
         private readonly string $exportPath,
         private readonly string $confidence = 'high',
@@ -41,6 +43,7 @@ class GestorConciliacoesMigrationService
         private readonly bool $skipFiles = false,
         private readonly bool $filesOnly = false,
         private readonly ?string $reportPath = null,
+        private readonly bool $workflowOnly = false,
     ) {}
 
     /**
@@ -52,6 +55,7 @@ class GestorConciliacoesMigrationService
         $this->payables = Payable::query()->get();
         $this->buildSupplierIndex();
         $this->buildUserIndex();
+        $this->initWorkflowMapper();
 
         $report = $this->buildMatchingReport();
         $result = [
@@ -60,6 +64,8 @@ class GestorConciliacoesMigrationService
             'matching' => array_merge($report['summary'], ['total_open' => $report['total_open']]),
             'migrated' => [],
             'failures' => [],
+            'workflow_failures' => [],
+            'status_transitions' => [],
             'files' => ['attempted' => 0, 'imported' => 0, 'failed' => 0],
             'comments' => ['attempted' => 0, 'imported' => 0],
         ];
@@ -72,6 +78,11 @@ class GestorConciliacoesMigrationService
             try {
                 $migrated = $this->migrateMatch($match, $result);
                 $result['migrated'][] = $migrated;
+
+                $gestorStatus = $migrated['gestor_status'];
+                $newStatus = $migrated['new_status'];
+                $key = "{$gestorStatus} → {$newStatus}";
+                $result['status_transitions'][$key] = ($result['status_transitions'][$key] ?? 0) + 1;
             } catch (\Throwable $e) {
                 $result['failures'][] = [
                     'gestor_id' => $match['gestor_id'],
@@ -147,6 +158,12 @@ class GestorConciliacoesMigrationService
                 'retentionReason' => $doc['retentionReason'] ?? null,
             ];
         }
+    }
+
+    private function initWorkflowMapper(): void
+    {
+        $this->workflowMapper = app(GestorWorkflowMapper::class);
+        $this->workflowMapper->setUserResolver(fn (?string $gestorId) => $this->resolveGestorUserId($gestorId));
     }
 
     private function buildSupplierIndex(): void
@@ -274,6 +291,7 @@ class GestorConciliacoesMigrationService
             'strategy' => $match['strategy'] ?? null,
             'comments_imported' => 0,
             'files_imported' => 0,
+            'workflow' => null,
         ];
 
         if ($this->execute) {
@@ -281,6 +299,19 @@ class GestorConciliacoesMigrationService
                 if (! $this->filesOnly) {
                     $old = $payable->only(array_merge(Payable::WORKFLOW_FIELDS, ['id', 'senior_id']));
                     $payable->update($workflow);
+                    $payable->refresh();
+
+                    $workflowResult = $this->applyWorkflowPositioning($payable, $match);
+                    $out['workflow'] = $workflowResult;
+
+                    if (! ($workflowResult['ok'] ?? false) && ($workflow['status'] ?? '') === 'aguardando_aprovacao') {
+                        $result['workflow_failures'][] = [
+                            'gestor_id' => $match['gestor_id'],
+                            'payable_id' => $payable->id,
+                            'gestor_status' => $match['status'],
+                            'error' => $workflowResult['error'] ?? 'erro_workflow',
+                        ];
+                    }
 
                     AuditLogger::log(
                         event: 'financeiro.contas_pagar.gestor_migration.updated',
@@ -289,17 +320,21 @@ class GestorConciliacoesMigrationService
                         auditable: $payable,
                         oldValues: $old,
                         newValues: $workflow,
-                        metadata: ['gestor_id' => $match['gestor_id'], 'strategy' => $match['strategy'] ?? null],
+                        metadata: [
+                            'gestor_id' => $match['gestor_id'],
+                            'strategy' => $match['strategy'] ?? null,
+                            'workflow' => $workflowResult,
+                        ],
                     );
                 }
 
-                if (! $this->filesOnly && ! $this->skipComments) {
+                if (! $this->workflowOnly && ! $this->filesOnly && ! $this->skipComments) {
                     $result['comments']['attempted'] += count($match['comments'] ?? []) + $this->extraCommentsCount($match);
                     $out['comments_imported'] = $this->importComments($payable, $match);
                     $result['comments']['imported'] += $out['comments_imported'];
                 }
 
-                if (! $this->skipFiles) {
+                if (! $this->workflowOnly && ! $this->skipFiles) {
                     $fileStats = $this->importFiles($payable, $match);
                     $out['files_imported'] = $fileStats['imported'];
                     $result['files']['attempted'] += $fileStats['attempted'];
@@ -309,8 +344,16 @@ class GestorConciliacoesMigrationService
             });
         } else {
             $out['would_update'] = $workflow;
-            $out['comments_to_import'] = count($match['comments'] ?? []) + $this->extraCommentsCount($match);
-            $out['files_to_import'] = count($match['files'] ?? []);
+            $phase = $this->workflowMapper?->resolveGestorPhase($match['status'], $match['history'] ?? []);
+            $out['workflow_preview'] = [
+                'phase' => $phase,
+                'needs_positioning' => ($workflow['status'] ?? '') === 'aguardando_aprovacao',
+                'clears_steps' => in_array($workflow['status'] ?? '', ['pendente', 'aprovado', 'pago', 'conciliado'], true),
+            ];
+            if (! $this->workflowOnly) {
+                $out['comments_to_import'] = count($match['comments'] ?? []) + $this->extraCommentsCount($match);
+                $out['files_to_import'] = count($match['files'] ?? []);
+            }
         }
 
         return $out;
@@ -320,73 +363,22 @@ class GestorConciliacoesMigrationService
      * @param  array<string, mixed>  $match
      * @return array<string, mixed>
      */
-    private function buildWorkflowUpdate(array $match): array
+    private function applyWorkflowPositioning(Payable $payable, array $match): array
     {
-        $statusMap = config('gestor_migration.status_map', []);
-        $gestorStatus = $match['status'];
-        $newStatus = $statusMap[$gestorStatus] ?? 'pendente';
-
-        $update = ['status' => $newStatus];
-
-        if ($gestorStatus === 'awaiting-rectification' && filled($match['rectificationReason'])) {
-            $update['rejection_reason'] = $match['rectificationReason'];
-        }
-
-        if ($gestorStatus === 'awaiting-inclusion') {
-            $update['approved_at'] = $update['approved_at'] ?? now();
-        }
-
-        $history = $this->extractHistoryActors($match['history'] ?? []);
-        if ($history['prepared_by']) {
-            $update['prepared_by'] = $history['prepared_by'];
-        }
-        if ($history['approved_by']) {
-            $update['approved_by'] = $history['approved_by'];
-        }
-        if ($history['sent_for_approval_at']) {
-            $update['sent_for_approval_at'] = $history['sent_for_approval_at'];
-        }
-        if ($history['approved_at']) {
-            $update['approved_at'] = $history['approved_at'];
-        }
-
-        return $update;
+        return $this->workflowMapper->applyWorkflowPosition(
+            $payable,
+            $match['status'],
+            $match['history'] ?? [],
+        );
     }
 
     /**
-     * @param  list<array<string, mixed>>  $history
-     * @return array{prepared_by: ?int, approved_by: ?int, sent_for_approval_at: ?Carbon, approved_at: ?Carbon}
+     * @param  array<string, mixed>  $match
+     * @return array<string, mixed>
      */
-    private function extractHistoryActors(array $history): array
+    private function buildWorkflowUpdate(array $match): array
     {
-        $preparedBy = null;
-        $approvedBy = null;
-        $sentAt = null;
-        $approvedAt = null;
-
-        foreach ($history as $event) {
-            $type = $event['type'] ?? '';
-            $userId = $this->resolveGestorUserId($event['by'] ?? null);
-            $at = isset($event['at']) ? Carbon::createFromTimestampMs((int) $event['at']) : null;
-
-            if (in_array($type, ['sent-to-analysis', 'sent-to-department-approval', 'sent-to-reanalysis'], true) && $userId) {
-                $preparedBy = $userId;
-            }
-            if ($type === 'sent-to-approval' && $at) {
-                $sentAt = $at;
-            }
-            if ($type === 'approved' && $userId) {
-                $approvedBy = $userId;
-                $approvedAt = $at ?? $approvedAt;
-            }
-        }
-
-        return [
-            'prepared_by' => $preparedBy,
-            'approved_by' => $approvedBy,
-            'sent_for_approval_at' => $sentAt,
-            'approved_at' => $approvedAt,
-        ];
+        return $this->workflowMapper->buildWorkflowUpdate($match);
     }
 
     /**

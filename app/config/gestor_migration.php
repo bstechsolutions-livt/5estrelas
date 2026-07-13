@@ -25,18 +25,40 @@ return [
         '64583647000176' => 12, // STAR FIVE / LSR
     ],
 
+    /**
+     * Gestor status → status intranet CP.
+     *
+     * awaiting-inclusion: pago no banco, ainda não conciliado no Senior (paid_at preenchido, conciliated_at null).
+     * included: baixado/conciliado no Senior.
+     */
     'status_map' => [
-        'awaiting-analysis' => 'em_preparacao',
-        'awaiting-reanalysis' => 'em_preparacao',
-        'awaiting-receipt' => 'aprovado',
-        'awaiting-approval' => 'aguardando_aprovacao',
-        'awaiting-inclusion' => 'aprovado',
         'awaiting-rectification' => 'pendente',
+        'awaiting-department-approval' => 'aguardando_aprovacao',
+        'awaiting-analysis' => 'aguardando_aprovacao',
+        'awaiting-reanalysis' => 'pendente',
+        'awaiting-approval' => 'aguardando_aprovacao',
         'awaiting-release' => 'pendente',
+        'awaiting-receipt' => 'aprovado',
+        'awaiting-inclusion' => 'pago',
+        'included' => 'conciliado',
         'draft' => 'pendente',
     ],
 
-    'skipped_statuses' => ['included'],
+    /**
+     * Status ignorados na carga do export.
+     * archived: TBD — aguardando definição de negócio para intranet.
+     */
+    'skipped_statuses' => ['archived'],
+
+    /**
+     * Fases do fluxo de aprovação intranet para status Gestor em aguardando_aprovacao.
+     * Usado por GestorWorkflowMapper::applyWorkflowPosition.
+     */
+    'gestor_workflow_phase' => [
+        'awaiting-department-approval' => 'department',
+        'awaiting-analysis' => 'analysis',
+        'awaiting-approval' => 'final',
+    ],
 
     'convex' => [
         'deployment_url' => env('GESTOR_CONVEX_URL', 'https://energized-schnauzer-304.convex.cloud'),
