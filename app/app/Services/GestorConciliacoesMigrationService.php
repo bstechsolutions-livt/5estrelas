@@ -44,6 +44,8 @@ class GestorConciliacoesMigrationService
         private readonly bool $filesOnly = false,
         private readonly ?string $reportPath = null,
         private readonly bool $workflowOnly = false,
+        private readonly ?int $codEmp = null,
+        private readonly ?int $codFil = null,
     ) {}
 
     /**
@@ -52,15 +54,40 @@ class GestorConciliacoesMigrationService
     public function run(): array
     {
         $this->loadExport();
-        $this->payables = Payable::query()->get();
+        $this->payables = Payable::query()
+            ->when($this->codEmp !== null, fn ($q) => $q->where('codemp', $this->codEmp))
+            ->when($this->codFil !== null, fn ($q) => $q->where('codfil', $this->codFil))
+            ->get();
         $this->buildSupplierIndex();
         $this->buildUserIndex();
         $this->initWorkflowMapper();
+
+        if ($this->codEmp !== null || $this->codFil !== null) {
+            $this->openDocuments = array_values(array_filter(
+                $this->openDocuments,
+                function (array $doc): bool {
+                    if ($this->codEmp !== null && (int) ($doc['codemp'] ?? 0) !== $this->codEmp) {
+                        return false;
+                    }
+                    if ($this->codFil !== null && (int) ($doc['codfil'] ?? 0) !== $this->codFil) {
+                        return false;
+                    }
+
+                    return true;
+                },
+            ));
+        }
 
         $report = $this->buildMatchingReport();
         $result = [
             'dry_run' => ! $this->execute,
             'confidence_filter' => $this->confidence,
+            'scope' => [
+                'cod_emp' => $this->codEmp,
+                'cod_fil' => $this->codFil,
+                'payables' => $this->payables->count(),
+                'gestor_docs' => count($this->openDocuments),
+            ],
             'matching' => array_merge($report['summary'], ['total_open' => $report['total_open']]),
             'migrated' => [],
             'failures' => [],

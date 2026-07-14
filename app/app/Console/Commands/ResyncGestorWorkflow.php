@@ -11,6 +11,8 @@ class ResyncGestorWorkflow extends Command
         {--dry-run : Apenas simula, sem gravar (default se --execute omitido)}
         {--execute : Aplica alterações}
         {--confidence=high : Nível mínimo de confiança (high|medium|low)}
+        {--cod-emp= : Filtra empresa Senior (codEmp)}
+        {--cod-fil= : Filtra filial Senior / número da enterprise no Gestor}
         {--export-path= : Caminho do export unpacked do Convex}
         {--report= : Caminho do relatório JSON}';
 
@@ -36,6 +38,13 @@ class ResyncGestorWorkflow extends Command
             $execute = false;
         }
 
+        $codEmp = $this->option('cod-emp') !== null && $this->option('cod-emp') !== ''
+            ? (int) $this->option('cod-emp')
+            : null;
+        $codFil = $this->option('cod-fil') !== null && $this->option('cod-fil') !== ''
+            ? (int) $this->option('cod-fil')
+            : null;
+
         if (! is_dir($exportPath)) {
             $this->error("Export não encontrado: {$exportPath}");
 
@@ -57,6 +66,8 @@ class ResyncGestorWorkflow extends Command
             filesOnly: false,
             reportPath: $reportPath,
             workflowOnly: true,
+            codEmp: $codEmp,
+            codFil: $codFil,
         );
 
         $result = $service->run();
