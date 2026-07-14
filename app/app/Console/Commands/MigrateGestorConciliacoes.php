@@ -11,6 +11,8 @@ class MigrateGestorConciliacoes extends Command
         {--export-path= : Caminho do export unpacked do Convex (default: infra/legado/exports/unpacked)}
         {--execute : Aplica alterações (default: dry-run)}
         {--confidence=high : Nível mínimo de confiança para migrar (high|medium|low)}
+        {--cod-emp= : Filtra empresa Senior (codEmp)}
+        {--cod-fil= : Filtra filial Senior / número da enterprise no Gestor}
         {--skip-comments : Não importa comentários}
         {--skip-files : Não baixa anexos do Convex}
         {--files-only : Importa apenas anexos (não altera status/comentários)}
@@ -34,6 +36,12 @@ class MigrateGestorConciliacoes extends Command
         }
 
         $execute = (bool) $this->option('execute');
+        $codEmp = $this->option('cod-emp') !== null && $this->option('cod-emp') !== ''
+            ? (int) $this->option('cod-emp')
+            : null;
+        $codFil = $this->option('cod-fil') !== null && $this->option('cod-fil') !== ''
+            ? (int) $this->option('cod-fil')
+            : null;
 
         if (! is_dir($exportPath)) {
             $this->error("Export não encontrado: {$exportPath}");
@@ -47,6 +55,14 @@ class MigrateGestorConciliacoes extends Command
             $this->info('Modo DRY-RUN (use --execute para aplicar).');
         }
 
+        if ($codEmp !== null || $codFil !== null) {
+            $this->info(sprintf(
+                'Escopo: emp=%s fil=%s',
+                $codEmp ?? '*',
+                $codFil ?? '*',
+            ));
+        }
+
         $service = new GestorConciliacoesMigrationService(
             exportPath: $exportPath,
             confidence: $confidence,
@@ -55,9 +71,19 @@ class MigrateGestorConciliacoes extends Command
             skipFiles: (bool) $this->option('skip-files'),
             filesOnly: (bool) $this->option('files-only'),
             reportPath: $reportPath,
+            codEmp: $codEmp,
+            codFil: $codFil,
         );
 
         $result = $service->run();
+
+        if (! empty($result['scope'])) {
+            $this->line(sprintf(
+                'Escopo aplicado: %d payables × %d docs gestor',
+                $result['scope']['payables'] ?? 0,
+                $result['scope']['gestor_docs'] ?? 0,
+            ));
+        }
 
         $matching = $result['matching'];
         $this->table(
@@ -71,8 +97,16 @@ class MigrateGestorConciliacoes extends Command
                 ['Sem match', $matching['none'] ?? 0],
                 ['Migrados (' . $confidence . ')', count($result['migrated'])],
                 ['Falhas', count($result['failures'])],
+                ['Falhas workflow', count($result['workflow_failures'] ?? [])],
             ],
         );
+
+        if (! empty($result['workflow_failures'])) {
+            $this->warn('Falhas de posicionamento no fluxo:');
+            foreach (array_slice($result['workflow_failures'], 0, 10) as $f) {
+                $this->line("  - payable #{$f['payable_id']} ({$f['gestor_status']}): {$f['error']}");
+            }
+        }
 
         if (! empty($result['migrated'])) {
             $statusBreakdown = collect($result['migrated'])
