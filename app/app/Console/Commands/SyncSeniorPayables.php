@@ -16,12 +16,25 @@ class SyncSeniorPayables extends Command
         {--full : Executa em modo completo (Full_Sync) em vez de incremental}
         {--from= : Data inicial da janela de vencimento (Y-m-d)}
         {--to= : Data final da janela de vencimento (Y-m-d)}
-        {--scheduled : Marca a execução como agendada (default: manual)}';
+        {--scheduled : Marca a execução como agendada (default: manual)}
+        {--backfill-depto-fornecedor : Só backfill depto (Financeiro) + nomes de fornecedor em títulos abertos}';
 
     protected $description = 'Sincroniza os títulos a pagar da Senior (Contas a Pagar)';
 
     public function handle(): int
     {
+        if ($this->option('backfill-depto-fornecedor')) {
+            $result = PayablesSyncService::make()->backfillOpenSupplierAndDepartment();
+            $this->info(sprintf(
+                'Backfill: %d fornecedores consultados, %d nomes enriquecidos, %d departamentos atribuídos.',
+                $result['suppliers_looked_up'],
+                $result['suppliers_enriched'],
+                $result['departments_assigned'],
+            ));
+
+            return self::SUCCESS;
+        }
+
         $mode = $this->option('full') ? PayableSyncRun::MODE_FULL : PayableSyncRun::MODE_INCREMENTAL;
         $trigger = $this->option('scheduled') ? PayableSyncRun::TRIGGER_SCHEDULED : PayableSyncRun::TRIGGER_MANUAL;
 
