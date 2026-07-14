@@ -78,8 +78,8 @@ class Receivable extends Model
         $casts = [
             'amount' => 'decimal:2',
             'open_amount' => 'decimal:2',
-            'due_date' => 'date',
-            'issue_date' => 'date',
+            'due_date' => 'date:Y-m-d',
+            'issue_date' => 'date:Y-m-d',
             'senior_missing_at' => 'datetime',
             'senior_synced_at' => 'datetime',
             'senior_raw' => 'array',
@@ -90,7 +90,7 @@ class Receivable extends Model
             $casts[$col] = match ($type) {
                 'money' => 'decimal:2',
                 'rate' => 'decimal:6',
-                'date' => 'date',
+                'date' => 'date:Y-m-d',
                 'int' => 'integer',
                 default => 'string',
             };

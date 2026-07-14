@@ -422,7 +422,7 @@ class PayablesSyncServiceTest extends TestCase
             'senior.cod_emps' => [2, 4, 9],
             'senior.cod_for_start' => 1,
             'senior.cod_for_end' => 1,
-            'payables.excluded_cod_emp' => [4, 12],
+            'payables.excluded_cod_emp' => [12],
         ]);
 
         $tracker = new class {

@@ -138,6 +138,9 @@ class ReceivableMapper
         return (float) $s;
     }
 
+    /**
+     * Converte data da Senior para Y-m-d (calendário), sem shift de timezone.
+     */
     private function parseDate(mixed $value): string
     {
         if (is_array($value)) {
@@ -145,13 +148,26 @@ class ReceivableMapper
         }
         $s = trim((string) $value);
 
-        foreach (['Y-m-d', 'd/m/Y', 'Y-m-d\TH:i:s', 'd/m/Y H:i:s', 'dmY', 'Ymd'] as $fmt) {
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})/', $s, $m)) {
+            return sprintf('%04d-%02d-%02d', (int) $m[3], (int) $m[2], (int) $m[1]);
+        }
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $s, $m)) {
+            return sprintf('%04d-%02d-%02d', (int) $m[1], (int) $m[2], (int) $m[3]);
+        }
+        if (preg_match('/^(\d{2})(\d{2})(\d{4})$/', $s, $m)) {
+            return sprintf('%04d-%02d-%02d', (int) $m[3], (int) $m[2], (int) $m[1]);
+        }
+        if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $s, $m)) {
+            return sprintf('%04d-%02d-%02d', (int) $m[1], (int) $m[2], (int) $m[3]);
+        }
+
+        foreach (['Y-m-d\TH:i:s', 'd/m/Y H:i:s'] as $fmt) {
             try {
                 $dt = Carbon::createFromFormat($fmt, $s);
             } catch (\Throwable) {
                 continue;
             }
-            if ($dt !== false && $dt->format($fmt) === $s) {
+            if ($dt !== false) {
                 return $dt->toDateString();
             }
         }

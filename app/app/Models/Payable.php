@@ -153,16 +153,17 @@ class Payable extends Model
 
     protected function casts(): array
     {
+        // date:Y-m-d evita JSON "…T00:00:00.000000Z" (UTC) que no browser em Brasília vira D-1.
         $casts = [
             'amount' => 'decimal:2',
-            'due_date' => 'date',
-            'issue_date' => 'date',
+            'due_date' => 'date:Y-m-d',
+            'issue_date' => 'date:Y-m-d',
             'sent_for_approval_at' => 'datetime',
             'approved_at' => 'datetime',
-            'paid_at' => 'date',
-            'payment_sla_date' => 'date',
+            'paid_at' => 'date:Y-m-d',
+            'payment_sla_date' => 'date:Y-m-d',
             'priority_set_at' => 'datetime',
-            'conciliated_at' => 'date',
+            'conciliated_at' => 'date:Y-m-d',
             'allocation_imported_at' => 'datetime',
             'senior_missing_at' => 'datetime',
             'senior_synced_at' => 'datetime',
@@ -175,7 +176,7 @@ class Payable extends Model
             $casts[$col] = match ($type) {
                 'money' => 'decimal:2',
                 'rate' => 'decimal:6',
-                'date' => 'date',
+                'date' => 'date:Y-m-d',
                 'int' => 'integer',
                 default => 'string',
             };
