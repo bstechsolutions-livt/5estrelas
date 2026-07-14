@@ -137,6 +137,15 @@ return [
     // Intervalo do agendador em minutos (requirement 6): default 5, faixa 1..1440.
     'sync_interval_minutes' => (int) env('SENIOR_SYNC_INTERVAL', 5),
 
+    // Pós-sync AbertosCP: quantos Exportar E de UsuGer rodar imediatamente nos inserts.
+    'post_sync_launcher_lookups' => (int) env('SENIOR_POST_SYNC_LAUNCHER_LOOKUPS', 80),
+
+    // Pós-sync: quantos codFor faltantes buscar no cad_fornecedor (prioriza títulos novos).
+    'post_sync_supplier_lookups' => (int) env('SENIOR_POST_SYNC_SUPPLIER_LOOKUPS', 200),
+
+    // Cron enrich UsuGer: teto de Exportar E por ciclo (após bulk ConsultarGeral).
+    'enrich_launcher_max_lookups' => (int) env('SENIOR_ENRICH_LAUNCHER_MAX', 400),
+
     // Tamanho de lote para upsert e paginação (requirement 4.6 / 1.8).
     'batch_size' => 500,
 ];

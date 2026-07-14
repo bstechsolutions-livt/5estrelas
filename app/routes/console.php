@@ -32,9 +32,17 @@ if (config('senior.enabled', false)) {
         ->runInBackground();
 
     // Lançador Senior (UsuGer) → senior_cod_usu → departamento do usuário intranet.
-    Schedule::command('senior:enrich-payable-launchers --max=120 --scheduled')
+    // Teto alto + bulk por (emp,fil) no service; prioriza títulos sem UsuGer mais novos.
+    $enrichMax = max(1, (int) config('senior.enrich_launcher_max_lookups', 400));
+    Schedule::command("senior:enrich-payable-launchers --max={$enrichMax} --scheduled")
         ->cron($cron)
-        ->withoutOverlapping(25)
+        ->withoutOverlapping(45)
+        ->runInBackground();
+
+    // Fornecedores faltantes / placeholders “Fornecedor N” — acompanha o ciclo do CP.
+    Schedule::command('senior:sync-fornecedores --scheduled')
+        ->cron($cron)
+        ->withoutOverlapping(45)
         ->runInBackground();
 
     // Sync de filiais/empresas (cad_filial) — muda pouco, roda 1x/dia de madrugada.
@@ -42,8 +50,6 @@ if (config('senior.enabled', false)) {
         ->dailyAt('03:20')
         ->withoutOverlapping()
         ->runInBackground();
-
-    // Fornecedores: on-demand no pós-sync de CP (syncMissingFromPayables) — sem catálogo full.
 
     // CR a cada hora (varredura é pesada; não disputa o loop de 5 min do CP).
     Schedule::command('senior:sync-receivables --scheduled')
