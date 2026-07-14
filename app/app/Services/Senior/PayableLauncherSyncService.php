@@ -123,11 +123,8 @@ class PayableLauncherSyncService
                     continue;
                 }
 
-                $raw = is_array($payable->senior_raw) ? $payable->senior_raw : [];
-                $raw['UsuGer'] = $usuGer;
                 $payable->update([
                     'senior_cod_usu' => $usuGer,
-                    'senior_raw' => $raw,
                 ]);
                 $updated++;
             }
@@ -191,11 +188,8 @@ class PayableLauncherSyncService
 
             $payables = $query->get();
             foreach ($payables as $payable) {
-                $raw = is_array($payable->senior_raw) ? $payable->senior_raw : [];
-                $raw['UsuGer'] = $usuGer;
                 $payable->update([
                     'senior_cod_usu' => $usuGer,
-                    'senior_raw' => $raw,
                 ]);
                 $updated++;
             }

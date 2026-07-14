@@ -396,6 +396,15 @@ class PayablesSyncService
 
         $existing = Payable::where('senior_id', $bk)->first();
 
+        // AbertosCP não traz UsuGer; não apagar senior_cod_usu já enriquecido via prj.contaspagar.
+        if ($existing) {
+            $prevCod = (int) ($existing->senior_cod_usu ?? 0);
+            $newCod = (int) ($attrs['senior_cod_usu'] ?? 0);
+            if ($prevCod > 0 && $newCod <= 0) {
+                $attrs['senior_cod_usu'] = $prevCod;
+            }
+        }
+
         if (!$existing) {
             // req 4.2 / 8.2: novo título — status inicial derivado da Senior.
             $payable = new Payable();
