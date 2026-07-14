@@ -44,14 +44,20 @@ class FornecedoresSyncService
 
     /**
      * Delta: busca na Senior só os codFor que aparecem em títulos e ainda não estão no cache.
+     *
+     * @param  list<int>|null  $prioritizePayableIds  Pares destes títulos entram primeiro (pós-insert).
      */
-    public function syncMissingFromPayables(string $trigger = 'manual', ?int $maxLookups = null): array
-    {
+    public function syncMissingFromPayables(
+        string $trigger = 'manual',
+        ?int $maxLookups = null,
+        ?array $prioritizePayableIds = null,
+    ): array {
         if (!config('senior.enabled', false)) {
             return $this->skippedResult();
         }
 
-        $missingByEmp = $this->missingSupplierPairs()
+        $missingPairs = $this->missingSupplierPairs($prioritizePayableIds);
+        $missingByEmp = $missingPairs
             ->groupBy(fn ($pair) => (int) $pair->codemp)
             ->map(fn ($rows) => $rows->pluck('codfor')->map(fn ($v) => (int) $v)->unique()->values()->all());
 
@@ -93,8 +99,8 @@ class FornecedoresSyncService
             }
         }
 
-        $enriched = $this->enrichPayables();
-        $enrichedDesc = $this->enrichFromDescriptions();
+        $enriched = $this->enrichPayables($prioritizePayableIds);
+        $enrichedDesc = $this->enrichFromDescriptions($prioritizePayableIds);
 
         if ($lookedUp > 0 || $enriched > 0 || $enrichedDesc > 0) {
             Log::info('[senior-fornecedor] sync delta concluído', [
@@ -119,6 +125,65 @@ class FornecedoresSyncService
             'looked_up' => $lookedUp,
             'message' => null,
         ];
+    }
+
+    /**
+     * Pares (codemp, codfor) presentes em payables mas ausentes em senior_suppliers.
+     * Prioriza pares dos títulos recém-inseridos e, em seguida, os mais novos.
+     *
+     * @param  list<int>|null  $prioritizePayableIds
+     */
+    public function missingSupplierPairs(?array $prioritizePayableIds = null): \Illuminate\Support\Collection
+    {
+        $priorityPairs = collect();
+        $ids = array_values(array_unique(array_filter(array_map('intval', $prioritizePayableIds ?? []), fn (int $id) => $id > 0)));
+        if ($ids !== []) {
+            $priorityPairs = Payable::query()
+                ->select('codemp', 'codfor', DB::raw('MAX(id) as latest_id'))
+                ->whereIn('id', $ids)
+                ->whereNotNull('codemp')
+                ->whereNotNull('codfor')
+                ->whereNotExists(function ($q) {
+                    $q->select(DB::raw(1))
+                        ->from('senior_suppliers as s')
+                        ->whereColumn('s.cod_emp', 'payables.codemp')
+                        ->whereColumn('s.cod_for', 'payables.codfor');
+                })
+                ->groupBy('codemp', 'codfor')
+                ->orderByDesc('latest_id')
+                ->get();
+        }
+
+        $rest = Payable::query()
+            ->select('codemp', 'codfor', DB::raw('MAX(id) as latest_id'))
+            ->whereNotNull('codemp')
+            ->whereNotNull('codfor')
+            ->whereNotExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('senior_suppliers as s')
+                    ->whereColumn('s.cod_emp', 'payables.codemp')
+                    ->whereColumn('s.cod_for', 'payables.codfor');
+            })
+            ->groupBy('codemp', 'codfor')
+            ->orderByDesc('latest_id')
+            ->get();
+
+        if ($priorityPairs->isEmpty()) {
+            return $rest;
+        }
+
+        $seen = [];
+        $ordered = collect();
+        foreach ($priorityPairs->concat($rest) as $pair) {
+            $key = (int) $pair->codemp . '-' . (int) $pair->codfor;
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $ordered->push($pair);
+        }
+
+        return $ordered;
     }
 
     /**
@@ -185,23 +250,6 @@ class FornecedoresSyncService
         ];
     }
 
-    /** Pares (codemp, codfor) presentes em payables mas ausentes em senior_suppliers. */
-    public function missingSupplierPairs(): \Illuminate\Support\Collection
-    {
-        return Payable::query()
-            ->select('codemp', 'codfor')
-            ->whereNotNull('codemp')
-            ->whereNotNull('codfor')
-            ->whereNotExists(function ($q) {
-                $q->select(DB::raw(1))
-                    ->from('senior_suppliers as s')
-                    ->whereColumn('s.cod_emp', 'payables.codemp')
-                    ->whereColumn('s.cod_for', 'payables.codfor');
-            })
-            ->distinct()
-            ->get();
-    }
-
     public function countMissingSuppliers(): int
     {
         return $this->missingSupplierPairs()->count();
@@ -242,71 +290,117 @@ class FornecedoresSyncService
         $updated++;
     }
 
-    /** Atualiza supplier_name/cnpj dos títulos a partir do cache senior_suppliers. */
-    public function enrichPayables(): int
+    /**
+     * Atualiza supplier_name/cnpj dos títulos a partir do cache senior_suppliers.
+     *
+     * @param  list<int>|null  $prioritizePayableIds
+     */
+    public function enrichPayables(?array $prioritizePayableIds = null): int
     {
         $count = 0;
-        Payable::query()
+        $query = Payable::query()
             ->whereNotNull('codemp')
-            ->whereNotNull('codfor')
-            ->chunkById(200, function ($payables) use (&$count) {
-                $pairs = $payables
-                    ->map(fn (Payable $p) => (int) $p->codemp . '-' . (int) $p->codfor)
-                    ->unique()
-                    ->values();
+            ->whereNotNull('codfor');
 
-                $supplierByPair = SeniorSupplier::query()
-                    ->where(function ($q) use ($pairs) {
-                        foreach ($pairs as $pair) {
-                            [$codEmp, $codFor] = explode('-', $pair, 2);
-                            $q->orWhere(fn ($qq) => $qq->where('cod_emp', (int) $codEmp)->where('cod_for', (int) $codFor));
-                        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $prioritizePayableIds ?? []), fn (int $id) => $id > 0)));
+        if ($ids !== []) {
+            // Pós-insert: primeiro os novos; depois placeholders restantes.
+            $count += $this->enrichPayableQuery(
+                (clone $query)->whereIn('id', $ids)
+            );
+            $count += $this->enrichPayableQuery(
+                (clone $query)
+                    ->where(function ($q) {
+                        $q->whereNull('supplier_name')
+                            ->orWhere('supplier_name', 'like', 'Fornecedor %');
                     })
-                    ->get()
-                    ->keyBy(fn (SeniorSupplier $s) => $s->cod_emp . '-' . $s->cod_for);
+                    ->whereNotIn('id', $ids)
+            );
 
-                foreach ($payables as $payable) {
-                    $key = (int) $payable->codemp . '-' . (int) $payable->codfor;
-                    $supplier = $supplierByPair->get($key);
-                    $resolved = $this->displayNameResolver->resolveForPayable($payable, $supplier);
+            return $count;
+        }
 
-                    $dirty = false;
-                    if ($payable->supplier_name !== $resolved) {
-                        $payable->supplier_name = $resolved;
-                        $dirty = true;
+        return $this->enrichPayableQuery($query);
+    }
+
+    private function enrichPayableQuery($query): int
+    {
+        $count = 0;
+        $query->orderByDesc('id')->chunkById(200, function ($payables) use (&$count) {
+            $pairs = $payables
+                ->map(fn (Payable $p) => (int) $p->codemp . '-' . (int) $p->codfor)
+                ->unique()
+                ->values();
+
+            if ($pairs->isEmpty()) {
+                return;
+            }
+
+            $supplierByPair = SeniorSupplier::query()
+                ->where(function ($q) use ($pairs) {
+                    foreach ($pairs as $pair) {
+                        [$codEmp, $codFor] = explode('-', $pair, 2);
+                        $q->orWhere(fn ($qq) => $qq->where('cod_emp', (int) $codEmp)->where('cod_for', (int) $codFor));
                     }
-                    if ($supplier?->cnpj && $payable->supplier_cnpj !== $supplier->cnpj) {
-                        $payable->supplier_cnpj = $supplier->cnpj;
-                        $dirty = true;
-                    }
-                    if ($dirty) {
-                        $payable->save();
-                        $count++;
-                    }
+                })
+                ->get()
+                ->keyBy(fn (SeniorSupplier $s) => $s->cod_emp . '-' . $s->cod_for);
+
+            foreach ($payables as $payable) {
+                $key = (int) $payable->codemp . '-' . (int) $payable->codfor;
+                $supplier = $supplierByPair->get($key);
+                $resolved = $this->displayNameResolver->resolveForPayable($payable, $supplier);
+
+                $dirty = false;
+                if ($payable->supplier_name !== $resolved) {
+                    $payable->supplier_name = $resolved;
+                    $dirty = true;
                 }
-            });
+                if ($supplier?->cnpj && $payable->supplier_cnpj !== $supplier->cnpj) {
+                    $payable->supplier_cnpj = $supplier->cnpj;
+                    $dirty = true;
+                }
+                if ($dirty) {
+                    $payable->save();
+                    $count++;
+                }
+            }
+        });
 
         return $count;
     }
 
-    /** Preenche nomes genéricos a partir de obsTcp (GFD, TRCT, VT, etc.). */
-    public function enrichFromDescriptions(): int
+    /**
+     * Preenche nomes genéricos a partir de obsTcp (GFD, TRCT, VT, etc.).
+     *
+     * @param  list<int>|null  $prioritizePayableIds
+     */
+    public function enrichFromDescriptions(?array $prioritizePayableIds = null): int
     {
         $count = 0;
-        Payable::query()
+        $query = Payable::query()
             ->where('supplier_name', 'like', 'Fornecedor %')
-            ->whereNotNull('description')
-            ->chunkById(200, function ($payables) use (&$count) {
-                foreach ($payables as $payable) {
-                    $name = $this->displayNameResolver->fromDescription($payable->description);
-                    if ($name === null || $name === $payable->supplier_name) {
-                        continue;
-                    }
-                    $payable->supplier_name = $name;
-                    $payable->save();
-                    $count++;
-                }
+            ->whereNotNull('description');
+
+        $ids = array_values(array_unique(array_filter(array_map('intval', $prioritizePayableIds ?? []), fn (int $id) => $id > 0)));
+        if ($ids !== []) {
+            $query->where(function ($q) use ($ids) {
+                $q->whereIn('id', $ids)
+                    ->orWhere('supplier_name', 'like', 'Fornecedor %');
             });
+        }
+
+        $query->orderByDesc('id')->chunkById(200, function ($payables) use (&$count) {
+            foreach ($payables as $payable) {
+                $name = $this->displayNameResolver->fromDescription($payable->description);
+                if ($name === null || $name === $payable->supplier_name) {
+                    continue;
+                }
+                $payable->supplier_name = $name;
+                $payable->save();
+                $count++;
+            }
+        });
 
         return $count;
     }

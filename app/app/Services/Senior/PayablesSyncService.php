@@ -101,10 +101,11 @@ class PayablesSyncService
         $inserted = 0;
         $updated = 0;
         $businessKeys = [];
+        $insertedIds = [];
 
         foreach (array_chunk($titulos, (int) config('senior.batch_size', 500)) as $chunk) {
             try {
-                DB::transaction(function () use ($chunk, &$inserted, &$updated, &$businessKeys) {
+                DB::transaction(function () use ($chunk, &$inserted, &$updated, &$businessKeys, &$insertedIds) {
                     foreach ($chunk as $titulo) {
                         $bk = $this->mapper->businessKey($titulo);
                         if ($bk === null) {
@@ -112,7 +113,7 @@ class PayablesSyncService
                             continue;
                         }
                         $businessKeys[] = $bk;
-                        $this->upsertTitulo($bk, $titulo, $inserted, $updated);
+                        $this->upsertTitulo($bk, $titulo, $inserted, $updated, $insertedIds);
                     }
                 });
             } catch (\Throwable $e) {
@@ -141,20 +142,63 @@ class PayablesSyncService
             );
         }
 
-        // Sempre após sync OK: resolve fornecedores que aparecem nos títulos mas ainda não estão no cache.
-        $this->syncMissingSuppliersAfterPayables();
+        // Automático no caminho de inclusão: UsuGer (depto) + nome do fornecedor.
+        $this->enrichLaunchersAfterInserts($insertedIds);
+        $this->syncMissingSuppliersAfterPayables($insertedIds);
 
         return $run->fresh();
     }
 
-    /** Após importar títulos, resolve nomes dos fornecedores que ainda não estão no cache. */
-    private function syncMissingSuppliersAfterPayables(): void
+    /**
+     * Pós-insert: busca UsuGer na Senior e grava senior_cod_usu (departamento via classifier).
+     * Não depende do cron de enrich global — novos títulos não ficam “Depto —” até pedido manual.
+     *
+     * @param  list<int>  $insertedIds
+     */
+    private function enrichLaunchersAfterInserts(array $insertedIds): void
     {
+        if ($insertedIds === []) {
+            return;
+        }
+
+        $max = (int) config('senior.post_sync_launcher_lookups', 80);
+        if ($max <= 0) {
+            return;
+        }
+
         try {
-            // Limita o delta pós-CP: ConsultarGeral não filtra por codFor e cada
-            // lookup pode levar minutos. O restante fica no próximo sync / comando dedicado.
-            $r = FornecedoresSyncService::make()->syncMissingFromPayables('pos-payables', maxLookups: 25);
-            if (($r['looked_up'] ?? 0) > 0 || ($r['enriched'] ?? 0) > 0) {
+            $r = PayableLauncherSyncService::make()->enrichByPayableIds(
+                $insertedIds,
+                maxLookups: $max,
+                trigger: 'pos-payables-insert',
+            );
+            if (($r['updated'] ?? 0) > 0 || ($r['looked_up'] ?? 0) > 0) {
+                Log::info('[senior-cp] lançadores pós-insert', $r);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[senior-cp] lançadores pós-insert falhou', ['erro' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Após importar títulos, resolve nomes dos fornecedores (cache + placeholders “Fornecedor N”).
+     *
+     * @param  list<int>  $insertedIds
+     */
+    private function syncMissingSuppliersAfterPayables(array $insertedIds = []): void
+    {
+        $max = (int) config('senior.post_sync_supplier_lookups', 200);
+        if ($max <= 0) {
+            return;
+        }
+
+        try {
+            $r = FornecedoresSyncService::make()->syncMissingFromPayables(
+                'pos-payables',
+                maxLookups: $max,
+                prioritizePayableIds: $insertedIds,
+            );
+            if (($r['looked_up'] ?? 0) > 0 || ($r['enriched'] ?? 0) > 0 || ($r['enriched_desc'] ?? 0) > 0) {
                 Log::info('[senior-cp] fornecedores delta pós-sync', $r);
             }
         } catch (\Throwable $e) {
@@ -374,7 +418,7 @@ class PayablesSyncService
     }
 
     /** Insere ou atualiza um título preservando Workflow_Fields (req 4, 8). */
-    private function upsertTitulo(string $bk, array $titulo, int &$inserted, int &$updated): void
+    private function upsertTitulo(string $bk, array $titulo, int &$inserted, int &$updated, array &$insertedIds = []): void
     {
         $attrs = $this->mapper->mapHeader($titulo);
         if (PayableEmpresaExclusion::isExcluded(isset($attrs['codemp']) ? (int) $attrs['codemp'] : null)) {
@@ -403,6 +447,17 @@ class PayablesSyncService
             if ($prevCod > 0 && $newCod <= 0) {
                 $attrs['senior_cod_usu'] = $prevCod;
             }
+
+            // Não rebaixar nome real para placeholder “Fornecedor N” se o cache ainda não carregou.
+            $resolver = new SupplierDisplayNameResolver();
+            $prevName = (string) ($existing->supplier_name ?? '');
+            $newName = (string) ($attrs['supplier_name'] ?? '');
+            if ($prevName !== '' && ! $resolver->isGeneric($prevName) && $resolver->isGeneric($newName)) {
+                $attrs['supplier_name'] = $prevName;
+                if (! empty($existing->supplier_cnpj) && empty($attrs['supplier_cnpj'])) {
+                    $attrs['supplier_cnpj'] = $existing->supplier_cnpj;
+                }
+            }
         }
 
         if (!$existing) {
@@ -415,6 +470,7 @@ class PayablesSyncService
             $payable->save();
             $this->syncRateios($payable, $titulo);
             $inserted++;
+            $insertedIds[] = (int) $payable->id;
 
             return;
         }

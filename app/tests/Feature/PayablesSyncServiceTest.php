@@ -40,6 +40,9 @@ class PayablesSyncServiceTest extends TestCase
             'senior.cp_strategy' => 'sweep',
             'senior.cod_for_start' => 1000,
             'senior.cod_for_end' => 1001,
+            // Testes usam client fake; pós-sync real (SOAP) desligado.
+            'senior.post_sync_launcher_lookups' => 0,
+            'senior.post_sync_supplier_lookups' => 0,
         ]);
 
         $fake = new class($titulos) extends SeniorCpClient {
@@ -117,6 +120,21 @@ class PayablesSyncServiceTest extends TestCase
 
     // ─── Upsert + idempotência (req 4) ──────────────────────────────────────────
 
+
+    public function test_sync_preserva_nome_fornecedor_nao_generico(): void
+    {
+        config(['senior.enabled' => true]);
+        $titulo = $this->titulo('TIT-FOR');
+        $this->service([$titulo])->run(PayableSyncRun::MODE_FULL);
+
+        $payable = Payable::where('title_number', 'TIT-FOR')->firstOrFail();
+        $payable->update(['supplier_name' => 'PROGIRO SERVICOS LTDA']);
+
+        $titulo['obsTcp'] = 'alterado';
+        $this->service([$titulo])->run(PayableSyncRun::MODE_FULL);
+
+        $this->assertSame('PROGIRO SERVICOS LTDA', $payable->fresh()->supplier_name);
+    }
 
     public function test_sync_preserva_senior_cod_usu_enrichido(): void
     {
@@ -222,10 +240,22 @@ class PayablesSyncServiceTest extends TestCase
     {
         config(['senior.enabled' => true]);
         $t1 = $this->titulo('TIT-1');
-        $t2 = $this->titulo('TIT-2', 'NOR', 1000);
-        $t2['codFor'] = 1001;
-        $t2['vctPro'] = '2010-01-01';
-        $this->service([$t1, $t2])->run(PayableSyncRun::MODE_FULL);
+        $this->service([$t1])->run(PayableSyncRun::MODE_FULL);
+
+        // Título já no banco com vencimento antigo (fora da janela incremental) — sync não o cria
+        // por causa do min_due_date, então inserimos direto para exercitar marcarAusentes.
+        Payable::create([
+            'title_number' => 'TIT-2',
+            'supplier_name' => 'Fornecedor 1001',
+            'amount' => 1000,
+            'due_date' => '2010-01-01',
+            'status' => 'pendente',
+            'codemp' => 1,
+            'codfil' => 1,
+            'codfor' => 1001,
+            'codtpt' => 'DP',
+            'senior_id' => '1-1-TIT-2-DP-1001',
+        ]);
 
         $run = $this->service([$t1])->run(PayableSyncRun::MODE_INCREMENTAL);
         $this->assertEquals(0, $run->missing_count);
@@ -271,6 +301,8 @@ class PayablesSyncServiceTest extends TestCase
             'senior.cod_emps' => [3],
             'senior.cod_for_start' => 1,
             'senior.cod_for_end' => 3,
+            'senior.post_sync_launcher_lookups' => 0,
+            'senior.post_sync_supplier_lookups' => 0,
         ]);
 
         // Parseia a resposta real da Senior (codEmp 3, codFor 1 → 2 títulos).
@@ -294,12 +326,12 @@ class PayablesSyncServiceTest extends TestCase
             ->run(PayableSyncRun::MODE_FULL);
 
         $this->assertEquals(PayableSyncRun::STATUS_SUCCESS, $run->status);
-        $this->assertEquals(2, $run->inserted_count);
-        $this->assertEquals(2, Payable::count());
-        $this->assertDatabaseHas('payables', ['title_number' => '48388378', 'senior_id' => '3-1-48388378-01-1']);
+        // Fixture: um título com vct 2024 (abaixo de min_due_date) é ignorado; só o de 2026 entra.
+        $this->assertEquals(1, $run->inserted_count);
+        $this->assertEquals(1, Payable::count());
         $this->assertDatabaseHas('payables', ['title_number' => '5080 05/05']);
-        // sitTit=AB não está no mapa → cai em pendente (req 8.4).
-        $this->assertEquals('pendente', Payable::where('title_number', '48388378')->first()->status);
+        $this->assertDatabaseMissing('payables', ['title_number' => '48388378']);
+        $this->assertEquals('pendente', Payable::where('title_number', '5080 05/05')->first()->status);
     }
 
     public function test_varredura_continua_apos_erro_de_negocio_por_fornecedor(): void
@@ -313,6 +345,8 @@ class PayablesSyncServiceTest extends TestCase
             'senior.cod_emps' => [3],
             'senior.cod_for_start' => 1,
             'senior.cod_for_end' => 5,
+            'senior.post_sync_launcher_lookups' => 0,
+            'senior.post_sync_supplier_lookups' => 0,
         ]);
 
         $xml = file_get_contents(base_path('tests/fixtures/senior/titulos-abertos-emp3-for1.xml'));
@@ -337,10 +371,10 @@ class PayablesSyncServiceTest extends TestCase
         $run = (new PayablesSyncService($fake, new PayableMapper(), new StatusMapper()))
             ->run(PayableSyncRun::MODE_FULL);
 
-        // Erros de negócio não abortam: o sync conclui com sucesso e grava os 2 títulos válidos.
+        // Erros de negócio não abortam: o sync conclui; título pré-2026 é filtrado pelo corte.
         $this->assertEquals(PayableSyncRun::STATUS_SUCCESS, $run->status);
-        $this->assertEquals(2, $run->inserted_count);
-        $this->assertEquals(2, Payable::count());
+        $this->assertEquals(1, $run->inserted_count);
+        $this->assertEquals(1, Payable::count());
     }
 
     public function test_bulk_por_empresa_filial_upserta_titulos(): void
@@ -413,6 +447,7 @@ class PayablesSyncServiceTest extends TestCase
         (new PayablesSyncService($fake, new PayableMapper(), new StatusMapper()))
             ->run(PayableSyncRun::MODE_FULL);
 
-        $this->assertSame([2], array_values(array_unique($tracker->emps)));
+        // Exclui 4; 2 e 9 permanecem na varredura.
+        $this->assertSame([2, 9], array_values(array_unique($tracker->emps)));
     }
 }
