@@ -11,6 +11,7 @@ class SyncSeniorPayableLaunchers extends Command
         {--cod-emp= : Filtra empresa Senior (codEmp)}
         {--cod-fil= : Filtra filial Senior (codFil)}
         {--max= : Limite de consultas Exportar E (após o bulk)}
+        {--created-within-minutes= : Só títulos criados nos últimos N minutos (prioriza Depto em syncs novos)}
         {--scheduled : Marca a execução como agendada}';
 
     protected $description = 'Preenche senior_cod_usu dos títulos via UsuGer (prj.contaspagar)';
@@ -26,9 +27,12 @@ class SyncSeniorPayableLaunchers extends Command
         $max = $this->option('max') !== null && $this->option('max') !== ''
             ? (int) $this->option('max')
             : null;
+        $createdWithin = $this->option('created-within-minutes') !== null && $this->option('created-within-minutes') !== ''
+            ? (int) $this->option('created-within-minutes')
+            : null;
         $trigger = $this->option('scheduled') ? 'agendado' : 'manual';
 
-        $r = PayableLauncherSyncService::make()->run($codEmp, $codFil, $max, $trigger);
+        $r = PayableLauncherSyncService::make()->run($codEmp, $codFil, $max, $trigger, $createdWithin);
 
         $this->info(sprintf(
             'Enrich lançadores [%s]: bulk=%d, lookups=%d, updated=%d, errors=%d, skipped=%d.',

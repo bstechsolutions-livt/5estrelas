@@ -32,9 +32,18 @@ if (config('senior.enabled', false)) {
         ->runInBackground();
 
     // Lançador Senior (UsuGer) → senior_cod_usu → departamento do usuário intranet.
-    Schedule::command('senior:enrich-payable-launchers --max=120 --scheduled')
+    // Exportar E ~30–40s/título: --max=40 cabe em ~25–30 min. Mutex curto (25)
+    // liberava overlap e empilhava jobs lentos, deixando LRB/RH novos sem Depto.
+    // Filtro created-within prioriza o que acabou de entrar no AbertosCP (ex.: emp 4 LRB).
+    Schedule::command('senior:enrich-payable-launchers --max=40 --created-within-minutes=180 --scheduled')
         ->cron($cron)
-        ->withoutOverlapping(25)
+        ->withoutOverlapping(90)
+        ->runInBackground();
+
+    // Backlog de títulos antigos sem UsuGer (fora da janela recente).
+    Schedule::command('senior:enrich-payable-launchers --max=30 --scheduled')
+        ->hourly()
+        ->withoutOverlapping(120)
         ->runInBackground();
 
     // Sync de filiais/empresas (cad_filial) — muda pouco, roda 1x/dia de madrugada.
