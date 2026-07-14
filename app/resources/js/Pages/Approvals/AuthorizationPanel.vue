@@ -7,6 +7,7 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 import { useDevice } from '@/composables/useDevice'
+import { formatApiDate } from '@/utils/apiDate'
 
 const props = defineProps({
     summary: Object,
@@ -34,9 +35,7 @@ function formatMoney(val) {
 }
 
 function formatDate(d) {
-    if (!d) return '—'
-    const [y, m, day] = d.split('-')
-    return `${day}/${m}/${y}`
+    return formatApiDate(d)
 }
 
 function go(path) {

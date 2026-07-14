@@ -11,6 +11,7 @@ import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
 import ApprovalFlowPreview from '@/Components/Financeiro/ApprovalFlowPreview.vue'
 import { useDevice } from '@/composables/useDevice'
+import { formatApiDate, parseApiDate } from '@/utils/apiDate'
 
 const props = defineProps({
     bordero: Object,
@@ -74,9 +75,7 @@ function sendForApproval() {
 }
 
 function parseDueDate(val) {
-    if (!val) return null
-    const d = new Date(val)
-    return Number.isNaN(d.getTime()) ? null : d
+    return parseApiDate(val)
 }
 
 const minApprovalDue = computed(() => parseDueDate(props.minDueDateForApproval))
@@ -168,8 +167,7 @@ function formatMoney(val) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
 }
 function formatDate(d) {
-    if (!d) return '—'
-    return new Date(d).toLocaleDateString('pt-BR')
+    return formatApiDate(d)
 }
 
 const isPending = computed(() => props.bordero.status === 'pendente')

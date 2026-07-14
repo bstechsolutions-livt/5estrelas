@@ -11,6 +11,7 @@ import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import { useDevice } from '@/composables/useDevice'
 import PayableDocumentPreviewCard from '@/Components/Financeiro/PayableDocumentPreviewCard.vue'
+import { formatApiDate } from '@/utils/apiDate'
 
 const props = defineProps({
     payables: { type: Array, default: () => [] },
@@ -44,8 +45,7 @@ function formatMoney(val) {
 }
 
 function formatDate(d) {
-    if (!d) return '—'
-    return new Date(d).toLocaleDateString('pt-BR')
+    return formatApiDate(d)
 }
 
 function docTypeLabel(doc) {

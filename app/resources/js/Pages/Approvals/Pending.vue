@@ -5,6 +5,7 @@ import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import { useDevice } from '@/composables/useDevice'
+import { formatApiDate } from '@/utils/apiDate'
 
 const props = defineProps({
     payables: { type: Array, default: () => [] },
@@ -17,8 +18,7 @@ function formatMoney(val) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
 }
 function formatDate(d) {
-    if (!d) return '—'
-    return new Date(d).toLocaleDateString('pt-BR')
+    return formatApiDate(d)
 }
 function goToPayable(id) {
     router.visit(`/financeiro/contas-pagar/${id}`)

@@ -6,6 +6,7 @@ import Chart from 'primevue/chart'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
+import { formatApiDate } from '@/utils/apiDate'
 
 const props = defineProps({
     kpis: Object,
@@ -89,9 +90,7 @@ function go(path) {
 }
 
 function formatDate(d) {
-    if (!d) return '—'
-    const [y, m, day] = d.split('-')
-    return `${day}/${m}/${y}`
+    return formatApiDate(d)
 }
 </script>
 
