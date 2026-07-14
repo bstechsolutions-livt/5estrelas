@@ -222,6 +222,19 @@ class PayablesSyncServiceTest extends TestCase
         $this->assertNull(Payable::where('title_number', 'TIT-2')->first()->senior_missing_at);
     }
 
+    public function test_sync_vazio_nao_marca_todos_como_ausentes(): void
+    {
+        config(['senior.enabled' => true]);
+        $t1 = $this->titulo('TIT-1');
+        $this->service([$t1])->run(PayableSyncRun::MODE_FULL);
+        $this->assertNull(Payable::where('title_number', 'TIT-1')->first()->senior_missing_at);
+
+        // Senior devolve lista vazia (timeout/janela) — não pode sumir a lista do CP.
+        $run = $this->service([])->run(PayableSyncRun::MODE_FULL);
+        $this->assertEquals(0, $run->missing_count);
+        $this->assertNull(Payable::where('title_number', 'TIT-1')->first()->senior_missing_at);
+    }
+
     public function test_incremental_marca_ausentes_na_janela(): void
     {
         config(['senior.enabled' => true]);

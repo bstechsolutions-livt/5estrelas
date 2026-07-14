@@ -515,13 +515,21 @@ class PayablesSyncService
     /**
      * Marca como ausentes os títulos de origem Senior não retornados (req 7.1).
      * No incremental, restringe à janela de vencimento consultada (vctIni/vctFim).
+     *
+     * Segurança: se a Senior não devolveu nenhum business key (falha/timeout/janela vazia),
+     * NÃO marca ninguém — senão a lista inteira some do Contas a Pagar.
      */
     private function marcarAusentes(array $businessKeys, ?Carbon $vctIni = null, ?Carbon $vctFim = null): int
     {
-        $query = Payable::whereNotNull('senior_id')->whereNull('senior_missing_at');
-        if ($businessKeys !== []) {
-            $query->whereNotIn('senior_id', array_values(array_unique($businessKeys)));
+        $keys = array_values(array_unique(array_filter($businessKeys)));
+        if ($keys === []) {
+            Log::warning('[senior-cp] marcarAusentes abortado: nenhum título retornado pela Senior neste ciclo');
+
+            return 0;
         }
+
+        $query = Payable::whereNotNull('senior_id')->whereNull('senior_missing_at');
+        $query->whereNotIn('senior_id', $keys);
 
         $emps = $this->activeCodEmps();
         if ($emps !== []) {
