@@ -152,6 +152,7 @@ class GestorConciliacoesMigrationService
                 'sup_cnpj' => $this->normalizeCnpj($supplier['cnpj'] ?? null),
                 'sup_name' => $supplier['name'] ?? null,
                 'codemp' => $cnpjMap[$entCnpj] ?? null,
+                'codfil' => isset($enterprise['number']) ? (int) $enterprise['number'] : null,
                 'ent_cnpj' => $entCnpj,
                 'description' => $details['description'] ?? null,
                 'files' => $doc['files'] ?? [],
@@ -320,18 +321,85 @@ class GestorConciliacoesMigrationService
             return $this->matchResult('high', $candidates->first()->id, 'title_number');
         }
 
-        if (! empty($doc['codemp'])) {
-            $scoped = $candidates->filter(fn (Payable $p) => (int) $p->codemp === (int) $doc['codemp']);
-            if ($scoped->count() === 1) {
-                return $this->matchResult('high', $scoped->first()->id, 'title_number_codemp');
-            }
+        $scoped = $this->narrowTitleCandidates($candidates, $doc);
+
+        if ($scoped->count() === 1) {
+            return $this->matchResult('high', $scoped->first()->id, $this->titleMatchStrategy($doc));
         }
 
         return [
             'confidence' => 'ambiguous',
-            'candidate_ids' => $candidates->pluck('id')->all(),
+            'candidate_ids' => ($scoped->isNotEmpty() ? $scoped : $candidates)->pluck('id')->all(),
             'strategy' => 'multiple_title_number',
         ];
+    }
+
+    /**
+     * Desempate por empresa + filial + fornecedor (CNPJ Gestor → codfor Senior).
+     *
+     * @param  Collection<int, Payable>  $candidates
+     * @param  array<string, mixed>  $doc
+     * @return Collection<int, Payable>
+     */
+    private function narrowTitleCandidates(Collection $candidates, array $doc): Collection
+    {
+        $scoped = $candidates;
+
+        if (! empty($doc['codemp'])) {
+            $scoped = $scoped->filter(fn (Payable $p) => (int) $p->codemp === (int) $doc['codemp']);
+        }
+
+        if (! empty($doc['codfil'])) {
+            $scoped = $scoped->filter(fn (Payable $p) => (int) $p->codfil === (int) $doc['codfil']);
+        }
+
+        $codfors = $this->codforsForGestorDoc($doc);
+        if ($codfors !== []) {
+            $scoped = $scoped->filter(fn (Payable $p) => in_array((int) $p->codfor, $codfors, true));
+        }
+
+        return $scoped->values();
+    }
+
+    /**
+     * @param  array<string, mixed>  $doc
+     * @return list<int>
+     */
+    private function codforsForGestorDoc(array $doc): array
+    {
+        if (empty($doc['sup_cnpj']) || empty($doc['codemp'])) {
+            return [];
+        }
+
+        $codemp = (int) $doc['codemp'];
+
+        return array_values(array_unique(array_column(
+            array_filter(
+                $this->cnpjToCodFors[$doc['sup_cnpj']] ?? [],
+                fn (array $pair) => $pair[0] === $codemp,
+            ),
+            1,
+        )));
+    }
+
+    /**
+     * @param  array<string, mixed>  $doc
+     */
+    private function titleMatchStrategy(array $doc): string
+    {
+        $parts = ['title_number'];
+
+        if (! empty($doc['codemp'])) {
+            $parts[] = 'codemp';
+        }
+        if (! empty($doc['codfil'])) {
+            $parts[] = 'codfil';
+        }
+        if ($this->codforsForGestorDoc($doc) !== []) {
+            $parts[] = 'codfor';
+        }
+
+        return implode('_', $parts);
     }
 
     /**

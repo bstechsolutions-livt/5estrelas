@@ -8,6 +8,9 @@ defineProps({
     user: Object,
     departments: { type: Array, default: () => [] },
     branches: { type: Array, default: () => [] },
+    representativeCandidates: { type: Array, default: () => [] },
+    representatives: { type: Array, default: () => [] },
+    scopeOptions: { type: Array, default: () => [] },
 })
 
 const { isMobile } = useDevice()

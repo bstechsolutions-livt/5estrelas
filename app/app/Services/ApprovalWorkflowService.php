@@ -10,6 +10,7 @@ use App\Models\Notification;
 use App\Models\Payable;
 use App\Models\PayableComment;
 use App\Models\User;
+use App\Models\UserRepresentative;
 use App\Events\NotificationCreated;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -144,7 +145,7 @@ class ApprovalWorkflowService
         }
 
         // Notifica o próximo aprovador
-        if ($nextStep->assigned_to) {
+        if ($this->activeDelegatedTo($nextStep) || $nextStep->assigned_to || $this->isWildcardStep($nextStep)) {
             $this->notifyApprover($nextStep, $payable, $approver);
         }
 
@@ -492,7 +493,37 @@ class ApprovalWorkflowService
     {
         $payableIds = ApprovalStep::where('assigned_to', $user->id)
             ->where('status', 'pendente')
+            ->get()
+            ->reject(function (ApprovalStep $step) use ($user) {
+                $delegateId = $this->activeDelegatedTo($step);
+
+                return $delegateId !== null && $delegateId !== $user->id;
+            })
             ->pluck('payable_id');
+
+        $delegatedPayableIds = ApprovalStep::where('status', 'pendente')
+            ->whereNotNull('delegated_to')
+            ->get()
+            ->filter(fn (ApprovalStep $step) => $this->activeDelegatedTo($step) === $user->id)
+            ->pluck('payable_id');
+
+        $payableIds = $payableIds->merge($delegatedPayableIds);
+
+        $representedIds = app(UserRepresentativeService::class)
+            ->representedUserIds($user, UserRepresentative::SCOPE_FINANCEIRO_APROVACAO);
+
+        if ($representedIds !== []) {
+            $asRepPayableIds = ApprovalStep::whereIn('assigned_to', $representedIds)
+                ->where('status', 'pendente')
+                ->get()
+                ->reject(function (ApprovalStep $step) use ($user) {
+                    $delegateId = $this->activeDelegatedTo($step);
+
+                    return $delegateId !== null && $delegateId !== $user->id;
+                })
+                ->pluck('payable_id');
+            $payableIds = $payableIds->merge($asRepPayableIds);
+        }
 
         if ($this->userBelongsToFinanceDepartment($user)) {
             $financePayables = ApprovalStep::where('approver_type', ApprovalTrail::TYPE_DEPT_FINANCEIRO)
@@ -503,7 +534,7 @@ class ApprovalWorkflowService
 
         if ($user->hasPermission('*') === false) {
             $presidencyIds = ApprovalStep::where('approver_type', ApprovalTrail::TYPE_USUARIO)
-                ->where('level_name', 'presidencia')
+                ->whereIn('level_name', ApprovalStep::presidencyLevelNames())
                 ->where('status', 'pendente')
                 ->pluck('payable_id');
             if ($presidencyIds->isNotEmpty() && $this->isPresidentSubstitute($user)) {
@@ -517,8 +548,63 @@ class ApprovalWorkflowService
             ->orderByDesc('sent_for_approval_at')
             ->get();
 
+        // Etapas futuras nascem como "pendente"; só entra na fila quem age na etapa atual.
+        $payables = $payables
+            ->filter(fn (Payable $payable) => $this->canUserApprove($payable, $user))
+            ->values();
+
         Payable::attachEmpresaNome($payables);
         Payable::attachFilialNome($payables);
+        Payable::attachSupplierDisplayName($payables);
+
+        return $payables;
+    }
+
+    /**
+     * Títulos na etapa Presidência aguardando ação do usuário (painel dedicado).
+     */
+    public function presidencyDeskPayables(User $user): Collection
+    {
+        $branchScope = app(PayableBranchScope::class);
+
+        $candidateIds = ApprovalStep::query()
+            ->whereIn('level_name', ApprovalStep::presidencyLevelNames())
+            ->where('status', 'pendente')
+            ->pluck('payable_id')
+            ->unique();
+
+        if ($candidateIds->isEmpty()) {
+            return collect();
+        }
+
+        $payables = Payable::query()
+            ->whereIn('id', $candidateIds)
+            ->where('status', 'aguardando_aprovacao')
+            ->with([
+                'documents.uploader:id,name',
+                'preparer:id,name',
+                'department:id,name',
+                'branch:id,name,code',
+            ])
+            ->orderBy('due_date')
+            ->orderBy('sent_for_approval_at')
+            ->get();
+
+        $payables = $payables->filter(function (Payable $payable) use ($user, $branchScope) {
+            if (! $branchScope->canAccessPayable($user, $payable)) {
+                return false;
+            }
+
+            $current = $this->currentStep($payable);
+
+            return $current
+                && ApprovalStep::isPresidencyLevel($current->level_name)
+                && $this->canUserApprove($payable, $user);
+        })->values();
+
+        Payable::attachEmpresaNome($payables);
+        Payable::attachFilialNome($payables);
+        Payable::attachSupplierDisplayName($payables);
 
         return $payables;
     }
@@ -810,15 +896,22 @@ class ApprovalWorkflowService
      * Verifica se o usuário pode aprovar este step.
      *
      * Elegível se:
-     * 1. É o assigned_to direto, OU
+     * 1. É o assigned_to direto (ou representante ativo configurado no usuário), OU
      * 2. Tem permissão wildcard '*', OU
      * 3. É um substituto válido do presidente (step=presidencia, assigned ausente,
      *    E o substituto NÃO assinou este mesmo documento como diretor — regra 3 do doc)
      */
     private function canApproveStep(ApprovalStep $step, User $approver, Payable $payable): bool
     {
-        // Caso 1: é o designado
-        if ($step->assigned_to === $approver->id) {
+        $delegateId = $this->activeDelegatedTo($step);
+
+        if ($delegateId !== null) {
+            if ($approver->id === $delegateId) {
+                return true;
+            }
+        } elseif ($step->assigned_to === $approver->id) {
+            return true;
+        } elseif ($step->assigned_to && $this->isUserRepresentativeOf($approver, (int) $step->assigned_to)) {
             return true;
         }
 
@@ -841,7 +934,7 @@ class ApprovalWorkflowService
         }
 
         // Caso 3: substituto do presidente
-        if ($step->level_name === 'presidencia' && $this->isPresidentSubstitute($approver)) {
+        if (ApprovalStep::isPresidencyLevel($step->level_name) && $this->isPresidentSubstitute($approver)) {
             // Regra 3: substituto nunca pode ser quem já assinou como diretor neste documento
             $alreadySigned = ApprovalStep::where('payable_id', $payable->id)
                 ->where('level_name', 'diretoria')
@@ -853,6 +946,15 @@ class ApprovalWorkflowService
         }
 
         return false;
+    }
+
+    private function isUserRepresentativeOf(User $representative, int $userId): bool
+    {
+        return app(UserRepresentativeService::class)->isActiveRepresentative(
+            $representative,
+            $userId,
+            UserRepresentative::SCOPE_FINANCEIRO_APROVACAO,
+        );
     }
 
     /**
@@ -906,8 +1008,11 @@ class ApprovalWorkflowService
     private function notifyApprover(ApprovalStep $step, Payable $payable, User $sender): void
     {
         $recipients = collect();
+        $delegateId = $this->activeDelegatedTo($step);
 
-        if ($this->stepApproverType($step) === ApprovalTrail::TYPE_DEPT_FINANCEIRO) {
+        if ($delegateId !== null) {
+            $recipients = collect([$delegateId]);
+        } elseif ($this->stepApproverType($step) === ApprovalTrail::TYPE_DEPT_FINANCEIRO) {
             $recipients = Department::financeApprovers()->pluck('id');
             if ($recipients->isEmpty() && $step->assigned_to) {
                 $recipients = collect([$step->assigned_to]);
@@ -923,7 +1028,21 @@ class ApprovalWorkflowService
             $recipients = collect([$step->assigned_to]);
         }
 
-        foreach ($recipients as $userId) {
+        if ($step->assigned_to && $delegateId === null) {
+            $repIds = UserRepresentative::query()
+                ->where('user_id', $step->assigned_to)
+                ->where('is_active', true)
+                ->whereDate('starts_at', '<=', now()->toDateString())
+                ->where(function ($q) {
+                    $q->whereNull('ends_at')->orWhereDate('ends_at', '>=', now()->toDateString());
+                })
+                ->get()
+                ->filter(fn (UserRepresentative $r) => $r->coversScope(UserRepresentative::SCOPE_FINANCEIRO_APROVACAO))
+                ->pluck('representative_id');
+            $recipients = $recipients->merge($repIds);
+        }
+
+        foreach ($recipients->unique()->filter() as $userId) {
             $notification = Notification::create([
                 'user_id' => $userId,
                 'title' => 'Aprovação pendente',
@@ -943,6 +1062,231 @@ class ApprovalWorkflowService
                 } catch (\Throwable $e) {
                     // Broadcast pode falhar se Reverb não estiver rodando (ambiente de teste)
                 }
+            }
+        }
+    }
+
+    public function activeDelegatedTo(ApprovalStep $step): ?int
+    {
+        if ($step->status !== 'pendente' || ! $step->delegated_to) {
+            return null;
+        }
+
+        if ($step->delegation_expires_at && $step->delegation_expires_at->isPast()) {
+            return null;
+        }
+
+        return (int) $step->delegated_to;
+    }
+
+    public function canManageStepDelegation(User $actor, ApprovalStep $step, Payable $payable): bool
+    {
+        if ($payable->status !== 'aguardando_aprovacao' || $step->status !== 'pendente') {
+            return false;
+        }
+
+        if (! $this->isDelegatableStep($step)) {
+            return false;
+        }
+
+        if ($actor->hasPermission('*') || $actor->hasPermission('financeiro.workflows.delegar')) {
+            return true;
+        }
+
+        return $step->assigned_to === $actor->id;
+    }
+
+    public function isDelegatableStep(ApprovalStep $step): bool
+    {
+        if ($step->status !== 'pendente') {
+            return false;
+        }
+
+        if ($step->assigned_to) {
+            return true;
+        }
+
+        return in_array($this->stepApproverType($step), [
+            ApprovalTrail::TYPE_USUARIO,
+            ApprovalTrail::TYPE_GESTOR_DEPTO,
+            ApprovalTrail::TYPE_DIRETOR_DEPTO,
+        ], true);
+    }
+
+    /**
+     * @return array{ok: bool, error?: string}
+     */
+    public function delegateStep(
+        ApprovalStep $step,
+        Payable $payable,
+        User $actor,
+        User $delegate,
+        ?Carbon $expiresAt = null,
+        ?string $reason = null,
+    ): array {
+        if (! $this->canManageStepDelegation($actor, $step, $payable)) {
+            return ['ok' => false, 'error' => 'Sem permissão para delegar esta etapa.'];
+        }
+
+        if (! $delegate->is_active) {
+            return ['ok' => false, 'error' => 'O substituto precisa ser um usuário ativo.'];
+        }
+
+        if ($step->assigned_to && $delegate->id === $step->assigned_to) {
+            return ['ok' => false, 'error' => 'Escolha alguém diferente do aprovador original.'];
+        }
+
+        $step->update([
+            'delegated_to' => $delegate->id,
+            'delegated_by' => $actor->id,
+            'delegated_at' => now(),
+            'delegation_expires_at' => $expiresAt,
+            'delegation_reason' => $reason ? trim($reason) : null,
+        ]);
+
+        $stepLabel = $step->role_label ?: (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name);
+        $original = $step->assignee?->name ?? 'aprovador designado';
+        $expiryText = $expiresAt ? ' até ' . $expiresAt->format('d/m/Y') : '';
+        $body = "Delegou a etapa \"{$stepLabel}\" ({$original}) para {$delegate->name}{$expiryText}";
+        if ($reason) {
+            $body .= " — {$reason}";
+        }
+
+        PayableComment::create([
+            'payable_id' => $payable->id,
+            'user_id' => $actor->id,
+            'body' => $body,
+            'type' => 'status_change',
+        ]);
+
+        if ($this->currentStep($payable)?->id === $step->id) {
+            $this->notifyApprover($step->fresh(), $payable, $actor);
+        }
+
+        return ['ok' => true];
+    }
+
+    /**
+     * @return array{ok: bool, error?: string}
+     */
+    public function revokeStepDelegation(ApprovalStep $step, Payable $payable, User $actor): array
+    {
+        if (! $this->canManageStepDelegation($actor, $step, $payable)) {
+            return ['ok' => false, 'error' => 'Sem permissão para remover delegação.'];
+        }
+
+        if (! $step->delegated_to) {
+            return ['ok' => false, 'error' => 'Esta etapa não tem delegação ativa.'];
+        }
+
+        $delegateName = $step->delegatee?->name ?? 'substituto';
+        $step->update([
+            'delegated_to' => null,
+            'delegated_by' => null,
+            'delegated_at' => null,
+            'delegation_expires_at' => null,
+            'delegation_reason' => null,
+        ]);
+
+        PayableComment::create([
+            'payable_id' => $payable->id,
+            'user_id' => $actor->id,
+            'body' => "Removeu a delegação temporária de {$delegateName} na etapa " . ($step->role_label ?: $step->level_name),
+            'type' => 'status_change',
+        ]);
+
+        if ($this->currentStep($payable)?->id === $step->id && $step->assigned_to) {
+            $this->notifyApprover($step->fresh(), $payable, $actor);
+        }
+
+        return ['ok' => true];
+    }
+
+    /** @return \Illuminate\Support\Collection<int, User> */
+    public function delegateCandidateUsers(): \Illuminate\Support\Collection
+    {
+        return User::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    public function hasConsecutiveDuplicateAssignees(Payable $payable): bool
+    {
+        $steps = ApprovalStep::where('payable_id', $payable->id)->orderBy('order')->get();
+
+        for ($i = 0; $i < $steps->count() - 1; $i++) {
+            $current = $steps[$i];
+            $next = $steps[$i + 1];
+
+            if ($current->assigned_to && $current->assigned_to === $next->assigned_to) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Remove etapas consecutivas com o mesmo aprovador (snapshot antigo gestor + head).
+     *
+     * @return array{ok: bool, deleted: int}
+     */
+    public function dedupeConsecutiveAssigneeSteps(Payable $payable): array
+    {
+        $deleted = 0;
+
+        while (true) {
+            $steps = ApprovalStep::where('payable_id', $payable->id)->orderBy('order')->get();
+            $removed = false;
+
+            for ($i = 0; $i < $steps->count() - 1; $i++) {
+                $current = $steps[$i];
+                $next = $steps[$i + 1];
+
+                if (! $current->assigned_to || $current->assigned_to !== $next->assigned_to) {
+                    continue;
+                }
+
+                $this->pickDuplicateStepToRemove($current, $next)->delete();
+                $deleted++;
+                $removed = true;
+                break;
+            }
+
+            if (! $removed) {
+                break;
+            }
+        }
+
+        if ($deleted > 0) {
+            $this->renumberApprovalSteps($payable);
+        }
+
+        return ['ok' => true, 'deleted' => $deleted];
+    }
+
+    private function pickDuplicateStepToRemove(ApprovalStep $a, ApprovalStep $b): ApprovalStep
+    {
+        if ($a->level_name === 'departamento' && $b->level_name === 'gerencia') {
+            return $a;
+        }
+
+        if ($b->level_name === 'departamento' && $a->level_name === 'gerencia') {
+            return $b;
+        }
+
+        return $a;
+    }
+
+    private function renumberApprovalSteps(Payable $payable): void
+    {
+        $steps = ApprovalStep::where('payable_id', $payable->id)->orderBy('order')->get();
+
+        foreach ($steps as $idx => $step) {
+            $order = $idx + 1;
+            if ((int) $step->order !== $order) {
+                $step->update(['order' => $order]);
             }
         }
     }

@@ -151,6 +151,10 @@ class ApprovalFlowConfigController extends Controller
         $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '_', $roleLabel) ?? 'etapa');
         $slug = trim($slug, '_') ?: 'etapa';
 
+        if (preg_match('/presid/i', $roleLabel) || str_starts_with($slug, 'presid')) {
+            return 'presidencia';
+        }
+
         return match ($approverType) {
             ApprovalTrail::TYPE_GESTOR_DEPTO => 'departamento',
             ApprovalTrail::TYPE_DIRETOR_DEPTO => 'diretoria',

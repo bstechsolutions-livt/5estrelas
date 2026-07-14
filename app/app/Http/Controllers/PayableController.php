@@ -357,6 +357,7 @@ class PayableController extends Controller
 
         Payable::attachEmpresaNome($payables->getCollection());
         Payable::attachFilialNome($payables->getCollection());
+        Payable::attachSupplierDisplayName($payables->getCollection());
         Payable::attachDepartmentNome($payables->getCollection());
         PayableDocumentPairAlert::attachToPayables($payables->getCollection());
         Payable::attachOrigemHub($payables->getCollection());
@@ -493,6 +494,7 @@ class PayableController extends Controller
         // A3: nome da empresa (nunca código) também no detalhe.
         Payable::attachEmpresaNome([$payable]);
         Payable::attachFilialNome([$payable]);
+        Payable::attachSupplierDisplayName([$payable]);
         $payable->setAttribute(
             'document_pair_alert',
             PayableDocumentPairAlert::resolveFromDocuments($payable->documents, $payable->status),
@@ -507,13 +509,18 @@ class PayableController extends Controller
 
         // Approval steps (workflow multinível)
         $approvalSteps = ApprovalStep::where('payable_id', $id)
-            ->with(['assignee:id,name', 'resolver:id,name'])
+            ->with(['assignee:id,name', 'resolver:id,name', 'delegatee:id,name', 'delegationSetBy:id,name'])
             ->orderBy('order')
             ->get();
 
         $workflow = app(ApprovalWorkflowService::class);
         $currentStep = $workflow->currentStep($payable);
         $canApproveStep = $workflow->canUserApprove($payable, $user);
+        $canDelegateStep = $currentStep
+            && $workflow->canManageStepDelegation($user, $currentStep, $payable);
+        $delegateUsers = ($canDelegateStep || $user?->hasPermission('financeiro.workflows.delegar') || $user?->hasPermission('*'))
+            ? $workflow->delegateCandidateUsers()
+            : collect();
 
         return Inertia::render('Payables/Show', [
             'payable' => $payable,
@@ -533,6 +540,8 @@ class PayableController extends Controller
             'approvalSteps' => $approvalSteps,
             'currentStep' => $currentStep,
             'canApproveStep' => $canApproveStep,
+            'canDelegateStep' => $canDelegateStep,
+            'delegateUsers' => $delegateUsers,
             'mentionableUsers' => app(\App\Services\MentionService::class)->mentionableUsers($user, $id),
             'approvalPreview' => $workflow->buildPreviewStepsForSender($user),
             'canImportAllocations' => in_array($payable->status, self::ALLOCATION_IMPORT_STATUSES, true),
@@ -753,6 +762,64 @@ class PayableController extends Controller
         }
 
         return back()->with('success', $result['message']);
+    }
+
+    public function delegateApprovalStep(Request $request, int $id)
+    {
+        $payable = $this->findPayableForUser($id);
+
+        if ($payable->status !== 'aguardando_aprovacao') {
+            return back()->with('error', 'Este título não está aguardando aprovação.');
+        }
+
+        $data = $request->validate([
+            'step_id' => ['required', 'integer', 'exists:approval_steps,id'],
+            'delegate_user_id' => ['required', 'integer', 'exists:users,id'],
+            'expires_at' => ['nullable', 'date', 'after:today'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $step = ApprovalStep::where('payable_id', $payable->id)
+            ->whereKey($data['step_id'])
+            ->firstOrFail();
+
+        $delegate = User::whereKey($data['delegate_user_id'])->where('is_active', true)->firstOrFail();
+        $expiresAt = isset($data['expires_at']) ? \Carbon\Carbon::parse($data['expires_at']) : null;
+
+        $workflow = app(ApprovalWorkflowService::class);
+        $result = $workflow->delegateStep($step, $payable, $request->user(), $delegate, $expiresAt, $data['reason'] ?? null);
+
+        if (! ($result['ok'] ?? false)) {
+            return back()->with('error', $result['error'] ?? 'Não foi possível delegar.');
+        }
+
+        return back()->with('success', "Aprovação delegada para {$delegate->name}.");
+    }
+
+    public function revokeApprovalDelegation(Request $request, int $id)
+    {
+        $payable = $this->findPayableForUser($id);
+
+        if ($payable->status !== 'aguardando_aprovacao') {
+            return back()->with('error', 'Este título não está aguardando aprovação.');
+        }
+
+        $data = $request->validate([
+            'step_id' => ['required', 'integer', 'exists:approval_steps,id'],
+        ]);
+
+        $step = ApprovalStep::where('payable_id', $payable->id)
+            ->whereKey($data['step_id'])
+            ->firstOrFail();
+
+        $workflow = app(ApprovalWorkflowService::class);
+        $result = $workflow->revokeStepDelegation($step, $payable, $request->user());
+
+        if (! ($result['ok'] ?? false)) {
+            return back()->with('error', $result['error'] ?? 'Não foi possível remover delegação.');
+        }
+
+        return back()->with('success', 'Delegação removida.');
     }
 
     /**

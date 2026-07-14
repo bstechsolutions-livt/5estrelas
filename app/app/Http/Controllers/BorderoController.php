@@ -90,6 +90,7 @@ class BorderoController extends Controller
 
         Payable::attachEmpresaNome($bordero->payables);
         Payable::attachFilialNome($bordero->payables);
+        Payable::attachSupplierDisplayName($bordero->payables);
 
         $workflow = app(ApprovalWorkflowService::class);
         $actions = app(BorderoActionService::class);

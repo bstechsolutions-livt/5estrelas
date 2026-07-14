@@ -158,6 +158,9 @@ Route::middleware('auth')->group(function () {
         ->name('financeiro.dashboard.index');
  // Minhas Pendências de Aprovação (Financeiro)
  Route::get("financeiro/pendencias", [\App\Http\Controllers\ApprovalPendingController::class, "index"])->name("approval-pending.index");
+ Route::get('financeiro/presidencia', [\App\Http\Controllers\PresidencyDeskController::class, 'index'])
+     ->middleware('permission:financeiro.presidencia.painel')
+     ->name('presidency-desk.index');
  Route::get('financeiro/autorizacoes', [\App\Http\Controllers\AuthorizationPanelController::class, 'index'])
      ->middleware('permission:financeiro.contas_pagar.visualizar')
      ->name('authorization-panel.index');

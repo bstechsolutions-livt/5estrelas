@@ -817,7 +817,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </Column>
                     <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '20%' : '18%' }" sortable>
                         <template #body="{ data }">
-                            <span class="cell-truncate text-xs" :title="data.supplier_name" @click="goShow(data.id)">{{ data.supplier_name }}</span>
+                            <span class="cell-truncate text-xs" :title="data.supplier_display_name || data.supplier_name" @click="goShow(data.id)">{{ data.supplier_display_name || data.supplier_name }}</span>
                         </template>
                     </Column>
                     <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '18%' : '16%' }" sortable>

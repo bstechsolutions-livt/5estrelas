@@ -61,6 +61,18 @@ class User extends Authenticatable
         return $this->belongsToMany(Branch::class, 'branch_user');
     }
 
+    /** Quem este usuário cadastrou como representante (age em nome dele). */
+    public function representatives(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(UserRepresentative::class, 'user_id');
+    }
+
+    /** Para quem este usuário está cadastrado como representante. */
+    public function representing(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(UserRepresentative::class, 'representative_id');
+    }
+
     public function permissionKeys(): array
     {
         if ($this->cachedPermissions === null) {

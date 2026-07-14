@@ -8,15 +8,38 @@ import Button from 'primevue/button'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
+import DatePicker from 'primevue/datepicker'
+import Textarea from 'primevue/textarea'
+import Tag from 'primevue/tag'
 
 const props = defineProps({
     mode: { type: String, required: true },
     user: Object,
     departments: { type: Array, default: () => [] },
     branches: { type: Array, default: () => [] },
+    representativeCandidates: { type: Array, default: () => [] },
+    representatives: { type: Array, default: () => [] },
+    scopeOptions: { type: Array, default: () => [] },
 })
 
 const isEdit = computed(() => props.mode === 'edit')
+
+function toDate(value) {
+    if (!value) return null
+    if (value instanceof Date) return value
+    const [y, m, d] = String(value).slice(0, 10).split('-').map(Number)
+    return new Date(y, m - 1, d)
+}
+
+function toIsoDate(value) {
+    if (!value) return null
+    const d = value instanceof Date ? value : toDate(value)
+    if (!d || Number.isNaN(d.getTime())) return null
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+}
 
 const form = useForm({
     name: props.user?.name || '',
@@ -26,6 +49,16 @@ const form = useForm({
     department_id: props.user?.department_id || null,
     senior_cod_usu: props.user?.senior_cod_usu || null,
     branch_ids: props.user?.branch_ids || [],
+    representatives: (props.representatives || []).map((r) => ({
+        id: r.id || null,
+        representative_id: r.representative_id,
+        starts_at: toDate(r.starts_at),
+        ends_at: toDate(r.ends_at),
+        reason: r.reason || '',
+        scopes: r.scopes?.length ? [...r.scopes] : ['financeiro.aprovacao'],
+        is_active: r.is_active ?? true,
+        currently_active: r.currently_active ?? false,
+    })),
 })
 
 const branchOptions = computed(() =>
@@ -37,11 +70,48 @@ const departmentOptions = computed(() => [
     ...props.departments.map(d => ({ label: d.name, value: d.id })),
 ])
 
+const candidateOptions = computed(() =>
+    (props.representativeCandidates || []).map(u => ({
+        label: `${u.name} (${u.email})`,
+        value: u.id,
+    })),
+)
+
+function addRepresentative() {
+    form.representatives.push({
+        id: null,
+        representative_id: null,
+        starts_at: new Date(),
+        ends_at: null,
+        reason: '',
+        scopes: ['financeiro.aprovacao'],
+        is_active: true,
+        currently_active: false,
+    })
+}
+
+function removeRepresentative(index) {
+    form.representatives.splice(index, 1)
+}
+
 function submit() {
+    const payload = {
+        ...form.data(),
+        representatives: form.representatives.map((r) => ({
+            id: r.id,
+            representative_id: r.representative_id,
+            starts_at: toIsoDate(r.starts_at),
+            ends_at: toIsoDate(r.ends_at),
+            reason: r.reason || null,
+            scopes: r.scopes?.length ? r.scopes : ['financeiro.aprovacao'],
+            is_active: r.is_active ?? true,
+        })),
+    }
+
     if (isEdit.value) {
-        form.put(`/usuarios/${props.user.id}`)
+        form.transform(() => payload).put(`/usuarios/${props.user.id}`)
     } else {
-        form.post('/usuarios')
+        form.transform(() => payload).post('/usuarios')
     }
 }
 
@@ -156,6 +226,86 @@ function cancel() {
                             Usuário ativo
                         </label>
                     </div>
+                </div>
+
+                <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-semibold text-gray-800">Representantes</h2>
+                            <p class="text-sm text-gray-500 mt-1">
+                                Quem pode agir em nome deste usuário no período informado. Hoje vale para aprovar no Financeiro; outros módulos entram depois no mesmo cadastro.
+                            </p>
+                        </div>
+                        <Button type="button" label="Adicionar" icon="pi pi-plus" size="small" outlined @click="addRepresentative" />
+                    </div>
+
+                    <div v-if="!form.representatives.length" class="text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">
+                        Nenhum representante cadastrado.
+                    </div>
+
+                    <div
+                        v-for="(rep, index) in form.representatives"
+                        :key="rep.id || `new-${index}`"
+                        class="border border-gray-200 rounded-lg p-4 space-y-3"
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium text-gray-700">Representante {{ index + 1 }}</span>
+                                <Tag v-if="rep.currently_active" value="Vigente agora" severity="success" />
+                            </div>
+                            <Button type="button" icon="pi pi-trash" severity="danger" text rounded @click="removeRepresentative(index)" />
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Pessoa</label>
+                            <Select
+                                v-model="rep.representative_id"
+                                :options="candidateOptions"
+                                option-label="label"
+                                option-value="value"
+                                placeholder="Selecione o representante"
+                                filter
+                                class="w-full"
+                            />
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1.5">Início</label>
+                                <DatePicker v-model="rep.starts_at" date-format="dd/mm/yy" class="w-full" show-icon />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1.5">Fim</label>
+                                <DatePicker v-model="rep.ends_at" date-format="dd/mm/yy" class="w-full" show-icon :min-date="rep.starts_at || undefined" />
+                                <p class="text-xs text-gray-500 mt-1">Vazio = sem data final.</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Escopos</label>
+                            <MultiSelect
+                                v-model="rep.scopes"
+                                :options="scopeOptions"
+                                option-label="label"
+                                option-value="value"
+                                placeholder="Onde o representante pode agir"
+                                display="chip"
+                                class="w-full"
+                            />
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Motivo</label>
+                            <Textarea v-model="rep.reason" rows="2" class="w-full" placeholder="Ex.: férias, viagem, afastamento..." />
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <ToggleSwitch v-model="rep.is_active" :inputId="`rep-active-${index}`" />
+                            <label :for="`rep-active-${index}`" class="text-sm font-medium text-gray-700 cursor-pointer">Ativo</label>
+                        </div>
+                    </div>
+
+                    <small v-if="form.errors.representatives" class="text-red-500 text-xs block">{{ form.errors.representatives }}</small>
                 </div>
 
                 <div class="flex justify-end gap-3">

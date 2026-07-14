@@ -45,7 +45,7 @@ class FornecedoresSyncService
     /**
      * Delta: busca na Senior só os codFor que aparecem em títulos e ainda não estão no cache.
      */
-    public function syncMissingFromPayables(string $trigger = 'manual'): array
+    public function syncMissingFromPayables(string $trigger = 'manual', ?int $maxLookups = null): array
     {
         if (!config('senior.enabled', false)) {
             return $this->skippedResult();
@@ -63,6 +63,9 @@ class FornecedoresSyncService
 
         foreach ($missingByEmp as $codEmp => $missingList) {
             foreach ($missingList as $codFor) {
+                if ($maxLookups !== null && $lookedUp >= $maxLookups) {
+                    break 2;
+                }
                 if ($codFor < 1) {
                     continue;
                 }
@@ -102,6 +105,7 @@ class FornecedoresSyncService
                 'enriched' => $enriched,
                 'enriched_desc' => $enrichedDesc,
                 'errors' => $errors,
+                'max_lookups' => $maxLookups,
             ]);
         }
 
@@ -246,19 +250,32 @@ class FornecedoresSyncService
             ->whereNotNull('codemp')
             ->whereNotNull('codfor')
             ->chunkById(200, function ($payables) use (&$count) {
+                $pairs = $payables
+                    ->map(fn (Payable $p) => (int) $p->codemp . '-' . (int) $p->codfor)
+                    ->unique()
+                    ->values();
+
+                $supplierByPair = SeniorSupplier::query()
+                    ->where(function ($q) use ($pairs) {
+                        foreach ($pairs as $pair) {
+                            [$codEmp, $codFor] = explode('-', $pair, 2);
+                            $q->orWhere(fn ($qq) => $qq->where('cod_emp', (int) $codEmp)->where('cod_for', (int) $codFor));
+                        }
+                    })
+                    ->get()
+                    ->keyBy(fn (SeniorSupplier $s) => $s->cod_emp . '-' . $s->cod_for);
+
                 foreach ($payables as $payable) {
-                    $supplier = SeniorSupplier::where('cod_emp', (int) $payable->codemp)
-                        ->where('cod_for', (int) $payable->codfor)
-                        ->first();
-                    if (!$supplier) {
-                        continue;
-                    }
+                    $key = (int) $payable->codemp . '-' . (int) $payable->codfor;
+                    $supplier = $supplierByPair->get($key);
+                    $resolved = $this->displayNameResolver->resolveForPayable($payable, $supplier);
+
                     $dirty = false;
-                    if ($payable->supplier_name !== $supplier->name) {
-                        $payable->supplier_name = $supplier->name;
+                    if ($payable->supplier_name !== $resolved) {
+                        $payable->supplier_name = $resolved;
                         $dirty = true;
                     }
-                    if ($supplier->cnpj && $payable->supplier_cnpj !== $supplier->cnpj) {
+                    if ($supplier?->cnpj && $payable->supplier_cnpj !== $supplier->cnpj) {
                         $payable->supplier_cnpj = $supplier->cnpj;
                         $dirty = true;
                     }

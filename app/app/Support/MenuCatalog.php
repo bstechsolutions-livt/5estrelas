@@ -18,6 +18,7 @@ class MenuCatalog
         return [
             // Plano de Voo (sempre primeiro)
             ['key' => 'dashboard', 'label' => 'Painel de Entrada', 'icon' => 'pi pi-home', 'href' => '/dashboard', 'permission' => null, 'group' => 'Plano de Voo'],
+            ['key' => 'presidencia_desk', 'label' => 'Assinaturas', 'icon' => 'pi pi-verified', 'href' => '/financeiro/presidencia', 'permission' => 'financeiro.presidencia.painel', 'group' => 'Plano de Voo'],
 
             // Cadastros
             ['key' => 'departamentos', 'label' => 'Departamentos', 'icon' => 'pi pi-building', 'href' => '/departamentos', 'permission' => 'departamentos.gerenciar', 'group' => 'Cadastros'],

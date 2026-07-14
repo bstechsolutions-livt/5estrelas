@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Senior\SupplierDisplayNameResolver;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -490,6 +491,45 @@ class Payable extends Model
 
             $p->setAttribute('filial_nome', $nome);
             $p->setAttribute('filial_label', self::formatFilialLabel($p->codfil, $nome));
+        }
+    }
+
+    /**
+     * Nome do fornecedor para exibição (cadastro Senior → nome válido → GFD/TRCT → código).
+     *
+     * @param iterable<Payable> $payables
+     */
+    public static function attachSupplierDisplayName(iterable $payables): void
+    {
+        $items = collect($payables);
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $pairs = $items
+            ->filter(fn (Payable $p) => $p->codemp && $p->codfor)
+            ->map(fn (Payable $p) => (int) $p->codemp . '-' . (int) $p->codfor)
+            ->unique()
+            ->values();
+
+        $supplierByPair = $pairs->isEmpty()
+            ? collect()
+            : SeniorSupplier::query()
+                ->where(function ($q) use ($pairs) {
+                    foreach ($pairs as $pair) {
+                        [$codEmp, $codFor] = explode('-', $pair, 2);
+                        $q->orWhere(fn ($qq) => $qq->where('cod_emp', (int) $codEmp)->where('cod_for', (int) $codFor));
+                    }
+                })
+                ->get()
+                ->keyBy(fn (SeniorSupplier $s) => $s->cod_emp . '-' . $s->cod_for);
+
+        $resolver = new SupplierDisplayNameResolver();
+
+        foreach ($items as $p) {
+            $key = ($p->codemp && $p->codfor) ? ((int) $p->codemp . '-' . (int) $p->codfor) : null;
+            $supplier = $key && $supplierByPair->has($key) ? $supplierByPair[$key] : null;
+            $p->setAttribute('supplier_display_name', $resolver->resolveForPayable($p, $supplier));
         }
     }
 

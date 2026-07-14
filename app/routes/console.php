@@ -28,22 +28,27 @@ if (config('senior.enabled', false)) {
 
     Schedule::command('senior:sync-payables --scheduled')
         ->cron($cron)
-        ->withoutOverlapping(); // req 6.4: sem execução concorrente
+        ->withoutOverlapping(30) // libera mutex se travar >30 min
+        ->runInBackground();
 
     // Sync de filiais/empresas (cad_filial) — muda pouco, roda 1x/dia de madrugada.
     Schedule::command('senior:sync-filiais --scheduled')
         ->dailyAt('03:20')
-        ->withoutOverlapping();
+        ->withoutOverlapping()
+        ->runInBackground();
 
     // Fornecedores: on-demand no pós-sync de CP (syncMissingFromPayables) — sem catálogo full.
 
+    // CR a cada hora (varredura é pesada; não disputa o loop de 5 min do CP).
     Schedule::command('senior:sync-receivables --scheduled')
-        ->cron($cron)
-        ->withoutOverlapping();
+        ->hourly()
+        ->withoutOverlapping(90)
+        ->runInBackground();
 
     Schedule::command('senior:sync-chart-of-accounts')
         ->dailyAt('03:45')
-        ->withoutOverlapping();
+        ->withoutOverlapping()
+        ->runInBackground();
 }
 
 // Borderôs automáticos — regras ativas rodam diariamente às 6h.

@@ -32,6 +32,8 @@ const props = defineProps({
     approvalSteps: { type: Array, default: () => [] },
     currentStep: { type: Object, default: null },
     canApproveStep: { type: Boolean, default: false },
+    canDelegateStep: { type: Boolean, default: false },
+    delegateUsers: { type: Array, default: () => [] },
     canFinalSign: { type: Boolean, default: false },
     canEditDueDate: { type: Boolean, default: false },
     canManagePriority: { type: Boolean, default: false },
@@ -73,6 +75,62 @@ const toast = useToast()
 const commentForm = useForm({ body: '' })
 const showRejectDialog = ref(false)
 const rejectForm = useForm({ reason: '' })
+const showDelegateDialog = ref(false)
+const delegateForm = useForm({
+    step_id: null,
+    delegate_user_id: null,
+    expires_at: null,
+    reason: '',
+})
+const delegateUserOptions = computed(() =>
+    (props.delegateUsers || []).map(u => ({ label: u.name, value: u.id }))
+)
+
+function stepDisplayName(step) {
+    if (step.delegatee?.name) {
+        const original = step.assignee?.name
+        return original ? `${original} → ${step.delegatee.name}` : step.delegatee.name
+    }
+    return step.assignee?.name || step.level_name
+}
+
+function isDelegationActive(step) {
+    if (!step.delegated_to || step.status !== 'pendente') return false
+    if (!step.delegation_expires_at) return true
+    return new Date(step.delegation_expires_at) >= new Date()
+}
+
+function openDelegateDialog() {
+    if (!props.currentStep) return
+    delegateForm.step_id = props.currentStep.id
+    delegateForm.delegate_user_id = props.currentStep.delegatee?.id || null
+    delegateForm.expires_at = null
+    delegateForm.reason = props.currentStep.delegation_reason || ''
+    showDelegateDialog.value = true
+}
+
+function submitDelegate() {
+    delegateForm
+        .transform((data) => ({
+            ...data,
+            expires_at: data.expires_at ? toYmd(data.expires_at) : null,
+        }))
+        .post(`/financeiro/contas-pagar/${props.payable.id}/delegar-etapa`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                showDelegateDialog.value = false
+                delegateForm.reset()
+            },
+        })
+}
+
+function revokeDelegation() {
+    if (!props.currentStep?.delegated_to) return
+    router.delete(`/financeiro/contas-pagar/${props.payable.id}/delegar-etapa`, {
+        data: { step_id: props.currentStep.id },
+        preserveScroll: true,
+    })
+}
 
 // ── @Mention autocomplete ──
 const mentionQuery = ref('')
@@ -585,7 +643,7 @@ const centroCusto = computed(() => {
                             <div class="col-span-2 border-t border-gray-100 pt-3 mt-1">
                                 <PayableFieldOriginLabel v-if="fieldOrigins" label="Fornecedor" field="supplier_name" :field-origins="fieldOrigins" />
                                 <p v-else class="text-xs text-gray-500">Fornecedor</p>
-                                <p class="text-gray-800 font-medium">{{ payable.supplier_name || '—' }}</p>
+                                <p class="text-gray-800 font-medium">{{ payable.supplier_display_name || payable.supplier_name || '—' }}</p>
                             </div>
                         </div>
                     </div>
@@ -866,7 +924,11 @@ const centroCusto = computed(() => {
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <p class="text-xs font-medium" :class="step.status === 'aprovado' ? 'text-green-700' : step.status === 'reprovado' ? 'text-red-700' : currentStep?.id === step.id ? 'text-blue-700' : 'text-gray-500'">
-                                        {{ step.assignee?.name || step.level_name }}
+                                        {{ stepDisplayName(step) }}
+                                    </p>
+                                    <p v-if="isDelegationActive(step)" class="text-[10px] text-amber-600">
+                                        Delegado{{ step.delegation_expires_at ? ` até ${formatDate(step.delegation_expires_at)}` : '' }}
+                                        <span v-if="step.delegation_set_by"> por {{ step.delegation_set_by.name }}</span>
                                     </p>
                                     <p v-if="step.resolver" class="text-[10px] text-gray-400">
                                         {{ step.status === 'aprovado' ? 'Aprovado' : 'Reprovado' }} por {{ step.resolver.name }}
@@ -879,6 +941,28 @@ const centroCusto = computed(() => {
                             <p class="text-xs text-blue-600 font-medium mb-2">Sua vez: {{ currentStep?.level_name }}</p>
                             <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="openApprove" />
                             <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="showRejectDialog = true" />
+                        </div>
+                        <div v-if="canDelegateStep" class="space-y-2 mt-3 pt-3 border-t border-gray-100">
+                            <p class="text-[11px] text-gray-500">Aprovador indisponível? Indique quem aprova temporariamente nesta etapa.</p>
+                            <Button
+                                :label="isDelegationActive(currentStep) ? 'Alterar substituto' : 'Delegar aprovação'"
+                                icon="pi pi-user-plus"
+                                severity="secondary"
+                                outlined
+                                class="w-full"
+                                size="small"
+                                @click="openDelegateDialog"
+                            />
+                            <Button
+                                v-if="isDelegationActive(currentStep)"
+                                label="Remover delegação"
+                                icon="pi pi-user-minus"
+                                severity="secondary"
+                                text
+                                class="w-full"
+                                size="small"
+                                @click="revokeDelegation"
+                            />
                         </div>
                     </div>
 
@@ -1056,6 +1140,39 @@ const centroCusto = computed(() => {
             <template #footer>
                 <Button label="Cancelar" severity="secondary" text @click="showPayment = false" />
                 <Button label="Confirmar pagamento" icon="pi pi-check" severity="success" :loading="paymentForm.processing" dusk="confirm-payment" @click="submitPayment" />
+            </template>
+        </Dialog>
+
+        <Dialog v-model:visible="showDelegateDialog" modal header="Delegar aprovação" :style="{ width: isMobile ? '95vw' : '420px' }">
+            <div class="space-y-3 pt-1">
+                <p class="text-sm text-gray-600">
+                    O substituto poderá aprovar ou reprovar <strong>em nome do aprovador desta etapa</strong>, até a data limite (se informada).
+                </p>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Substituto *</label>
+                    <Select
+                        v-model="delegateForm.delegate_user_id"
+                        :options="delegateUserOptions"
+                        option-label="label"
+                        option-value="value"
+                        placeholder="Selecione o usuário"
+                        filter
+                        class="w-full"
+                    />
+                    <p v-if="delegateForm.errors.delegate_user_id" class="text-xs text-red-500 mt-1">{{ delegateForm.errors.delegate_user_id }}</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Válido até (opcional)</label>
+                    <DatePicker v-model="delegateForm.expires_at" date-format="dd/mm/yy" :min-date="new Date()" class="w-full" show-icon />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Motivo (opcional)</label>
+                    <Textarea v-model="delegateForm.reason" rows="2" class="w-full" placeholder="Ex.: férias, viagem..." />
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Cancelar" severity="secondary" text @click="showDelegateDialog = false" />
+                <Button label="Confirmar delegação" icon="pi pi-user-plus" :loading="delegateForm.processing" :disabled="!delegateForm.delegate_user_id" @click="submitDelegate" />
             </template>
         </Dialog>
 

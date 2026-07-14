@@ -7,7 +7,6 @@ use App\Models\Payable;
 use App\Models\PayableSyncRun;
 use App\Support\PayableEmpresaExclusion;
 use App\Services\AuditLogger;
-use App\Support\PayableEmpresaExclusion;
 use App\Support\SeniorDueDatePolicy;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -152,7 +151,9 @@ class PayablesSyncService
     private function syncMissingSuppliersAfterPayables(): void
     {
         try {
-            $r = FornecedoresSyncService::make()->syncMissingFromPayables('pos-payables');
+            // Limita o delta pós-CP: ConsultarGeral não filtra por codFor e cada
+            // lookup pode levar minutos. O restante fica no próximo sync / comando dedicado.
+            $r = FornecedoresSyncService::make()->syncMissingFromPayables('pos-payables', maxLookups: 25);
             if (($r['looked_up'] ?? 0) > 0 || ($r['enriched'] ?? 0) > 0) {
                 Log::info('[senior-cp] fornecedores delta pós-sync', $r);
             }

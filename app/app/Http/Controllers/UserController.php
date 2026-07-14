@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\User;
+use App\Models\UserRepresentative;
 use App\Services\AuditLogger;
+use App\Services\UserRepresentativeService;
 use App\Support\DefaultUserPassword;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -50,6 +52,9 @@ class UserController extends Controller
             'user' => null,
             'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'branches' => $this->branchOptions(),
+            'representativeCandidates' => $this->representativeCandidates(),
+            'representatives' => [],
+            'scopeOptions' => $this->scopeOptions(),
         ]);
     }
 
@@ -64,6 +69,15 @@ class UserController extends Controller
             'senior_cod_usu' => ['nullable', 'integer', 'min:1'],
             'branch_ids' => ['nullable', 'array'],
             'branch_ids.*' => ['integer', 'exists:branches,id'],
+            'representatives' => ['nullable', 'array'],
+            'representatives.*.id' => ['nullable', 'integer'],
+            'representatives.*.representative_id' => ['required', 'integer', 'exists:users,id'],
+            'representatives.*.starts_at' => ['required', 'date'],
+            'representatives.*.ends_at' => ['nullable', 'date', 'after_or_equal:representatives.*.starts_at'],
+            'representatives.*.reason' => ['nullable', 'string', 'max:500'],
+            'representatives.*.scopes' => ['nullable', 'array'],
+            'representatives.*.scopes.*' => ['string'],
+            'representatives.*.is_active' => ['boolean'],
         ]);
 
         $user = User::create([
@@ -90,10 +104,12 @@ class UserController extends Controller
             );
         }
 
+        app(UserRepresentativeService::class)->syncForUser($user, $data['representatives'] ?? [], $request->user());
+
         return redirect('/usuarios')->with('success', 'Usuário criado com sucesso.');
     }
 
-    public function edit(int $id)
+    public function edit(int $id, UserRepresentativeService $reps)
     {
         $user = User::with('branches:id')->findOrFail($id);
 
@@ -110,6 +126,9 @@ class UserController extends Controller
             ],
             'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'branches' => $this->branchOptions(),
+            'representativeCandidates' => $this->representativeCandidates($user->id),
+            'representatives' => $reps->payloadForUser($user),
+            'scopeOptions' => $this->scopeOptions(),
         ]);
     }
 
@@ -126,6 +145,15 @@ class UserController extends Controller
             'senior_cod_usu' => ['nullable', 'integer', 'min:1'],
             'branch_ids' => ['nullable', 'array'],
             'branch_ids.*' => ['integer', 'exists:branches,id'],
+            'representatives' => ['nullable', 'array'],
+            'representatives.*.id' => ['nullable', 'integer'],
+            'representatives.*.representative_id' => ['required', 'integer', 'exists:users,id', Rule::notIn([$user->id])],
+            'representatives.*.starts_at' => ['required', 'date'],
+            'representatives.*.ends_at' => ['nullable', 'date', 'after_or_equal:representatives.*.starts_at'],
+            'representatives.*.reason' => ['nullable', 'string', 'max:500'],
+            'representatives.*.scopes' => ['nullable', 'array'],
+            'representatives.*.scopes.*' => ['string'],
+            'representatives.*.is_active' => ['boolean'],
         ]);
 
         $user->name = $data['name'];
@@ -158,6 +186,16 @@ class UserController extends Controller
             );
         }
 
+        app(UserRepresentativeService::class)->syncForUser($user, $data['representatives'] ?? [], $request->user());
+
+        AuditLogger::log(
+            event: 'usuarios.representantes_atualizados',
+            module: 'usuarios',
+            description: "Representantes de {$user->name} atualizados",
+            auditable: $user,
+            newValues: ['count' => count($data['representatives'] ?? [])],
+        );
+
         return redirect('/usuarios')->with('success', 'Usuário atualizado com sucesso.');
     }
 
@@ -185,6 +223,33 @@ class UserController extends Controller
             ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
             ->values()
             ->all();
+    }
+
+    /** @return list<array{id:int,name:string,email:string}> */
+    private function representativeCandidates(?int $exceptUserId = null): array
+    {
+        return User::query()
+            ->where('is_active', true)
+            ->when($exceptUserId, fn ($q) => $q->whereKeyNot($exceptUserId))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email'])
+            ->map(fn (User $u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+            ])
+            ->all();
+    }
+
+    /** @return list<array{value:string,label:string}> */
+    private function scopeOptions(): array
+    {
+        return [
+            [
+                'value' => UserRepresentative::SCOPE_FINANCEIRO_APROVACAO,
+                'label' => 'Aprovar no Financeiro (Contas a Pagar)',
+            ],
+        ];
     }
 
     public function toggleActive(int $id, Request $request)

@@ -405,7 +405,7 @@ const currentTotal = computed(() => {
                 <div class="flex items-start justify-between gap-2 mb-1">
                     <div class="flex items-center gap-2 flex-1 min-w-0">
                         <i v-if="selectionMode" :class="['pi', isSelected(p.id) ? 'pi-check-circle text-blue-600' : 'pi-circle text-gray-300']"></i>
-                        <p class="text-sm font-medium text-gray-800 truncate flex-1">{{ p.supplier_name }}</p>
+                        <p class="text-sm font-medium text-gray-800 truncate flex-1">{{ p.supplier_display_name || p.supplier_name }}</p>
                     </div>
                     <Tag
                         v-if="!['pago', 'aguardando_conciliacao', 'conciliado'].includes(status) && p.workflow_moment"
