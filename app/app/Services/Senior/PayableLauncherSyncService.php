@@ -2,7 +2,9 @@
 
 namespace App\Services\Senior;
 
+use App\Models\Department;
 use App\Models\Payable;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -316,11 +318,33 @@ class PayableLauncherSyncService
             return 'looked';
         }
 
-        $payable->update([
-            'senior_cod_usu' => $usuGer,
-        ]);
+        $payable->update($this->launcherUpdatePayload($payable, $usuGer));
 
         return 'updated';
+    }
+
+    /**
+     * @return array{senior_cod_usu: int, department_id?: int}
+     */
+    private function launcherUpdatePayload(Payable $payable, int $usuGer): array
+    {
+        $payload = ['senior_cod_usu' => $usuGer];
+        $financeiroId = Department::financeDepartmentId();
+
+        $user = User::query()
+            ->where('senior_cod_usu', $usuGer)
+            ->whereNotNull('department_id')
+            ->first();
+        if ($user?->department_id) {
+            $dept = Department::query()->find($user->department_id);
+            if ($dept && $dept->is_active) {
+                if ($payable->department_id === null || (int) $payable->department_id === (int) $financeiroId) {
+                    $payload['department_id'] = (int) $dept->id;
+                }
+            }
+        }
+
+        return $payload;
     }
 
     private function applyBulkConsultarGeral(int $codEmp, int $codFil): int
@@ -357,9 +381,7 @@ class PayableLauncherSyncService
 
             $payables = $query->get();
             foreach ($payables as $payable) {
-                $payable->update([
-                    'senior_cod_usu' => $usuGer,
-                ]);
+                $payable->update($this->launcherUpdatePayload($payable, $usuGer));
                 $updated++;
             }
         }

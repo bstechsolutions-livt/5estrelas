@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\Department;
 use App\Models\Payable;
 use App\Models\PayableSyncRun;
 use App\Models\SeniorSupplier;
+use App\Models\User;
 use App\Services\Senior\FornecedoresSyncService;
 use App\Services\Senior\PayableLauncherSyncService;
 use App\Services\Senior\PayableMapper;
@@ -18,7 +20,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Pós-sync automático: UsuGer (depto) + nome do fornecedor nos inserts.
+ * Pós-sync automático: UsuGer (depto) + nome do fornecedor nos inserts e updates.
  */
 class PayablePostSyncEnrichTest extends TestCase
 {
@@ -182,5 +184,156 @@ class PayablePostSyncEnrichTest extends TestCase
         $this->assertSame(PayableSyncRun::STATUS_SUCCESS, $run->status);
         $payable = Payable::where('title_number', '9730171/36')->firstOrFail();
         $this->assertSame('PROGIRO SERVICOS LTDA', $payable->supplier_name);
+    }
+
+    public function test_resync_preenche_fornecedor_quando_cache_chega_depois(): void
+    {
+        config([
+            'senior.enabled' => true,
+            'senior.cod_emps' => [8],
+            'senior.emp_enabled' => [],
+            'senior.cp_strategy' => 'sweep',
+            'senior.cod_for_start' => 219,
+            'senior.cod_for_end' => 219,
+            'senior.post_sync_launcher_lookups' => 0,
+            'senior.post_sync_supplier_lookups' => 0,
+        ]);
+
+        $titulo = [
+            'codEmp' => 8, 'codFil' => 1, 'numTit' => '9730171/36', 'codTpt' => '01', 'codFor' => 219,
+            'sitTit' => 'NOR', 'vlrOri' => 100.0, 'vlrAbe' => 100.0, 'vctPro' => '2026-08-01',
+            'rateios' => [['perRat' => 100, 'vlrRat' => 100.0, 'seqRat' => 1]],
+        ];
+
+        $fakeCp = new class([$titulo]) extends SeniorCpClient {
+            public function __construct(private array $fakeTitulos)
+            {
+                parent::__construct(config('senior'));
+            }
+
+            public function consultarTitulosPorFornecedor(int $codEmp, int $codFor, ?Carbon $vctIni, ?Carbon $vctFim): array
+            {
+                return $this->fakeTitulos;
+            }
+        };
+
+        $service = new PayablesSyncService($fakeCp, new PayableMapper(), new StatusMapper());
+        $service->run(PayableSyncRun::MODE_FULL);
+
+        $payable = Payable::where('title_number', '9730171/36')->firstOrFail();
+        $this->assertTrue((new \App\Services\Senior\SupplierDisplayNameResolver())->isGeneric($payable->supplier_name));
+
+        SeniorSupplier::create([
+            'cod_emp' => 8,
+            'cod_for' => 219,
+            'name' => 'PROGIRO SERVICOS LTDA',
+            'senior_synced_at' => now(),
+        ]);
+
+        // Raw igual — ainda assim deve preencher o nome a partir do cache.
+        $service->run(PayableSyncRun::MODE_FULL);
+
+        $this->assertSame('PROGIRO SERVICOS LTDA', $payable->fresh()->supplier_name);
+    }
+
+    public function test_depto_vem_do_usuario_do_usuger(): void
+    {
+        $compras = Department::create(['name' => 'Compras', 'slug' => 'compras', 'is_active' => true]);
+        Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
+        User::factory()->create([
+            'is_active' => true,
+            'senior_cod_usu' => 55,
+            'department_id' => $compras->id,
+        ]);
+
+        $payable = Payable::create([
+            'title_number' => 'T-USU',
+            'supplier_name' => 'ACME',
+            'amount' => 10,
+            'due_date' => '2026-08-01',
+            'status' => 'pendente',
+            'senior_cod_usu' => 55,
+        ]);
+
+        $assigned = (new PayablesSyncService(
+            new class extends SeniorCpClient {
+                public function __construct()
+                {
+                    parent::__construct(config('senior'));
+                }
+            },
+            new PayableMapper(),
+            new StatusMapper(),
+        ))->resolveDepartmentsAfterSync([$payable->id]);
+
+        $this->assertSame(1, $assigned);
+        $this->assertSame($compras->id, (int) $payable->fresh()->department_id);
+    }
+
+    public function test_depto_fallback_financeiro_quando_sem_lancador(): void
+    {
+        $financeiro = Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
+
+        $payable = Payable::create([
+            'title_number' => 'T-FIN',
+            'supplier_name' => 'ACME',
+            'amount' => 10,
+            'due_date' => '2026-08-01',
+            'status' => 'pendente',
+        ]);
+
+        $assigned = (new PayablesSyncService(
+            new class extends SeniorCpClient {
+                public function __construct()
+                {
+                    parent::__construct(config('senior'));
+                }
+            },
+            new PayableMapper(),
+            new StatusMapper(),
+        ))->resolveDepartmentsAfterSync([$payable->id]);
+
+        $this->assertSame(1, $assigned);
+        $this->assertSame($financeiro->id, (int) $payable->fresh()->department_id);
+    }
+
+    public function test_sync_insert_aplica_fallback_financeiro(): void
+    {
+        $financeiro = Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
+
+        config([
+            'senior.enabled' => true,
+            'senior.cod_emps' => [8],
+            'senior.emp_enabled' => [],
+            'senior.cp_strategy' => 'sweep',
+            'senior.cod_for_start' => 219,
+            'senior.cod_for_end' => 219,
+            'senior.post_sync_launcher_lookups' => 0,
+            'senior.post_sync_supplier_lookups' => 0,
+        ]);
+
+        $titulo = [
+            'codEmp' => 8, 'codFil' => 1, 'numTit' => 'T-FB', 'codTpt' => '01', 'codFor' => 219,
+            'sitTit' => 'NOR', 'vlrOri' => 50.0, 'vlrAbe' => 50.0, 'vctPro' => '2026-08-01',
+            'rateios' => [['perRat' => 100, 'vlrRat' => 50.0, 'seqRat' => 1]],
+        ];
+
+        $fakeCp = new class([$titulo]) extends SeniorCpClient {
+            public function __construct(private array $fakeTitulos)
+            {
+                parent::__construct(config('senior'));
+            }
+
+            public function consultarTitulosPorFornecedor(int $codEmp, int $codFor, ?Carbon $vctIni, ?Carbon $vctFim): array
+            {
+                return $this->fakeTitulos;
+            }
+        };
+
+        (new PayablesSyncService($fakeCp, new PayableMapper(), new StatusMapper()))
+            ->run(PayableSyncRun::MODE_FULL);
+
+        $payable = Payable::where('title_number', 'T-FB')->firstOrFail();
+        $this->assertSame($financeiro->id, (int) $payable->department_id);
     }
 }
