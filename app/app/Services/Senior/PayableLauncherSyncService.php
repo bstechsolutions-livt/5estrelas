@@ -78,7 +78,9 @@ class PayableLauncherSyncService
             $query->where('codfil', $codFil);
         }
 
-        $query->orderByDesc('id')->chunkById(100, function ($chunk) use (
+        // chunkById (ASC) ignorava orderByDesc e consumia o --max nos títulos
+        // mais antigos sem UsuGer — lançamentos novos ficavam sem departamento.
+        $query->chunkByIdDesc(100, function ($chunk) use (
             &$lookedUp, &$updated, &$errors, &$skipped, $maxLookups
         ) {
             foreach ($chunk as $payable) {
