@@ -117,6 +117,22 @@ class PayablesSyncServiceTest extends TestCase
 
     // ─── Upsert + idempotência (req 4) ──────────────────────────────────────────
 
+
+    public function test_sync_preserva_senior_cod_usu_enrichido(): void
+    {
+        config(['senior.enabled' => true]);
+        $titulo = $this->titulo('TIT-KEEP');
+        $this->service([$titulo])->run(PayableSyncRun::MODE_FULL);
+
+        $payable = Payable::where('title_number', 'TIT-KEEP')->firstOrFail();
+        $payable->update(['senior_cod_usu' => 166]);
+
+        $titulo['obsTcp'] = 'alterado';
+        $this->service([$titulo])->run(PayableSyncRun::MODE_FULL);
+
+        $this->assertSame(166, (int) $payable->fresh()->senior_cod_usu);
+    }
+
     public function test_insere_e_e_idempotente(): void
     {
         config(['senior.enabled' => true]);
