@@ -309,6 +309,54 @@ class PayableController extends Controller
         if ($status === 'pendente') {
             $query->whereNull('bordero_id');
         }
+
+        $this->applyPayablesListFilters($query, $request, $departmentContext['department_id'], $user);
+        $this->applyPayablesOrdering($query, $request->input('sort'), $request->input('dir'));
+
+        $payables = $query->paginate($this->resolvePerPage($request, $defaultPerPage))->withQueryString();
+
+        Payable::attachEmpresaNome($payables->getCollection());
+        Payable::attachFilialNome($payables->getCollection());
+        Payable::attachSupplierDisplayName($payables->getCollection());
+        Payable::attachDepartmentNome($payables->getCollection());
+        PayableDocumentPairAlert::attachToPayables($payables->getCollection());
+        Payable::attachOrigemHub($payables->getCollection());
+        Payable::attachOrigemSenior($payables->getCollection());
+        Payable::attachPriorityMeta($payables->getCollection());
+        Payable::attachWorkflowMoment($payables->getCollection());
+
+        // Totals das abas: mesmos filtros da lista (exceto status da aba ativa).
+        $totalsQuery = Payable::query()
+            ->excludeMissingInSenior()
+            ->where(function ($q) {
+                $q->where('status', '!=', 'pendente')
+                    ->orWhereNull('bordero_id');
+            });
+        $this->applyPayablesListFilters($totalsQuery, $request, $departmentContext['department_id'], $user);
+        $totals = $totalsQuery
+            ->selectRaw('status, count(*) as count, coalesce(sum(amount), 0) as total')
+            ->groupBy('status')
+            ->get()
+            ->keyBy('status');
+
+        return [
+            'payables' => $payables,
+            'status' => $status,
+            'departmentContext' => $departmentContext,
+            'totals' => $totals,
+        ];
+    }
+
+    /**
+     * Filtros compartilhados entre a listagem e as contagens das abas de status.
+     * Não aplica o status da aba (isso fica a cargo do caller).
+     */
+    private function applyPayablesListFilters(
+        \Illuminate\Database\Eloquent\Builder $query,
+        Request $request,
+        ?int $departmentId,
+        ?User $user,
+    ): void {
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
@@ -349,42 +397,8 @@ class PayableController extends Controller
                 $query->where('payment_priority', $request->payment_priority);
             }
         }
-        app(FinanceiroDepartmentScope::class)->applyFilter($query, $departmentContext['department_id']);
+        app(FinanceiroDepartmentScope::class)->applyFilter($query, $departmentId);
         app(PayableBranchScope::class)->applyFilter($query, $user);
-        $this->applyPayablesOrdering($query, $request->input('sort'), $request->input('dir'));
-
-        $payables = $query->paginate($this->resolvePerPage($request, $defaultPerPage))->withQueryString();
-
-        Payable::attachEmpresaNome($payables->getCollection());
-        Payable::attachFilialNome($payables->getCollection());
-        Payable::attachSupplierDisplayName($payables->getCollection());
-        Payable::attachDepartmentNome($payables->getCollection());
-        PayableDocumentPairAlert::attachToPayables($payables->getCollection());
-        Payable::attachOrigemHub($payables->getCollection());
-        Payable::attachOrigemSenior($payables->getCollection());
-        Payable::attachPriorityMeta($payables->getCollection());
-        Payable::attachWorkflowMoment($payables->getCollection());
-
-        $totalsQuery = Payable::query()
-            ->excludeMissingInSenior()
-            ->where(function ($q) {
-                $q->where('status', '!=', 'pendente')
-                    ->orWhereNull('bordero_id');
-            });
-        app(FinanceiroDepartmentScope::class)->applyFilter($totalsQuery, $departmentContext['department_id']);
-        app(PayableBranchScope::class)->applyFilter($totalsQuery, $user);
-        $totals = $totalsQuery
-            ->selectRaw("status, count(*) as count, coalesce(sum(amount), 0) as total")
-            ->groupBy('status')
-            ->get()
-            ->keyBy('status');
-
-        return [
-            'payables' => $payables,
-            'status' => $status,
-            'departmentContext' => $departmentContext,
-            'totals' => $totals,
-        ];
     }
 
     private function resolvePerPage(Request $request, int $default): int

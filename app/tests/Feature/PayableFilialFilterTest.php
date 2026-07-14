@@ -117,6 +117,53 @@ class PayableFilialFilterTest extends TestCase
         $this->assertSame(['Fornecedor Gerencial'], $names);
     }
 
+    public function test_totals_das_abas_respeitam_filtro_de_filial(): void
+    {
+        $this->seedEmpresa(2, '5 ESTRELAS SISTEMA DE SEGURANCA LTDA', '5 ESTRELAS');
+        Filial::create([
+            'cod_emp' => 2,
+            'cod_fil' => 6,
+            'senior_id' => '2-6',
+            'nome' => 'FILIAL SP',
+            'fantasia' => 'FILIAL SP',
+            'apelido' => 'FILIAL SP',
+            'ativo' => true,
+        ]);
+
+        $this->makePayable([
+            'supplier_name' => 'Matriz Pendente',
+            'codemp' => 2,
+            'codfil' => 1,
+            'status' => 'pendente',
+        ]);
+        $this->makePayable([
+            'supplier_name' => 'SP Pendente',
+            'codemp' => 2,
+            'codfil' => 6,
+            'status' => 'pendente',
+        ]);
+        $this->makePayable([
+            'supplier_name' => 'SP Aprovacao',
+            'codemp' => 2,
+            'codfil' => 6,
+            'status' => 'aguardando_aprovacao',
+        ]);
+        $this->makePayable([
+            'supplier_name' => 'Matriz Aprovacao',
+            'codemp' => 2,
+            'codfil' => 1,
+            'status' => 'aguardando_aprovacao',
+        ]);
+
+        $this->actingAs($this->activeUser())
+            ->get('/financeiro/contas-pagar?status=pendente&filial=2-6')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('totals.pendente.count', 1)
+                ->where('totals.aguardando_aprovacao.count', 1)
+            );
+    }
+
     public function test_titulos_de_empresa_excluida_nao_aparecem_na_listagem(): void
     {
         $this->seedEmpresa(4, 'ARI CONSTRUTORA E ADMINISTRADORA LTDA', 'ARI ADM');
