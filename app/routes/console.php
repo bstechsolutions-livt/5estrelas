@@ -31,6 +31,12 @@ if (config('senior.enabled', false)) {
         ->withoutOverlapping(30) // libera mutex se travar >30 min
         ->runInBackground();
 
+    // Lançador Senior (UsuGer) → senior_cod_usu → departamento do usuário intranet.
+    Schedule::command('senior:enrich-payable-launchers --max=120 --scheduled')
+        ->cron($cron)
+        ->withoutOverlapping(25)
+        ->runInBackground();
+
     // Sync de filiais/empresas (cad_filial) — muda pouco, roda 1x/dia de madrugada.
     Schedule::command('senior:sync-filiais --scheduled')
         ->dailyAt('03:20')

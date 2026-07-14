@@ -551,7 +551,7 @@ class Payable extends Model
     }
 
     /**
-     * Nome do departamento (workflow, lançador Senior ou fallback codCcu/descrição).
+     * Nome do departamento (workflow ou lançador Senior → usuário intranet). Sem fallback.
      *
      * @param iterable<Payable> $payables
      */

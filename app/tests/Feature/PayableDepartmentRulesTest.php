@@ -59,7 +59,7 @@ class PayableDepartmentRulesTest extends TestCase
         $this->assertSame(['%GFD%', '%TRCT%'], $rule->description_patterns);
     }
 
-    public function test_regras_do_banco_alimentam_classificador_fallback(): void
+    public function test_regras_do_banco_nao_classificam_mais_titulo(): void
     {
         $dept = Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
         PayableDepartmentRule::create([
@@ -79,10 +79,10 @@ class PayableDepartmentRulesTest extends TestCase
 
         $resolved = app(PayableDepartmentClassifier::class)->departmentForPayable($payable);
 
-        $this->assertSame($dept->id, $resolved->id);
+        $this->assertNull($resolved);
     }
 
-    public function test_senior_cod_usu_tem_prioridade_sobre_regras_fallback(): void
+    public function test_senior_cod_usu_define_departamento_sem_fallback(): void
     {
         $dept = Department::create(['name' => 'Compras', 'slug' => 'compras', 'is_active' => true]);
         Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);

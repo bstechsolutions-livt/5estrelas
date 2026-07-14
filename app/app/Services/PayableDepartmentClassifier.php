@@ -34,57 +34,33 @@ class PayableDepartmentClassifier
 
     public function slugForPayable(Payable $payable): ?string
     {
-        if ($payable->department_id) {
-            return Department::whereKey($payable->department_id)->value('slug');
-        }
-
-        $dept = $this->departmentFromSeniorCodUsu($payable->senior_cod_usu);
-        if ($dept) {
-            return $dept->slug;
-        }
-
-        $codccu = trim((string) ($payable->codccu ?? ''));
-        $description = (string) ($payable->description ?? '');
-
-        foreach ($this->rules() as $slug => $rule) {
-            if ($codccu !== '' && in_array($codccu, $rule['codccu'] ?? [], true)) {
-                return $slug;
-            }
-            foreach ($rule['description'] ?? [] as $pattern) {
-                if ($this->descriptionMatches($description, $pattern)) {
-                    return $slug;
-                }
-            }
-        }
-
-        return null;
+        return $this->departmentForPayable($payable)?->slug;
     }
 
+    /**
+     * Departamento do título: department_id explícito (fluxo) OU lançador Senior → usuário intranet.
+     * Sem fallback por codCcu/descrição — se não achar, fica sem.
+     */
     public function departmentForPayable(Payable $payable): ?Department
     {
         if ($payable->relationLoaded('department') && $payable->department) {
-            return $payable->department;
+            return $payable->department->is_active ? $payable->department : null;
         }
 
         if ($payable->department_id) {
-            return Department::find($payable->department_id);
+            $dept = Department::find($payable->department_id);
+
+            return ($dept && $dept->is_active) ? $dept : null;
         }
 
-        $fromLauncher = $this->departmentFromSeniorCodUsu($payable->senior_cod_usu);
-        if ($fromLauncher) {
-            return $fromLauncher;
-        }
-
-        $slug = $this->slugForPayable($payable);
-
-        return $slug ? Department::where('slug', $slug)->where('is_active', true)->first() : null;
+        return $this->departmentFromSeniorCodUsu($payable->senior_cod_usu);
     }
 
-    /** Restringe a query aos títulos do departamento (workflow + lançador Senior + fallback). */
+    /** Restringe a query aos títulos do departamento (workflow + lançador Senior). Sem fallback. */
     public function applyDepartmentFilter(Builder $query, int $departmentId): void
     {
         $department = Department::find($departmentId);
-        if (!$department) {
+        if (! $department) {
             $query->whereRaw('0 = 1');
 
             return;
@@ -109,21 +85,13 @@ class PayableDepartmentClassifier
                         ->whereIn('senior_cod_usu', $launcherCodUsus);
                 });
             }
-
-            $q->orWhere(function (Builder $inner) use ($department, $launcherCodUsus) {
-                $inner->whereNull('department_id');
-                if ($launcherCodUsus !== []) {
-                    $inner->whereNull('senior_cod_usu');
-                }
-                $this->applyRuleMatch($inner, $department->slug);
-            });
         });
     }
 
     public function applyRuleMatch(Builder $query, string $slug): void
     {
         $rule = $this->rules()[$slug] ?? null;
-        if (!$rule) {
+        if (! $rule) {
             $query->whereRaw('0 = 1');
 
             return;
@@ -157,7 +125,7 @@ class PayableDepartmentClassifier
 
     private function departmentFromSeniorCodUsu(?int $codUsu): ?Department
     {
-        if (!$codUsu || $codUsu <= 0) {
+        if (! $codUsu || $codUsu <= 0) {
             return null;
         }
 
@@ -167,7 +135,7 @@ class PayableDepartmentClassifier
             ->with('department:id,slug,name,is_active')
             ->first();
 
-        if (!$user?->department || !$user->department->is_active) {
+        if (! $user?->department || ! $user->department->is_active) {
             return null;
         }
 
@@ -187,15 +155,5 @@ class PayableDepartmentClassifier
         $or
             ? $query->orWhereRaw('LOWER(description) LIKE LOWER(?)', [$pattern])
             : $query->whereRaw('LOWER(description) LIKE LOWER(?)', [$pattern]);
-    }
-
-    private function descriptionMatches(string $description, string $pattern): bool
-    {
-        $needle = trim($pattern, '%');
-        if ($needle === '') {
-            return false;
-        }
-
-        return stripos($description, $needle) !== false;
     }
 }
