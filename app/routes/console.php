@@ -66,7 +66,7 @@ if (config('senior.enabled', false)) {
         ->runInBackground();
 }
 
-// Borderôs automáticos — regras ativas rodam diariamente às 6h.
+// Borderôs automáticos — regras ativas a cada 5 minutos.
 Schedule::command('borderos:auto-generate --scheduled')
-    ->dailyAt('06:00')
-    ->withoutOverlapping();
+    ->everyFiveMinutes()
+    ->withoutOverlapping(4);
