@@ -143,6 +143,9 @@ return [
     // Pós-sync: quantos codFor faltantes buscar no cad_fornecedor (prioriza títulos novos).
     'post_sync_supplier_lookups' => (int) env('SENIOR_POST_SYNC_SUPPLIER_LOOKUPS', 200),
 
+    // Teto de títulos marcados como ausentes por ciclo (0 = sem teto). Protege contra wipe da lista.
+    'sync_max_missing_per_run' => (int) env('SENIOR_SYNC_MAX_MISSING', 200),
+
     // Cron enrich UsuGer: teto de Exportar E por ciclo (após bulk ConsultarGeral).
     'enrich_launcher_max_lookups' => (int) env('SENIOR_ENRICH_LAUNCHER_MAX', 400),
 

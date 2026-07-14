@@ -231,8 +231,24 @@ class PayablesSyncServiceTest extends TestCase
 
         // Senior devolve lista vazia (timeout/janela) — não pode sumir a lista do CP.
         $run = $this->service([])->run(PayableSyncRun::MODE_FULL);
+        $this->assertEquals(PayableSyncRun::STATUS_FAILED, $run->status);
         $this->assertEquals(0, $run->missing_count);
         $this->assertNull(Payable::where('title_number', 'TIT-1')->first()->senior_missing_at);
+    }
+
+    public function test_marcar_ausentes_respeita_teto_de_volume(): void
+    {
+        config(['senior.enabled' => true, 'senior.sync_max_missing_per_run' => 0]);
+        $t1 = $this->titulo('TIT-1');
+        $t2 = $this->titulo('TIT-2');
+        $t2['codFor'] = 1001;
+        $this->service([$t1, $t2])->run(PayableSyncRun::MODE_FULL);
+        $this->assertNotNull(Payable::where('title_number', 'TIT-2')->first());
+
+        // Só TIT-1 volta → haveria 1+ ausente, mas teto 0 aborta qualquer marcação.
+        $run = $this->service([$t1])->run(PayableSyncRun::MODE_FULL);
+        $this->assertEquals(0, $run->missing_count);
+        $this->assertNull(Payable::where('title_number', 'TIT-2')->first()->senior_missing_at);
     }
 
     public function test_incremental_marca_ausentes_na_janela(): void
@@ -460,7 +476,7 @@ class PayablesSyncServiceTest extends TestCase
         (new PayablesSyncService($fake, new PayableMapper(), new StatusMapper()))
             ->run(PayableSyncRun::MODE_FULL);
 
-        // Exclui 4; 2 e 9 permanecem na varredura.
-        $this->assertSame([2, 9], array_values(array_unique($tracker->emps)));
+        // Exclui apenas LSR/12; LRB/4 e Baluarte/9 permanecem na varredura.
+        $this->assertSame([2, 4, 9], array_values(array_unique($tracker->emps)));
     }
 }

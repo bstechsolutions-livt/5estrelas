@@ -3,8 +3,10 @@
 namespace App\Services\Senior;
 
 use App\Models\Branch;
+use App\Models\Department;
 use App\Models\Payable;
 use App\Models\PayableSyncRun;
+use App\Models\User;
 use App\Support\PayableEmpresaExclusion;
 use App\Services\AuditLogger;
 use App\Support\SeniorDueDatePolicy;
@@ -98,14 +100,34 @@ class PayablesSyncService
             return $run->fresh();
         }
 
+        // Coleta vazia = Senior falhou/timeout/janela inválida. Não marcar ausentes nem “sucesso limpo”.
+        if ($titulos === []) {
+            Log::error('[senior-cp] sync sem títulos retornados pela Senior — abortando marcarAusentes', [
+                'mode' => $mode,
+                'window_start' => $vctIni?->toDateString(),
+                'window_end' => $vctFim?->toDateString(),
+            ]);
+            $run->update([
+                'status' => PayableSyncRun::STATUS_FAILED,
+                'finished_at' => now(),
+                'error_message' => 'Senior não retornou títulos neste ciclo (lista vazia). Nenhuma marcação de ausência aplicada.',
+                'inserted_count' => 0,
+                'updated_count' => 0,
+                'missing_count' => 0,
+            ]);
+
+            return $run->fresh();
+        }
+
         $inserted = 0;
         $updated = 0;
         $businessKeys = [];
-        $insertedIds = [];
+        // Insert + update + re-sync sem mudança de raw: ainda preenche depto/fornecedor.
+        $enrichIds = [];
 
         foreach (array_chunk($titulos, (int) config('senior.batch_size', 500)) as $chunk) {
             try {
-                DB::transaction(function () use ($chunk, &$inserted, &$updated, &$businessKeys, &$insertedIds) {
+                DB::transaction(function () use ($chunk, &$inserted, &$updated, &$businessKeys, &$enrichIds) {
                     foreach ($chunk as $titulo) {
                         $bk = $this->mapper->businessKey($titulo);
                         if ($bk === null) {
@@ -113,7 +135,7 @@ class PayablesSyncService
                             continue;
                         }
                         $businessKeys[] = $bk;
-                        $this->upsertTitulo($bk, $titulo, $inserted, $updated, $insertedIds);
+                        $this->upsertTitulo($bk, $titulo, $inserted, $updated, $enrichIds);
                     }
                 });
             } catch (\Throwable $e) {
@@ -142,22 +164,22 @@ class PayablesSyncService
             );
         }
 
-        // Automático no caminho de inclusão: UsuGer (depto) + nome do fornecedor.
-        $this->enrichLaunchersAfterInserts($insertedIds);
-        $this->syncMissingSuppliersAfterPayables($insertedIds);
+        // A cada ciclo (insert e update): UsuGer → depto; senão Financeiro; nome do fornecedor.
+        $this->enrichLaunchersAfterSync($enrichIds);
+        $this->resolveDepartmentsAfterSync($enrichIds);
+        $this->syncMissingSuppliersAfterPayables($enrichIds);
 
         return $run->fresh();
     }
 
     /**
-     * Pós-insert: busca UsuGer na Senior e grava senior_cod_usu (departamento via classifier).
-     * Não depende do cron de enrich global — novos títulos não ficam “Depto —” até pedido manual.
+     * Pós-sync: busca UsuGer na Senior e grava senior_cod_usu (insert e update).
      *
-     * @param  list<int>  $insertedIds
+     * @param  list<int>  $enrichIds
      */
-    private function enrichLaunchersAfterInserts(array $insertedIds): void
+    private function enrichLaunchersAfterSync(array $enrichIds): void
     {
-        if ($insertedIds === []) {
+        if ($enrichIds === []) {
             return;
         }
 
@@ -168,24 +190,126 @@ class PayablesSyncService
 
         try {
             $r = PayableLauncherSyncService::make()->enrichByPayableIds(
-                $insertedIds,
+                $enrichIds,
                 maxLookups: $max,
-                trigger: 'pos-payables-insert',
+                trigger: 'pos-payables-sync',
             );
             if (($r['updated'] ?? 0) > 0 || ($r['looked_up'] ?? 0) > 0) {
-                Log::info('[senior-cp] lançadores pós-insert', $r);
+                Log::info('[senior-cp] lançadores pós-sync', $r);
             }
         } catch (\Throwable $e) {
-            Log::warning('[senior-cp] lançadores pós-insert falhou', ['erro' => $e->getMessage()]);
+            Log::warning('[senior-cp] lançadores pós-sync falhou', ['erro' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Materializa department_id: usuário do UsuGer → depto; se não houver → Financeiro.
+     * Não sobrescreve department_id já definido (exceto upgrade do fallback Financeiro via launcher).
+     *
+     * @param  list<int>  $payableIds
+     */
+    public function resolveDepartmentsAfterSync(array $payableIds): int
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $payableIds), fn (int $id) => $id > 0)));
+        if ($ids === []) {
+            return 0;
+        }
+
+        $financeiroId = Department::financeDepartmentId();
+        $assigned = 0;
+
+        Payable::query()
+            ->whereIn('id', $ids)
+            ->orderBy('id')
+            ->chunkById(200, function ($chunk) use ($financeiroId, &$assigned) {
+                foreach ($chunk as $payable) {
+                    $nextId = $this->resolveDepartmentIdForPayable($payable, $financeiroId);
+                    if ($nextId === null || (int) $payable->department_id === $nextId) {
+                        continue;
+                    }
+                    $payable->update(['department_id' => $nextId]);
+                    $assigned++;
+                }
+            });
+
+        if ($assigned > 0) {
+            Log::info('[senior-cp] departamentos materializados pós-sync', ['assigned' => $assigned]);
+        }
+
+        return $assigned;
+    }
+
+    /**
+     * Backfill: fornecedores faltantes + depto (UsuGer já gravado ou Financeiro) em títulos abertos.
+     *
+     * @return array{suppliers_looked_up:int, suppliers_enriched:int, departments_assigned:int}
+     */
+    public function backfillOpenSupplierAndDepartment(?int $supplierMaxLookups = null): array
+    {
+        $supplierMax = $supplierMaxLookups ?? max(200, (int) config('senior.post_sync_supplier_lookups', 200));
+        $sup = ['looked_up' => 0, 'enriched' => 0, 'enriched_desc' => 0];
+        try {
+            $sup = FornecedoresSyncService::make()->syncMissingFromPayables(
+                'backfill-open',
+                maxLookups: $supplierMax,
+            );
+        } catch (\Throwable $e) {
+            Log::warning('[senior-cp] backfill fornecedores falhou', ['erro' => $e->getMessage()]);
+        }
+
+        $openIds = Payable::query()
+            ->whereNull('senior_missing_at')
+            ->whereNotIn('status', ['pago', 'aguardando_conciliacao', 'conciliado', 'encerrado'])
+            ->where(function ($q) {
+                $q->whereNull('department_id')
+                    ->orWhereNull('supplier_name')
+                    ->orWhere('supplier_name', 'like', 'Fornecedor %');
+            })
+            ->orderByDesc('id')
+            ->pluck('id')
+            ->all();
+
+        $depts = $this->resolveDepartmentsAfterSync($openIds);
+
+        return [
+            'suppliers_looked_up' => (int) ($sup['looked_up'] ?? 0),
+            'suppliers_enriched' => (int) (($sup['enriched'] ?? 0) + ($sup['enriched_desc'] ?? 0)),
+            'departments_assigned' => $depts,
+        ];
+    }
+
+    private function resolveDepartmentIdForPayable(Payable $payable, ?int $financeiroId): ?int
+    {
+        $codUsu = (int) ($payable->senior_cod_usu ?? 0);
+        if ($codUsu > 0) {
+            $user = User::query()
+                ->where('senior_cod_usu', $codUsu)
+                ->whereNotNull('department_id')
+                ->first();
+            if ($user?->department_id) {
+                $dept = Department::query()->find($user->department_id);
+                if ($dept && $dept->is_active) {
+                    // Materializa depto do lançador; sobrescreve só se vazio ou era fallback Financeiro.
+                    if ($payable->department_id === null || (int) $payable->department_id === (int) $financeiroId) {
+                        return (int) $dept->id;
+                    }
+                }
+            }
+        }
+
+        if ($payable->department_id) {
+            return (int) $payable->department_id;
+        }
+
+        return $financeiroId;
     }
 
     /**
      * Após importar títulos, resolve nomes dos fornecedores (cache + placeholders “Fornecedor N”).
      *
-     * @param  list<int>  $insertedIds
+     * @param  list<int>  $enrichIds
      */
-    private function syncMissingSuppliersAfterPayables(array $insertedIds = []): void
+    private function syncMissingSuppliersAfterPayables(array $enrichIds = []): void
     {
         $max = (int) config('senior.post_sync_supplier_lookups', 200);
         if ($max <= 0) {
@@ -196,7 +320,7 @@ class PayablesSyncService
             $r = FornecedoresSyncService::make()->syncMissingFromPayables(
                 'pos-payables',
                 maxLookups: $max,
-                prioritizePayableIds: $insertedIds,
+                prioritizePayableIds: $enrichIds,
             );
             if (($r['looked_up'] ?? 0) > 0 || ($r['enriched'] ?? 0) > 0 || ($r['enriched_desc'] ?? 0) > 0) {
                 Log::info('[senior-cp] fornecedores delta pós-sync', $r);
@@ -418,7 +542,7 @@ class PayablesSyncService
     }
 
     /** Insere ou atualiza um título preservando Workflow_Fields (req 4, 8). */
-    private function upsertTitulo(string $bk, array $titulo, int &$inserted, int &$updated, array &$insertedIds = []): void
+    private function upsertTitulo(string $bk, array $titulo, int &$inserted, int &$updated, array &$enrichIds = []): void
     {
         $attrs = $this->mapper->mapHeader($titulo);
         if (PayableEmpresaExclusion::isExcluded(isset($attrs['codemp']) ? (int) $attrs['codemp'] : null)) {
@@ -439,6 +563,7 @@ class PayablesSyncService
         }
 
         $existing = Payable::where('senior_id', $bk)->first();
+        $resolver = new SupplierDisplayNameResolver();
 
         // AbertosCP não traz UsuGer; não apagar senior_cod_usu já enriquecido via prj.contaspagar.
         if ($existing) {
@@ -449,7 +574,6 @@ class PayablesSyncService
             }
 
             // Não rebaixar nome real para placeholder “Fornecedor N” se o cache ainda não carregou.
-            $resolver = new SupplierDisplayNameResolver();
             $prevName = (string) ($existing->supplier_name ?? '');
             $newName = (string) ($attrs['supplier_name'] ?? '');
             if ($prevName !== '' && ! $resolver->isGeneric($prevName) && $resolver->isGeneric($newName)) {
@@ -470,7 +594,7 @@ class PayablesSyncService
             $payable->save();
             $this->syncRateios($payable, $titulo);
             $inserted++;
-            $insertedIds[] = (int) $payable->id;
+            $enrichIds[] = (int) $payable->id;
 
             return;
         }
@@ -480,8 +604,29 @@ class PayablesSyncService
         $voltouDaAusencia = $existing->senior_missing_at !== null; // req 7.4
 
         if ($semMudanca && !$voltouDaAusencia) {
+            $silent = [];
             if ($existing->branch_id === null && ! empty($attrs['branch_id'])) {
-                $existing->update(['branch_id' => $attrs['branch_id']]);
+                $silent['branch_id'] = $attrs['branch_id'];
+            }
+
+            // Cache de fornecedor pode ter chegado depois do insert — preenche sem contar como update de raw.
+            $prevName = (string) ($existing->supplier_name ?? '');
+            $newName = (string) ($attrs['supplier_name'] ?? '');
+            if (($prevName === '' || $resolver->isGeneric($prevName)) && $newName !== '' && ! $resolver->isGeneric($newName)) {
+                $silent['supplier_name'] = $newName;
+                if (! empty($attrs['supplier_cnpj'])) {
+                    $silent['supplier_cnpj'] = $attrs['supplier_cnpj'];
+                }
+            }
+
+            if ($silent !== []) {
+                $existing->update($silent);
+                $existing->refresh();
+            }
+
+            // Ainda precisa de UsuGer / depto / fornecedor? Enfileira para pós-sync.
+            if ($this->needsPostSyncEnrich($existing)) {
+                $enrichIds[] = (int) $existing->id;
             }
 
             return;
@@ -495,10 +640,34 @@ class PayablesSyncService
             $existing->save();
             $this->syncRateios($existing, $titulo);
             $updated++;
+            $enrichIds[] = (int) $existing->id;
         } elseif ($voltouDaAusencia) {
             // Conteúdo igual mas estava marcado como ausente: só limpa o flag (req 7.4).
             $existing->update(['senior_missing_at' => null]);
+            if ($this->needsPostSyncEnrich($existing)) {
+                $enrichIds[] = (int) $existing->id;
+            }
         }
+    }
+
+    /** Título ainda sem depto materializado ou com fornecedor genérico. */
+    private function needsPostSyncEnrich(Payable $payable): bool
+    {
+        if ($payable->department_id === null) {
+            return true;
+        }
+
+        $name = (string) ($payable->supplier_name ?? '');
+        if ($name === '' || (new SupplierDisplayNameResolver())->isGeneric($name)) {
+            return true;
+        }
+
+        $codUsu = (int) ($payable->senior_cod_usu ?? 0);
+        if ($codUsu <= 0) {
+            return true;
+        }
+
+        return false;
     }
 
     /** Substitui os rateios do título (req 3.3 / 3.9). */
@@ -516,14 +685,14 @@ class PayablesSyncService
      * Marca como ausentes os títulos de origem Senior não retornados (req 7.1).
      * No incremental, restringe à janela de vencimento consultada (vctIni/vctFim).
      *
-     * Segurança: se a Senior não devolveu nenhum business key (falha/timeout/janela vazia),
-     * NÃO marca ninguém — senão a lista inteira some do Contas a Pagar.
+     * Segurança (incidente 2026-07-14): nunca marcar em massa se a coleta veio vazia
+     * ou se o volume a marcar ultrapassa o teto configurável — evita sumir a lista do CP.
      */
     private function marcarAusentes(array $businessKeys, ?Carbon $vctIni = null, ?Carbon $vctFim = null): int
     {
         $keys = array_values(array_unique(array_filter($businessKeys)));
         if ($keys === []) {
-            Log::warning('[senior-cp] marcarAusentes abortado: nenhum título retornado pela Senior neste ciclo');
+            Log::error('[senior-cp] marcarAusentes abortado: nenhum business key neste ciclo');
 
             return 0;
         }
@@ -549,6 +718,19 @@ class PayablesSyncService
             if ($vctFim !== null) {
                 $query->where('due_date', '<=', $vctFim);
             }
+        }
+
+        $wouldMark = (clone $query)->count();
+        // null/negativo = sem teto; 0 = não marca ninguém se houver qualquer candidato.
+        $maxMissing = config('senior.sync_max_missing_per_run');
+        if ($maxMissing !== null && (int) $maxMissing >= 0 && $wouldMark > (int) $maxMissing) {
+            Log::error('[senior-cp] marcarAusentes abortado: volume suspeito', [
+                'would_mark' => $wouldMark,
+                'max_allowed' => (int) $maxMissing,
+                'keys_returned' => count($keys),
+            ]);
+
+            return 0;
         }
 
         return $query->update(['senior_missing_at' => now()]);
