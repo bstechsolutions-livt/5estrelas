@@ -31,6 +31,12 @@ return [
     // Servlet SOAP do serviço de Contas a Pagar (sapiens_Sync + nome do serviço).
     'cp_service' => 'sapiens_Synccom_senior_g5_co_mfi_cpa_titulos',
 
+    // prj.contaspagar — Exportar/ConsultarGeral com UsuGer (lançador do título).
+    'prj_contaspagar_service' => env(
+        'SENIOR_PRJ_CONTASPAGAR_SERVICE',
+        'sapiens_Synccom_senior_g5_co_prj_contaspagar'
+    ),
+
     // Servlet SOAP do serviço de Contas a Receber (ConsultarTitulosAbertosCR).
     'cr_service' => 'sapiens_Synccom_senior_g5_co_mfi_cre_titulos',
 

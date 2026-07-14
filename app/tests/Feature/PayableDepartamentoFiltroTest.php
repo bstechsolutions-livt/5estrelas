@@ -75,32 +75,18 @@ class PayableDepartamentoFiltroTest extends TestCase
         ]);
     }
 
-    public function test_classifica_por_descricao_gfd(): void
+    public function test_sem_lancador_e_sem_department_id_fica_sem_departamento(): void
     {
-        $dept = $this->dpRhDepartment();
+        $this->dpRhDepartment();
         $payable = $this->makePayable([
             'supplier_name' => 'TituloGfd',
             'description' => 'GFD JUNHO 2026 - FOLHA',
-        ]);
-
-        $resolved = app(PayableDepartmentClassifier::class)->departmentForPayable($payable);
-
-        $this->assertNotNull($resolved);
-        $this->assertSame($dept->id, $resolved->id);
-    }
-
-    public function test_classifica_por_codccu(): void
-    {
-        $dept = $this->dpRhDepartment();
-        $payable = $this->makePayable([
-            'supplier_name' => 'TituloCcu',
             'codccu' => '2363',
-            'description' => 'Pagamento diverso',
         ]);
 
         $resolved = app(PayableDepartmentClassifier::class)->departmentForPayable($payable);
 
-        $this->assertSame($dept->id, $resolved->id);
+        $this->assertNull($resolved);
     }
 
     public function test_classifica_por_senior_cod_usu_do_lancador(): void
@@ -140,7 +126,7 @@ class PayableDepartamentoFiltroTest extends TestCase
             'description' => 'Despesa operacional',
         ]);
         $this->makePayable([
-            'supplier_name' => 'MatchDpRhFallback',
+            'supplier_name' => 'SemLancador',
             'description' => 'TRCT FUNCIONARIO 123',
         ]);
 
@@ -152,37 +138,7 @@ class PayableDepartamentoFiltroTest extends TestCase
         $names = collect($resp->json('data'))->pluck('supplier_name')->all();
 
         $this->assertContains('MatchFinanceiroLauncher', $names);
-        $this->assertNotContains('MatchDpRhFallback', $names);
-    }
-
-    public function test_filtro_por_departamento_inclui_titulos_senior_sem_department_id(): void
-    {
-        $dept = $this->dpRhDepartment();
-        $this->financeiroDepartment();
-
-        $this->makePayable([
-            'supplier_name' => 'MatchDpRh',
-            'description' => 'TRCT FUNCIONARIO 123',
-        ]);
-        $this->makePayable([
-            'supplier_name' => 'MatchFinanceiro',
-            'description' => 'TAXA SERASA CONSULTA',
-        ]);
-        $this->makePayable([
-            'supplier_name' => 'SemMatch',
-            'description' => 'Material de escritorio',
-        ]);
-
-        $resp = $this->actingAs($this->userComTodosDepartamentos())
-            ->withHeaders(['X-Json-Only' => '1'])
-            ->get("/financeiro/contas-pagar?status=pendente&department_id={$dept->id}")
-            ->assertOk();
-
-        $names = collect($resp->json('data'))->pluck('supplier_name')->all();
-
-        $this->assertContains('MatchDpRh', $names);
-        $this->assertNotContains('MatchFinanceiro', $names);
-        $this->assertNotContains('SemMatch', $names);
+        $this->assertNotContains('SemLancador', $names);
     }
 
     public function test_filtro_respeita_department_id_explicito(): void
@@ -196,7 +152,7 @@ class PayableDepartamentoFiltroTest extends TestCase
             'description' => 'GFD que seria DP/RH',
         ]);
         $this->makePayable([
-            'supplier_name' => 'SoHeuristicaDpRh',
+            'supplier_name' => 'SemDepto',
             'description' => 'GFD JULHO',
         ]);
 
@@ -208,14 +164,20 @@ class PayableDepartamentoFiltroTest extends TestCase
         $names = collect($resp->json('data'))->pluck('supplier_name')->all();
 
         $this->assertContains('ExplicitoFinanceiro', $names);
-        $this->assertNotContains('SoHeuristicaDpRh', $names);
+        $this->assertNotContains('SemDepto', $names);
     }
 
-    public function test_index_exibe_department_nome(): void
+    public function test_index_exibe_department_nome_do_lancador(): void
     {
-        $this->dpRhDepartment();
+        $dept = $this->dpRhDepartment();
+        User::factory()->create([
+            'department_id' => $dept->id,
+            'senior_cod_usu' => 91,
+        ]);
+
         $this->makePayable([
             'supplier_name' => 'ComDepto',
+            'senior_cod_usu' => 91,
             'description' => 'PENSÃO ALIMENTICIA',
         ]);
 
@@ -233,7 +195,7 @@ class PayableDepartamentoFiltroTest extends TestCase
     public function test_usuario_sem_permissao_ve_apenas_seu_departamento(): void
     {
         $dept = $this->dpRhDepartment();
-        $this->financeiroDepartment();
+        $fin = $this->financeiroDepartment();
 
         $user = User::factory()->create(['is_active' => true, 'department_id' => $dept->id]);
         $user->permissions()->attach(
@@ -249,8 +211,11 @@ class PayableDepartamentoFiltroTest extends TestCase
             )->id,
         );
 
-        $this->makePayable(['supplier_name' => 'DoDpRh', 'description' => 'GFD JULHO']);
-        $this->makePayable(['supplier_name' => 'DoFinanceiro', 'description' => 'TAXA SERASA']);
+        User::factory()->create(['department_id' => $dept->id, 'senior_cod_usu' => 201]);
+        User::factory()->create(['department_id' => $fin->id, 'senior_cod_usu' => 202]);
+
+        $this->makePayable(['supplier_name' => 'DoDpRh', 'senior_cod_usu' => 201]);
+        $this->makePayable(['supplier_name' => 'DoFinanceiro', 'senior_cod_usu' => 202]);
 
         $resp = $this->actingAs($user)
             ->withHeaders(['X-Json-Only' => '1'])
@@ -266,7 +231,7 @@ class PayableDepartamentoFiltroTest extends TestCase
     public function test_usuario_com_permissao_ver_todos_pode_filtrar_outro_departamento(): void
     {
         $dept = $this->financeiroDepartment();
-        $this->dpRhDepartment();
+        $dp = $this->dpRhDepartment();
 
         $user = User::factory()->create(['is_active' => true, 'department_id' => $dept->id]);
         $user->permissions()->attach(
@@ -288,8 +253,11 @@ class PayableDepartamentoFiltroTest extends TestCase
             )->id,
         );
 
-        $this->makePayable(['supplier_name' => 'DoDpRh', 'description' => 'GFD JULHO']);
-        $this->makePayable(['supplier_name' => 'DoFinanceiro', 'description' => 'TAXA SERASA']);
+        User::factory()->create(['department_id' => $dp->id, 'senior_cod_usu' => 301]);
+        User::factory()->create(['department_id' => $dept->id, 'senior_cod_usu' => 302]);
+
+        $this->makePayable(['supplier_name' => 'DoDpRh', 'senior_cod_usu' => 301]);
+        $this->makePayable(['supplier_name' => 'DoFinanceiro', 'senior_cod_usu' => 302]);
 
         $resp = $this->actingAs($user)
             ->withHeaders(['X-Json-Only' => '1'])

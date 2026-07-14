@@ -72,11 +72,12 @@ class PayableMapper
 
     /**
      * Extrai o código do usuário lançador do título Senior.
-     * ConsultarTitulosAbertosCP v3 não documenta codUsu; em produção codFav vem 0.0.
+     * Preferência: UsuGer (prj.contaspagar / E501TCP) → codUsu → codFav.
+     * ConsultarTitulosAbertosCP não traz UsuGer; AbertosCP em produção costuma vir com codFav=0.
      */
     public static function resolveLauncherCodUsu(array $titulo): ?int
     {
-        foreach (['codUsu', 'codFav'] as $key) {
+        foreach (['UsuGer', 'usuGer', 'codUsu', 'codFav'] as $key) {
             $raw = $titulo[$key] ?? null;
             if ($raw === null || $raw === '' || (is_array($raw) && $raw === [])) {
                 continue;
