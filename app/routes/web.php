@@ -166,6 +166,9 @@ Route::middleware('auth')->group(function () {
      ->name('authorization-panel.index');
  Route::get('financeiro/configuracao', [\App\Http\Controllers\FinanceiroConfiguracaoController::class, 'index'])
      ->name('financeiro.configuracao.index');
+    Route::get('financeiro/sync-senior', [\App\Http\Controllers\PayableSyncMonitorController::class, 'index'])
+        ->middleware('permission:financeiro.workflows.configurar')
+        ->name('financeiro.sync-senior.index');
  Route::get("financeiro/fluxos-aprovacao", [\App\Http\Controllers\ApprovalFlowConfigController::class, "index"])->middleware("permission:financeiro.workflows.configurar")->name("approval-flow-config.index");
  Route::post("financeiro/fluxos-aprovacao", [\App\Http\Controllers\ApprovalFlowConfigController::class, "update"])->middleware("permission:financeiro.workflows.configurar")->name("approval-flow-config.update");
     Route::prefix('financeiro/contas-pagar/alcada')->middleware('permission:financeiro.contas_pagar.alcada_gerenciar')->group(function () {
