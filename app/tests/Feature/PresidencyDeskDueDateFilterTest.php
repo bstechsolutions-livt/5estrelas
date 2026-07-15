@@ -6,6 +6,7 @@ use App\Models\ApprovalStep;
 use App\Models\Payable;
 use App\Models\Permission;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -74,7 +75,31 @@ class PresidencyDeskDueDateFilterTest extends TestCase
             );
     }
 
-    public function test_presidency_desk_without_due_filter_returns_all(): void
+    public function test_presidency_desk_defaults_to_due_this_week(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-07-15 12:00:00')); // quarta
+
+        $president = $this->president();
+
+        $inWeek = $this->payableAtPresidency($president, '2026-07-17', 'TIT-SEMANA'); // sex
+        $this->payableAtPresidency($president, '2026-07-22', 'TIT-FORA'); // quarta seguinte
+
+        // Sem query → default av_semana: 2026-07-15 → 2026-07-19 (domingo)
+        $this->actingAs($president)
+            ->get('/financeiro/presidencia')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Approvals/PresidencyDesk', false)
+                ->has('payables', 1)
+                ->where('filters.due_from', '2026-07-15')
+                ->where('filters.due_to', '2026-07-19')
+                ->where('payables.0.id', $inWeek->id)
+            );
+
+        Carbon::setTestNow();
+    }
+
+    public function test_presidency_desk_all_returns_unfiltered(): void
     {
         $president = $this->president();
 
@@ -82,12 +107,13 @@ class PresidencyDeskDueDateFilterTest extends TestCase
         $this->payableAtPresidency($president, '2026-08-10', 'TIT-B');
 
         $this->actingAs($president)
-            ->get('/financeiro/presidencia')
+            ->get('/financeiro/presidencia?all=1')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Approvals/PresidencyDesk', false)
                 ->has('payables', 2)
                 ->where('pendingCount', 2)
+                ->where('filters.all', true)
             );
     }
 }
