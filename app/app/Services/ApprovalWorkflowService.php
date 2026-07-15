@@ -203,10 +203,65 @@ class ApprovalWorkflowService
             auditable: $payable,
         );
 
+        $this->notifyPreparerOfRejection($payable->fresh(), $rejector, $reason);
+
         return [
             'success' => true,
             'message' => 'Título devolvido para pendente. Corrija e reenvie para aprovação.',
         ];
+    }
+
+    /**
+     * Notifica no sininho quem preparou o título quando ele volta para pendente por reprovação.
+     * Não notifica se prepared_by for null ou for o próprio reprovador.
+     */
+    public function notifyPreparerOfRejection(
+        Payable $payable,
+        User $rejector,
+        string $reason,
+        string $context = 'titulo',
+        ?string $link = null,
+    ): void {
+        if (! $payable->prepared_by || (int) $payable->prepared_by === (int) $rejector->id) {
+            return;
+        }
+
+        // Evita duplicata óbvia no mesmo evento (ex.: retry / chamada dupla em < 30s).
+        $alreadyNotified = Notification::query()
+            ->where('user_id', $payable->prepared_by)
+            ->where('type', 'approval_rejected')
+            ->whereNull('read_at')
+            ->where('created_at', '>=', now()->subSeconds(30))
+            ->where('metadata->payable_id', $payable->id)
+            ->exists();
+
+        if ($alreadyNotified) {
+            return;
+        }
+
+        $titleNumber = $payable->title_number;
+        $rejectorName = $rejector->name ?? 'um aprovador';
+
+        $message = match ($context) {
+            'bordero' => "O título {$titleNumber} foi reprovado com o borderô por {$rejectorName} e voltou para pendente. Motivo: {$reason}. Corrija e reenvie para aprovação.",
+            'expulsao' => "O título {$titleNumber} foi expulso do borderô por {$rejectorName} e voltou para pendente. Motivo: {$reason}. Corrija e reenvie para aprovação.",
+            default => "O título {$titleNumber} foi reprovado por {$rejectorName} e voltou para pendente. Motivo: {$reason}. Corrija e reenvie para aprovação.",
+        };
+
+        NotificationService::send(
+            $payable->prepared_by,
+            'Título reprovado',
+            $message,
+            $link ?? "/financeiro/contas-pagar/{$payable->id}",
+            'approval_rejected',
+            'pi pi-times-circle',
+            [
+                'payable_id' => $payable->id,
+                'rejected_by' => $rejector->id,
+                'reason' => $reason,
+                'context' => $context,
+            ],
+        );
     }
 
     /** Após reprovação avulsa de título ainda no borderô (legado); expulsão usa BorderoActionService. */

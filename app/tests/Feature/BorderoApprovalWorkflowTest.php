@@ -6,6 +6,7 @@ use App\Models\ApprovalStep;
 use App\Models\ApprovalTrail;
 use App\Models\Bordero;
 use App\Models\Department;
+use App\Models\Notification;
 use App\Models\Payable;
 use App\Models\PayableComment;
 use App\Models\PayableDocument;
@@ -188,6 +189,19 @@ class BorderoApprovalWorkflowTest extends TestCase
         $this->assertSame('pendente', $bordero->status);
         $this->assertSame('Documentação incompleta no borderô', $bordero->rejection_reason);
         $this->assertGreaterThan(0, PayableComment::where('payable_id', $p1->id)->where('type', 'rejection')->count());
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $this->sender->id,
+            'type' => 'approval_rejected',
+            'title' => 'Título reprovado',
+        ]);
+        $this->assertSame(
+            2,
+            Notification::where('user_id', $this->sender->id)
+                ->where('type', 'approval_rejected')
+                ->where('link', "/financeiro/borderos/{$bordero->id}")
+                ->count()
+        );
     }
 
     public function test_expulsar_titulo_remove_do_bordero_para_cp_avulso(): void
@@ -216,6 +230,19 @@ class BorderoApprovalWorkflowTest extends TestCase
         $this->assertSame($bordero->id, $p2->bordero_id);
         $this->assertSame('aguardando_aprovacao', $bordero->status);
         $this->assertSame(1, $bordero->items_count);
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $this->sender->id,
+            'type' => 'approval_rejected',
+            'title' => 'Título reprovado',
+            'link' => "/financeiro/contas-pagar/{$p1->id}",
+        ]);
+        $notif = Notification::where('user_id', $this->sender->id)
+            ->where('type', 'approval_rejected')
+            ->where('link', "/financeiro/contas-pagar/{$p1->id}")
+            ->first();
+        $this->assertNotNull($notif);
+        $this->assertStringContainsString('expulso', $notif->message);
     }
 
     public function test_liberar_titulo_exige_permissao_especial(): void

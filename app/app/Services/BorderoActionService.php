@@ -139,6 +139,13 @@ class BorderoActionService
             description: "Título {$payable->title_number} expulso do borderô {$bordero->number}: {$reason}",
             auditable: $payable,
         );
+
+        $this->workflow->notifyPreparerOfRejection(
+            $payable->fresh(),
+            $actor,
+            $reason,
+            'expulsao',
+        );
     }
 
     /** Reprova o borderô inteiro: pacote volta para pendente, títulos permanecem dentro. */
@@ -190,6 +197,17 @@ class BorderoActionService
             description: "Borderô {$bordero->number} reprovado (pacote devolvido para pendente): {$reason}",
             auditable: $bordero,
         );
+
+        $bordero->load('payables');
+        foreach ($bordero->payables as $payable) {
+            $this->workflow->notifyPreparerOfRejection(
+                $payable,
+                $actor,
+                $reason,
+                'bordero',
+                "/financeiro/borderos/{$bordero->id}",
+            );
+        }
     }
 
     /** Desfaz borderô pendente/em preparação e libera títulos para CP avulso. */

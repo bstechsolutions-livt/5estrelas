@@ -281,6 +281,72 @@ class ApprovalWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_reject_notifica_preparador_no_sininho(): void
+    {
+        $preparer = User::factory()->create(['name' => 'Karen Preparadora', 'is_active' => true]);
+        $payable = $this->makePayable(['prepared_by' => $preparer->id]);
+        $this->workflow->sendForApproval($payable, $preparer, 'matriz');
+
+        $admin = $this->userWithPerm('*');
+        $admin->forceFill(['name' => 'Aprovador Teste'])->save();
+
+        $this->workflow->reject($payable->fresh(), $admin, 'Documento ilegível');
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $preparer->id,
+            'type' => 'approval_rejected',
+            'title' => 'Título reprovado',
+        ]);
+
+        $notification = Notification::where('user_id', $preparer->id)
+            ->where('type', 'approval_rejected')
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($notification);
+        $this->assertStringContainsString($payable->title_number, $notification->message);
+        $this->assertStringContainsString('Aprovador Teste', $notification->message);
+        $this->assertStringContainsString('Documento ilegível', $notification->message);
+        $this->assertStringContainsString('Corrija e reenvie', $notification->message);
+        $this->assertSame("/financeiro/contas-pagar/{$payable->id}", $notification->link);
+        $this->assertSame($payable->id, $notification->metadata['payable_id'] ?? null);
+        $this->assertSame($admin->id, $notification->metadata['rejected_by'] ?? null);
+    }
+
+    public function test_reject_nao_notifica_quando_prepared_by_null(): void
+    {
+        $sender = User::factory()->create(['is_active' => true]);
+        $payable = $this->makePayable();
+        $this->workflow->sendForApproval($payable, $sender, 'matriz');
+
+        // Simula título legado sem preparador após o envio
+        $payable->forceFill(['prepared_by' => null])->save();
+
+        $before = Notification::where('type', 'approval_rejected')->count();
+        $admin = $this->userWithPerm('*');
+        $this->workflow->reject($payable->fresh(), $admin, 'Sem preparador');
+
+        $this->assertSame($before, Notification::where('type', 'approval_rejected')->count());
+    }
+
+    public function test_reject_nao_notifica_quando_reprovador_e_o_preparador(): void
+    {
+        $preparer = User::factory()->create(['is_active' => true]);
+        $preparer->permissions()->attach(
+            Permission::firstOrCreate(['key' => '*'], ['label' => '*', 'module' => 'sistema'])->id
+        );
+        $payable = $this->makePayable(['prepared_by' => $preparer->id]);
+        $this->workflow->sendForApproval($payable, $preparer, 'matriz');
+
+        $before = Notification::where('user_id', $preparer->id)->where('type', 'approval_rejected')->count();
+        $this->workflow->reject($payable->fresh(), $preparer, 'Eu mesmo reprovo');
+
+        $this->assertSame(
+            $before,
+            Notification::where('user_id', $preparer->id)->where('type', 'approval_rejected')->count()
+        );
+    }
+
     public function test_reenvio_apos_reprovacao_limpa_motivo(): void
     {
         $sender = User::factory()->create(['is_active' => true]);
