@@ -50,6 +50,10 @@ return [
     'fornecedor_service' => 'sapiens_Synccom_senior_g5_co_cad_fornecedor',
     'fornecedor_page_size' => (int) env('SENIOR_FORNECEDOR_PAGE_SIZE', 100),
     'fornecedor_max_pages' => (int) env('SENIOR_FORNECEDOR_MAX_PAGES', 500),
+    // Lookups pontuais via Exportar no sync delta / schedule de fornecedores.
+    'fornecedor_max_lookups_per_sync' => (int) env('SENIOR_FORNECEDOR_MAX_LOOKUPS', 40),
+    // Cooldown (minutos) de stub unresolved: libera o teto de lookups sem bloquear forever.
+    'fornecedor_unresolved_ttl_minutes' => (int) env('SENIOR_FORNECEDOR_UNRESOLVED_TTL', 360),
     // codFor máximo observado no cad_fornecedor (ConsultarGeral). Acima disso são
     // favorecidos de folha (GFD/TRCT) — nome vem de obsTcp, não do cadastro.
     'fornecedor_catalog_max_cod' => (int) env('SENIOR_FORNECEDOR_CATALOG_MAX_COD', 120),

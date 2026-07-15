@@ -43,7 +43,9 @@ class FornecedorMapper
         if ($value === null || $value === '') {
             return null;
         }
-        $digits = preg_replace('/\D/', '', (string) $value);
+        // Senior às vezes devolve float textual (ex.: "19593175000188.0").
+        $raw = preg_replace('/\.0+$/', '', trim((string) $value)) ?? '';
+        $digits = preg_replace('/\D/', '', $raw);
 
         return $digits !== '' ? $digits : null;
     }
