@@ -156,6 +156,8 @@ class BorderoAutoRuleFilterService
             'options' => match ($field) {
                 'codemp' => $this->empresaOptions($user),
                 'department_id' => $this->departmentOptions(),
+                // Descrição é texto livre (ex.: "FUNDO FIXO: TIAGO") — sem lista de distinct.
+                'description' => [],
                 default => $this->distinctOptions($user, BorderoAutoRule::filterColumn($field)),
             },
         ];
