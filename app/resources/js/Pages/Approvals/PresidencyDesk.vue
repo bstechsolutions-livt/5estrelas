@@ -247,9 +247,10 @@ function goToPayable(id) {
                 class="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100"
             >
                 <div
-                    v-for="p in payables"
+                    v-for="(p, idx) in payables"
                     :key="p.id"
                     class="px-3 py-2.5 grid gap-2 min-w-0"
+                    :class="idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
                 >
                     <!-- Linha 1: infos -->
                     <div class="min-w-0">
