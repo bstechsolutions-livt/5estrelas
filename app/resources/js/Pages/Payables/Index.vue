@@ -17,6 +17,8 @@ defineProps({
     lockedBranches: { type: Array, default: () => [] },
     noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
+    canManagePriority: { type: Boolean, default: false },
+    canLancar: { type: Boolean, default: false },
     priorityOptions: { type: Object, default: () => ({}) },
     canBypassApprovalDeadline: { type: Boolean, default: false },
     minDueDateForApproval: { type: String, default: null },

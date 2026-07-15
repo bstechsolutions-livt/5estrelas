@@ -29,12 +29,14 @@ const props = defineProps({
     lockedBranches: { type: Array, default: () => [] },
     noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
+    canLancar: { type: Boolean, default: false },
     priorityOptions: { type: Object, default: () => ({}) },
     syncStatus: { type: Object, default: null },
 })
 
 const { can } = useAuth()
 const canBorderos = computed(() => can('financeiro.borderos.visualizar'))
+const canLancarTitulo = computed(() => props.canLancar || can('financeiro.contas_pagar.lancar'))
 
 const STORAGE_KEY = 'payables_filters_mobile'
 
@@ -306,6 +308,18 @@ const currentTotal = computed(() => {
 
 <template>
     <AppLayoutMobile title="Contas a Pagar">
+        <div v-if="canLancarTitulo" class="px-4 pt-3">
+            <button
+                type="button"
+                class="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 text-white text-sm font-medium py-2.5 active:bg-blue-700"
+                dusk="btn-lancar-titulo-mobile"
+                @click="router.visit('/financeiro/contas-pagar/lancar')"
+            >
+                <i class="pi pi-plus text-xs"></i>
+                Lançar título
+            </button>
+        </div>
+
         <div v-if="noBranchAccess" class="px-4 pt-3">
             <BranchAccessBlocked />
         </div>

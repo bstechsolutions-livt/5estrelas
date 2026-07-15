@@ -39,6 +39,7 @@ const props = defineProps({
     noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
     canManagePriority: { type: Boolean, default: false },
+    canLancar: { type: Boolean, default: false },
     priorityOptions: { type: Object, default: () => ({}) },
     canBypassApprovalDeadline: { type: Boolean, default: false },
     minDueDateForApproval: { type: String, default: null },
@@ -47,6 +48,7 @@ const props = defineProps({
 
 const { can } = useAuth()
 const canBorderos = computed(() => can('financeiro.borderos.visualizar'))
+const canLancarTitulo = computed(() => props.canLancar || can('financeiro.contas_pagar.lancar'))
 
 const STORAGE_KEY = 'payables_filters'
 
@@ -514,10 +516,20 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
 <template>
     <AppLayout>
         <div class="max-w-7xl mx-auto">
-            <div class="mb-6">
-                <h1 class="text-2xl font-bold text-gray-800">Contas a Pagar</h1>
-                <p class="text-sm text-gray-500 mt-1">Gerencie títulos, anexe documentos e envie para aprovação.</p>
-                <PayableSyncStatusLine :sync-status="syncStatus" />
+            <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Contas a Pagar</h1>
+                    <p class="text-sm text-gray-500 mt-1">Gerencie títulos, anexe documentos e envie para aprovação.</p>
+                    <PayableSyncStatusLine :sync-status="syncStatus" />
+                </div>
+                <Button
+                    v-if="canLancarTitulo"
+                    label="Lançar título"
+                    icon="pi pi-plus"
+                    size="small"
+                    dusk="btn-lancar-titulo"
+                    @click="router.visit('/financeiro/contas-pagar/lancar')"
+                />
             </div>
 
             <BranchAccessBlocked v-if="noBranchAccess" />

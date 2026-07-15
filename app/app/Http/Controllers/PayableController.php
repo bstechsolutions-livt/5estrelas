@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StorePayableRequest;
 use App\Models\Branch;
 use App\Models\Comercial\Filial as ComercialFilial;
 use App\Models\Department;
@@ -284,11 +285,76 @@ class PayableController extends Controller
             'noBranchAccess' => $branchScope['no_branch_access'],
             'canManageClassification' => $user?->hasPermission('financeiro.contas_pagar.classificacao_gerenciar') ?? false,
             'canManagePriority' => $user?->hasPermission('financeiro.contas_pagar.prioridade_gerenciar') ?? false,
+            'canLancar' => $user?->hasPermission('financeiro.contas_pagar.lancar') ?? false,
             'priorityOptions' => Payable::PRIORITY_LABELS,
             'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
             'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
             'syncStatus' => $this->payablesSyncStatusProps($user),
         ];
+    }
+
+    public function create(Request $request)
+    {
+        $user = $request->user();
+        $branchScope = app(PayableBranchScope::class)->resolve($user);
+        $deptScope = app(FinanceiroDepartmentScope::class);
+        $canChangeDepartment = $deptScope->canBypass($user);
+        $lockedDepartmentId = $canChangeDepartment ? null : $deptScope->resolve($user);
+        $lockedDepartment = $lockedDepartmentId
+            ? Department::whereKey($lockedDepartmentId)->first(['id', 'name'])
+            : null;
+
+        $filiais = app(PayableBranchScope::class)->filialOptionsForUser($user);
+        $defaultFilial = count($filiais) === 1 ? $filiais[0]['value'] : null;
+
+        return Inertia::render('Payables/Create', [
+            'filiais' => $filiais,
+            'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'canChangeDepartment' => $canChangeDepartment,
+            'lockedDepartment' => $lockedDepartment ? ['id' => $lockedDepartment->id, 'name' => $lockedDepartment->name] : null,
+            'defaultFilial' => $defaultFilial,
+            'defaultDueDate' => Payable::defaultDueDate()->toDateString(),
+            'priorityOptions' => Payable::PRIORITY_LABELS,
+            'noBranchAccess' => $branchScope['no_branch_access'],
+        ]);
+    }
+
+    public function store(StorePayableRequest $request)
+    {
+        $attrs = $request->payableAttributes();
+        $user = $request->user();
+
+        $payable = Payable::create(array_merge($attrs, [
+            'status' => 'pendente',
+            'prepared_by' => $user->id,
+            'senior_id' => null,
+        ]));
+
+        PayableComment::create([
+            'payable_id' => $payable->id,
+            'user_id' => $user->id,
+            'body' => 'Título lançado manualmente pela intranet (Hub).',
+            'type' => 'status_change',
+        ]);
+
+        AuditLogger::log(
+            event: 'contas_pagar.lancado_manual',
+            module: 'financeiro.contas_pagar',
+            description: "Título {$payable->title_number} lançado manualmente - {$payable->supplier_name} R$ {$payable->amount}",
+            auditable: $payable,
+            newValues: [
+                'origem' => 'hub',
+                'supplier_name' => $payable->supplier_name,
+                'amount' => $payable->amount,
+                'due_date' => $payable->due_date?->toDateString(),
+                'codemp' => $payable->codemp,
+                'codfil' => $payable->codfil,
+            ],
+        );
+
+        return redirect()
+            ->route('payables.show', $payable->id)
+            ->with('success', 'Título lançado. Anexe documentos e envie para aprovação quando estiver pronto.');
     }
 
     /**

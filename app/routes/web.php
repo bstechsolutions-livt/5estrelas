@@ -207,6 +207,12 @@ Route::middleware('auth')->group(function () {
     // Financeiro - Contas a Pagar
     Route::prefix('financeiro/contas-pagar')->middleware('permission:financeiro.contas_pagar.visualizar')->group(function () {
         Route::get('/', [PayableController::class, 'index'])->name('payables.index');
+        Route::get('/lancar', [PayableController::class, 'create'])
+            ->middleware('permission:financeiro.contas_pagar.lancar')
+            ->name('payables.create');
+        Route::post('/', [PayableController::class, 'store'])
+            ->middleware('permission:financeiro.contas_pagar.lancar')
+            ->name('payables.store');
         Route::post('/lote/apelidos', [PayableController::class, 'batchUpdateNicknames'])->name('payables.batch_nicknames');
         Route::post('/lote/enviar-aprovacao', [PayableController::class, 'batchSendForApproval'])->name('payables.batch_send_approval');
         Route::post('/lote/aprovar', [PayableController::class, 'batchApprove'])->name('payables.batch_approve');

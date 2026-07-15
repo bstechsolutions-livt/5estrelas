@@ -30,6 +30,7 @@ class PermissionsSeeder extends Seeder
             ['key' => 'filiais.gerenciar', 'label' => 'Gerenciar filiais', 'module' => 'filiais', 'description' => 'Cadastrar filiais, apelidos e liberação de acesso por filial.'],
 
             ['key' => 'financeiro.contas_pagar.visualizar', 'label' => 'Ver contas a pagar', 'module' => 'financeiro', 'description' => 'Acessar listagem e detalhe de títulos a pagar.'],
+            ['key' => 'financeiro.contas_pagar.lancar', 'label' => 'Lançar título manual (CP)', 'module' => 'financeiro', 'description' => 'Criar títulos de contas a pagar pela intranet (sem Senior).'],
             ['key' => 'financeiro.contas_pagar.preparar', 'label' => 'Preparar contas a pagar', 'module' => 'financeiro', 'description' => 'Anexar documentos, editar dados e montar títulos avulsos para envio.'],
             ['key' => 'financeiro.contas_pagar.aprovar', 'label' => 'Aprovar contas a pagar', 'module' => 'financeiro', 'description' => 'Aprovar títulos avulsos quando designado na etapa do fluxo.'],
             ['key' => 'financeiro.contas_pagar.alcada_gerenciar', 'label' => 'Gerenciar alçada do contas a pagar', 'module' => 'financeiro', 'description' => 'Configurar limites e regras de alçada de pagamento.'],
