@@ -1,15 +1,29 @@
 <script setup>
+import { computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Tag from 'primevue/tag'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import Chart from 'primevue/chart'
 
-defineProps({
+const props = defineProps({
     config: { type: Object, required: true },
     current_run: { type: Object, default: null },
     runs: { type: Array, default: () => [] },
     stats: { type: Object, required: true },
+    charts_12h: {
+        type: Object,
+        default: () => ({
+            labels: [],
+            sucesso: [],
+            falha: [],
+            ignorado: [],
+            inserted: [],
+            updated: [],
+            missing: [],
+        }),
+    },
     by_empresa: { type: Array, default: null },
     next_steps: { type: Array, default: () => [] },
 })
@@ -63,6 +77,96 @@ function formatDuration(seconds) {
     const rem = total % 60
     return rem === 0 ? `${m}min` : `${m}min ${rem}s`
 }
+
+const lineOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+        legend: { position: 'bottom' },
+    },
+    scales: {
+        y: {
+            beginAtZero: true,
+            ticks: { precision: 0 },
+        },
+    },
+}
+
+const chartStatusData = computed(() => {
+    const c = props.charts_12h
+    if (!c?.labels?.length) return null
+    return {
+        labels: c.labels,
+        datasets: [
+            {
+                label: 'Sucesso',
+                data: c.sucesso ?? [],
+                borderColor: '#22c55e',
+                backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 3,
+            },
+            {
+                label: 'Erro',
+                data: c.falha ?? [],
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 3,
+            },
+            {
+                label: 'Ignorado',
+                data: c.ignorado ?? [],
+                borderColor: '#94a3b8',
+                backgroundColor: 'rgba(148, 163, 184, 0.12)',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 2,
+                borderDash: [4, 4],
+            },
+        ],
+    }
+})
+
+const chartMutationsData = computed(() => {
+    const c = props.charts_12h
+    if (!c?.labels?.length) return null
+    return {
+        labels: c.labels,
+        datasets: [
+            {
+                label: 'Insert',
+                data: c.inserted ?? [],
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 3,
+            },
+            {
+                label: 'Update',
+                data: c.updated ?? [],
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 3,
+            },
+            {
+                label: 'Ausentes',
+                data: c.missing ?? [],
+                borderColor: '#a855f7',
+                backgroundColor: 'rgba(168, 85, 247, 0.12)',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 3,
+            },
+        ],
+    }
+})
 </script>
 
 <template>
@@ -120,6 +224,39 @@ function formatDuration(seconds) {
                     <div>Início: {{ formatDt(current_run.started_at) }} · duração {{ formatDuration(current_run.duration_seconds) }}</div>
                 </div>
                 <p v-else class="text-sm text-slate-500">Nenhum sync em andamento no momento.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" dusk="sync-charts-12h">
+                <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
+                    <div class="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-1">
+                        Sucesso / erro (últimas 12h)
+                    </div>
+                    <p class="text-xs text-slate-500 mb-3">Quantidade de runs por hora · fuso America/Sao_Paulo</p>
+                    <div class="h-56">
+                        <Chart
+                            v-if="chartStatusData"
+                            type="line"
+                            :data="chartStatusData"
+                            :options="lineOptions"
+                            class="h-full"
+                        />
+                    </div>
+                </div>
+                <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
+                    <div class="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-1">
+                        Insert / update / ausentes (últimas 12h)
+                    </div>
+                    <p class="text-xs text-slate-500 mb-3">Somas por hora nas runs · fuso America/Sao_Paulo</p>
+                    <div class="h-56">
+                        <Chart
+                            v-if="chartMutationsData"
+                            type="line"
+                            :data="chartMutationsData"
+                            :options="lineOptions"
+                            class="h-full"
+                        />
+                    </div>
+                </div>
             </div>
 
             <div

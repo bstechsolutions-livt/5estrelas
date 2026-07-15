@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Payable;
 use App\Models\PayableSyncRun;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -61,11 +62,83 @@ class PayableSyncMonitorController extends Controller
                 'failed_24h' => $failedRecent,
                 'failed_503_or_timeout_24h' => $failed503Recent,
             ],
+            'charts_12h' => $this->hourlyChartsLast12h(),
             'by_empresa' => $this->cheapEmpresaBreakdown(),
             'next_steps' => [
                 'Breakdown por departamento na próxima versão (quando o volume e índices permitirem sem pesar a tela).',
             ],
         ]);
+    }
+
+    /**
+     * Agrega payable_sync_runs das últimas 12h por hora (America/Sao_Paulo).
+     * Volume típico (~5 min) cabe em PHP sem SQL por driver.
+     *
+     * @return array{
+     *   labels: list<string>,
+     *   sucesso: list<int>,
+     *   falha: list<int>,
+     *   ignorado: list<int>,
+     *   inserted: list<int>,
+     *   updated: list<int>,
+     *   missing: list<int>
+     * }
+     */
+    private function hourlyChartsLast12h(): array
+    {
+        $tz = 'America/Sao_Paulo';
+        $nowHour = Carbon::now($tz)->startOfHour();
+        $since = $nowHour->copy()->subHours(11);
+
+        $buckets = [];
+        for ($i = 0; $i < 12; $i++) {
+            $hour = $since->copy()->addHours($i);
+            $key = $hour->format('Y-m-d H:00');
+            $buckets[$key] = [
+                'label' => $hour->format('H:i'),
+                'sucesso' => 0,
+                'falha' => 0,
+                'ignorado' => 0,
+                'inserted' => 0,
+                'updated' => 0,
+                'missing' => 0,
+            ];
+        }
+
+        $runs = PayableSyncRun::query()
+            ->where('started_at', '>=', $since)
+            ->whereNotNull('started_at')
+            ->get(['status', 'started_at', 'inserted_count', 'updated_count', 'missing_count']);
+
+        foreach ($runs as $run) {
+            $key = $run->started_at->copy()->timezone($tz)->format('Y-m-d H:00');
+            if (! isset($buckets[$key])) {
+                continue;
+            }
+
+            match ($run->status) {
+                PayableSyncRun::STATUS_SUCCESS => $buckets[$key]['sucesso']++,
+                PayableSyncRun::STATUS_FAILED => $buckets[$key]['falha']++,
+                PayableSyncRun::STATUS_SKIPPED => $buckets[$key]['ignorado']++,
+                default => null,
+            };
+
+            $buckets[$key]['inserted'] += (int) $run->inserted_count;
+            $buckets[$key]['updated'] += (int) $run->updated_count;
+            $buckets[$key]['missing'] += (int) $run->missing_count;
+        }
+
+        $rows = array_values($buckets);
+
+        return [
+            'labels' => array_column($rows, 'label'),
+            'sucesso' => array_column($rows, 'sucesso'),
+            'falha' => array_column($rows, 'falha'),
+            'ignorado' => array_column($rows, 'ignorado'),
+            'inserted' => array_column($rows, 'inserted'),
+            'updated' => array_column($rows, 'updated'),
+            'missing' => array_column($rows, 'missing'),
+        ];
     }
 
     /** @return array<string, mixed> */

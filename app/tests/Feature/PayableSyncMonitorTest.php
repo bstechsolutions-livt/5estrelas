@@ -65,9 +65,67 @@ class PayableSyncMonitorTest extends TestCase
                 ->component('Financeiro/SyncMonitor/Index', false)
                 ->has('runs')
                 ->has('config')
+                ->has('charts_12h')
+                ->has('charts_12h.labels', 12)
                 ->where('stats.failed_24h', 1)
                 ->where('stats.failed_503_or_timeout_24h', 1)
                 ->where('current_run.status', PayableSyncRun::STATUS_RUNNING)
+            );
+    }
+
+    public function test_monitor_aggregates_hourly_charts_last_12h(): void
+    {
+        $hour = now('America/Sao_Paulo')->startOfHour();
+
+        PayableSyncRun::create([
+            'environment' => 'PRD',
+            'mode' => PayableSyncRun::MODE_INCREMENTAL,
+            'trigger' => PayableSyncRun::TRIGGER_SCHEDULED,
+            'status' => PayableSyncRun::STATUS_SUCCESS,
+            'started_at' => $hour->copy()->addMinutes(5),
+            'finished_at' => $hour->copy()->addMinutes(6),
+            'inserted_count' => 2,
+            'updated_count' => 3,
+            'missing_count' => 1,
+        ]);
+
+        PayableSyncRun::create([
+            'environment' => 'PRD',
+            'mode' => PayableSyncRun::MODE_INCREMENTAL,
+            'trigger' => PayableSyncRun::TRIGGER_SCHEDULED,
+            'status' => PayableSyncRun::STATUS_FAILED,
+            'started_at' => $hour->copy()->addMinutes(15),
+            'finished_at' => $hour->copy()->addMinutes(16),
+            'inserted_count' => 0,
+            'updated_count' => 1,
+            'missing_count' => 0,
+            'error_message' => 'timeout',
+        ]);
+
+        // Fora da janela de 12h — não deve entrar nos gráficos.
+        PayableSyncRun::create([
+            'environment' => 'PRD',
+            'mode' => PayableSyncRun::MODE_INCREMENTAL,
+            'trigger' => PayableSyncRun::TRIGGER_SCHEDULED,
+            'status' => PayableSyncRun::STATUS_SUCCESS,
+            'started_at' => $hour->copy()->subHours(13),
+            'finished_at' => $hour->copy()->subHours(13)->addMinute(),
+            'inserted_count' => 99,
+            'updated_count' => 99,
+            'missing_count' => 99,
+        ]);
+
+        $this->actingAs($this->userWith(['financeiro.workflows.configurar']))
+            ->get('/financeiro/sync-senior')
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('charts_12h.labels', 12)
+                ->where('charts_12h.sucesso.11', 1)
+                ->where('charts_12h.falha.11', 1)
+                ->where('charts_12h.inserted.11', 2)
+                ->where('charts_12h.updated.11', 4)
+                ->where('charts_12h.missing.11', 1)
+                ->where('charts_12h.labels.11', $hour->format('H:i'))
             );
     }
 }
