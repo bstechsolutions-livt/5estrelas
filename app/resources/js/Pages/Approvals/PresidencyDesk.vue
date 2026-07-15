@@ -10,17 +10,26 @@ import Dialog from 'primevue/dialog'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import { useDevice } from '@/composables/useDevice'
+import { useDueDatePresets } from '@/composables/useDueDatePresets'
 import PayableDocumentPreviewCard from '@/Components/Financeiro/PayableDocumentPreviewCard.vue'
+import DueDatePeriodChips from '@/Components/Financeiro/DueDatePeriodChips.vue'
 
 const props = defineProps({
     payables: { type: Array, default: () => [] },
     pendingCount: { type: Number, default: 0 },
+    filters: { type: Object, default: () => ({}) },
     docTypeLabels: { type: Object, default: () => ({}) },
 })
 
 const { isMobile } = useDevice()
 const page = usePage()
 const toast = useToast()
+
+const dueFrom = ref(props.filters?.due_from || '')
+const dueTo = ref(props.filters?.due_to || '')
+const { duePreset, applyDuePreset, clearDuePreset } = useDueDatePresets(dueFrom, dueTo)
+
+const hasDueFilter = computed(() => !!(dueFrom.value || dueTo.value))
 
 const viewerDoc = ref(null)
 const showViewer = computed({
@@ -54,6 +63,25 @@ function docTypeLabel(doc) {
 
 function openViewer(doc) {
     viewerDoc.value = doc
+}
+
+function applyFilters() {
+    router.get('/financeiro/presidencia', {
+        due_from: dueFrom.value || undefined,
+        due_to: dueTo.value || undefined,
+    }, { preserveState: true, replace: true, preserveScroll: true })
+}
+
+function selectDuePreset(key) {
+    applyDuePreset(key)
+    applyFilters()
+}
+
+function clearDueFilters() {
+    dueFrom.value = ''
+    dueTo.value = ''
+    clearDuePreset()
+    applyFilters()
 }
 
 function approve(payable) {
@@ -108,10 +136,40 @@ function goToPayable(id) {
                 <Tag v-if="pendingCount > 0" :value="`${pendingCount} aguardando`" severity="warn" class="!text-sm" />
             </div>
 
+            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 space-y-3">
+                <DueDatePeriodChips
+                    :active-key="duePreset"
+                    :compact="isMobile"
+                    @select="selectDuePreset"
+                />
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <span v-if="hasDueFilter" class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        Filtro de vencimento ativo
+                    </span>
+                    <span v-else class="text-xs text-gray-400">Nenhum filtro de vencimento</span>
+                    <Button
+                        label="Limpar"
+                        severity="secondary"
+                        outlined
+                        size="small"
+                        :disabled="!hasDueFilter"
+                        @click="clearDueFilters"
+                    />
+                </div>
+            </div>
+
             <div v-if="payables.length === 0" class="text-center py-20 text-gray-400 bg-white rounded-2xl border border-gray-100">
-                <i class="pi pi-check-circle text-5xl mb-4 block text-green-400"></i>
-                <p class="text-lg font-medium text-gray-600">Nada pendente</p>
-                <p class="text-sm mt-1">Nenhum título aguarda sua assinatura no momento.</p>
+                <template v-if="hasDueFilter">
+                    <i class="pi pi-calendar text-5xl mb-4 block text-gray-300"></i>
+                    <p class="text-lg font-medium text-gray-600">Nenhum título neste período</p>
+                    <p class="text-sm mt-1">Ajuste ou limpe o filtro de vencimento.</p>
+                    <Button label="Limpar filtro" severity="secondary" outlined size="small" class="mt-4" @click="clearDueFilters" />
+                </template>
+                <template v-else>
+                    <i class="pi pi-check-circle text-5xl mb-4 block text-green-400"></i>
+                    <p class="text-lg font-medium text-gray-600">Nada pendente</p>
+                    <p class="text-sm mt-1">Nenhum título aguarda sua assinatura no momento.</p>
+                </template>
             </div>
 
             <div v-else class="space-y-4">

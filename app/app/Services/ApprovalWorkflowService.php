@@ -562,8 +562,11 @@ class ApprovalWorkflowService
 
     /**
      * Títulos na etapa Presidência aguardando ação do usuário (painel dedicado).
+     *
+     * @param  string|null  $dueFrom  Y-m-d (opcional)
+     * @param  string|null  $dueTo    Y-m-d (opcional)
      */
-    public function presidencyDeskPayables(User $user): Collection
+    public function presidencyDeskPayables(User $user, ?string $dueFrom = null, ?string $dueTo = null): Collection
     {
         $branchScope = app(PayableBranchScope::class);
 
@@ -577,9 +580,18 @@ class ApprovalWorkflowService
             return collect();
         }
 
-        $payables = Payable::query()
+        $query = Payable::query()
             ->whereIn('id', $candidateIds)
-            ->where('status', 'aguardando_aprovacao')
+            ->where('status', 'aguardando_aprovacao');
+
+        if ($dueFrom) {
+            $query->whereDate('due_date', '>=', $dueFrom);
+        }
+        if ($dueTo) {
+            $query->whereDate('due_date', '<=', $dueTo);
+        }
+
+        $payables = $query
             ->with([
                 'documents.uploader:id,name',
                 'preparer:id,name',
