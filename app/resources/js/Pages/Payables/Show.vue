@@ -707,6 +707,11 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Departamento" field="department_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Departamento</p><p class="text-gray-800">{{ departamentoTitulo || '—' }}</p></div>
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Emissão" field="issue_date" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Emissão</p><p class="text-gray-800">{{ formatDate(payable.issue_date) }}</p></div>
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="CNPJ" field="supplier_cnpj" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">CNPJ</p><p class="text-gray-800 font-mono text-xs">{{ payable.supplier_cnpj || '—' }}</p></div>
+                            <div dusk="payable-lancado-por">
+                                <PayableFieldOriginLabel v-if="fieldOrigins" label="Lançado por (Senior)" field="launcher_nome" :field-origins="fieldOrigins" />
+                                <p v-else class="text-xs text-gray-500">Lançado por (Senior)</p>
+                                <p class="text-gray-800">{{ payable.launcher_label || '—' }}</p>
+                            </div>
                             <div class="col-span-2 border-t border-gray-100 pt-3 mt-1">
                                 <PayableFieldOriginLabel v-if="fieldOrigins" label="Fornecedor" field="supplier_name" :field-origins="fieldOrigins" />
                                 <p v-else class="text-xs text-gray-500">Fornecedor</p>

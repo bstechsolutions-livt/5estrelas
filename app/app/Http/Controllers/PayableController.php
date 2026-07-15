@@ -703,6 +703,7 @@ class PayableController extends Controller
         Payable::attachSupplierDisplayName([$payable]);
         Payable::attachDepartmentNome([$payable]);
         Payable::attachAccountingLabels([$payable]);
+        Payable::attachLauncherNome([$payable]);
         $payable->setAttribute(
             'document_pair_alert',
             PayableDocumentPairAlert::resolveFromDocuments($payable->documents, $payable->status),
