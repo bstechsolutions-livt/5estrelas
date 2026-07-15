@@ -241,6 +241,79 @@ function goToPayable(id) {
                 </template>
             </div>
 
+            <!-- Lista: rows compactas -->
+            <div
+                v-else-if="viewMode === 'list'"
+                class="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 overflow-hidden"
+            >
+                <div
+                    v-for="p in payables"
+                    :key="p.id"
+                    class="px-3 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3"
+                >
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                            <span class="text-sm font-bold text-gray-900">{{ p.title_number }}</span>
+                            <span class="text-sm text-gray-800 truncate max-w-full sm:max-w-[28rem]">
+                                {{ p.supplier_display_name || p.supplier_name || '—' }}
+                            </span>
+                            <Tag v-if="p.origem_senior" value="Senior" severity="secondary" class="!text-[9px] !py-0" />
+                        </div>
+                        <div class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
+                            <span class="font-semibold text-gray-800">{{ formatMoney(p.amount) }}</span>
+                            <span>Venc. {{ formatDate(p.due_date) }}</span>
+                            <span v-if="p.empresa_nome" class="truncate">{{ p.empresa_nome }}</span>
+                            <span v-if="p.filial_nome" class="truncate">{{ p.filial_nome }}</span>
+                            <span v-if="p.department?.name" class="truncate">{{ p.department.name }}</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0 flex-nowrap justify-end">
+                        <button
+                            v-if="p.documents?.length"
+                            type="button"
+                            class="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap px-1 py-1"
+                            @click="openViewer(p.documents[0], p)"
+                        >
+                            <i class="pi pi-file mr-1 text-[10px]"></i>Abrir documento
+                            <span v-if="p.documents.length > 1" class="text-gray-400 font-normal">({{ p.documents.length }})</span>
+                        </button>
+                        <span v-else class="text-[11px] text-amber-600 whitespace-nowrap">
+                            <i class="pi pi-exclamation-triangle mr-0.5"></i>Sem docs
+                        </span>
+                        <Button
+                            label="Ver"
+                            icon="pi pi-external-link"
+                            severity="secondary"
+                            text
+                            size="small"
+                            class="!px-2"
+                            @click="goToPayable(p.id)"
+                        />
+                        <div class="inline-flex items-center gap-1.5 flex-nowrap shrink-0">
+                            <Button
+                                label="Reprovar"
+                                icon="pi pi-times"
+                                severity="danger"
+                                outlined
+                                size="small"
+                                @click="openReject(p)"
+                            />
+                            <Button
+                                label="Aprovar"
+                                icon="pi pi-check"
+                                severity="success"
+                                size="small"
+                                :loading="approvingId === p.id"
+                                :disabled="!p.documents?.length"
+                                @click="approve(p)"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cards: preview de documentos -->
             <div v-else class="space-y-4">
                 <article
                     v-for="p in payables"
@@ -278,7 +351,7 @@ function goToPayable(id) {
                         <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
                             Documentos ({{ p.documents?.length || 0 }})
                         </p>
-                        <div v-if="p.documents?.length && viewMode === 'card'" class="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+                        <div v-if="p.documents?.length" class="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
                             <div
                                 v-for="doc in p.documents"
                                 :key="doc.id"
@@ -290,16 +363,6 @@ function goToPayable(id) {
                                     @open="(d) => openViewer(d, p)"
                                 />
                             </div>
-                        </div>
-                        <div v-else-if="p.documents?.length" class="space-y-2">
-                            <PayableDocumentPreviewCard
-                                v-for="doc in p.documents"
-                                :key="doc.id"
-                                :doc="doc"
-                                :type-label="docTypeLabel(doc)"
-                                dense
-                                @open="(d) => openViewer(d, p)"
-                            />
                         </div>
                         <p v-else class="text-xs text-amber-600 flex items-center gap-1">
                             <i class="pi pi-exclamation-triangle"></i> Sem documentos anexados
@@ -315,23 +378,25 @@ function goToPayable(id) {
                             size="small"
                             @click="goToPayable(p.id)"
                         />
-                        <Button
-                            label="Reprovar"
-                            icon="pi pi-times"
-                            severity="danger"
-                            outlined
-                            size="small"
-                            @click="openReject(p)"
-                        />
-                        <Button
-                            label="Aprovar"
-                            icon="pi pi-check"
-                            severity="success"
-                            size="small"
-                            :loading="approvingId === p.id"
-                            :disabled="!p.documents?.length"
-                            @click="approve(p)"
-                        />
+                        <div class="inline-flex items-center gap-2 flex-nowrap shrink-0">
+                            <Button
+                                label="Reprovar"
+                                icon="pi pi-times"
+                                severity="danger"
+                                outlined
+                                size="small"
+                                @click="openReject(p)"
+                            />
+                            <Button
+                                label="Aprovar"
+                                icon="pi pi-check"
+                                severity="success"
+                                size="small"
+                                :loading="approvingId === p.id"
+                                :disabled="!p.documents?.length"
+                                @click="approve(p)"
+                            />
+                        </div>
                     </div>
                 </article>
             </div>
