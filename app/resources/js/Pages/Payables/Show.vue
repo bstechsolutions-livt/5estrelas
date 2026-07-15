@@ -395,7 +395,7 @@ const wasRejectedBack = computed(() =>
     props.payable.status === 'pendente' && !!props.payable.rejection_reason
 )
 
-// Envio usa o departamento do usuário logado (preview em approvalPreview).
+// Envio usa o departamento do título (preview em approvalPreview).
 function sendForApproval() {
     router.post(`/financeiro/contas-pagar/${props.payable.id}/enviar-aprovacao`, {
         urgente: urgentBypass.value && props.canBypassApprovalDeadline,
@@ -511,9 +511,18 @@ const naturezaGasto = computed(() => {
 })
 
 const centroCusto = computed(() => {
-    const cc = props.payable.codccu
-    return cc !== null && cc !== undefined && cc !== '' ? String(cc) : null
+    return props.payable.centro_custo_label
+        || (props.payable.codccu !== null && props.payable.codccu !== undefined && props.payable.codccu !== ''
+            ? String(props.payable.codccu)
+            : null)
 })
+
+const contaFinanceira = computed(() => {
+    return props.payable.conta_financeira_label
+        || (props.payable.ctafin ? String(props.payable.ctafin) : null)
+})
+
+const departamentoTitulo = computed(() => props.payable.department_nome || null)
 </script>
 
 <template>
@@ -637,7 +646,9 @@ const centroCusto = computed(() => {
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Empresa" field="empresa_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Empresa</p><p class="text-gray-800">{{ payable.empresa_nome || '—' }}</p></div>
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Filial" field="filial_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Filial</p><p class="text-gray-800">{{ payable.filial_label || payable.filial_nome || '—' }}</p></div>
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Natureza de gasto" field="codntg" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Natureza de gasto</p><p class="text-gray-800">{{ naturezaGasto || '—' }}</p></div>
-                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Centro de custo" field="codccu" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Centro de custo</p><p class="text-gray-800 font-mono text-xs">{{ centroCusto || '—' }}</p></div>
+                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Centro de custo" field="codccu" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Centro de custo</p><p class="text-gray-800 text-xs" :class="centroCusto && !payable.centro_custo_nome ? 'font-mono' : ''">{{ centroCusto || '—' }}</p></div>
+                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Conta financeira" field="ctafin" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Conta financeira</p><p class="text-gray-800 text-xs" :class="contaFinanceira && !payable.conta_financeira_nome ? 'font-mono' : ''">{{ contaFinanceira || '—' }}</p></div>
+                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Departamento" field="department_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Departamento</p><p class="text-gray-800">{{ departamentoTitulo || '—' }}</p></div>
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Emissão" field="issue_date" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Emissão</p><p class="text-gray-800">{{ formatDate(payable.issue_date) }}</p></div>
                             <div><PayableFieldOriginLabel v-if="fieldOrigins" label="CNPJ" field="supplier_cnpj" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">CNPJ</p><p class="text-gray-800 font-mono text-xs">{{ payable.supplier_cnpj || '—' }}</p></div>
                             <div class="col-span-2 border-t border-gray-100 pt-3 mt-1">

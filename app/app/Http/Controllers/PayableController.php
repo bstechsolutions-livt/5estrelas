@@ -118,10 +118,6 @@ class PayableController extends Controller
 
         $user = $request->user();
         $workflow = app(ApprovalWorkflowService::class);
-        $preview = $workflow->buildPreviewStepsForSender($user);
-        if (! $preview['ok']) {
-            return back()->with('error', $preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
-        }
 
         $urgent = $request->boolean('urgente');
         $sent = 0;
@@ -142,6 +138,12 @@ class PayableController extends Controller
                 }
                 if ($payable->documents()->count() === 0) {
                     $skipped++;
+                    continue;
+                }
+
+                $preview = $workflow->buildPreviewStepsForPayable($payable);
+                if (! $preview['ok']) {
+                    $errors[] = $preview['errors'][0] ?? "Título #{$id}: fluxo inválido.";
                     continue;
                 }
 
@@ -509,6 +511,8 @@ class PayableController extends Controller
         Payable::attachEmpresaNome([$payable]);
         Payable::attachFilialNome([$payable]);
         Payable::attachSupplierDisplayName([$payable]);
+        Payable::attachDepartmentNome([$payable]);
+        Payable::attachAccountingLabels([$payable]);
         $payable->setAttribute(
             'document_pair_alert',
             PayableDocumentPairAlert::resolveFromDocuments($payable->documents, $payable->status),
@@ -557,7 +561,7 @@ class PayableController extends Controller
             'canDelegateStep' => $canDelegateStep,
             'delegateUsers' => $delegateUsers,
             'mentionableUsers' => app(\App\Services\MentionService::class)->mentionableUsers($user, $id),
-            'approvalPreview' => $workflow->buildPreviewStepsForSender($user),
+            'approvalPreview' => $workflow->buildPreviewStepsForPayable($payable),
             'canImportAllocations' => in_array($payable->status, self::ALLOCATION_IMPORT_STATUSES, true),
             'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
             'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
@@ -700,7 +704,7 @@ class PayableController extends Controller
         }
 
         $workflow = app(ApprovalWorkflowService::class);
-        $preview = $workflow->buildPreviewStepsForSender($request->user());
+        $preview = $workflow->buildPreviewStepsForPayable($payable);
         if (! $preview['ok']) {
             return back()->with('error', $preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
         }

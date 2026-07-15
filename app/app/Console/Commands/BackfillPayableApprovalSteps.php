@@ -55,7 +55,7 @@ class BackfillPayableApprovalSteps extends Command
                     continue;
                 }
 
-                $preview = $workflow->buildPreviewStepsForSender($sender);
+                $preview = $workflow->buildPreviewStepsForPayable($payable);
                 if (! ($preview['ok'] ?? false)) {
                     $this->warn("#{$payable->id} {$payable->title_number}: " . implode('; ', $preview['errors'] ?? ['erro']));
                     $failed++;

@@ -418,6 +418,8 @@ class Payable extends Model
             'issue_date' => 'senior',
             'codntg' => 'senior',
             'codccu' => 'senior',
+            'ctafin' => 'senior',
+            'department_nome' => 'hub',
             'description' => 'senior',
             'payment_priority' => 'hub',
             'payment_sla_date' => 'hub',
@@ -568,6 +570,123 @@ class Payable extends Model
             $dept = $classifier->departmentForPayable($p);
             $p->setAttribute('department_nome', $dept?->name);
         }
+    }
+
+    /**
+     * Labels de centro de custo (codCcu) e conta financeira (ctaFin) via chart_of_accounts / regras.
+     *
+     * @param iterable<Payable> $payables
+     */
+    public static function attachAccountingLabels(iterable $payables): void
+    {
+        $items = collect($payables);
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $ccuCodes = $items
+            ->map(fn (Payable $p) => trim((string) ($p->codccu ?? '')))
+            ->filter(fn (string $c) => $c !== '' && $c !== '0')
+            ->unique()
+            ->values();
+
+        $ctaCodes = $items
+            ->map(fn (Payable $p) => (int) ($p->ctafin ?? 0))
+            ->filter(fn (int $c) => $c > 0)
+            ->map(fn (int $c) => (string) $c)
+            ->unique()
+            ->values();
+
+        $ccuRows = $ccuCodes->isEmpty()
+            ? collect()
+            : ChartOfAccount::query()
+                ->where('account_type', ChartOfAccount::TYPE_CENTRO_CUSTO)
+                ->whereIn('code', $ccuCodes)
+                ->get();
+
+        $ctaRows = $ctaCodes->isEmpty()
+            ? collect()
+            : ChartOfAccount::query()
+                ->where('account_type', ChartOfAccount::TYPE_CONTA_FINANCEIRA)
+                ->whereIn('code', $ctaCodes)
+                ->get();
+
+        foreach ($items as $p) {
+            $codccu = trim((string) ($p->codccu ?? ''));
+            $ccuNome = null;
+            if ($codccu !== '' && $codccu !== '0') {
+                $ccuNome = self::resolveChartDescription(
+                    $ccuRows,
+                    $codccu,
+                    $p->codemp !== null ? (int) $p->codemp : null,
+                    ChartOfAccount::TYPE_CENTRO_CUSTO,
+                );
+            }
+
+            $ctafin = (int) ($p->ctafin ?? 0);
+            $ctaNome = null;
+            $ctaCode = $ctafin > 0 ? (string) $ctafin : null;
+            if ($ctaCode) {
+                $ctaNome = self::resolveChartDescription(
+                    $ctaRows,
+                    $ctaCode,
+                    $p->codemp !== null ? (int) $p->codemp : null,
+                    ChartOfAccount::TYPE_CONTA_FINANCEIRA,
+                );
+            }
+
+            $p->setAttribute('centro_custo_nome', $ccuNome);
+            $p->setAttribute(
+                'centro_custo_label',
+                $codccu === '' || $codccu === '0'
+                    ? null
+                    : ($ccuNome && $ccuNome !== $codccu && ! str_starts_with($ccuNome, 'Centro de custo ')
+                        ? "{$ccuNome} ({$codccu})"
+                        : $codccu),
+            );
+            $p->setAttribute('conta_financeira', $ctaCode);
+            $p->setAttribute('conta_financeira_nome', $ctaNome);
+            $p->setAttribute(
+                'conta_financeira_label',
+                $ctaCode === null
+                    ? null
+                    : ($ctaNome && $ctaNome !== $ctaCode && ! str_starts_with($ctaNome, 'Conta financeira ')
+                        ? "{$ctaNome} ({$ctaCode})"
+                        : $ctaCode),
+            );
+        }
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, ChartOfAccount> $rows
+     */
+    private static function resolveChartDescription(
+        \Illuminate\Support\Collection $rows,
+        string $code,
+        ?int $codemp,
+        string $accountType,
+    ): ?string {
+        $match = null;
+        if ($codemp !== null) {
+            $match = $rows->first(
+                fn (ChartOfAccount $a) => $a->code === $code && (int) $a->codemp === $codemp,
+            );
+        }
+        $match ??= $rows->first(fn (ChartOfAccount $a) => $a->code === $code);
+
+        $description = filled($match?->description)
+            ? trim((string) $match->description)
+            : ChartOfAccount::deriveDescription($accountType, $code, $codemp);
+
+        $generic = $accountType === ChartOfAccount::TYPE_CENTRO_CUSTO
+            ? 'Centro de custo '.$code
+            : 'Conta financeira '.$code;
+
+        if ($description === '' || $description === $generic) {
+            return $description === $generic ? null : ($description !== '' ? $description : null);
+        }
+
+        return $description;
     }
 
     /** ok | warning (≤3 dias) | overdue — null se sem SLA ou já pago/encerrado. */

@@ -133,7 +133,9 @@ class BorderoController extends Controller
             'currentStepLabel' => $currentStepLabel,
             'requiresPriorityOnApprove' => $canApproveStep && $currentStepLabel === 'financeiro',
             'priorityOptions' => Payable::PRIORITY_LABELS,
-            'approvalPreview' => $workflow->buildPreviewStepsForSender($user),
+            'approvalPreview' => $bordero->payables->isNotEmpty()
+                ? $workflow->buildPreviewStepsForPayable($bordero->payables->first())
+                : $workflow->buildPreviewStepsForSender($user),
             'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
             'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
         ]);
@@ -226,9 +228,13 @@ class BorderoController extends Controller
         }
 
         $workflow = app(ApprovalWorkflowService::class);
-        $preview = $workflow->buildPreviewStepsForSender($request->user());
-        if (! $preview['ok']) {
-            return back()->with('error', $preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
+        foreach ($bordero->payables as $payable) {
+            $preview = $workflow->buildPreviewStepsForPayable($payable);
+            if (! $preview['ok']) {
+                $num = $payable->title_number ?: "#{$payable->id}";
+
+                return back()->with('error', "Título {$num}: ".($preview['errors'][0] ?? 'Não foi possível enviar para aprovação.'));
+            }
         }
 
         $withoutDocs = $bordero->payables->filter(fn (Payable $p) => $p->documents()->count() === 0);

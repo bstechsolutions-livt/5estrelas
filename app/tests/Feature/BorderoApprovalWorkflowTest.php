@@ -108,6 +108,7 @@ class BorderoApprovalWorkflowTest extends TestCase
             'amount' => 1500.00,
             'due_date' => now()->addDays(5)->toDateString(),
             'status' => 'pendente',
+            'department_id' => $this->department->id,
         ]);
 
         PayableDocument::create([
