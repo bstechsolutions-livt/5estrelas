@@ -20,6 +20,7 @@ defineProps({
     priorityOptions: { type: Object, default: () => ({}) },
     canBypassApprovalDeadline: { type: Boolean, default: false },
     minDueDateForApproval: { type: String, default: null },
+    syncStatus: { type: Object, default: null },
 })
 
 const { isMobile } = useDevice()
