@@ -31,16 +31,37 @@ function statusSeverity(status) {
 
 function formatDt(iso) {
     if (!iso) return '—'
-    return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' })
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return '—'
+    // Datetime com hora: locale pt-BR (dd/mm/yyyy HH:mm:ss)
+    return d.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    })
 }
 
 function formatDuration(seconds) {
     if (seconds == null) return '—'
-    const s = Number(seconds)
-    if (s < 60) return `${s}s`
-    const m = Math.floor(s / 60)
-    const rem = s % 60
-    return `${m}m ${rem}s`
+    const raw = Number(seconds)
+    if (!Number.isFinite(raw) || raw < 0) return '—'
+
+    if (raw < 60) {
+        const oneDecimal = Math.round(raw * 10) / 10
+        if (Number.isInteger(oneDecimal)) {
+            return `${oneDecimal}s`
+        }
+        return `${oneDecimal.toFixed(1).replace('.', ',')}s`
+    }
+
+    const total = Math.round(raw)
+    const m = Math.floor(total / 60)
+    const rem = total % 60
+    return rem === 0 ? `${m}min` : `${m}min ${rem}s`
 }
 </script>
 
