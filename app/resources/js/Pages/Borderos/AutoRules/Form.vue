@@ -24,7 +24,7 @@ const toast = useToast()
 
 const isEditing = computed(() => !!props.rule?.id)
 
-const emptyFilter = () => ({ field: 'codccu', operator: 'eq', value: '' })
+const emptyFilter = () => ({ field: 'description', operator: 'contains', value: '' })
 
 const form = useForm({
     name: props.rule?.name ?? props.defaults.name,
@@ -206,7 +206,8 @@ watch(() => page.props.flash?.error, (msg) => {
                     {{ isEditing ? 'Editar regra' : 'Nova regra' }}
                 </h1>
                 <p class="text-sm text-gray-500 mt-1 max-w-2xl">
-                    Defina <strong>quando</strong> criar o borderô — com valores específicos de natureza, filial, CCU, fornecedor, etc.
+                    Defina <strong>quando</strong> criar o borderô — por exemplo descrição contendo “FUNDO FIXO: TIAGO”, filial, CCU, etc.
+                    O agrupamento dos títulos que batem continua sendo por <strong>data de vencimento</strong> (opções abaixo).
                 </p>
             </div>
 
@@ -220,7 +221,7 @@ watch(() => page.props.flash?.error, (msg) => {
                     <div class="p-4 space-y-4">
                         <div class="space-y-1">
                             <label class="block text-xs font-medium text-gray-600">Nome da regra</label>
-                            <InputText v-model="form.name" class="w-full" placeholder="Ex: Natureza 90500 — Filial 2" />
+                            <InputText v-model="form.name" class="w-full" placeholder="Ex: Fundo fixo Tiago — Filial 6" />
                         </div>
 
                         <div class="space-y-2">
@@ -245,7 +246,9 @@ watch(() => page.props.flash?.error, (msg) => {
                                             placeholder="Valor" class="w-full flex-1" filter show-clear
                                             @update:model-value="scheduleSimulate" />
                                         <InputText v-else v-model="cond.value" class="w-full flex-1"
-                                            :placeholder="cond.operator === 'in' ? 'Ex: 2363, 2566' : 'Valor'"
+                                            :placeholder="cond.field === 'description'
+                                                ? (cond.operator === 'contains' ? 'Ex: FUNDO FIXO: TIAGO' : 'Descrição exata')
+                                                : (cond.operator === 'in' ? 'Ex: 2363, 2566' : 'Valor')"
                                             @update:model-value="scheduleSimulate" />
                                         <Button icon="pi pi-trash" severity="danger" text size="small"
                                             @click="removeCondition(index)" />

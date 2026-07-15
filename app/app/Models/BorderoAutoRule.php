@@ -51,6 +51,7 @@ class BorderoAutoRule extends Model
     public static function filterFields(): array
     {
         return [
+            'description' => ['label' => 'Descrição', 'operators' => ['contains', 'eq']],
             'codemp' => ['label' => 'Empresa', 'operators' => ['eq', 'in']],
             'codfil' => ['label' => 'Filial (codFil)', 'operators' => ['eq', 'in']],
             'department_id' => ['label' => 'Departamento', 'operators' => ['eq']],
@@ -68,6 +69,7 @@ class BorderoAutoRule extends Model
     public static function filterColumn(string $field): ?string
     {
         return match ($field) {
+            'description' => 'description',
             'codemp' => 'codemp',
             'codfil' => 'codfil',
             'codccu' => 'codccu',

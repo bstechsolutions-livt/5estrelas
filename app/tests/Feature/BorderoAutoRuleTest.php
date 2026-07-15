@@ -230,4 +230,55 @@ class BorderoAutoRuleTest extends TestCase
             ->assertOk()
             ->assertJsonFragment(['value' => '42']);
     }
+
+    public function test_filtro_por_descricao_e_agrupa_por_vencimento(): void
+    {
+        $dayA = now()->addDays(3)->toDateString();
+        $dayB = now()->addDays(10)->toDateString();
+
+        $this->makePayable([
+            'description' => 'FUNDO FIXO: TIAGO DOS SANTOS MENEZES — pedágio',
+            'due_date' => $dayA,
+            'amount' => 50,
+        ]);
+        $this->makePayable([
+            'description' => 'FUNDO FIXO: TIAGO MENEZES — estacionamento',
+            'due_date' => $dayA,
+            'amount' => 40,
+        ]);
+        $this->makePayable([
+            'description' => 'FUNDO FIXO: TIAGO DOS SANTOS MENEZES — outro',
+            'due_date' => $dayB,
+            'amount' => 30,
+        ]);
+        $this->makePayable([
+            'description' => 'FUNDO FIXO: TIAGO DOS SANTOS MENEZES — solo no dia B',
+            'due_date' => $dayB,
+            'amount' => 25,
+        ]);
+        $this->makePayable([
+            'description' => 'REF A LINHA VOZ E DADOS',
+            'due_date' => $dayA,
+            'amount' => 99,
+        ]);
+
+        $this->actingAs($this->manager())
+            ->post('/financeiro/borderos/automatico', [
+                'name' => 'Fundo fixo Tiago',
+                'filters' => [
+                    ['field' => 'description', 'operator' => 'contains', 'value' => 'FUNDO FIXO: TIAGO'],
+                ],
+                'filter_logic' => 'and',
+                'min_titles_per_group' => 2,
+                'due_grouping' => BorderoAutoRule::DUE_SAME_DAY,
+                'max_due_span_days' => 7,
+                'eligibility_mode' => BorderoAutoRule::ELIGIBILITY_ALL,
+                'apply_mode' => 'now',
+            ])
+            ->assertRedirect('/financeiro/borderos?status=pendente');
+
+        $this->assertSame(2, Bordero::count());
+        $this->assertSame(4, Payable::whereNotNull('bordero_id')->count());
+        $this->assertSame(0, Payable::where('description', 'like', '%LINHA VOZ%')->whereNotNull('bordero_id')->count());
+    }
 }
