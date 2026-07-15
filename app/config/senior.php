@@ -137,6 +137,10 @@ return [
     // Intervalo do agendador em minutos (requirement 6): default 5, faixa 1..1440.
     'sync_interval_minutes' => (int) env('SENIOR_SYNC_INTERVAL', 5),
 
+    // Runs em_andamento sem finished_at mais antigos que isto são marcados como falha
+    // antes do próximo ciclo (evita cron bloqueado após 503/timeout/kill).
+    'sync_stale_minutes' => (int) env('SENIOR_SYNC_STALE_MINUTES', 45),
+
     // Pós-sync AbertosCP: quantos Exportar E de UsuGer rodar imediatamente nos inserts.
     'post_sync_launcher_lookups' => (int) env('SENIOR_POST_SYNC_LAUNCHER_LOOKUPS', 80),
 

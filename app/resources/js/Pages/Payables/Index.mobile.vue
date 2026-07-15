@@ -84,7 +84,7 @@ const statusList = [
 
 const statusTabHint = computed(() => {
     const hints = {
-        pendente: 'Títulos que ainda não foram enviados para aprovação.',
+        pendente: 'Só títulos ainda não enviados. Depois do envio, veja a aba Em Aprovação.',
         em_preparacao: 'Títulos em preparação antes do envio.',
         aguardando_aprovacao: 'A etiqueta Etapa indica em qual nível de aprovação cada título está.',
         aprovado: 'Títulos aprovados aguardando pagamento.',

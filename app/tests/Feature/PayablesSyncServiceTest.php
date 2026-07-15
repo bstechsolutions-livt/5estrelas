@@ -262,6 +262,72 @@ class PayablesSyncServiceTest extends TestCase
         $this->assertNull(Payable::where('title_number', 'TIT-2')->first()->senior_missing_at);
     }
 
+    public function test_nao_marca_ausentes_quando_collect_vazio(): void
+    {
+        config(['senior.enabled' => true]);
+        $this->service([$this->titulo('TIT-1')])->run(PayableSyncRun::MODE_FULL);
+        $this->assertNull(Payable::where('title_number', 'TIT-1')->first()->senior_missing_at);
+
+        // Collect retorna zero títulos (sucesso vazio) — NÃO pode marcar todos como ausentes.
+        $run = $this->service([])->run(PayableSyncRun::MODE_FULL);
+
+        $this->assertEquals(PayableSyncRun::STATUS_SUCCESS, $run->status);
+        $this->assertEquals(0, $run->missing_count);
+        $this->assertNull(Payable::where('title_number', 'TIT-1')->first()->senior_missing_at);
+    }
+
+    public function test_nao_marca_irma_multi_filial_como_ausente(): void
+    {
+        config(['senior.enabled' => true]);
+
+        $tFil1 = $this->titulo('TIT-IRM');
+        $tFil1['codFil'] = 1;
+        $this->service([$tFil1])->run(PayableSyncRun::MODE_FULL);
+
+        // Cópia "irmã" na filial 6 (mesmo emp/num/tpt/for) — cenário CliOpcAbr multi-filial.
+        Payable::create([
+            'title_number' => 'TIT-IRM',
+            'supplier_name' => 'Fornecedor 1000',
+            'amount' => 1000,
+            'due_date' => '2026-07-01',
+            'status' => 'pendente',
+            'codemp' => 1,
+            'codfil' => 6,
+            'codfor' => 1000,
+            'codtpt' => 'DP',
+            'senior_id' => '1-6-TIT-IRM-DP-1000',
+        ]);
+
+        // Sync só devolve a chave da filial 1.
+        $run = $this->service([$tFil1])->run(PayableSyncRun::MODE_FULL);
+
+        $this->assertEquals(0, $run->missing_count);
+        $this->assertNull(Payable::where('senior_id', '1-6-TIT-IRM-DP-1000')->value('senior_missing_at'));
+        $this->assertNull(Payable::where('senior_id', '1-1-TIT-IRM-DP-1000')->value('senior_missing_at'));
+    }
+
+    public function test_libera_run_stale_em_andamento(): void
+    {
+        config([
+            'senior.enabled' => true,
+            'senior.sync_stale_minutes' => 30,
+        ]);
+
+        $stale = PayableSyncRun::create([
+            'environment' => 'HML', 'mode' => 'incremental', 'trigger' => 'agendado',
+            'status' => PayableSyncRun::STATUS_RUNNING,
+            'started_at' => now()->subMinutes(60),
+            'finished_at' => null,
+        ]);
+
+        $run = $this->service([$this->titulo('TIT-STALE')])->run();
+
+        $this->assertEquals(PayableSyncRun::STATUS_SUCCESS, $run->status);
+        $this->assertEquals(PayableSyncRun::STATUS_FAILED, $stale->fresh()->status);
+        $this->assertNotNull($stale->fresh()->finished_at);
+        $this->assertEquals(1, Payable::where('title_number', 'TIT-STALE')->count());
+    }
+
     // ─── Falha de comunicação (req 2.3 / 9.4) ───────────────────────────────────
 
     public function test_falha_de_comunicacao_nao_altera_dados(): void

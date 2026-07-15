@@ -23,6 +23,14 @@ use Illuminate\Support\Facades\Log;
  */
 class PayablesSyncService
 {
+    /**
+     * Pares (codEmp, codFil) cuja consulta bulk concluiu sem erro transitório.
+     * null = modo sweep / sem rastreio (marca ausentes só com proteções de keys).
+     *
+     * @var list<array{0: int, 1: int}>|null
+     */
+    private ?array $collectOkPairs = null;
+
     public function __construct(
         private SeniorCpClient $client,
         private PayableMapper $mapper,
@@ -60,6 +68,9 @@ class PayablesSyncService
             ]);
         }
 
+        // Libera jobs presos (503/timeout/kill) antes de checar concorrência.
+        $this->failStaleRunningRuns();
+
         // req 6.4/6.5: impede execução concorrente.
         if (PayableSyncRun::where('status', PayableSyncRun::STATUS_RUNNING)->whereNull('finished_at')->exists()) {
             AuditLogger::log(
@@ -87,70 +98,122 @@ class PayablesSyncService
 
         try {
             $titulos = $this->collectTitulos($vctIni, $vctFim);
+
+            $inserted = 0;
+            $updated = 0;
+            $businessKeys = [];
+            $logicalKeys = [];
+            // Insert + update + re-sync sem mudança de raw: ainda preenche depto/fornecedor.
+            $enrichIds = [];
+
+            foreach (array_chunk($titulos, (int) config('senior.batch_size', 500)) as $chunk) {
+                try {
+                    DB::transaction(function () use ($chunk, &$inserted, &$updated, &$businessKeys, &$logicalKeys, &$enrichIds) {
+                        foreach ($chunk as $titulo) {
+                            $bk = $this->mapper->businessKey($titulo);
+                            if ($bk === null) {
+                                Log::warning('[senior-cp] título sem Business_Key derivável, descartado', ['titulo' => $titulo]);
+                                continue;
+                            }
+                            $businessKeys[] = $bk;
+                            $logical = $this->logicalKeyFromTitulo($titulo);
+                            if ($logical !== null) {
+                                $logicalKeys[] = $logical;
+                            }
+                            $this->upsertTitulo($bk, $titulo, $inserted, $updated, $enrichIds);
+                        }
+                    });
+                } catch (\Throwable $e) {
+                    // req 4.8: lote revertido (transaction), estado anterior preservado, lote registrado.
+                    Log::error('[senior-cp] falha ao gravar lote do sync', ['erro' => $e->getMessage(), 'tamanho' => count($chunk)]);
+                }
+            }
+
+            // req 7: ausentes — só com keys retornadas; protege irmãs multi-filial.
+            $missing = $this->marcarAusentes($businessKeys, $logicalKeys, $vctIni, $vctFim);
+
+            $run->update([
+                'status' => PayableSyncRun::STATUS_SUCCESS,
+                'finished_at' => now(),
+                'inserted_count' => $inserted,
+                'updated_count' => $updated,
+                'missing_count' => $missing,
+            ]);
+
+            if ($inserted + $updated > 0) {
+                AuditLogger::log(
+                    event: 'contas_pagar.sync.concluido',
+                    module: 'financeiro.contas_pagar',
+                    description: "Sync Contas a Pagar: {$inserted} inseridos, {$updated} atualizados, {$missing} ausentes",
+                    metadata: ['sync_run_id' => $run->id, 'inserted' => $inserted, 'updated' => $updated, 'missing' => $missing],
+                );
+            }
+
+            // A cada ciclo (insert e update): UsuGer → depto; senão Financeiro; nome do fornecedor.
+            $this->enrichLaunchersAfterSync($enrichIds);
+            $this->resolveDepartmentsAfterSync($enrichIds);
+            $this->syncMissingSuppliersAfterPayables($enrichIds);
         } catch (\Throwable $e) {
-            // req 2.3 / 9.4: falha de comunicação não altera dados; registra erro truncado.
-            // Captura \Throwable (não só SeniorException) para que um erro inesperado
-            // NÃO deixe a execução presa em RUNNING e bloqueie os próximos syncs (concorrência).
+            // req 2.3 / 9.4: falha de comunicação (503/timeout) ou erro inesperado —
+            // NÃO altera payables / NÃO marca ausentes; fecha o run para não travar o cron.
+            $msg = mb_substr($e->getMessage(), 0, 2000);
+            Log::error('[senior-cp] sync falhou', [
+                'sync_run_id' => $run->id,
+                'erro' => $msg,
+                'tipo' => $e instanceof SeniorException ? $e->kind : $e::class,
+            ]);
             $run->update([
                 'status' => PayableSyncRun::STATUS_FAILED,
                 'finished_at' => now(),
-                'error_message' => mb_substr($e->getMessage(), 0, 2000),
+                'error_message' => $msg,
+            ]);
+        }
+
+        return $run->fresh();
+    }
+
+    /**
+     * Marca como falha runs em_andamento órfãos (sem finished_at há tempo demais).
+     * Evita bloqueio permanente do cron após 503/timeout/processo morto.
+     */
+    public function failStaleRunningRuns(): int
+    {
+        $minutes = max(5, (int) config('senior.sync_stale_minutes', 45));
+        $cutoff = now()->subMinutes($minutes);
+
+        $stale = PayableSyncRun::query()
+            ->where('status', PayableSyncRun::STATUS_RUNNING)
+            ->whereNull('finished_at')
+            ->where('started_at', '<=', $cutoff)
+            ->get(['id']);
+
+        if ($stale->isEmpty()) {
+            return 0;
+        }
+
+        $n = PayableSyncRun::query()
+            ->whereIn('id', $stale->pluck('id'))
+            ->update([
+                'status' => PayableSyncRun::STATUS_FAILED,
+                'finished_at' => now(),
+                'error_message' => "Execução interrompida: em_andamento sem finished_at há mais de {$minutes} min (stale lock).",
             ]);
 
-            return $run->fresh();
-        }
-
-        $inserted = 0;
-        $updated = 0;
-        $businessKeys = [];
-        // Insert + update + re-sync sem mudança de raw: ainda preenche depto/fornecedor.
-        $enrichIds = [];
-
-        foreach (array_chunk($titulos, (int) config('senior.batch_size', 500)) as $chunk) {
-            try {
-                DB::transaction(function () use ($chunk, &$inserted, &$updated, &$businessKeys, &$enrichIds) {
-                    foreach ($chunk as $titulo) {
-                        $bk = $this->mapper->businessKey($titulo);
-                        if ($bk === null) {
-                            Log::warning('[senior-cp] título sem Business_Key derivável, descartado', ['titulo' => $titulo]);
-                            continue;
-                        }
-                        $businessKeys[] = $bk;
-                        $this->upsertTitulo($bk, $titulo, $inserted, $updated, $enrichIds);
-                    }
-                });
-            } catch (\Throwable $e) {
-                // req 4.8: lote revertido (transaction), estado anterior preservado, lote registrado.
-                Log::error('[senior-cp] falha ao gravar lote do sync', ['erro' => $e->getMessage(), 'tamanho' => count($chunk)]);
-            }
-        }
-
-        // req 7: títulos ausentes na Senior — full (todos) ou incremental (janela vctIni/vctFim).
-        $missing = $this->marcarAusentes($businessKeys, $vctIni, $vctFim);
-
-        $run->update([
-            'status' => PayableSyncRun::STATUS_SUCCESS,
-            'finished_at' => now(),
-            'inserted_count' => $inserted,
-            'updated_count' => $updated,
-            'missing_count' => $missing,
-        ]);
-
-        if ($inserted + $updated > 0) {
+        if ($n > 0) {
+            Log::warning('[senior-cp] runs em_andamento liberados (stale)', [
+                'count' => $n,
+                'ids' => $stale->pluck('id')->all(),
+                'stale_minutes' => $minutes,
+            ]);
             AuditLogger::log(
-                event: 'contas_pagar.sync.concluido',
+                event: 'contas_pagar.sync.stale_liberado',
                 module: 'financeiro.contas_pagar',
-                description: "Sync Contas a Pagar: {$inserted} inseridos, {$updated} atualizados, {$missing} ausentes",
-                metadata: ['sync_run_id' => $run->id, 'inserted' => $inserted, 'updated' => $updated, 'missing' => $missing],
+                description: "Sync: {$n} execução(ões) em_andamento órfã(s) marcada(s) como falha.",
+                metadata: ['ids' => $stale->pluck('id')->all(), 'stale_minutes' => $minutes],
             );
         }
 
-        // A cada ciclo (insert e update): UsuGer → depto; senão Financeiro; nome do fornecedor.
-        $this->enrichLaunchersAfterSync($enrichIds);
-        $this->resolveDepartmentsAfterSync($enrichIds);
-        $this->syncMissingSuppliersAfterPayables($enrichIds);
-
-        return $run->fresh();
+        return $n;
     }
 
     /**
@@ -316,6 +379,8 @@ class PayablesSyncService
      */
     private function collectTitulos(?Carbon $vctIni, ?Carbon $vctFim): array
     {
+        $this->collectOkPairs = null;
+
         if (config('senior.cp_strategy', 'bulk') === 'bulk') {
             return $this->collectTitulosBulk($vctIni, $vctFim);
         }
@@ -329,6 +394,7 @@ class PayablesSyncService
     private function collectTitulosBulk(?Carbon $vctIni, ?Carbon $vctFim): array
     {
         $all = [];
+        $okPairs = [];
 
         foreach ($this->activeCodEmpFilPairs() as [$codEmp, $codFil]) {
             Log::info('[senior-cp] bulk', ['codEmp' => $codEmp, 'codFil' => $codFil]);
@@ -345,6 +411,7 @@ class PayablesSyncService
                 ]);
                 continue;
             }
+            $okPairs[] = [(int) $codEmp, (int) $codFil];
             foreach ($titulos as $t) {
                 $all[] = $t;
             }
@@ -355,6 +422,8 @@ class PayablesSyncService
                 'total' => count($all),
             ]);
         }
+
+        $this->collectOkPairs = $okPairs;
 
         return $this->dedupTitulos($all);
     }
@@ -665,17 +734,51 @@ class PayablesSyncService
     /**
      * Marca como ausentes os títulos de origem Senior não retornados (req 7.1).
      * No incremental, restringe à janela de vencimento consultada (vctIni/vctFim).
+     *
+     * Proteções:
+     * - Sem business keys → não marca ninguém (evita sumiço em massa se collect vazio/falhou).
+     * - Bulk: só considera pares (codEmp,codFil) que responderam com sucesso.
+     * - Irmãs multi-filial (mesmo emp+numTit+codTpt+codFor, outra fil) não são marcadas
+     *   se qualquer filial retornou o título lógico.
+     *
+     * @param  list<string>  $businessKeys
+     * @param  list<string>  $logicalKeys  chaves "emp|numTit|codTpt|codFor"
      */
-    private function marcarAusentes(array $businessKeys, ?Carbon $vctIni = null, ?Carbon $vctFim = null): int
-    {
-        $query = Payable::whereNotNull('senior_id')->whereNull('senior_missing_at');
-        if ($businessKeys !== []) {
-            $query->whereNotIn('senior_id', array_values(array_unique($businessKeys)));
+    private function marcarAusentes(
+        array $businessKeys,
+        array $logicalKeys = [],
+        ?Carbon $vctIni = null,
+        ?Carbon $vctFim = null,
+    ): int {
+        $keys = array_values(array_unique(array_filter($businessKeys, fn ($k) => is_string($k) && $k !== '')));
+        if ($keys === []) {
+            Log::warning('[senior-cp] marcarAusentes ignorado: nenhuma business key retornada');
+
+            return 0;
         }
+
+        $query = Payable::whereNotNull('senior_id')->whereNull('senior_missing_at')
+            ->whereNotIn('senior_id', $keys);
 
         $emps = $this->activeCodEmps();
         if ($emps !== []) {
             $query->whereIn('codemp', $emps);
+        }
+
+        // Bulk: só marca ausentes em filiais cuja consulta SOAP concluiu.
+        if ($this->collectOkPairs !== null) {
+            if ($this->collectOkPairs === []) {
+                Log::warning('[senior-cp] marcarAusentes ignorado: nenhum par emp/fil concluído');
+
+                return 0;
+            }
+            $query->where(function ($q) {
+                foreach ($this->collectOkPairs as [$codEmp, $codFil]) {
+                    $q->orWhere(function ($qq) use ($codEmp, $codFil) {
+                        $qq->where('codemp', $codEmp)->where('codfil', $codFil);
+                    });
+                }
+            });
         }
 
         // No modo bulk a janela respeita o corte mínimo — marca ausentes só na faixa válida.
@@ -693,7 +796,75 @@ class PayablesSyncService
             }
         }
 
+        // Irmãs multi-filial: se o título lógico voltou em qualquer fil, não ocultar a cópia.
+        $logicalSet = array_fill_keys(array_values(array_unique(array_filter($logicalKeys))), true);
+        if ($logicalSet !== []) {
+            $candidateIds = (clone $query)->pluck('id');
+            if ($candidateIds->isEmpty()) {
+                return 0;
+            }
+
+            $protectedIds = Payable::query()
+                ->whereIn('id', $candidateIds)
+                ->get(['id', 'codemp', 'title_number', 'codtpt', 'codfor'])
+                ->filter(function (Payable $p) use ($logicalSet) {
+                    $logical = $this->logicalKeyFromPayable($p);
+
+                    return $logical !== null && isset($logicalSet[$logical]);
+                })
+                ->pluck('id')
+                ->all();
+
+            if ($protectedIds !== []) {
+                $query->whereNotIn('id', $protectedIds);
+                Log::info('[senior-cp] marcarAusentes: irmãs multi-filial protegidas', [
+                    'protected' => count($protectedIds),
+                ]);
+            }
+        }
+
         return $query->update(['senior_missing_at' => now()]);
+    }
+
+    /** Chave lógica sem filial: emp|numTit|codTpt|codFor. */
+    private function logicalKeyFromTitulo(array $titulo): ?string
+    {
+        $emp = $this->mapperAsString($titulo['codEmp'] ?? null);
+        $num = $this->mapperAsString($titulo['numTit'] ?? null);
+        $tpt = $this->mapperAsString($titulo['codTpt'] ?? null);
+        $for = $this->mapperAsString($titulo['codFor'] ?? null);
+        if ($emp === null || $emp === '' || $num === null || $num === ''
+            || $tpt === null || $tpt === '' || $for === null || $for === '') {
+            return null;
+        }
+
+        return trim($emp).'|'.trim($num).'|'.trim($tpt).'|'.trim($for);
+    }
+
+    private function logicalKeyFromPayable(Payable $payable): ?string
+    {
+        $emp = $payable->codemp;
+        $num = $payable->title_number;
+        $tpt = $payable->codtpt;
+        $for = $payable->codfor;
+        if ($emp === null || $num === null || $num === '' || $tpt === null || $tpt === '' || $for === null) {
+            return null;
+        }
+
+        return (string) $emp.'|'.trim((string) $num).'|'.trim((string) $tpt).'|'.(string) $for;
+    }
+
+    private function mapperAsString(mixed $v): ?string
+    {
+        if ($v === null || (is_array($v) && $v === [])) {
+            return null;
+        }
+        if (is_array($v)) {
+            $v = reset($v);
+        }
+        $s = trim((string) $v);
+
+        return $s === '' ? null : $s;
     }
 
     private function clamp(int $v, int $min, int $max): int
