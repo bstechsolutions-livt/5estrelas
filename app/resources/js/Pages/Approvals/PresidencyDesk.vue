@@ -241,56 +241,60 @@ function goToPayable(id) {
                 </template>
             </div>
 
-            <!-- Lista: rows compactas -->
+            <!-- Lista: info + ações em duas linhas (sem overflow) -->
             <div
                 v-else-if="viewMode === 'list'"
-                class="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 overflow-hidden"
+                class="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100"
             >
                 <div
                     v-for="p in payables"
                     :key="p.id"
-                    class="px-3 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3"
+                    class="px-3 py-2.5 grid gap-2 min-w-0"
                 >
-                    <div class="min-w-0 flex-1">
+                    <!-- Linha 1: infos -->
+                    <div class="min-w-0">
                         <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                            <span class="text-sm font-bold text-gray-900">{{ p.title_number }}</span>
-                            <span class="text-sm text-gray-800 truncate max-w-full sm:max-w-[28rem]">
+                            <span class="text-sm font-bold text-gray-900 shrink-0">{{ p.title_number }}</span>
+                            <span class="text-sm text-gray-800 truncate min-w-0">
                                 {{ p.supplier_display_name || p.supplier_name || '—' }}
                             </span>
-                            <Tag v-if="p.origem_senior" value="Senior" severity="secondary" class="!text-[9px] !py-0" />
+                            <Tag v-if="p.origem_senior" value="Senior" severity="secondary" class="!text-[9px] !py-0 shrink-0" />
                         </div>
                         <div class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
-                            <span class="font-semibold text-gray-800">{{ formatMoney(p.amount) }}</span>
-                            <span>Venc. {{ formatDate(p.due_date) }}</span>
-                            <span v-if="p.empresa_nome" class="truncate">{{ p.empresa_nome }}</span>
-                            <span v-if="p.filial_nome" class="truncate">{{ p.filial_nome }}</span>
-                            <span v-if="p.department?.name" class="truncate">{{ p.department.name }}</span>
+                            <span class="font-semibold text-gray-800 shrink-0">{{ formatMoney(p.amount) }}</span>
+                            <span class="shrink-0">Venc. {{ formatDate(p.due_date) }}</span>
+                            <span v-if="p.empresa_nome" class="truncate min-w-0 max-w-[12rem]">{{ p.empresa_nome }}</span>
+                            <span v-if="p.filial_nome" class="truncate min-w-0 max-w-[10rem]">{{ p.filial_nome }}</span>
+                            <span v-if="p.department?.name" class="truncate min-w-0 max-w-[10rem]">{{ p.department.name }}</span>
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-2 shrink-0 flex-nowrap justify-end">
-                        <button
-                            v-if="p.documents?.length"
-                            type="button"
-                            class="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap px-1 py-1"
-                            @click="openViewer(p.documents[0], p)"
-                        >
-                            <i class="pi pi-file mr-1 text-[10px]"></i>Abrir documento
-                            <span v-if="p.documents.length > 1" class="text-gray-400 font-normal">({{ p.documents.length }})</span>
-                        </button>
-                        <span v-else class="text-[11px] text-amber-600 whitespace-nowrap">
-                            <i class="pi pi-exclamation-triangle mr-0.5"></i>Sem docs
-                        </span>
-                        <Button
-                            label="Ver"
-                            icon="pi pi-external-link"
-                            severity="secondary"
-                            text
-                            size="small"
-                            class="!px-2"
-                            @click="goToPayable(p.id)"
-                        />
-                        <div class="inline-flex items-center gap-1.5 flex-nowrap shrink-0">
+                    <!-- Linha 2: links à esquerda | decisões à direita -->
+                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 min-w-0">
+                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
+                            <button
+                                v-if="p.documents?.length"
+                                type="button"
+                                class="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap shrink-0"
+                                @click="openViewer(p.documents[0], p)"
+                            >
+                                <i class="pi pi-file text-[10px]"></i>
+                                <span>Abrir documento</span>
+                                <span v-if="p.documents.length > 1" class="text-gray-400 font-normal">({{ p.documents.length }})</span>
+                            </button>
+                            <span v-else class="text-[11px] text-amber-600 whitespace-nowrap shrink-0">
+                                <i class="pi pi-exclamation-triangle mr-0.5"></i>Sem docs
+                            </span>
+                            <button
+                                type="button"
+                                class="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:underline whitespace-nowrap shrink-0"
+                                @click="goToPayable(p.id)"
+                            >
+                                <i class="pi pi-external-link text-[10px]"></i>
+                                <span>Ver título</span>
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 shrink-0 ml-auto">
                             <Button
                                 label="Reprovar"
                                 icon="pi pi-times"
