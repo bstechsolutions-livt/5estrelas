@@ -244,6 +244,58 @@ class PayablesSyncServiceTest extends TestCase
         $this->assertNull(Payable::where('title_number', 'TIT-2')->first()->senior_missing_at);
     }
 
+    public function test_coleta_vazia_nao_marca_todos_como_ausentes(): void
+    {
+        config(['senior.enabled' => true]);
+        $t1 = $this->titulo('TIT-1');
+        $this->service([$t1])->run(PayableSyncRun::MODE_FULL);
+        $this->assertNull(Payable::where('title_number', 'TIT-1')->first()->senior_missing_at);
+
+        // Segundo sync sem títulos (coleta “vazia”) não pode mass-marcar ausentes.
+        $run = $this->service([])->run(PayableSyncRun::MODE_FULL);
+        $this->assertEquals(0, $run->missing_count);
+        $this->assertNull(Payable::where('title_number', 'TIT-1')->first()->senior_missing_at);
+    }
+
+    public function test_bulk_servico_indisponivel_nao_marca_ausentes(): void
+    {
+        config([
+            'senior.enabled' => true,
+            'senior.cod_emps' => [1],
+            'senior.emp_enabled' => [],
+            'senior.cp_strategy' => 'bulk',
+            'senior.post_sync_launcher_lookups' => 0,
+            'senior.post_sync_supplier_lookups' => 0,
+        ]);
+
+        $t1 = $this->titulo('TIT-1');
+        // Seed via sweep first
+        config(['senior.cp_strategy' => 'sweep', 'senior.cod_for_start' => 1000, 'senior.cod_for_end' => 1000]);
+        $this->service([$t1])->run(PayableSyncRun::MODE_FULL);
+
+        config(['senior.cp_strategy' => 'bulk']);
+        $fake = new class extends SeniorCpClient {
+            public function __construct()
+            {
+                parent::__construct(config('senior'));
+            }
+
+            public function consultarTitulosAbertosPorEmpresa(int $codEmp, ?Carbon $vctIni, ?Carbon $vctFim): array
+            {
+                throw new SeniorException(
+                    'Não foi possível executar o serviço solicitado.',
+                    SeniorException::KIND_BUSINESS,
+                );
+            }
+        };
+        $svc = new PayablesSyncService($fake, new PayableMapper(), new StatusMapper());
+        $run = $svc->run(PayableSyncRun::MODE_INCREMENTAL);
+
+        $this->assertEquals(PayableSyncRun::STATUS_FAILED, $run->status);
+        $this->assertEquals(0, $run->missing_count);
+        $this->assertNull(Payable::where('title_number', 'TIT-1')->first()->senior_missing_at);
+    }
+
     public function test_incremental_marca_ausentes_na_janela(): void
     {
         config(['senior.enabled' => true]);

@@ -269,13 +269,14 @@ class PayablesSyncService
 
         $this->mergeEmpresasStats($run, $byEmpMutations, []);
 
-        // req 7: títulos ausentes na Senior — full (todos) ou incremental (janela vctIni/vctFim).
+        // req 7: títulos ausentes — NUNCA com coleta vazia/falha (evita mass-mark tipo #1508).
+        $okCodEmps = $this->okCodEmpsFromProgress($run);
         $this->patchProgress($run, [
             'phase' => 'ausentes',
             'phase_label' => 'Marcando ausentes',
             'percent' => 95,
         ]);
-        [$missing, $byEmpMissing] = $this->marcarAusentes($businessKeys, $vctIni, $vctFim);
+        [$missing, $byEmpMissing] = $this->marcarAusentes($businessKeys, $vctIni, $vctFim, $okCodEmps);
         $this->mergeEmpresasStats($run, [], $byEmpMissing);
 
         // Sucesso = SOAP + upsert + ausentes ok. Enrich é best-effort (fora do lock).
@@ -570,7 +571,11 @@ class PayablesSyncService
                 $empresas[$index]['status'] = 'ok';
                 $empresas[$index]['titulos'] = count($titulos);
             } catch (SeniorException $e) {
-                if ($e->isTransient()) {
+                // No bulk por empresa, "Não foi possível executar o serviço solicitado"
+                // costuma ser queda/instabilidade do servlet — NÃO tratar como "sem títulos".
+                $abortBulk = $e->isTransient()
+                    || str_contains($e->getMessage(), 'Não foi possível executar o serviço solicitado');
+                if ($abortBulk) {
                     $empresas[$index]['status'] = 'erro';
                     $empresas[$index]['error'] = $e->getMessage();
                     $empresas[$index]['duration_seconds'] = (int) round(microtime(true) - $t0);
@@ -999,18 +1004,45 @@ class PayablesSyncService
      * Marca como ausentes os títulos de origem Senior não retornados (req 7.1).
      * No incremental, restringe à janela de vencimento consultada (vctIni/vctFim).
      *
+     * Segurança: se a coleta não trouxe chaves (SOAP falhou / vazio), NÃO marca ninguém —
+     * businessKeys=[] + whereNotIn omitido apagaria a lista inteira (#1508).
+     *
+     * @param  list<string>  $businessKeys
+     * @param  list<int>|null  $okCodEmps  Só marca ausentes nessas empresas (status ok na coleta).
      * @return array{0: int, 1: array<int, int>} [total, map codEmp => qtd]
      */
-    private function marcarAusentes(array $businessKeys, ?Carbon $vctIni = null, ?Carbon $vctFim = null): array
-    {
-        $query = Payable::whereNotNull('senior_id')->whereNull('senior_missing_at');
-        if ($businessKeys !== []) {
-            $query->whereNotIn('senior_id', array_values(array_unique($businessKeys)));
+    private function marcarAusentes(
+        array $businessKeys,
+        ?Carbon $vctIni = null,
+        ?Carbon $vctFim = null,
+        ?array $okCodEmps = null,
+    ): array {
+        $businessKeys = array_values(array_unique(array_filter($businessKeys)));
+        if ($businessKeys === []) {
+            Log::warning('[senior-cp] marcarAusentes abortado: coleta sem títulos (evita mass-mark)');
+
+            return [0, []];
         }
 
-        $emps = $this->activeCodEmps();
-        if ($emps !== []) {
-            $query->whereIn('codemp', $emps);
+        if ($okCodEmps !== null) {
+            $okCodEmps = array_values(array_unique(array_filter(array_map('intval', $okCodEmps))));
+            if ($okCodEmps === []) {
+                Log::warning('[senior-cp] marcarAusentes abortado: nenhuma empresa ok na coleta');
+
+                return [0, []];
+            }
+        }
+
+        $query = Payable::whereNotNull('senior_id')->whereNull('senior_missing_at')
+            ->whereNotIn('senior_id', $businessKeys);
+
+        if ($okCodEmps !== null) {
+            $query->whereIn('codemp', $okCodEmps);
+        } else {
+            $emps = $this->activeCodEmps();
+            if ($emps !== []) {
+                $query->whereIn('codemp', $emps);
+            }
         }
 
         // No modo bulk a janela respeita o corte mínimo — marca ausentes só na faixa válida.
@@ -1040,6 +1072,27 @@ class PayablesSyncService
         $total = (int) $query->update(['senior_missing_at' => now()]);
 
         return [$total, $byEmp];
+    }
+
+    /** @return list<int> */
+    private function okCodEmpsFromProgress(PayableSyncRun $run): array
+    {
+        $empresas = $run->progress['empresas'] ?? [];
+        if (! is_array($empresas)) {
+            return [];
+        }
+
+        $ok = [];
+        foreach ($empresas as $emp) {
+            if (($emp['status'] ?? null) === 'ok') {
+                $cod = (int) ($emp['cod_emp'] ?? 0);
+                if ($cod > 0) {
+                    $ok[] = $cod;
+                }
+            }
+        }
+
+        return array_values(array_unique($ok));
     }
 
     /**
