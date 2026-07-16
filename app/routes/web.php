@@ -14,6 +14,7 @@ use App\Http\Controllers\PayableController;
 use App\Http\Controllers\PayableAlcadaController;
 use App\Http\Controllers\PayableDepartmentRulesController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\DeviceTokenController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PostController;
@@ -97,6 +98,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/usuarios/{id}/permissoes', [UserPermissionController::class, 'edit'])->name('users.permissions.edit');
         Route::put('/usuarios/{id}/permissoes', [UserPermissionController::class, 'update'])->name('users.permissions.update');
     });
+    Route::middleware('permission:usuarios.impersonar')->group(function () {
+        Route::post('/usuarios/{id}/impersonar', [ImpersonationController::class, 'store'])->name('users.impersonate');
+    });
+    Route::post('/impersonacao/sair', [ImpersonationController::class, 'destroy'])->name('impersonation.leave');
 
     // Notícias / Destaques (admin)
     Route::middleware('permission:noticias.gerenciar')->group(function () {

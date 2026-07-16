@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { useAuth } from '@/composables/useAuth'
@@ -25,6 +25,8 @@ const page = usePage()
 const toast = useToast()
 const confirm = useConfirm()
 const { can, user: authUser } = useAuth()
+
+const isImpersonating = computed(() => !!page.props.auth?.impersonator)
 
 const search = ref(props.filters?.search || '')
 
@@ -54,6 +56,19 @@ function onPage(event) {
 function goCreate() { router.visit('/usuarios/criar') }
 function goEdit(id) { router.visit(`/usuarios/${id}/editar`) }
 function goPermissions(id) { router.visit(`/usuarios/${id}/permissoes`) }
+
+function impersonate(u) {
+    confirm.require({
+        message: `Entrar no sistema como "${u.name}"? Você verá tudo exatamente como este usuário.`,
+        header: 'Entrar como usuário',
+        icon: 'pi pi-user',
+        rejectProps: { label: 'Cancelar', severity: 'secondary', outlined: true },
+        acceptProps: { label: 'Entrar como', severity: 'warn' },
+        accept: () => {
+            router.post(`/usuarios/${u.id}/impersonar`)
+        },
+    })
+}
 
 function toggleActive(u) {
     router.post(`/usuarios/${u.id}/toggle-active`, {}, { preserveScroll: true })
@@ -175,6 +190,15 @@ watch(() => page.props.flash?.error, (msg) => {
                     <Column header="Ações" style="width: 220px">
                         <template #body="{ data }">
                             <div class="flex items-center gap-1">
+                                <Button
+                                    v-if="can('usuarios.impersonar') && !isImpersonating && data.is_active && data.id !== authUser?.id"
+                                    icon="pi pi-sign-in"
+                                    severity="warn"
+                                    text
+                                    rounded
+                                    title="Entrar como este usuário"
+                                    @click="impersonate(data)"
+                                />
                                 <Button
                                     v-if="can('usuarios.editar')"
                                     icon="pi pi-pencil"

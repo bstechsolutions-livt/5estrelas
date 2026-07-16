@@ -5,6 +5,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
 import NotificationBell from '@/Components/NotificationBell.vue'
 import GlobalSearch from '@/Components/GlobalSearch.vue'
+import ImpersonationBanner from '@/Components/ImpersonationBanner.vue'
 
 const page = usePage()
 const user = computed(() => page.props.auth?.user)
@@ -318,6 +319,7 @@ const sidebarBg = computed(() => theme.value?.secondary_color || '#1e1e2d')
 
         <!-- Main content -->
         <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+            <ImpersonationBanner />
             <header class="h-16 flex items-center justify-between px-4 lg:px-6 border-b flex-shrink-0" :style="{ backgroundColor: sidebarBg, color: 'var(--app-secondary-text)', borderColor: 'rgba(255,255,255,0.08)' }">
                 <div class="flex items-center gap-3">
                     <button

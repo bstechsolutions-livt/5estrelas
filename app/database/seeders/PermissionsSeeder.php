@@ -17,6 +17,7 @@ class PermissionsSeeder extends Seeder
             ['key' => 'usuarios.editar', 'label' => 'Editar usuários', 'module' => 'usuarios', 'description' => 'Alterar dados, departamento e filiais de acesso dos usuários.'],
             ['key' => 'usuarios.excluir', 'label' => 'Excluir usuários', 'module' => 'usuarios', 'description' => 'Desativar ou remover usuários.'],
             ['key' => 'usuarios.gerenciar_permissoes', 'label' => 'Gerenciar permissões', 'module' => 'usuarios', 'description' => 'Atribuir e remover permissões de outros usuários.'],
+            ['key' => 'usuarios.impersonar', 'label' => 'Entrar como outro usuário', 'module' => 'usuarios', 'description' => 'Visualizar e operar o sistema em nome de outro usuário (suporte/auditoria).'],
 
             ['key' => 'aparencia.visualizar', 'label' => 'Ver aparência', 'module' => 'aparencia', 'description' => 'Acessar configurações visuais do sistema.'],
             ['key' => 'aparencia.editar', 'label' => 'Editar aparência', 'module' => 'aparencia', 'description' => 'Alterar logo, cores e identidade visual.'],

@@ -3,7 +3,9 @@
 namespace App\Http\Middleware;
 
 use App\Models\Setting;
+use App\Models\User;
 use App\Models\UserShortcut;
+use App\Support\Impersonation;
 use App\Support\MenuCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -30,6 +32,7 @@ class HandleInertiaRequests extends Middleware
                     'avatar_url' => $request->user()->avatar_path ? Storage::url($request->user()->avatar_path) : null,
                     'permissions' => $request->user()->permissionKeys(),
                 ] : null,
+                'impersonator' => $this->resolveImpersonator(),
             ],
             'shortcuts' => fn () => $request->user() ? $this->resolveShortcuts($request->user(), 'dashboard') : [],
             'mobileNavShortcuts' => fn () => $request->user() ? $this->resolveShortcuts($request->user(), 'mobile_nav') : [],
@@ -52,6 +55,25 @@ class HandleInertiaRequests extends Middleware
             ],
             'is_mobile_app' => $request->header('X-Client') === '5estrelas-app'
                 || str_contains((string) $request->userAgent(), '5Estrelas'),
+        ];
+    }
+
+    private function resolveImpersonator(): ?array
+    {
+        $id = Impersonation::impersonatorId();
+        if (! $id) {
+            return null;
+        }
+
+        $user = User::query()->find($id, ['id', 'name', 'email']);
+        if (! $user) {
+            return null;
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
         ];
     }
 
