@@ -152,6 +152,36 @@ function submitReject() {
     })
 }
 
+const LEVEL_LABELS = {
+    departamento: 'Departamento',
+    gerencia: 'Gerência',
+    diretoria: 'Diretoria',
+    financeiro: 'Financeiro',
+    presidencia: 'Presidência',
+    presidencia_2: 'Presidência (2ª assinatura)',
+}
+
+function levelLabel(step) {
+    return LEVEL_LABELS[step.level_name] || step.role_label || step.level_name || 'Etapa'
+}
+
+function stepDisplayName(step) {
+    if (step.delegatee?.name) {
+        const original = step.assignee?.name
+        return original ? `${original} → ${step.delegatee.name}` : step.delegatee.name
+    }
+    return step.assignee?.name || step.resolver?.name || levelLabel(step)
+}
+
+function stepRoleLabel(step) {
+    const label = levelLabel(step)
+    return label === stepDisplayName(step) ? '' : label
+}
+
+function stepTitle(step) {
+    return `${levelLabel(step)} — ${stepDisplayName(step)}`
+}
+
 function goToPayable(id) {
     router.visit(`/financeiro/contas-pagar/${id}`)
 }
@@ -353,26 +383,67 @@ function goToPayable(id) {
                         <span v-if="p.sent_for_approval_at"><i class="pi pi-clock mr-1"></i>Enviado {{ formatDateTime(p.sent_for_approval_at) }}</span>
                     </div>
 
-                    <div class="px-4 py-3">
-                        <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                            Documentos ({{ p.documents?.length || 0 }})
-                        </p>
-                        <div v-if="p.documents?.length" class="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
-                            <div
-                                v-for="doc in p.documents"
-                                :key="doc.id"
-                                class="shrink-0 w-44 sm:w-52"
-                            >
-                                <PayableDocumentPreviewCard
-                                    :doc="doc"
-                                    :type-label="docTypeLabel(doc)"
-                                    @open="(d) => openViewer(d, p)"
-                                />
+                    <div class="px-4 py-3 flex flex-col lg:flex-row gap-4">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                Documentos ({{ p.documents?.length || 0 }})
+                            </p>
+                            <div v-if="p.documents?.length" class="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+                                <div
+                                    v-for="doc in p.documents"
+                                    :key="doc.id"
+                                    class="shrink-0 w-44 sm:w-52"
+                                >
+                                    <PayableDocumentPreviewCard
+                                        :doc="doc"
+                                        :type-label="docTypeLabel(doc)"
+                                        @open="(d) => openViewer(d, p)"
+                                    />
+                                </div>
+                            </div>
+                            <p v-else class="text-xs text-amber-600 flex items-center gap-1">
+                                <i class="pi pi-exclamation-triangle"></i> Sem documentos anexados
+                            </p>
+                        </div>
+
+                        <!-- Timeline das etapas de aprovação -->
+                        <div
+                            v-if="p.approval_steps?.length"
+                            class="lg:w-64 shrink-0 lg:border-l lg:border-gray-100 lg:pl-4"
+                        >
+                            <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                Fluxo de aprovação
+                            </p>
+                            <div class="space-y-2">
+                                <div
+                                    v-for="step in p.approval_steps"
+                                    :key="step.id"
+                                    class="flex items-start gap-2"
+                                >
+                                    <div class="mt-0.5">
+                                        <i v-if="step.status === 'aprovado'" class="pi pi-check-circle text-green-500 text-sm"></i>
+                                        <i v-else-if="step.status === 'reprovado'" class="pi pi-times-circle text-red-500 text-sm"></i>
+                                        <i v-else-if="p.current_step_id === step.id" class="pi pi-circle-fill text-blue-500 text-sm"></i>
+                                        <i v-else class="pi pi-circle text-gray-300 text-sm"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p
+                                            class="text-xs font-medium truncate"
+                                            :class="step.status === 'aprovado' ? 'text-green-700' : step.status === 'reprovado' ? 'text-red-700' : p.current_step_id === step.id ? 'text-blue-700' : 'text-gray-500'"
+                                            :title="stepTitle(step)"
+                                        >
+                                            {{ stepDisplayName(step) }}
+                                        </p>
+                                        <p v-if="stepRoleLabel(step)" class="text-[10px] text-gray-400 truncate">
+                                            {{ stepRoleLabel(step) }}
+                                        </p>
+                                        <p v-if="step.resolver && step.resolved_at" class="text-[10px] text-gray-400 truncate">
+                                            {{ step.status === 'aprovado' ? 'Aprovado' : 'Reprovado' }} · {{ formatDateTime(step.resolved_at) }}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <p v-else class="text-xs text-amber-600 flex items-center gap-1">
-                            <i class="pi pi-exclamation-triangle"></i> Sem documentos anexados
-                        </p>
                     </div>
 
                     <div class="px-4 py-3 border-t border-gray-50 flex flex-wrap items-center justify-end gap-2 bg-white">
