@@ -34,6 +34,7 @@ class ApprovalFlowOverride extends Model
     public static function findMatch(string $area, int $stepOrder, Payable $payable): ?self
     {
         return static::query()
+            ->with('approver:id,name')
             ->where('area', $area)
             ->where('step_order', $stepOrder)
             ->where('is_active', true)
@@ -54,11 +55,13 @@ class ApprovalFlowOverride extends Model
 
         $ccMatch = false;
         if ($codccus !== []) {
-            $cc = $payable->codccu !== null && $payable->codccu !== ''
-                ? trim((string) $payable->codccu)
-                : '';
-            $allowed = collect($codccus)->map(fn ($v) => trim((string) $v))->filter()->all();
-            $ccMatch = $cc !== '' && in_array($cc, $allowed, true);
+            $payableCcs = self::codccusForPayable($payable);
+            $allowed = collect($codccus)
+                ->map(fn ($v) => self::normalizeCodccu($v))
+                ->filter()
+                ->all();
+            $ccMatch = $payableCcs !== []
+                && collect($payableCcs)->contains(fn (string $cc) => in_array($cc, $allowed, true));
         }
 
         $titleMatch = false;
@@ -83,12 +86,52 @@ class ApprovalFlowOverride extends Model
     }
 
     /** @return string[] */
+    public static function codccusForPayable(Payable $payable): array
+    {
+        $ccs = [];
+
+        $header = self::normalizeCodccu($payable->codccu);
+        if ($header !== null) {
+            $ccs[] = $header;
+        }
+
+        if (! $payable->relationLoaded('rateios')) {
+            $payable->load('rateios:payable_id,codccu');
+        }
+
+        foreach ($payable->rateios as $rateio) {
+            $cc = self::normalizeCodccu($rateio->codccu);
+            if ($cc !== null) {
+                $ccs[] = $cc;
+            }
+        }
+
+        return array_values(array_unique($ccs));
+    }
+
+    public static function normalizeCodccu(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $s = trim((string) $value);
+        if ($s === '' || $s === '0') {
+            return null;
+        }
+
+        if (ctype_digit($s)) {
+            $s = ltrim($s, '0') ?: '0';
+        }
+
+        return $s;
+    }
+
     public static function formatCodccuLines(?array $codccu): string
     {
         return collect($codccu ?? [])->implode("\n");
     }
 
-    /** @return string[] */
     public static function formatTitlePatternLines(?array $patterns): string
     {
         return PayableDepartmentRule::formatLines($patterns ?? []);
