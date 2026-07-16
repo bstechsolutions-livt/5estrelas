@@ -307,17 +307,27 @@ const chartMutationsData = computed(() => {
                                         class="text-xs"
                                     />
                                 </div>
-                                <div class="mt-1 text-xs text-slate-500 flex justify-between gap-2">
-                                    <span>
-                                        {{
-                                            emp.status === 'ok' || emp.status === 'ignorado' || emp.status === 'erro'
-                                                ? '100%'
-                                                : emp.status === 'em_andamento'
-                                                    ? '…'
-                                                    : '0%'
-                                        }}
-                                    </span>
-                                    <span>{{ emp.titulos ?? 0 }} títulos</span>
+                                <div class="mt-1 text-xs text-slate-600 dark:text-slate-300 space-y-0.5">
+                                    <div class="flex justify-between gap-2">
+                                        <span class="text-slate-500">Coletados</span>
+                                        <span class="font-mono">{{ emp.titulos ?? 0 }}</span>
+                                    </div>
+                                    <div class="flex justify-between gap-2">
+                                        <span class="text-slate-500">Incluídos</span>
+                                        <span class="font-mono">{{ emp.inserted ?? 0 }}</span>
+                                    </div>
+                                    <div class="flex justify-between gap-2">
+                                        <span class="text-slate-500">Atualizados</span>
+                                        <span class="font-mono">{{ emp.updated ?? 0 }}</span>
+                                    </div>
+                                    <div class="flex justify-between gap-2">
+                                        <span class="text-slate-500">Ausentes</span>
+                                        <span class="font-mono">{{ emp.missing ?? 0 }}</span>
+                                    </div>
+                                    <div v-if="emp.duration_seconds != null" class="flex justify-between gap-2 pt-0.5 border-t border-amber-100 dark:border-amber-900/40">
+                                        <span class="text-slate-500">Tempo SOAP</span>
+                                        <span class="font-mono">{{ formatDuration(emp.duration_seconds) }}</span>
+                                    </div>
                                 </div>
                                 <p
                                     v-if="emp.error"
