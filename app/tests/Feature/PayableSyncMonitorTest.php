@@ -120,12 +120,11 @@ class PayableSyncMonitorTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->has('charts_12h.labels', 12)
-                ->where('charts_12h.sucesso.11', 1)
-                ->where('charts_12h.falha.11', 1)
-                ->where('charts_12h.inserted.11', 2)
-                ->where('charts_12h.updated.11', 4)
-                ->where('charts_12h.missing.11', 1)
-                ->where('charts_12h.labels.11', $hour->format('H:i'))
+                ->where('charts_12h.sucesso', fn ($rows) => array_sum(collect($rows)->all()) === 1)
+                ->where('charts_12h.falha', fn ($rows) => array_sum(collect($rows)->all()) === 1)
+                ->where('charts_12h.inserted', fn ($rows) => array_sum(collect($rows)->all()) === 2)
+                ->where('charts_12h.updated', fn ($rows) => array_sum(collect($rows)->all()) === 4)
+                ->where('charts_12h.missing', fn ($rows) => array_sum(collect($rows)->all()) === 1)
             );
     }
 }

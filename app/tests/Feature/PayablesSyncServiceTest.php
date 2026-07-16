@@ -399,6 +399,52 @@ class PayablesSyncServiceTest extends TestCase
         $this->assertEquals(1, Payable::count());
     }
 
+    public function test_bulk_por_empresa_grava_progresso_por_empresa(): void
+    {
+        config([
+            'senior.enabled' => true,
+            'senior.cp_strategy' => 'bulk',
+            'senior.emp_enabled' => [2, 5],
+        ]);
+
+        $fake = new class extends SeniorCpClient {
+            public function __construct()
+            {
+                parent::__construct(config('senior'));
+            }
+
+            public function consultarTitulosAbertosPorEmpresa(int $codEmp, ?Carbon $vctIni, ?Carbon $vctFim): array
+            {
+                $t = [
+                    'codEmp' => $codEmp,
+                    'codFil' => 1,
+                    'numTit' => 'P-'.$codEmp,
+                    'codTpt' => 'DP',
+                    'codFor' => 1000 + $codEmp,
+                    'vlrOri' => 10,
+                    'vlrAbe' => 10,
+                    'vctPro' => now()->addDays(10)->format('d/m/Y'),
+                    'datEmi' => now()->format('d/m/Y'),
+                    'sitTit' => 'AB',
+                ];
+
+                return [$t];
+            }
+        };
+
+        $run = (new PayablesSyncService($fake, new PayableMapper(), new StatusMapper()))
+            ->run(PayableSyncRun::MODE_INCREMENTAL);
+
+        $this->assertEquals(PayableSyncRun::STATUS_SUCCESS, $run->status);
+        $this->assertIsArray($run->progress);
+        $this->assertEquals(2, $run->progress['total_empresas'] ?? null);
+        $this->assertEquals(2, $run->progress['done_empresas'] ?? null);
+        $this->assertEquals(100, $run->progress['percent'] ?? null);
+        $this->assertCount(2, $run->progress['empresas'] ?? []);
+        $this->assertEquals('ok', $run->progress['empresas'][0]['status'] ?? null);
+        $this->assertEquals('concluido', $run->progress['phase'] ?? null);
+    }
+
     public function test_bulk_por_empresa_upserta_titulos_de_todas_filiais(): void
     {
         config([

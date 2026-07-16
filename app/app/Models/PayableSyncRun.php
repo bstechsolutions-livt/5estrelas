@@ -25,7 +25,7 @@ class PayableSyncRun extends Model
         'environment', 'mode', 'trigger', 'status',
         'started_at', 'finished_at',
         'inserted_count', 'updated_count', 'missing_count',
-        'window_start', 'window_end', 'error_message',
+        'window_start', 'window_end', 'error_message', 'progress',
     ];
 
     protected $casts = [
@@ -36,6 +36,7 @@ class PayableSyncRun extends Model
         'inserted_count' => 'integer',
         'updated_count' => 'integer',
         'missing_count' => 'integer',
+        'progress' => 'array',
     ];
 
     public function isRunning(): bool
