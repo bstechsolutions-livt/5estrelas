@@ -13,6 +13,7 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import DatePicker from 'primevue/datepicker'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
+import PayableSyncStatusLine from '@/Components/Financeiro/PayableSyncStatusLine.vue'
 import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
 import { formatApiDate, parseApiDate, toApiDateString } from '@/utils/apiDate'
 import {
@@ -41,6 +42,7 @@ const props = defineProps({
     priorityOptions: { type: Object, default: () => ({}) },
     canBypassApprovalDeadline: { type: Boolean, default: false },
     minDueDateForApproval: { type: String, default: null },
+    syncStatus: { type: Object, default: null },
 })
 
 const { can } = useAuth()
@@ -515,6 +517,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
             <div class="mb-6">
                 <h1 class="text-2xl font-bold text-gray-800">Contas a Pagar</h1>
                 <p class="text-sm text-gray-500 mt-1">Gerencie títulos, anexe documentos e envie para aprovação.</p>
+                <PayableSyncStatusLine :sync-status="syncStatus" />
             </div>
 
             <BranchAccessBlocked v-if="noBranchAccess" />

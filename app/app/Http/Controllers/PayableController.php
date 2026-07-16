@@ -8,6 +8,7 @@ use App\Models\Department;
 use App\Models\Payable;
 use App\Models\PayableComment;
 use App\Models\PayableDocument;
+use App\Models\PayableSyncRun;
 use App\Models\ApprovalStep;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -23,6 +24,7 @@ use App\Support\PayableApprovalDeadline;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -118,10 +120,6 @@ class PayableController extends Controller
 
         $user = $request->user();
         $workflow = app(ApprovalWorkflowService::class);
-        $preview = $workflow->buildPreviewStepsForSender($user);
-        if (! $preview['ok']) {
-            return back()->with('error', $preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
-        }
 
         $urgent = $request->boolean('urgente');
         $sent = 0;
@@ -142,6 +140,12 @@ class PayableController extends Controller
                 }
                 if ($payable->documents()->count() === 0) {
                     $skipped++;
+                    continue;
+                }
+
+                $preview = $workflow->buildPreviewStepsForPayable($payable);
+                if (! $preview['ok']) {
+                    $errors[] = $preview['errors'][0] ?? "Título #{$id}: fluxo inválido.";
                     continue;
                 }
 
@@ -283,7 +287,91 @@ class PayableController extends Controller
             'priorityOptions' => Payable::PRIORITY_LABELS,
             'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
             'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
+            'syncStatus' => $this->payablesSyncStatusProps($user),
         ];
+    }
+
+    /**
+     * Resumo leve do sync Senior p/ banner da lista (sem histórico).
+     *
+     * @return array{
+     *   last_finished_at: ?string,
+     *   next_estimated_at: ?string,
+     *   online: ?bool,
+     *   status_label: ?string,
+     *   sync_interval_minutes: int,
+     *   can_view_monitor: bool
+     * }
+     */
+    private function payablesSyncStatusProps(?User $user): array
+    {
+        $interval = max(1, (int) config('senior.sync_interval_minutes', 5));
+        $tz = 'America/Sao_Paulo';
+        $now = Carbon::now($tz);
+
+        $canViewMonitor = $user?->hasPermission('financeiro.workflows.configurar') ?? false;
+
+        $empty = [
+            'last_finished_at' => null,
+            'next_estimated_at' => $this->nextSyncSlotAfter($now, $interval)->toIso8601String(),
+            'online' => null,
+            'status_label' => null,
+            'sync_interval_minutes' => $interval,
+            'can_view_monitor' => $canViewMonitor,
+        ];
+
+        if (! Schema::hasTable('payable_sync_runs')) {
+            return $empty;
+        }
+
+        $lastClosed = PayableSyncRun::query()
+            ->whereIn('status', [
+                PayableSyncRun::STATUS_SUCCESS,
+                PayableSyncRun::STATUS_FAILED,
+            ])
+            ->whereNotNull('finished_at')
+            ->orderByDesc('finished_at')
+            ->first(['status', 'finished_at', 'started_at']);
+
+        if (! $lastClosed) {
+            return $empty;
+        }
+
+        $finishedAt = ($lastClosed->finished_at ?? $lastClosed->started_at)?->copy()->timezone($tz);
+        $online = $lastClosed->status === PayableSyncRun::STATUS_SUCCESS;
+
+        $next = $finishedAt
+            ? $finishedAt->copy()->addMinutes($interval)
+            : null;
+
+        if (! $next || $next->lte($now)) {
+            $next = $this->nextSyncSlotAfter($now, $interval);
+        }
+
+        return [
+            'last_finished_at' => $finishedAt?->toIso8601String(),
+            'next_estimated_at' => $next->toIso8601String(),
+            'online' => $online,
+            'status_label' => $online ? 'Online' : 'Offline',
+            'sync_interval_minutes' => $interval,
+            'can_view_monitor' => $canViewMonitor,
+        ];
+    }
+
+    /** Próximo horário alinhado ao intervalo (ex.: a cada 5 min a partir de agora). */
+    private function nextSyncSlotAfter(Carbon $from, int $intervalMinutes): Carbon
+    {
+        $slot = $from->copy()->timezone('America/Sao_Paulo')->startOfMinute();
+        $minute = (int) $slot->format('i');
+        $remainder = $minute % $intervalMinutes;
+
+        if ($remainder === 0 && (int) $from->format('s') === 0) {
+            return $slot->copy()->addMinutes($intervalMinutes);
+        }
+
+        $add = $remainder === 0 ? $intervalMinutes : ($intervalMinutes - $remainder);
+
+        return $slot->copy()->addMinutes($add)->seconds(0);
     }
 
     /**
@@ -509,6 +597,8 @@ class PayableController extends Controller
         Payable::attachEmpresaNome([$payable]);
         Payable::attachFilialNome([$payable]);
         Payable::attachSupplierDisplayName([$payable]);
+        Payable::attachDepartmentNome([$payable]);
+        Payable::attachAccountingLabels([$payable]);
         $payable->setAttribute(
             'document_pair_alert',
             PayableDocumentPairAlert::resolveFromDocuments($payable->documents, $payable->status),
@@ -557,7 +647,7 @@ class PayableController extends Controller
             'canDelegateStep' => $canDelegateStep,
             'delegateUsers' => $delegateUsers,
             'mentionableUsers' => app(\App\Services\MentionService::class)->mentionableUsers($user, $id),
-            'approvalPreview' => $workflow->buildPreviewStepsForSender($user),
+            'approvalPreview' => $workflow->buildPreviewStepsForPayable($payable),
             'canImportAllocations' => in_array($payable->status, self::ALLOCATION_IMPORT_STATUSES, true),
             'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
             'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
@@ -700,7 +790,7 @@ class PayableController extends Controller
         }
 
         $workflow = app(ApprovalWorkflowService::class);
-        $preview = $workflow->buildPreviewStepsForSender($request->user());
+        $preview = $workflow->buildPreviewStepsForPayable($payable);
         if (! $preview['ok']) {
             return back()->with('error', $preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
         }

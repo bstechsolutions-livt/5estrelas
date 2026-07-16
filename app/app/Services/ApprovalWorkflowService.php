@@ -46,16 +46,24 @@ class ApprovalWorkflowService
         $department = null;
 
         if ($area === null) {
-            $preview = $this->buildPreviewStepsForSender($sender);
+            $preview = $this->buildPreviewStepsForPayable($payable);
             if (! $preview['ok']) {
                 throw new \InvalidArgumentException($preview['errors'][0] ?? 'Não foi possível enviar para aprovação.');
             }
             $area = $preview['area'];
-            $payable->update(['department_id' => $preview['department']['id']]);
-            $payable->refresh();
+            // Persiste o departamento do título (nunca o do remetente).
+            if ((int) $payable->department_id !== (int) $preview['department']['id']) {
+                $payable->update(['department_id' => $preview['department']['id']]);
+                $payable->refresh();
+            }
             $department = Department::with(['manager:id,name', 'director:id,name'])->find($preview['department']['id']);
         } else {
-            if ($sender->department_id) {
+            // Área explícita (legado/testes): resolve departamento do título; só preenche se vazio.
+            $resolved = app(PayableDepartmentClassifier::class)->departmentForPayable($payable);
+            if ($resolved && ! $payable->department_id) {
+                $payable->update(['department_id' => $resolved->id]);
+                $payable->refresh();
+            } elseif (! $payable->department_id && $sender->department_id) {
                 $payable->update(['department_id' => $sender->department_id]);
                 $payable->refresh();
             }
@@ -256,12 +264,16 @@ class ApprovalWorkflowService
             return ['ok' => false, 'error' => 'Sem preparador vinculado'];
         }
 
-        if (! $payable->department_id && $sender->department_id) {
+        $resolved = app(PayableDepartmentClassifier::class)->departmentForPayable($payable);
+        if ($resolved && ! $payable->department_id) {
+            $payable->update(['department_id' => $resolved->id]);
+            $payable->refresh();
+        } elseif (! $payable->department_id && $sender->department_id) {
             $payable->update(['department_id' => $sender->department_id]);
             $payable->refresh();
         }
 
-        $preview = $this->buildPreviewStepsForSender($sender);
+        $preview = $this->buildPreviewStepsForPayable($payable);
         if (! $preview['ok']) {
             return ['ok' => false, 'error' => implode('; ', $preview['errors'])];
         }
@@ -291,12 +303,16 @@ class ApprovalWorkflowService
             return ['ok' => false, 'error' => "Fase inválida: {$phase}"];
         }
 
-        if (! $payable->department_id && $sender->department_id) {
+        $resolved = app(PayableDepartmentClassifier::class)->departmentForPayable($payable);
+        if ($resolved && ! $payable->department_id) {
+            $payable->update(['department_id' => $resolved->id]);
+            $payable->refresh();
+        } elseif (! $payable->department_id && $sender->department_id) {
             $payable->update(['department_id' => $sender->department_id]);
             $payable->refresh();
         }
 
-        $preview = $this->buildPreviewStepsForSender($sender);
+        $preview = $this->buildPreviewStepsForPayable($payable);
         if (! $preview['ok']) {
             return ['ok' => false, 'error' => implode('; ', $preview['errors'])];
         }
@@ -562,8 +578,11 @@ class ApprovalWorkflowService
 
     /**
      * Títulos na etapa Presidência aguardando ação do usuário (painel dedicado).
+     *
+     * @param  string|null  $dueFrom  Y-m-d (opcional)
+     * @param  string|null  $dueTo    Y-m-d (opcional)
      */
-    public function presidencyDeskPayables(User $user): Collection
+    public function presidencyDeskPayables(User $user, ?string $dueFrom = null, ?string $dueTo = null): Collection
     {
         $branchScope = app(PayableBranchScope::class);
 
@@ -577,9 +596,18 @@ class ApprovalWorkflowService
             return collect();
         }
 
-        $payables = Payable::query()
+        $query = Payable::query()
             ->whereIn('id', $candidateIds)
-            ->where('status', 'aguardando_aprovacao')
+            ->where('status', 'aguardando_aprovacao');
+
+        if ($dueFrom) {
+            $query->whereDate('due_date', '>=', $dueFrom);
+        }
+        if ($dueTo) {
+            $query->whereDate('due_date', '<=', $dueTo);
+        }
+
+        $payables = $query
             ->with([
                 'documents.uploader:id,name',
                 'preparer:id,name',
@@ -610,7 +638,25 @@ class ApprovalWorkflowService
     }
 
     /**
-     * Valida se o remetente pode submeter e monta o preview da trilha de aprovação.
+     * Preview da trilha com base no departamento do título (não do remetente).
+     *
+     * @return array{
+     *   ok: bool,
+     *   errors: string[],
+     *   department: ?array{id: int, name: string},
+     *   area: ?string,
+     *   area_label: ?string,
+     *   steps: array<int, array{order: int, level_name: string, level_label: string, role_label: string, assignee_id: ?int, assignee_name: ?string, configured: bool}>
+     * }
+     */
+    public function buildPreviewStepsForPayable(Payable $payable): array
+    {
+        return $this->buildPreviewFromDepartmentBase($this->validatePayableDepartment($payable));
+    }
+
+    /**
+     * @deprecated Preferir buildPreviewStepsForPayable — o fluxo segue o departamento do título.
+     * Mantido para telas/batch que ainda montam preview só com o usuário (ex.: borderô sem título âncora).
      *
      * @return array{
      *   ok: bool,
@@ -623,7 +669,22 @@ class ApprovalWorkflowService
      */
     public function buildPreviewStepsForSender(User $sender): array
     {
-        $base = $this->validateSenderDepartment($sender);
+        return $this->buildPreviewFromDepartmentBase($this->validateSenderDepartment($sender));
+    }
+
+    /**
+     * @param array{errors: string[], department: ?Department, area: ?string} $base
+     * @return array{
+     *   ok: bool,
+     *   errors: string[],
+     *   department: ?array{id: int, name: string},
+     *   area: ?string,
+     *   area_label: ?string,
+     *   steps: array<int, array{order: int, level_name: string, level_label: string, role_label: string, assignee_id: ?int, assignee_name: ?string, configured: bool}>
+     * }
+     */
+    private function buildPreviewFromDepartmentBase(array $base): array
+    {
         if (! $base['department']) {
             return [
                 'ok' => false,
@@ -684,7 +745,7 @@ class ApprovalWorkflowService
         }
 
         if ($steps === []) {
-            $errors[] = 'Não há etapas de aprovação configuradas para o seu departamento.';
+            $errors[] = 'Não há etapas de aprovação configuradas para o departamento do título.';
         }
 
         $errors = array_values(array_unique($errors));
@@ -696,6 +757,50 @@ class ApprovalWorkflowService
             'area' => $area,
             'area_label' => ApprovalTrail::AREAS[$area] ?? $area,
             'steps' => $steps,
+        ];
+    }
+
+    /** @return array{errors: string[], department: ?Department, area: ?string} */
+    private function validatePayableDepartment(Payable $payable): array
+    {
+        $errors = [];
+        $resolved = app(PayableDepartmentClassifier::class)->departmentForPayable($payable);
+
+        if (! $resolved) {
+            return [
+                'errors' => ['Este título não possui departamento vinculado. Associe o lançador Senior a um usuário com departamento ou defina o departamento do título.'],
+                'department' => null,
+                'area' => null,
+            ];
+        }
+
+        $department = Department::with(['manager:id,name', 'director:id,name'])
+            ->where('is_active', true)
+            ->find($resolved->id);
+
+        if (! $department) {
+            return [
+                'errors' => ['Departamento do título não encontrado ou inativo.'],
+                'department' => null,
+                'area' => null,
+            ];
+        }
+
+        if (! $department->area_key) {
+            $errors[] = "O departamento \"{$department->name}\" não possui área de aprovação configurada.";
+        }
+
+        $area = $department->area_key;
+
+        if ($area && ! $this->areaHasTrail($area)) {
+            $label = ApprovalTrail::AREAS[$area] ?? $area;
+            $errors[] = "Não há fluxo de aprovação configurado para \"{$label}\".";
+        }
+
+        return [
+            'errors' => $errors,
+            'department' => $department,
+            'area' => $area,
         ];
     }
 

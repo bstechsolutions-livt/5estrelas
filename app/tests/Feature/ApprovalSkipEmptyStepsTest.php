@@ -58,9 +58,10 @@ class ApprovalSkipEmptyStepsTest extends TestCase
             'amount' => 100,
             'due_date' => now()->addDays(3)->toDateString(),
             'status' => 'pendente',
+            'department_id' => $dept->id,
         ]);
 
-        $preview = $this->workflow->buildPreviewStepsForSender($sender);
+        $preview = $this->workflow->buildPreviewStepsForPayable($payable);
         $this->assertTrue($preview['ok']);
         $this->assertFalse(collect($preview['steps'])->pluck('level_name')->contains('diretoria'));
 

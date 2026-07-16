@@ -66,6 +66,7 @@ class PayableApprovalDeadlineTest extends TestCase
             'amount' => 500,
             'due_date' => $dueDate,
             'status' => 'pendente',
+            'department_id' => $user->department_id,
         ]);
 
         PayableDocument::create([

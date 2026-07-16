@@ -21,7 +21,7 @@ defineProps({
 
         <template v-else>
             <div class="text-xs text-gray-600 space-y-0.5">
-                <p><span class="font-medium text-gray-700">Seu departamento:</span> {{ preview.department?.name }}</p>
+                <p><span class="font-medium text-gray-700">Departamento do título:</span> {{ preview.department?.name }}</p>
                 <p v-if="preview.area_label"><span class="font-medium text-gray-700">Fluxo:</span> {{ preview.area_label }}</p>
             </div>
 

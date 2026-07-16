@@ -120,7 +120,16 @@ class FinanceiroRoutesSmokeTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Financeiro/Configuracao/Index', false)
-                ->has('items', 5));
+                ->has('items', 5)); // alcada, fluxos, borderos_auto, plano_contas, sync_senior
+    }
+
+    public function test_sync_senior_monitor(): void
+    {
+        $user = $this->admin();
+        $user->permissions()->attach(
+            Permission::firstOrCreate(['key' => 'financeiro.workflows.configurar'], ['label' => 'x', 'module' => 'financeiro'])->id
+        );
+        $this->actingAs($user)->get('/financeiro/sync-senior')->assertOk();
     }
 
     public function test_configuracao_hub_forbidden_without_permissions(): void

@@ -10,6 +10,7 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import DatePicker from 'primevue/datepicker'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
+import PayableSyncStatusLine from '@/Components/Financeiro/PayableSyncStatusLine.vue'
 import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
 import { formatApiDate, parseApiDate, toApiDateString } from '@/utils/apiDate'
 import { PAYABLE_SORT_GROUPS, sortQueryFromValue, sortValueFromQuery } from '@/composables/usePayableSort'
@@ -29,6 +30,7 @@ const props = defineProps({
     noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
     priorityOptions: { type: Object, default: () => ({}) },
+    syncStatus: { type: Object, default: null },
 })
 
 const { can } = useAuth()
@@ -306,6 +308,10 @@ const currentTotal = computed(() => {
     <AppLayoutMobile title="Contas a Pagar">
         <div v-if="noBranchAccess" class="px-4 pt-3">
             <BranchAccessBlocked />
+        </div>
+
+        <div class="px-4 pt-2">
+            <PayableSyncStatusLine :sync-status="syncStatus" />
         </div>
 
         <!-- Tabs de status (scroll horizontal) -->

@@ -328,7 +328,12 @@ XML;
             $params['vctFim'] = $vctFim->format('d/m/Y');
         }
 
-        return $this->callOnce($params, (int) ($this->config['cp_timeout_response'] ?? $this->config['timeout_response'] ?? 60));
+        return $this->callOnce($params, (int) (
+            $this->config['sync_http_timeout']
+            ?? $this->config['cp_timeout_response']
+            ?? $this->config['timeout_response']
+            ?? 60
+        ));
     }
 
     /** Uma chamada HTTP com timeout + retry (backoff 2/4/8s). */

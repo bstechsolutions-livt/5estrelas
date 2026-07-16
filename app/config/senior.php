@@ -91,8 +91,10 @@ return [
     // Títulos com vencimento anterior a esta data não são importados nem mantidos no sync.
     'min_due_date' => env('SENIOR_MIN_DUE_DATE', '2026-01-01'),
 
-    // Timeout maior para resposta bulk (muitos títulos em uma chamada).
-    'cp_timeout_response' => (int) env('SENIOR_CP_TIMEOUT_RESPONSE', 180),
+    // Timeout HTTP das chamadas SOAP do sync CP (AbertosCP bulk). Default ~1 min.
+    // Preferir SENIOR_SYNC_HTTP_TIMEOUT; SENIOR_CP_TIMEOUT_RESPONSE permanece como alias.
+    'sync_http_timeout' => (int) env('SENIOR_SYNC_HTTP_TIMEOUT', env('SENIOR_CP_TIMEOUT_RESPONSE', 60)),
+    'cp_timeout_response' => (int) env('SENIOR_SYNC_HTTP_TIMEOUT', env('SENIOR_CP_TIMEOUT_RESPONSE', 60)),
 
     // Compat: codEmp único (fallback usado quando cod_emps fica vazio e pelo DemoSeeder).
     'cod_emp' => (int) env('SENIOR_COD_EMP', 1),

@@ -44,6 +44,14 @@ class FinanceiroConfigCatalog
                 'href' => '/financeiro/plano-de-contas',
                 'permission' => 'financeiro.plano_contas.visualizar',
             ],
+            [
+                'key' => 'sync_senior',
+                'label' => 'Sync Senior (CP)',
+                'description' => 'Acompanhe status, contagens e falhas (503/timeout) da sincronização Contas a Pagar.',
+                'icon' => 'pi pi-sync',
+                'href' => '/financeiro/sync-senior',
+                'permission' => 'financeiro.workflows.configurar',
+            ],
         ];
     }
 
