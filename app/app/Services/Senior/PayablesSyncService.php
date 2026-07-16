@@ -226,6 +226,22 @@ class PayablesSyncService
         [$missing, $byEmpMissing] = $this->marcarAusentes($businessKeys, $vctIni, $vctFim);
         $this->mergeEmpresasStats($run, [], $byEmpMissing);
 
+        // Enrich pós-SOAP pode travar (timeout Senior). Só marca sucesso depois —
+        // senão o monitor mostra “sucesso” com processo PHP ainda vivo e, sem
+        // runInBackground, o schedule:run do supervisor fica preso.
+        $this->patchProgress($run, [
+            'phase' => 'enrich',
+            'phase_label' => 'Enriquecendo lançadores / fornecedores',
+            'percent' => 98,
+        ]);
+        try {
+            $this->enrichLaunchersAfterSync($enrichIds);
+            $this->resolveDepartmentsAfterSync($enrichIds);
+            $this->syncMissingSuppliersAfterPayables($enrichIds);
+        } catch (\Throwable $e) {
+            Log::warning('[senior-cp] enrich pós-sync falhou', ['erro' => $e->getMessage(), 'run_id' => $run->id]);
+        }
+
         $run->update([
             'status' => PayableSyncRun::STATUS_SUCCESS,
             'finished_at' => now(),
@@ -242,16 +258,6 @@ class PayablesSyncService
                 metadata: ['sync_run_id' => $run->id, 'inserted' => $inserted, 'updated' => $updated, 'missing' => $missing],
             );
         }
-
-        // A cada ciclo (insert e update): UsuGer → depto; senão Financeiro; nome do fornecedor.
-        $this->patchProgress($run, [
-            'phase' => 'enrich',
-            'phase_label' => 'Enriquecendo lançadores / fornecedores',
-            'percent' => 98,
-        ]);
-        $this->enrichLaunchersAfterSync($enrichIds);
-        $this->resolveDepartmentsAfterSync($enrichIds);
-        $this->syncMissingSuppliersAfterPayables($enrichIds);
 
         $this->patchProgress($run, [
             'phase' => 'concluido',
