@@ -774,7 +774,12 @@ class ApprovalWorkflowService
             $level = $item['level'];
             $trailArea = $item['trail_area'];
             $assigneeId = $this->resolveAssigneeId($level, $department, $trailArea, $payable);
-            $assigneeName = $this->resolveAssigneeName($level, $assigneeId);
+            $override = ($payable && $area)
+                ? ApprovalFlowOverride::findMatch($trailArea, (int) $level->order, $payable)
+                : null;
+            $assigneeName = $override
+                ? ($override->approver?->name ?? User::whereKey($assigneeId)->value('name'))
+                : $this->resolveAssigneeName($level, $assigneeId);
             $roleLabel = $level->role_label;
             $type = $level->effectiveApproverType();
             $configured = match ($type) {
@@ -790,6 +795,7 @@ class ApprovalWorkflowService
                 'approver_type' => $type,
                 'assignee_id' => $assigneeId,
                 'assignee_name' => $assigneeName,
+                'override_label' => $override?->label,
                 'configured' => $configured,
             ];
         }

@@ -8,6 +8,7 @@ use App\Models\ApprovalTrail;
 use App\Models\Department;
 use App\Models\Payable;
 use App\Models\PayableDocument;
+use App\Models\PayableRateio;
 use App\Models\Permission;
 use App\Models\User;
 use App\Services\ApprovalWorkflowService;
@@ -221,5 +222,83 @@ class ApprovalFlowOverrideTest extends TestCase
 
         $firstDefault = $payable2->fresh()->approvalSteps()->orderBy('order')->first();
         $this->assertSame($erismar->id, $firstDefault->assigned_to);
+    }
+
+    public function test_override_matches_codccu_from_rateio_when_header_empty(): void
+    {
+        $silas = User::factory()->create(['is_active' => true]);
+
+        $payable = Payable::create([
+            'title_number' => 'TIT-RAT',
+            'supplier_name' => 'Fornecedor',
+            'amount' => 100,
+            'due_date' => now()->addDays(5)->toDateString(),
+            'status' => 'pendente',
+        ]);
+
+        PayableRateio::create([
+            'payable_id' => $payable->id,
+            'codccu' => '06289',
+            'vlrcta' => 100,
+        ]);
+
+        $rule = ApprovalFlowOverride::create([
+            'area' => 'compras',
+            'step_order' => 1,
+            'codccu' => ['6289'],
+            'title_patterns' => [],
+            'approver_user_id' => $silas->id,
+        ]);
+
+        $this->assertTrue($rule->matchesPayable($payable->fresh(['rateios'])));
+    }
+
+    public function test_preview_shows_override_assignee(): void
+    {
+        $erismar = User::factory()->create(['name' => 'Erismar', 'is_active' => true]);
+        $silas = User::factory()->create(['name' => 'Silas', 'is_active' => true]);
+
+        $dept = Department::create([
+            'name' => 'Compras',
+            'slug' => 'compras_dept',
+            'area_key' => 'compras',
+            'is_active' => true,
+            'manager_id' => $erismar->id,
+        ]);
+
+        ApprovalFlowArea::create(['area' => 'compras', 'label' => 'Compras']);
+        ApprovalTrail::create([
+            'area' => 'compras',
+            'order' => 1,
+            'level_name' => 'gerencia',
+            'role_label' => 'Gerência',
+            'approver_type' => ApprovalTrail::TYPE_USUARIO,
+            'default_user_id' => $erismar->id,
+        ]);
+
+        ApprovalFlowOverride::create([
+            'area' => 'compras',
+            'step_order' => 1,
+            'label' => 'Silas — obra',
+            'codccu' => ['6289'],
+            'title_patterns' => [],
+            'approver_user_id' => $silas->id,
+        ]);
+
+        $payable = Payable::create([
+            'title_number' => 'TIT-PREV',
+            'supplier_name' => 'Fornecedor',
+            'amount' => 100,
+            'due_date' => now()->addDays(5)->toDateString(),
+            'status' => 'pendente',
+            'department_id' => $dept->id,
+            'codccu' => '6289',
+        ]);
+
+        $preview = app(ApprovalWorkflowService::class)->buildPreviewStepsForPayable($payable);
+
+        $this->assertTrue($preview['ok']);
+        $this->assertSame('Silas', $preview['steps'][0]['assignee_name']);
+        $this->assertSame('Silas — obra', $preview['steps'][0]['override_label']);
     }
 }

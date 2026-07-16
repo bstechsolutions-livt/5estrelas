@@ -32,7 +32,10 @@ defineProps({
                         <span class="text-[10px] font-bold text-gray-400 w-4 shrink-0">{{ step.order }}</span>
                         <div class="min-w-0">
                             <p class="text-xs text-gray-800">{{ step.role_label }}</p>
-                            <p class="text-[11px] text-gray-500">{{ step.assignee_name || '—' }}</p>
+                            <p class="text-[11px] text-gray-500">
+                                {{ step.assignee_name || '—' }}
+                                <span v-if="step.override_label" class="text-amber-700"> (exceção: {{ step.override_label }})</span>
+                            </p>
                         </div>
                     </div>
                 </div>
