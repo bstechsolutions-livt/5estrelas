@@ -669,6 +669,11 @@ class ApprovalWorkflowService
                 'preparer:id,name',
                 'department:id,name',
                 'branch:id,name,code',
+                'approvalSteps' => fn ($q) => $q->with([
+                    'assignee:id,name',
+                    'resolver:id,name',
+                    'delegatee:id,name',
+                ])->orderBy('order'),
             ])
             ->orderBy('due_date')
             ->orderBy('sent_for_approval_at')
@@ -689,6 +694,10 @@ class ApprovalWorkflowService
         Payable::attachEmpresaNome($payables);
         Payable::attachFilialNome($payables);
         Payable::attachSupplierDisplayName($payables);
+
+        foreach ($payables as $payable) {
+            $payable->setAttribute('current_step_id', $this->currentStep($payable)?->id);
+        }
 
         return $payables;
     }
