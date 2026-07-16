@@ -14,6 +14,7 @@ import { useDueDatePresets } from '@/composables/useDueDatePresets'
 import PayableDocumentPreviewCard from '@/Components/Financeiro/PayableDocumentPreviewCard.vue'
 import DueDatePeriodChips from '@/Components/Financeiro/DueDatePeriodChips.vue'
 import DocumentViewerDialog from '@/Components/Financeiro/DocumentViewerDialog.vue'
+import { formatApiDate } from '@/utils/apiDate'
 
 const VIEW_STORAGE_KEY = 'presidency_desk_view_mode'
 
@@ -81,9 +82,9 @@ function formatMoney(val) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
 }
 
-function formatDate(d) {
+function formatDateTime(d) {
     if (!d) return '—'
-    return new Date(d).toLocaleDateString('pt-BR')
+    return new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
 function docTypeLabel(doc) {
@@ -263,7 +264,7 @@ function goToPayable(id) {
                         </div>
                         <div class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
                             <span class="font-semibold text-gray-800 shrink-0">{{ formatMoney(p.amount) }}</span>
-                            <span class="shrink-0">Venc. {{ formatDate(p.due_date) }}</span>
+                            <span class="shrink-0">Venc. {{ formatApiDate(p.due_date) }}</span>
                             <span v-if="p.empresa_nome" class="truncate min-w-0 max-w-[12rem]">{{ p.empresa_nome }}</span>
                             <span v-if="p.filial_nome" class="truncate min-w-0 max-w-[10rem]">{{ p.filial_nome }}</span>
                             <span v-if="p.department?.name" class="truncate min-w-0 max-w-[10rem]">{{ p.department.name }}</span>
@@ -340,7 +341,7 @@ function goToPayable(id) {
                         </div>
                         <div class="text-right shrink-0">
                             <p class="text-lg font-bold text-gray-900">{{ formatMoney(p.amount) }}</p>
-                            <p class="text-xs text-gray-500">Venc. {{ formatDate(p.due_date) }}</p>
+                            <p class="text-xs text-gray-500">Venc. {{ formatApiDate(p.due_date) }}</p>
                         </div>
                     </div>
 
@@ -349,7 +350,7 @@ function goToPayable(id) {
                         <span v-if="p.filial_nome"><i class="pi pi-map-marker mr-1"></i>{{ p.filial_nome }}</span>
                         <span v-if="p.department?.name"><i class="pi pi-sitemap mr-1"></i>{{ p.department.name }}</span>
                         <span v-if="p.preparer"><i class="pi pi-user mr-1"></i>{{ p.preparer.name }}</span>
-                        <span v-if="p.sent_for_approval_at"><i class="pi pi-clock mr-1"></i>Enviado {{ formatDate(p.sent_for_approval_at) }}</span>
+                        <span v-if="p.sent_for_approval_at"><i class="pi pi-clock mr-1"></i>Enviado {{ formatDateTime(p.sent_for_approval_at) }}</span>
                     </div>
 
                     <div class="px-4 py-3">
