@@ -65,18 +65,50 @@ class PayablesSyncService
         // TTL alto (2h) — se o processo morrer, o lock expira sozinho.
         $lock = Cache::lock('senior:sync-payables', 7200);
         if (! $lock->get()) {
-            AuditLogger::log(
-                event: 'contas_pagar.sync.sobreposicao',
-                module: 'financeiro.contas_pagar',
-                description: 'Execução do sync ignorada: lock Redis já em uso.',
-            );
+            // Kill/supervisor pode deixar lock “fantasma” sem em_andamento real.
+            $this->failStaleRunningRuns();
+            $reallyRunning = PayableSyncRun::query()
+                ->where('status', PayableSyncRun::STATUS_RUNNING)
+                ->whereNull('finished_at')
+                ->exists();
 
-            return PayableSyncRun::create([
-                'environment' => $env, 'mode' => $mode, 'trigger' => $trigger,
-                'status' => PayableSyncRun::STATUS_SKIPPED,
-                'started_at' => now(), 'finished_at' => now(),
-                'error_message' => 'Execução ignorada: lock Redis indica outro sync em andamento.',
-            ]);
+            if ($reallyRunning) {
+                AuditLogger::log(
+                    event: 'contas_pagar.sync.sobreposicao',
+                    module: 'financeiro.contas_pagar',
+                    description: 'Execução do sync ignorada: lock Redis já em uso.',
+                );
+
+                return PayableSyncRun::create([
+                    'environment' => $env, 'mode' => $mode, 'trigger' => $trigger,
+                    'status' => PayableSyncRun::STATUS_SKIPPED,
+                    'started_at' => now(), 'finished_at' => now(),
+                    'error_message' => 'Execução ignorada: lock Redis indica outro sync em andamento.',
+                ]);
+            }
+
+            try {
+                Cache::lock('senior:sync-payables')->forceRelease();
+            } catch (\Throwable) {
+                // ignore
+            }
+
+            if (! $lock->get()) {
+                AuditLogger::log(
+                    event: 'contas_pagar.sync.sobreposicao',
+                    module: 'financeiro.contas_pagar',
+                    description: 'Execução do sync ignorada: lock Redis já em uso.',
+                );
+
+                return PayableSyncRun::create([
+                    'environment' => $env, 'mode' => $mode, 'trigger' => $trigger,
+                    'status' => PayableSyncRun::STATUS_SKIPPED,
+                    'started_at' => now(), 'finished_at' => now(),
+                    'error_message' => 'Execução ignorada: lock Redis indica outro sync em andamento.',
+                ]);
+            }
+
+            Log::warning('[senior-cp] lock Redis fantasma liberado; sync seguindo');
         }
 
         try {
