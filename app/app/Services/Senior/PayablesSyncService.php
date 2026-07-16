@@ -111,6 +111,7 @@ class PayablesSyncService
             Log::warning('[senior-cp] lock Redis fantasma liberado; sync seguindo');
         }
 
+        $pendingEnrich = null;
         try {
             $this->failStaleRunningRuns();
 
@@ -130,10 +131,23 @@ class PayablesSyncService
                 ]);
             }
 
-            return $this->executeRun($mode, $trigger, $env, $windowFrom, $windowTo);
+            $pendingEnrich = $this->executeRun($mode, $trigger, $env, $windowFrom, $windowTo);
         } finally {
             optional($lock)->release();
         }
+
+        // Enrich DEPOIS de soltar o lock: se a Senior travar no UsuGer/fornecedor,
+        // o próximo ciclo de 10 min não fica bloqueado e o run já está "sucesso".
+        if (is_array($pendingEnrich)) {
+            $run = $pendingEnrich['run'];
+            if ($run->status === PayableSyncRun::STATUS_SUCCESS && $pendingEnrich['enrich_ids'] !== []) {
+                $this->safePostSyncEnrich($run, $pendingEnrich['enrich_ids']);
+            }
+
+            return $run->fresh();
+        }
+
+        return $pendingEnrich;
     }
 
     /**
@@ -165,13 +179,16 @@ class PayablesSyncService
         }
     }
 
+    /**
+     * @return array{run: PayableSyncRun, enrich_ids: list<int>}
+     */
     private function executeRun(
         string $mode,
         string $trigger,
         string $env,
         ?Carbon $windowFrom,
         ?Carbon $windowTo,
-    ): PayableSyncRun {
+    ): array {
         [$vctIni, $vctFim] = $this->window($mode, $windowFrom, $windowTo);
 
         $run = PayableSyncRun::create([
@@ -198,7 +215,10 @@ class PayablesSyncService
                 'error_message' => mb_substr($e->getMessage(), 0, 2000),
             ]);
 
-            return $run->fresh();
+            return [
+                'run' => $run->fresh(),
+                'enrich_ids' => [],
+            ];
         }
 
         $this->patchProgress($run, [
@@ -258,22 +278,7 @@ class PayablesSyncService
         [$missing, $byEmpMissing] = $this->marcarAusentes($businessKeys, $vctIni, $vctFim);
         $this->mergeEmpresasStats($run, [], $byEmpMissing);
 
-        // Enrich pós-SOAP pode travar (timeout Senior). Só marca sucesso depois —
-        // senão o monitor mostra “sucesso” com processo PHP ainda vivo e, sem
-        // runInBackground, o schedule:run do supervisor fica preso.
-        $this->patchProgress($run, [
-            'phase' => 'enrich',
-            'phase_label' => 'Enriquecendo lançadores / fornecedores',
-            'percent' => 98,
-        ]);
-        try {
-            $this->enrichLaunchersAfterSync($enrichIds);
-            $this->resolveDepartmentsAfterSync($enrichIds);
-            $this->syncMissingSuppliersAfterPayables($enrichIds);
-        } catch (\Throwable $e) {
-            Log::warning('[senior-cp] enrich pós-sync falhou', ['erro' => $e->getMessage(), 'run_id' => $run->id]);
-        }
-
+        // Sucesso = SOAP + upsert + ausentes ok. Enrich é best-effort (fora do lock).
         $run->update([
             'status' => PayableSyncRun::STATUS_SUCCESS,
             'finished_at' => now(),
@@ -300,7 +305,51 @@ class PayablesSyncService
             'missing_total' => $missing,
         ]);
 
-        return $run->fresh();
+        return [
+            'run' => $run->fresh(),
+            'enrich_ids' => $enrichIds,
+        ];
+    }
+
+    /**
+     * Pós-sync best-effort com teto de tempo — não pode segurar o processo por dezenas de min.
+     *
+     * @param  list<int>  $enrichIds
+     */
+    private function safePostSyncEnrich(PayableSyncRun $run, array $enrichIds): void
+    {
+        $maxSec = max(15, (int) config('senior.post_sync_enrich_max_seconds', 90));
+        $deadline = microtime(true) + $maxSec;
+
+        $this->patchProgress($run, [
+            'phase' => 'enrich',
+            'phase_label' => 'Enriquecendo lançadores / fornecedores',
+            'percent' => 98,
+        ]);
+
+        try {
+            if (microtime(true) < $deadline) {
+                $this->enrichLaunchersAfterSync($enrichIds);
+            }
+            // Depto é local (sem SOAP) — sempre tenta.
+            $this->resolveDepartmentsAfterSync($enrichIds);
+            if (microtime(true) < $deadline) {
+                $this->syncMissingSuppliersAfterPayables($enrichIds);
+            } else {
+                Log::warning('[senior-cp] enrich fornecedores pulado (teto de tempo)', [
+                    'run_id' => $run->id,
+                    'max_seconds' => $maxSec,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[senior-cp] enrich pós-sync falhou', ['erro' => $e->getMessage(), 'run_id' => $run->id]);
+        }
+
+        $this->patchProgress($run, [
+            'phase' => 'concluido',
+            'phase_label' => 'Concluído',
+            'percent' => 100,
+        ]);
     }
 
     /**
