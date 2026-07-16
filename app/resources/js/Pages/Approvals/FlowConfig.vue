@@ -5,6 +5,8 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
+import Checkbox from 'primevue/checkbox'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 
@@ -33,6 +35,7 @@ function cloneTrails(trails) {
     return trails.map(t => ({
         ...t,
         levels: t.levels.map(l => ({ ...l })),
+        overrides: (t.overrides || []).map(o => ({ ...o })),
     }))
 }
 
@@ -47,6 +50,7 @@ function addFlow() {
         levels: [
             { id: null, order: 1, role_label: 'Departamento', approver_type: 'gestor_depto', default_user_id: null, approver_department_id: null },
         ],
+        overrides: [],
     })
 }
 
@@ -107,6 +111,32 @@ function isReadonlyType(type) {
     return type === 'gestor_depto' || type === 'dept_financeiro'
 }
 
+function addOverride(trail) {
+    if (!trail.overrides) trail.overrides = []
+    const firstOrder = trail.levels[0]?.order ?? 1
+    trail.overrides.push({
+        id: null,
+        step_order: firstOrder,
+        label: '',
+        codccu_text: '',
+        title_patterns_text: '',
+        approver_user_id: null,
+        priority: 0,
+        is_active: true,
+    })
+}
+
+function removeOverride(trail, index) {
+    trail.overrides.splice(index, 1)
+}
+
+function stepOptions(trail) {
+    return trail.levels.map(l => ({
+        value: l.order,
+        label: `${l.order} — ${l.role_label}`,
+    }))
+}
+
 function save() {
     const form = useForm({
         trails: localTrails.value
@@ -121,6 +151,16 @@ function save() {
                     approver_type: l.approver_type,
                     default_user_id: l.default_user_id,
                     approver_department_id: l.approver_department_id,
+                })),
+                overrides: (t.overrides || []).map(o => ({
+                    id: o.id,
+                    step_order: o.step_order,
+                    label: o.label || null,
+                    codccu_text: o.codccu_text || '',
+                    title_patterns_text: o.title_patterns_text || '',
+                    approver_user_id: o.approver_user_id,
+                    priority: o.priority ?? 0,
+                    is_active: o.is_active !== false,
                 })),
             })),
         deleted_areas: deletedAreas.value,
@@ -157,6 +197,7 @@ function save() {
                     <li><strong>Usuário específico:</strong> selecione a pessoa.</li>
                     <li><strong>Departamento específico:</strong> gestor ou equipe do dept. escolhido.</li>
                     <li>Etapas sem aprovador configurado são ignoradas automaticamente (exceto gestor e financeiro).</li>
+                    <li><strong>Exceções:</strong> por centro de custo ou padrão no título, troca o aprovador de uma etapa; o restante do fluxo permanece igual.</li>
                 </ul>
             </div>
 
@@ -245,6 +286,63 @@ function save() {
                         </div>
 
                         <Button label="Adicionar etapa" icon="pi pi-plus" text size="small" @click="addLevel(trail)" />
+
+                        <div class="mt-5 pt-4 border-t border-dashed border-gray-200">
+                            <p class="text-xs font-semibold text-gray-700 mb-1">Exceções por centro de custo / título</p>
+                            <p class="text-xs text-gray-400 mb-3">
+                                Quando o título bater, substitui o aprovador da etapa escolhida. Demais etapas seguem o fluxo normal.
+                                Informe ao menos um centro de custo (um por linha) ou padrão no título.
+                            </p>
+
+                            <div v-if="!trail.overrides?.length" class="text-xs text-gray-400 italic mb-2">
+                                Nenhuma exceção — só o fluxo padrão acima.
+                            </div>
+
+                            <div
+                                v-for="(rule, rIdx) in trail.overrides"
+                                :key="`ov-${trail.area}-${rIdx}`"
+                                class="mb-3 p-3 rounded-lg border border-amber-100 bg-amber-50/40 space-y-2"
+                            >
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <Select
+                                        v-model="rule.step_order"
+                                        :options="stepOptions(trail)"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Etapa"
+                                        class="w-44"
+                                    />
+                                    <InputText v-model="rule.label" class="flex-1 min-w-[120px] text-xs" placeholder="Rótulo (opcional)" />
+                                    <Select
+                                        v-model="rule.approver_user_id"
+                                        :options="users"
+                                        optionLabel="name"
+                                        optionValue="id"
+                                        placeholder="Aprovador alternativo"
+                                        filter
+                                        class="w-52"
+                                    />
+                                    <InputText v-model.number="rule.priority" type="number" class="w-20 text-xs" placeholder="Prior." title="Maior = avalia primeiro" />
+                                    <label class="inline-flex items-center gap-1 text-xs text-gray-600">
+                                        <Checkbox v-model="rule.is_active" binary />
+                                        Ativa
+                                    </label>
+                                    <Button icon="pi pi-times" text rounded severity="danger" size="small" @click="removeOverride(trail, rIdx)" />
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-[10px] font-medium text-gray-500 mb-1">Centros de custo (codCcu)</label>
+                                        <Textarea v-model="rule.codccu_text" rows="3" class="w-full text-xs" placeholder="6289&#10;2559" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-medium text-gray-500 mb-1">Padrão no título / observação</label>
+                                        <Textarea v-model="rule.title_patterns_text" rows="3" class="w-full text-xs" placeholder="58 03&#10;OBRA" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Button label="Adicionar exceção" icon="pi pi-sliders-h" text size="small" @click="addOverride(trail)" />
+                        </div>
                     </div>
                 </div>
             </div>

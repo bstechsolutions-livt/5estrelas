@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\ApprovalFlowArea;
+use App\Models\ApprovalFlowOverride;
 use App\Models\ApprovalTrail;
 use App\Models\Department;
+use App\Models\PayableDepartmentRule;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +20,13 @@ class ApprovalFlowConfigController extends Controller
 {
     public function index()
     {
+        $overridesByArea = ApprovalFlowOverride::with('approver:id,name')
+            ->orderBy('area')
+            ->orderByDesc('priority')
+            ->orderBy('step_order')
+            ->get()
+            ->groupBy('area');
+
         $areaLabels = ApprovalTrail::areaLabels();
         $trails = ApprovalTrail::with(['defaultUser:id,name', 'approverDepartment:id,name'])
             ->orderBy('area')->orderBy('order')->get()
@@ -37,6 +46,17 @@ class ApprovalFlowConfigController extends Controller
                     'approver_department_id' => $l->approver_department_id,
                     'approver_department_name' => $l->approverDepartment?->name,
                 ])->values(),
+                'overrides' => ($overridesByArea[$area] ?? collect())->map(fn (ApprovalFlowOverride $o) => [
+                    'id' => $o->id,
+                    'step_order' => $o->step_order,
+                    'label' => $o->label,
+                    'codccu_text' => ApprovalFlowOverride::formatCodccuLines($o->codccu),
+                    'title_patterns_text' => ApprovalFlowOverride::formatTitlePatternLines($o->title_patterns),
+                    'approver_user_id' => $o->approver_user_id,
+                    'approver_user_name' => $o->approver?->name,
+                    'priority' => $o->priority,
+                    'is_active' => $o->is_active,
+                ])->values(),
             ])->values();
 
         foreach (ApprovalTrail::COMPOSITE_AREAS as $composite) {
@@ -48,6 +68,7 @@ class ApprovalFlowConfigController extends Controller
                 'area_label' => $areaLabels[$composite] ?? $composite,
                 'is_composite' => true,
                 'levels' => [],
+                'overrides' => [],
             ]);
         }
 
@@ -75,6 +96,15 @@ class ApprovalFlowConfigController extends Controller
             'trails.*.levels.*.approver_type' => ['required', Rule::in($validTypes)],
             'trails.*.levels.*.default_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'trails.*.levels.*.approver_department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'trails.*.overrides' => ['nullable', 'array'],
+            'trails.*.overrides.*.id' => ['nullable', 'integer', 'exists:approval_flow_overrides,id'],
+            'trails.*.overrides.*.step_order' => ['required', 'integer', 'min:1'],
+            'trails.*.overrides.*.label' => ['nullable', 'string', 'max:120'],
+            'trails.*.overrides.*.codccu_text' => ['nullable', 'string', 'max:5000'],
+            'trails.*.overrides.*.title_patterns_text' => ['nullable', 'string', 'max:5000'],
+            'trails.*.overrides.*.approver_user_id' => ['required', 'integer', 'exists:users,id'],
+            'trails.*.overrides.*.priority' => ['nullable', 'integer'],
+            'trails.*.overrides.*.is_active' => ['nullable', 'boolean'],
             'deleted_areas' => ['array'],
             'deleted_areas.*' => ['string', 'max:50'],
         ]);
@@ -87,6 +117,7 @@ class ApprovalFlowConfigController extends Controller
                     }
                     ApprovalTrail::where('area', $area)->delete();
                     ApprovalFlowArea::where('area', $area)->delete();
+                    ApprovalFlowOverride::where('area', $area)->delete();
                 }
             }
 
@@ -138,6 +169,43 @@ class ApprovalFlowConfigController extends Controller
                         ApprovalTrail::where('id', $level['id'])->update($attrs);
                     } else {
                         ApprovalTrail::create($attrs);
+                    }
+                }
+
+                $incomingOverrideIds = collect($trailData['overrides'] ?? [])
+                    ->pluck('id')
+                    ->filter()
+                    ->all();
+
+                ApprovalFlowOverride::where('area', $area)
+                    ->when($incomingOverrideIds !== [], fn ($q) => $q->whereNotIn('id', $incomingOverrideIds))
+                    ->delete();
+
+                foreach ($trailData['overrides'] ?? [] as $overrideData) {
+                    $codccu = PayableDepartmentRule::parseLines($overrideData['codccu_text'] ?? '');
+                    $titlePatterns = PayableDepartmentRule::parseLines($overrideData['title_patterns_text'] ?? '');
+
+                    if ($codccu === [] && $titlePatterns === []) {
+                        continue;
+                    }
+
+                    $attrs = [
+                        'area' => $area,
+                        'step_order' => (int) $overrideData['step_order'],
+                        'label' => $overrideData['label'] ?? null,
+                        'codccu' => $codccu,
+                        'title_patterns' => $titlePatterns,
+                        'approver_user_id' => (int) $overrideData['approver_user_id'],
+                        'priority' => (int) ($overrideData['priority'] ?? 0),
+                        'is_active' => array_key_exists('is_active', $overrideData)
+                            ? (bool) $overrideData['is_active']
+                            : true,
+                    ];
+
+                    if (! empty($overrideData['id'])) {
+                        ApprovalFlowOverride::where('id', $overrideData['id'])->update($attrs);
+                    } else {
+                        ApprovalFlowOverride::create($attrs);
                     }
                 }
             }
