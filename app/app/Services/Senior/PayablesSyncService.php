@@ -324,23 +324,23 @@ class PayablesSyncService
     }
 
     /**
-     * Bulk (CliOpcAbr): 1 chamada SOAP por (codEmp, codFil) — sem codFor.
+     * Bulk (CliOpcAbr): 1 chamada SOAP por empresa (todas as filiais) — sem codFor/codFil.
+     * Validado em PRD 16/07/2026: reduz ~15 round-trips (emp×fil) para ~N empresas.
      */
     private function collectTitulosBulk(?Carbon $vctIni, ?Carbon $vctFim): array
     {
         $all = [];
 
-        foreach ($this->activeCodEmpFilPairs() as [$codEmp, $codFil]) {
-            Log::info('[senior-cp] bulk', ['codEmp' => $codEmp, 'codFil' => $codFil]);
+        foreach ($this->activeCodEmps() as $codEmp) {
+            Log::info('[senior-cp] bulk', ['codEmp' => $codEmp, 'escopo' => 'empresa']);
             try {
-                $titulos = $this->client->consultarTitulosAbertosPorEmpresaFilial((int) $codEmp, (int) $codFil, $vctIni, $vctFim);
+                $titulos = $this->client->consultarTitulosAbertosPorEmpresa((int) $codEmp, $vctIni, $vctFim);
             } catch (SeniorException $e) {
                 if ($e->isTransient()) {
                     throw $e;
                 }
                 Log::warning('[senior-cp] bulk ignorado (erro de negócio)', [
                     'codEmp' => $codEmp,
-                    'codFil' => $codFil,
                     'erro' => $e->getMessage(),
                 ]);
                 continue;
@@ -350,7 +350,6 @@ class PayablesSyncService
             }
             Log::info('[senior-cp] bulk concluído', [
                 'codEmp' => $codEmp,
-                'codFil' => $codFil,
                 'titulos' => count($titulos),
                 'total' => count($all),
             ]);

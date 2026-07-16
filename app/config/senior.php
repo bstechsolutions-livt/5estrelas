@@ -91,10 +91,14 @@ return [
     // Títulos com vencimento anterior a esta data não são importados nem mantidos no sync.
     'min_due_date' => env('SENIOR_MIN_DUE_DATE', '2026-01-01'),
 
-    // Timeout HTTP das chamadas SOAP do sync CP (AbertosCP bulk). Default ~1 min.
+    // Timeout HTTP das chamadas SOAP do sync CP (AbertosCP). Default ~1 min.
     // Preferir SENIOR_SYNC_HTTP_TIMEOUT; SENIOR_CP_TIMEOUT_RESPONSE permanece como alias.
     'sync_http_timeout' => (int) env('SENIOR_SYNC_HTTP_TIMEOUT', env('SENIOR_CP_TIMEOUT_RESPONSE', 60)),
     'cp_timeout_response' => (int) env('SENIOR_SYNC_HTTP_TIMEOUT', env('SENIOR_CP_TIMEOUT_RESPONSE', 60)),
+
+    // Timeout do bulk por empresa (todas as filiais numa chamada) — payload maior.
+    // PRD 16/07/2026: emp 2 levou até ~176s; default 180s.
+    'sync_http_timeout_bulk_empresa' => (int) env('SENIOR_SYNC_HTTP_TIMEOUT_BULK_EMPRESA', 180),
 
     // Compat: codEmp único (fallback usado quando cod_emps fica vazio e pelo DemoSeeder).
     'cod_emp' => (int) env('SENIOR_COD_EMP', 1),
@@ -137,7 +141,7 @@ return [
     'window_days_forward' => (int) env('SENIOR_WINDOW_FORWARD', 90),
 
     // Intervalo do agendador em minutos (requirement 6): default 5, faixa 1..1440.
-    'sync_interval_minutes' => (int) env('SENIOR_SYNC_INTERVAL', 5),
+    'sync_interval_minutes' => (int) env('SENIOR_SYNC_INTERVAL', 10),
 
     // Pós-sync AbertosCP: quantos Exportar E de UsuGer rodar imediatamente nos inserts.
     'post_sync_launcher_lookups' => (int) env('SENIOR_POST_SYNC_LAUNCHER_LOOKUPS', 80),

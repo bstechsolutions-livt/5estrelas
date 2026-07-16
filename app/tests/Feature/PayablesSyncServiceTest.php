@@ -377,13 +377,12 @@ class PayablesSyncServiceTest extends TestCase
         $this->assertEquals(1, Payable::count());
     }
 
-    public function test_bulk_por_empresa_filial_upserta_titulos(): void
+    public function test_bulk_por_empresa_upserta_titulos_de_todas_filiais(): void
     {
         config([
             'senior.enabled' => true,
             'senior.cp_strategy' => 'bulk',
             'senior.emp_enabled' => [2],
-            'senior.cod_fil' => 1,
         ]);
 
         $titulos = [
@@ -391,18 +390,29 @@ class PayablesSyncServiceTest extends TestCase
             $this->titulo('BULK-2', 'AB', 200),
         ];
         $titulos[0]['codEmp'] = 2;
+        $titulos[0]['codFil'] = 1;
         $titulos[1]['codEmp'] = 2;
+        $titulos[1]['codFil'] = 3;
         $titulos[1]['codFor'] = 2000;
 
         $fake = new class($titulos) extends SeniorCpClient {
+            public int $calls = 0;
+
             public function __construct(private array $fakeTitulos)
             {
                 parent::__construct(config('senior'));
             }
 
+            public function consultarTitulosAbertosPorEmpresa(int $codEmp, ?Carbon $vctIni, ?Carbon $vctFim): array
+            {
+                $this->calls++;
+
+                return $codEmp === 2 ? $this->fakeTitulos : [];
+            }
+
             public function consultarTitulosAbertosPorEmpresaFilial(int $codEmp, int $codFil, ?Carbon $vctIni, ?Carbon $vctFim): array
             {
-                return $codEmp === 2 && $codFil === 1 ? $this->fakeTitulos : [];
+                throw new \RuntimeException('bulk não deve mais chamar por filial');
             }
         };
 
@@ -411,7 +421,9 @@ class PayablesSyncServiceTest extends TestCase
 
         $this->assertEquals(PayableSyncRun::STATUS_SUCCESS, $run->status);
         $this->assertEquals(2, $run->inserted_count);
+        $this->assertEquals(1, $fake->calls);
         $this->assertEquals(2, Payable::where('codemp', 2)->count());
+        $this->assertEquals(1, Payable::where('codemp', 2)->where('codfil', 3)->count());
     }
 
     public function test_sync_nao_varre_empresas_excluidas_do_cp(): void
