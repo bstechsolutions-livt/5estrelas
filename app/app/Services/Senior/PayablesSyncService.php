@@ -312,30 +312,29 @@ class PayablesSyncService
     }
 
     /**
-     * Pós-sync best-effort com teto de tempo — não pode segurar o processo por dezenas de min.
+     * Pós-sync best-effort. Não altera o progress para "98% enrich" — o run já está
+     * sucesso/100%; o monitor não deve parecer travado. SOAP de UsuGer/fornecedor
+     * é opcional (desligar com SENIOR_POST_SYNC_*_LOOKUPS=0; o cron separado cobre).
      *
      * @param  list<int>  $enrichIds
      */
     private function safePostSyncEnrich(PayableSyncRun $run, array $enrichIds): void
     {
+        $launcherMax = (int) config('senior.post_sync_launcher_lookups', 0);
+        $supplierMax = (int) config('senior.post_sync_supplier_lookups', 0);
         $maxSec = max(15, (int) config('senior.post_sync_enrich_max_seconds', 90));
         $deadline = microtime(true) + $maxSec;
 
-        $this->patchProgress($run, [
-            'phase' => 'enrich',
-            'phase_label' => 'Enriquecendo lançadores / fornecedores',
-            'percent' => 98,
-        ]);
-
         try {
-            if (microtime(true) < $deadline) {
+            // Depto é local (sem SOAP) — barato e útil.
+            $this->resolveDepartmentsAfterSync($enrichIds);
+
+            if ($launcherMax > 0 && microtime(true) < $deadline) {
                 $this->enrichLaunchersAfterSync($enrichIds);
             }
-            // Depto é local (sem SOAP) — sempre tenta.
-            $this->resolveDepartmentsAfterSync($enrichIds);
-            if (microtime(true) < $deadline) {
+            if ($supplierMax > 0 && microtime(true) < $deadline) {
                 $this->syncMissingSuppliersAfterPayables($enrichIds);
-            } else {
+            } elseif ($supplierMax > 0) {
                 Log::warning('[senior-cp] enrich fornecedores pulado (teto de tempo)', [
                     'run_id' => $run->id,
                     'max_seconds' => $maxSec,
@@ -344,12 +343,6 @@ class PayablesSyncService
         } catch (\Throwable $e) {
             Log::warning('[senior-cp] enrich pós-sync falhou', ['erro' => $e->getMessage(), 'run_id' => $run->id]);
         }
-
-        $this->patchProgress($run, [
-            'phase' => 'concluido',
-            'phase_label' => 'Concluído',
-            'percent' => 100,
-        ]);
     }
 
     /**
