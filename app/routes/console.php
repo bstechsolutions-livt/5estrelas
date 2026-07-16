@@ -31,8 +31,10 @@ if (config('senior.enabled', false)) {
         // TTL do mutex no Redis: se o sync passar disso, outro ciclo sobe em paralelo (zumbi).
         // Sync real leva 8–15+ min; 120 min cobre travamento SOAP sem empilhar.
         ->withoutOverlapping(120)
-        // Sem runInBackground: schedule:run espera terminar e o mutex não “solta” cedo demais.
-        ;
+        // Em background: o loop supervisor (schedule:run a cada 60s) não pode ficar
+        // bloqueado 15+ min. Se o PHP do sync travar no enrich pós-SOAP, o agendador
+        // inteiro parava. Anti-empilhamento = Cache::lock + em_andamento no service.
+        ->runInBackground();
 
     // Lançador Senior (UsuGer) → senior_cod_usu → departamento do usuário intranet.
     // Teto alto + bulk por empresa no service; prioriza títulos sem UsuGer mais novos.
