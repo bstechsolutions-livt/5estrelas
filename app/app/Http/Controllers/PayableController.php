@@ -725,6 +725,7 @@ class PayableController extends Controller
             'canImportAllocations' => in_array($payable->status, self::ALLOCATION_IMPORT_STATUSES, true),
             'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
             'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
+            'maxDocumentBytes' => $this->maxDocumentKb() * 1024,
         ]);
     }
 
@@ -737,7 +738,7 @@ class PayableController extends Controller
         }
 
         $request->validate([
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:10240'],
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:'.$this->maxDocumentKb()],
         ]);
 
         $result = $importService->import($payable, $request->file('file'), $request->user()->id);
@@ -791,9 +792,9 @@ class PayableController extends Controller
         $payable = $this->findPayableForUser($id);
 
         $request->validate([
-            'file' => ['nullable', 'file', 'max:10240'],
+            'file' => ['nullable', 'file', 'max:'.$this->maxDocumentKb()],
             'files' => ['nullable', 'array'],
-            'files.*' => ['file', 'max:10240'],
+            'files.*' => ['file', 'max:'.$this->maxDocumentKb()],
             'type' => ['nullable', Rule::in(array_keys(PayableDocument::TYPES))],
         ]);
 
@@ -1017,7 +1018,7 @@ class PayableController extends Controller
         $data = $request->validate([
             'paid_at' => ['required', 'date', 'before_or_equal:today'],
             'payment_method' => ['nullable', 'string', Rule::in(array_keys(Payable::PAYMENT_METHODS))],
-            'file' => ['nullable', 'file', 'max:10240'], // 10MB — comprovante opcional
+            'file' => ['nullable', 'file', 'max:'.$this->maxDocumentKb()], // comprovante opcional
         ]);
 
         $paid = DB::transaction(function () use ($payable, $user, $data, $request) {
@@ -1393,5 +1394,10 @@ class PayableController extends Controller
         $users = $mentionService->mentionableUsers($request->user(), $id);
 
         return response()->json($users);
+    }
+
+    private function maxDocumentKb(): int
+    {
+        return (int) config('payables.max_document_kb', 15360);
     }
 }

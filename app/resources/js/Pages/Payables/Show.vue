@@ -45,7 +45,10 @@ const props = defineProps({
     canImportAllocations: { type: Boolean, default: false },
     canBypassApprovalDeadline: { type: Boolean, default: false },
     minDueDateForApproval: { type: String, default: null },
+    maxDocumentBytes: { type: Number, default: 15 * 1024 * 1024 },
 })
+
+const maxDocumentMb = computed(() => Math.round(props.maxDocumentBytes / 1024 / 1024))
 
 const DOCS_VIEW_STORAGE_KEY = 'payable_docs_view_mode'
 
@@ -740,12 +743,12 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
 
                                 <p v-else-if="!docsByType(t.key).length" class="text-[11px] text-gray-400 mb-2">Nenhum anexo deste tipo.</p>
                                 <FileUpload v-if="canPrepare" mode="basic" multiple :auto="true" :choose-label="`Anexar ${t.label}`"
-                                    :max-file-size="10485760" @select="(e) => uploadDoc(e, t.key)" class="w-full"
+                                    :max-file-size="maxDocumentBytes" @select="(e) => uploadDoc(e, t.key)" class="w-full"
                                     invalid-file-size-message="O arquivo é muito grande. O tamanho máximo permitido é {1}." />
                                 <p v-if="canPrepare" class="text-[11px] text-gray-400 mt-1">Ctrl ou Shift para selecionar vários arquivos de uma vez.</p>
                             </div>
                         </div>
-                        <p v-if="canPrepare" class="text-[11px] text-gray-400 mt-2 text-center">Tamanho máximo por arquivo: 10 MB.</p>
+                        <p v-if="canPrepare" class="text-[11px] text-gray-400 mt-2 text-center">Tamanho máximo por arquivo: {{ maxDocumentMb }} MB.</p>
                     </div>
 
                     <!-- Rateio (planilha) -->
@@ -761,7 +764,7 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                                 :auto="true"
                                 accept=".xlsx,.xls,.csv"
                                 choose-label="Importar planilha"
-                                :max-file-size="10485760"
+                                :max-file-size="maxDocumentBytes"
                                 @select="uploadAllocation"
                                 dusk="payable-allocation-upload"
                             />
@@ -1144,8 +1147,8 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Comprovante</label>
-                    <FileUpload mode="basic" :auto="false" choose-label="Anexar comprovante" :max-file-size="10485760" @select="onSelectComprovante" class="w-full" dusk="payment-file" />
-                    <p class="text-[11px] text-gray-400 mt-1">Opcional. Tamanho máximo: 10 MB.</p>
+                    <FileUpload mode="basic" :auto="false" choose-label="Anexar comprovante" :max-file-size="maxDocumentBytes" @select="onSelectComprovante" class="w-full" dusk="payment-file" />
+                    <p class="text-[11px] text-gray-400 mt-1">Opcional. Tamanho máximo: {{ maxDocumentMb }} MB.</p>
                 </div>
             </div>
             <template #footer>
@@ -1221,8 +1224,8 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Comprovante</label>
-                    <FileUpload mode="basic" :auto="false" choose-label="Anexar comprovante" :max-file-size="10485760" @select="onSelectComprovante" class="w-full" dusk="payment-file" />
-                    <p class="text-[11px] text-gray-400 mt-1">Opcional. Tamanho máximo: 10 MB.</p>
+                    <FileUpload mode="basic" :auto="false" choose-label="Anexar comprovante" :max-file-size="maxDocumentBytes" @select="onSelectComprovante" class="w-full" dusk="payment-file" />
+                    <p class="text-[11px] text-gray-400 mt-1">Opcional. Tamanho máximo: {{ maxDocumentMb }} MB.</p>
                 </div>
                 <Button label="Confirmar pagamento" icon="pi pi-check" severity="success" class="w-full" :loading="paymentForm.processing" dusk="confirm-payment" @click="submitPayment" />
             </div>
