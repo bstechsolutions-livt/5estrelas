@@ -140,8 +140,11 @@ return [
     'window_days_back' => (int) env('SENIOR_WINDOW_BACK', 90),
     'window_days_forward' => (int) env('SENIOR_WINDOW_FORWARD', 90),
 
-    // Intervalo do agendador em minutos (requirement 6): default 5, faixa 1..1440.
+    // Intervalo do agendador em minutos (requirement 6): default 10, faixa 1..1440.
     'sync_interval_minutes' => (int) env('SENIOR_SYNC_INTERVAL', 10),
+
+    // Sync em_andamento há mais que isto (minutos) é tratado como órfão/zumbi e marcado falha.
+    'sync_stale_running_minutes' => (int) env('SENIOR_SYNC_STALE_RUNNING_MINUTES', 120),
 
     // Pós-sync AbertosCP: quantos Exportar E de UsuGer rodar imediatamente nos inserts.
     'post_sync_launcher_lookups' => (int) env('SENIOR_POST_SYNC_LAUNCHER_LOOKUPS', 80),

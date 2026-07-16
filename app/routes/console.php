@@ -28,21 +28,24 @@ if (config('senior.enabled', false)) {
 
     Schedule::command('senior:sync-payables --scheduled')
         ->cron($cron)
-        ->withoutOverlapping(30) // libera mutex se travar >30 min
-        ->runInBackground();
+        // TTL do mutex no Redis: se o sync passar disso, outro ciclo sobe em paralelo (zumbi).
+        // Sync real leva 8–15+ min; 120 min cobre travamento SOAP sem empilhar.
+        ->withoutOverlapping(120)
+        // Sem runInBackground: schedule:run espera terminar e o mutex não “solta” cedo demais.
+        ;
 
     // Lançador Senior (UsuGer) → senior_cod_usu → departamento do usuário intranet.
-    // Teto alto + bulk por (emp,fil) no service; prioriza títulos sem UsuGer mais novos.
+    // Teto alto + bulk por empresa no service; prioriza títulos sem UsuGer mais novos.
     $enrichMax = max(1, (int) config('senior.enrich_launcher_max_lookups', 400));
     Schedule::command("senior:enrich-payable-launchers --max={$enrichMax} --scheduled")
         ->cron($cron)
-        ->withoutOverlapping(45)
+        ->withoutOverlapping(120)
         ->runInBackground();
 
     // Fornecedores faltantes / placeholders “Fornecedor N” — acompanha o ciclo do CP.
     Schedule::command('senior:sync-fornecedores --scheduled')
         ->cron($cron)
-        ->withoutOverlapping(45)
+        ->withoutOverlapping(120)
         ->runInBackground();
 
     // Sync de filiais/empresas (cad_filial) — muda pouco, roda 1x/dia de madrugada.

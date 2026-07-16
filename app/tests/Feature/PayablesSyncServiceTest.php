@@ -118,6 +118,28 @@ class PayablesSyncServiceTest extends TestCase
         $this->assertEquals(0, Payable::count());
     }
 
+    public function test_sync_orfao_stale_e_marcado_falha_antes_de_rodar(): void
+    {
+        config([
+            'senior.enabled' => true,
+            'senior.sync_stale_running_minutes' => 30,
+        ]);
+
+        $stale = PayableSyncRun::create([
+            'environment' => 'HML', 'mode' => 'incremental', 'trigger' => 'agendado',
+            'status' => PayableSyncRun::STATUS_RUNNING,
+            'started_at' => now()->subHours(3),
+            'finished_at' => null,
+        ]);
+
+        $run = $this->service([$this->titulo('TIT-STALE')])->run(PayableSyncRun::MODE_FULL);
+
+        $this->assertEquals(PayableSyncRun::STATUS_SUCCESS, $run->status);
+        $this->assertEquals(PayableSyncRun::STATUS_FAILED, $stale->fresh()->status);
+        $this->assertNotNull($stale->fresh()->finished_at);
+        $this->assertEquals(1, Payable::where('title_number', 'TIT-STALE')->count());
+    }
+
     // ─── Upsert + idempotência (req 4) ──────────────────────────────────────────
 
 
