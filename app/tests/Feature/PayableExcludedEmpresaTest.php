@@ -57,18 +57,19 @@ class PayableExcludedEmpresaTest extends TestCase
 
     public function test_filter_cod_emps_remove_excluidas(): void
     {
-        $this->assertSame([2, 3, 9], PayableEmpresaExclusion::filterCodEmps([2, 3, 4, 9, 12]));
+        $this->assertSame([2, 3, 4, 9], PayableEmpresaExclusion::filterCodEmps([1, 2, 3, 4, 9, 12]));
     }
 
-    public function test_config_exclui_ari_adm_e_lsr(): void
+    public function test_config_exclui_modelo_e_lsr(): void
     {
-        $this->assertSame([4, 12], PayableEmpresaExclusion::excludedCodEmps());
+        $this->assertSame([1, 12], PayableEmpresaExclusion::excludedCodEmps());
     }
 
     public function test_empresa_options_nao_incluem_excluidas(): void
     {
+        $this->makeFilial(1, 'MODELO');
         $this->makeFilial(2, '5 ESTRELAS');
-        $this->makeFilial(4, 'ARI ADM');
+        $this->makeFilial(4, 'LRB');
         $this->makeFilial(9, 'BALUARTE');
         $this->makeFilial(12, 'LSR');
 
@@ -77,15 +78,16 @@ class PayableExcludedEmpresaTest extends TestCase
 
         $values = array_column($options, 'value');
         $this->assertContains(2, $values);
+        $this->assertContains(4, $values);
         $this->assertContains(9, $values);
-        $this->assertNotContains(4, $values);
+        $this->assertNotContains(1, $values);
         $this->assertNotContains(12, $values);
     }
 
     public function test_receivable_empresa_options_tambem_excluem(): void
     {
         $this->makeFilial(2, '5 ESTRELAS');
-        $this->makeFilial(4, 'ARI ADM');
+        $this->makeFilial(12, 'LSR');
 
         $user = User::factory()->create(['is_active' => true]);
         $user->permissions()->attach(
@@ -99,18 +101,20 @@ class PayableExcludedEmpresaTest extends TestCase
         $values = array_column($options, 'value');
 
         $this->assertContains(2, $values);
-        $this->assertNotContains(4, $values);
+        $this->assertNotContains(12, $values);
     }
 
     public function test_index_nao_lista_titulos_de_empresas_excluidas(): void
     {
         $this->makeFilial(2, '5 ESTRELAS');
-        $this->makeFilial(4, 'ARI ADM');
+        $this->makeFilial(4, 'LRB');
         $this->makeFilial(9, 'BALUARTE');
+        $this->makeFilial(12, 'LSR');
 
         $this->makePayable(['codemp' => 2, 'supplier_name' => 'TituloValido']);
-        $this->makePayable(['codemp' => 4, 'supplier_name' => 'TituloAri']);
+        $this->makePayable(['codemp' => 4, 'supplier_name' => 'TituloLrb']);
         $this->makePayable(['codemp' => 9, 'supplier_name' => 'TituloBaluarte']);
+        $this->makePayable(['codemp' => 12, 'supplier_name' => 'TituloLsr']);
 
         $resp = $this->actingAs($this->cpUserWithAllBranches())
             ->withHeaders(['X-Json-Only' => '1'])
@@ -118,17 +122,17 @@ class PayableExcludedEmpresaTest extends TestCase
             ->assertOk();
 
         $names = collect($resp->json('data'))->pluck('supplier_name')->all();
-        $this->assertEqualsCanonicalizing(['TituloValido', 'TituloBaluarte'], $names);
+        $this->assertEqualsCanonicalizing(['TituloValido', 'TituloLrb', 'TituloBaluarte'], $names);
     }
 
     public function test_filtro_codemp_excluido_retorna_vazio(): void
     {
-        $this->makeFilial(4, 'ARI ADM');
-        $this->makePayable(['codemp' => 4, 'supplier_name' => 'TituloAri']);
+        $this->makeFilial(12, 'LSR');
+        $this->makePayable(['codemp' => 12, 'supplier_name' => 'TituloLsr']);
 
         $resp = $this->actingAs($this->cpUserWithAllBranches())
             ->withHeaders(['X-Json-Only' => '1'])
-            ->get('/financeiro/contas-pagar?status=pendente&codemp=4')
+            ->get('/financeiro/contas-pagar?status=pendente&codemp=12')
             ->assertOk();
 
         $this->assertCount(0, $resp->json('data'));
@@ -136,8 +140,8 @@ class PayableExcludedEmpresaTest extends TestCase
 
     public function test_show_bloqueia_titulo_de_empresa_excluida(): void
     {
-        $this->makeFilial(4, 'ARI ADM');
-        $payable = $this->makePayable(['codemp' => 4]);
+        $this->makeFilial(12, 'LSR');
+        $payable = $this->makePayable(['codemp' => 12]);
 
         $this->actingAs($this->cpUserWithAllBranches())
             ->get("/financeiro/contas-pagar/{$payable->id}")
@@ -146,17 +150,19 @@ class PayableExcludedEmpresaTest extends TestCase
 
     public function test_inertia_index_nao_expoe_empresas_excluidas(): void
     {
+        $this->makeFilial(1, 'MODELO');
         $this->makeFilial(2, '5 ESTRELAS');
-        $this->makeFilial(4, 'ARI ADM');
+        $this->makeFilial(4, 'LRB');
         $this->makeFilial(9, 'BALUARTE');
+        $this->makeFilial(12, 'LSR');
 
         $this->actingAs($this->cpUserWithAllBranches())
             ->get('/financeiro/contas-pagar?status=pendente')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('empresas', 2)
-                ->where('empresas.0.value', 2)
-                ->where('empresas.1.value', 9),
+                ->has('empresas', 3)
+                ->where('empresas', fn ($empresas) => collect($empresas)->pluck('value')->sort()->values()->all() === [2, 4, 9]
+                ),
             );
     }
 }

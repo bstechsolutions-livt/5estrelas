@@ -558,10 +558,10 @@ class PayablesSyncServiceTest extends TestCase
         config([
             'senior.enabled' => true,
             'senior.cp_strategy' => 'sweep',
-            'senior.cod_emps' => [2, 4, 9],
+            'senior.cod_emps' => [1, 2, 4, 9, 12],
             'senior.cod_for_start' => 1,
             'senior.cod_for_end' => 1,
-            'payables.excluded_cod_emp' => [4, 12],
+            'payables.excluded_cod_emp' => [1, 12],
         ]);
 
         $tracker = new class {
@@ -586,7 +586,7 @@ class PayablesSyncServiceTest extends TestCase
         (new PayablesSyncService($fake, new PayableMapper(), new StatusMapper()))
             ->run(PayableSyncRun::MODE_FULL);
 
-        // Exclui 4; 2 e 9 permanecem na varredura.
-        $this->assertSame([2, 9], array_values(array_unique($tracker->emps)));
+        // Exclui 1 e 12; 2, 4 e 9 permanecem na varredura.
+        $this->assertSame([2, 4, 9], array_values(array_unique($tracker->emps)));
     }
 }

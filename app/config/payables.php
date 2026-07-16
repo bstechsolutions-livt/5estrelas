@@ -10,10 +10,10 @@
  */
 return [
     /**
-     * Empresas (codEmp Senior) ocultas em Contas a Pagar — não pertencem ao fluxo do grupo.
-     * 4 = ARI ADM, 12 = LSR (Baluarte codEmp 9 voltou ao CP)
+     * Empresas (codEmp Senior) fora do Contas a Pagar — escopo operacional: codEmp 2–11.
+     * 1 = Modelo (Senior), 12 = LSR / STAR FIVE.
      */
-    'excluded_cod_emp' => [4, 12],
+    'excluded_cod_emp' => [1, 12],
 
     /** Tamanho máximo por arquivo anexado (KB) — validação Laravel `max`. */
     'max_document_kb' => 15360, // 15 MB
