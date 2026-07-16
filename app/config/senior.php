@@ -147,13 +147,15 @@ return [
     'sync_stale_running_minutes' => (int) env('SENIOR_SYNC_STALE_RUNNING_MINUTES', 120),
 
     // Pós-sync AbertosCP: quantos Exportar E de UsuGer rodar imediatamente nos inserts.
-    'post_sync_launcher_lookups' => (int) env('SENIOR_POST_SYNC_LAUNCHER_LOOKUPS', 20),
+    // 0 = desliga (recomendado em PRD; use o cron senior:enrich-payable-launchers).
+    'post_sync_launcher_lookups' => (int) env('SENIOR_POST_SYNC_LAUNCHER_LOOKUPS', 0),
 
     // Pós-sync: quantos codFor faltantes buscar no cad_fornecedor (prioriza títulos novos).
-    'post_sync_supplier_lookups' => (int) env('SENIOR_POST_SYNC_SUPPLIER_LOOKUPS', 40),
+    // 0 = desliga (cron/fornecedores separado cobre).
+    'post_sync_supplier_lookups' => (int) env('SENIOR_POST_SYNC_SUPPLIER_LOOKUPS', 0),
 
     // Teto de parede (segundos) para enrich pós-sync; estouro pula o restante.
-    'post_sync_enrich_max_seconds' => (int) env('SENIOR_POST_SYNC_ENRICH_MAX_SECONDS', 90),
+    'post_sync_enrich_max_seconds' => (int) env('SENIOR_POST_SYNC_ENRICH_MAX_SECONDS', 30),
 
     // Cron enrich UsuGer: teto de Exportar E por ciclo (após bulk ConsultarGeral).
     'enrich_launcher_max_lookups' => (int) env('SENIOR_ENRICH_LAUNCHER_MAX', 400),
