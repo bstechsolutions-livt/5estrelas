@@ -25,6 +25,8 @@ const toast = useToast()
 const confirm = useConfirm()
 const { can, user: authUser } = useAuth()
 
+const isImpersonating = computed(() => !!page.props.auth?.impersonator)
+
 const search = ref(props.filters?.search || '')
 
 // Lista local que cresce com "Carregar mais"
@@ -92,6 +94,19 @@ function goEdit() {
 function goPermissions() {
     router.visit(`/usuarios/${selectedUser.value.id}/permissoes`)
     actionsOpen.value = false
+}
+
+function impersonate() {
+    const u = selectedUser.value
+    actionsOpen.value = false
+    confirm.require({
+        message: `Entrar no sistema como "${u.name}"? Você verá tudo exatamente como este usuário.`,
+        header: 'Entrar como usuário',
+        icon: 'pi pi-user',
+        rejectProps: { label: 'Cancelar', severity: 'secondary', outlined: true },
+        acceptProps: { label: 'Entrar como', severity: 'warn' },
+        accept: () => router.post(`/usuarios/${u.id}/impersonar`),
+    })
 }
 
 function toggleActive() {
@@ -205,6 +220,14 @@ const hasMore = computed(() => currentPage.value < lastPage.value)
         <!-- Bottom sheet de ações -->
         <BottomSheet v-model="actionsOpen" :title="selectedUser?.name || ''">
             <div class="space-y-1">
+                <button
+                    v-if="can('usuarios.impersonar') && !isImpersonating && selectedUser?.is_active && selectedUser?.id !== authUser?.id"
+                    @click="impersonate"
+                    class="w-full flex items-center gap-3 p-3 rounded-lg active:bg-amber-50 text-left text-amber-800"
+                >
+                    <i class="pi pi-sign-in"></i>
+                    <span class="text-sm">Entrar como este usuário</span>
+                </button>
                 <button
                     v-if="can('usuarios.editar')"
                     @click="goEdit"

@@ -8,6 +8,7 @@ import BottomSheet from '@/Components/Mobile/BottomSheet.vue'
 import Checkbox from 'primevue/checkbox'
 import { useTheme } from '@/composables/useTheme'
 import { useNotifications } from '@/composables/useNotifications'
+import ImpersonationBanner from '@/Components/ImpersonationBanner.vue'
 
 defineProps({
     title: { type: String, default: '' },
@@ -120,6 +121,7 @@ function onDeleteNotif(e, id) {
 
 <template>
     <div class="min-h-screen flex flex-col bg-gray-50">
+        <ImpersonationBanner />
         <MobileHeader :title="title" :show-back="showBack" @menu="drawerOpen = true" @notifications="openNotifications" />
 
         <main class="flex-1 mobile-main" :class="hideBottomNav ? 'pb-4' : 'pb-20'">
