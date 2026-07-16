@@ -53,7 +53,7 @@ const props = defineProps({
 
 const { can } = useAuth()
 const canBorderos = computed(() => can('financeiro.borderos.visualizar'))
-const canLancarTitulo = computed(() => props.canLancar || can('financeiro.contas_pagar.lancar'))
+const canLancarTitulo = computed(() => false) // oculto por enquanto — rota/permissão mantidas
 
 const STORAGE_KEY = 'payables_filters'
 
