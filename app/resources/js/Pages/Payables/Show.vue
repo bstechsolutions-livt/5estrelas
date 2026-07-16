@@ -78,6 +78,7 @@ const toast = useToast()
 const commentForm = useForm({ body: '' })
 const showRejectDialog = ref(false)
 const rejectForm = useForm({ reason: '' })
+const approvalComment = ref('')
 const showDelegateDialog = ref(false)
 const delegateForm = useForm({
     step_id: null,
@@ -342,21 +343,39 @@ function confirmApproveWithPriority() {
         .transform((data) => ({
             payment_priority: data.payment_priority,
             payment_sla_date: data.payment_sla_date ? toYmd(data.payment_sla_date) : null,
+            comment: approvalComment.value.trim() || undefined,
         }))
         .post(`/financeiro/contas-pagar/${props.payable.id}/aprovar`, {
             preserveScroll: true,
-            onSuccess: () => { showPriorityDialog.value = false },
+            onSuccess: () => { showPriorityDialog.value = false; approvalComment.value = '' },
         })
 }
 
 function approve() {
-    router.post(`/financeiro/contas-pagar/${props.payable.id}/aprovar`, {}, { preserveScroll: true })
+    router.post(`/financeiro/contas-pagar/${props.payable.id}/aprovar`, {
+        comment: approvalComment.value.trim() || undefined,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => { approvalComment.value = '' },
+    })
+}
+
+// Reprovar: se já escreveu o comentário na caixa do fluxo, usa direto como motivo.
+// Senão, abre o dialog pedindo a justificativa (motivo é obrigatório).
+function openReject() {
+    const text = approvalComment.value.trim()
+    if (text) {
+        rejectForm.reason = text
+        reject()
+        return
+    }
+    showRejectDialog.value = true
 }
 
 function reject() {
     rejectForm.post(`/financeiro/contas-pagar/${props.payable.id}/reprovar`, {
         preserveScroll: true,
-        onSuccess: () => { showRejectDialog.value = false; rejectForm.reset() },
+        onSuccess: () => { showRejectDialog.value = false; rejectForm.reset(); approvalComment.value = '' },
     })
 }
 
@@ -953,8 +972,16 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                         <!-- Botões de ação se o usuário pode aprovar o step atual -->
                         <div v-if="canApproveStep" class="space-y-2">
                             <p class="text-xs text-blue-600 font-medium mb-2">Sua vez: {{ currentStep?.level_name }}</p>
+                            <Textarea
+                                v-model="approvalComment"
+                                placeholder="Comentário (opcional ao aprovar, vira o motivo ao reprovar)"
+                                rows="2"
+                                class="w-full"
+                                dusk="approval-comment"
+                            />
                             <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="openApprove" />
-                            <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="showRejectDialog = true" />
+                            <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="openReject" />
+                            <p class="text-[10px] text-gray-400">O comentário aparece na timeline em <span class="text-green-600 font-medium">verde</span> se aprovar ou <span class="text-red-600 font-medium">vermelho</span> se reprovar.</p>
                         </div>
                         <div v-if="canDelegateStep" class="space-y-2 mt-3 pt-3 border-t border-gray-100">
                             <p class="text-[11px] text-gray-500">Aprovador indisponível? Indique quem aprova temporariamente nesta etapa.</p>
@@ -984,8 +1011,14 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                     <div v-else-if="canApprove && !approvalSteps?.length" class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Aprovação</h3>
                         <div class="space-y-2">
+                            <Textarea
+                                v-model="approvalComment"
+                                placeholder="Comentário (opcional ao aprovar, vira o motivo ao reprovar)"
+                                rows="2"
+                                class="w-full"
+                            />
                             <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="openApprove" />
-                            <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="showRejectDialog = true" />
+                            <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="openReject" />
                         </div>
                     </div>
 
