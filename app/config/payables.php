@@ -15,6 +15,9 @@ return [
      */
     'excluded_cod_emp' => [4, 12],
 
+    /** Tamanho máximo por arquivo anexado (KB) — validação Laravel `max`. */
+    'max_document_kb' => 15360, // 15 MB
+
     'department_rules' => [
         'dp_rh' => [
             'codccu' => ['2363', '2566', '2631', '2847'],
