@@ -38,6 +38,8 @@ export const PAYABLE_SORT_GROUPS = [
             { label: 'Descrição — Z → A', value: 'description:desc' },
             { label: 'Prioridade — urgente primeiro', value: 'payment_priority:desc' },
             { label: 'Prioridade — normal primeiro', value: 'payment_priority:asc' },
+            { label: 'Aprovador / etapa — A → Z', value: 'workflow_moment:asc' },
+            { label: 'Aprovador / etapa — Z → A', value: 'workflow_moment:desc' },
         ],
     },
 ]

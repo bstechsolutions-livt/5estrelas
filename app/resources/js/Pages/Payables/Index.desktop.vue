@@ -968,7 +968,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span v-else class="text-xs text-gray-300" @click="goShow(data.id)">—</span>
                         </template>
                     </Column>
-                    <Column v-if="!['pago', 'aguardando_conciliacao', 'conciliado'].includes(status)" header="Aprovador" style="width: 14%; min-width: 8.5rem" dusk="col-etapa">
+                    <Column v-if="!['pago', 'aguardando_conciliacao', 'conciliado'].includes(status)" field="workflow_moment" header="Aprovador" style="width: 14%; min-width: 8.5rem" sortable dusk="col-etapa">
                         <template #body="{ data }">
                             <div class="flex flex-col gap-0.5 min-w-0" @click="goShow(data.id)">
                                 <span
