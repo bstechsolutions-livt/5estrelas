@@ -443,6 +443,13 @@ class PayablesSyncServiceTest extends TestCase
         $this->assertCount(2, $run->progress['empresas'] ?? []);
         $this->assertEquals('ok', $run->progress['empresas'][0]['status'] ?? null);
         $this->assertEquals('concluido', $run->progress['phase'] ?? null);
+        $emp2 = collect($run->progress['empresas'] ?? [])->firstWhere('cod_emp', 2);
+        $emp5 = collect($run->progress['empresas'] ?? [])->firstWhere('cod_emp', 5);
+        $this->assertSame(1, $emp2['titulos'] ?? null);
+        $this->assertSame(1, $emp2['inserted'] ?? null);
+        $this->assertSame(0, $emp2['updated'] ?? null);
+        $this->assertSame(1, $emp5['inserted'] ?? null);
+        $this->assertArrayHasKey('duration_seconds', $emp2);
     }
 
     public function test_bulk_por_empresa_upserta_titulos_de_todas_filiais(): void

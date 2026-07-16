@@ -173,6 +173,7 @@ class PayablesSyncService
             'phase' => 'gravacao',
             'phase_label' => 'Gravando títulos no Hub',
             'titulos_coletados' => count($titulos),
+            'percent' => 92,
         ]);
 
         $inserted = 0;
@@ -180,10 +181,12 @@ class PayablesSyncService
         $businessKeys = [];
         // Insert + update + re-sync sem mudança de raw: ainda preenche depto/fornecedor.
         $enrichIds = [];
+        /** @var array<int, array{inserted:int, updated:int}> $byEmpMutations */
+        $byEmpMutations = [];
 
         foreach (array_chunk($titulos, (int) config('senior.batch_size', 500)) as $chunk) {
             try {
-                DB::transaction(function () use ($chunk, &$inserted, &$updated, &$businessKeys, &$enrichIds) {
+                DB::transaction(function () use ($chunk, &$inserted, &$updated, &$businessKeys, &$enrichIds, &$byEmpMutations) {
                     foreach ($chunk as $titulo) {
                         $bk = $this->mapper->businessKey($titulo);
                         if ($bk === null) {
@@ -191,7 +194,19 @@ class PayablesSyncService
                             continue;
                         }
                         $businessKeys[] = $bk;
+                        $beforeIns = $inserted;
+                        $beforeUpd = $updated;
                         $this->upsertTitulo($bk, $titulo, $inserted, $updated, $enrichIds);
+                        $codEmp = (int) ($titulo['codEmp'] ?? 0);
+                        if ($codEmp > 0 && ($inserted > $beforeIns || $updated > $beforeUpd)) {
+                            $byEmpMutations[$codEmp] ??= ['inserted' => 0, 'updated' => 0];
+                            if ($inserted > $beforeIns) {
+                                $byEmpMutations[$codEmp]['inserted']++;
+                            }
+                            if ($updated > $beforeUpd) {
+                                $byEmpMutations[$codEmp]['updated']++;
+                            }
+                        }
                     }
                 });
             } catch (\Throwable $e) {
@@ -200,12 +215,16 @@ class PayablesSyncService
             }
         }
 
+        $this->mergeEmpresasStats($run, $byEmpMutations, []);
+
         // req 7: títulos ausentes na Senior — full (todos) ou incremental (janela vctIni/vctFim).
         $this->patchProgress($run, [
             'phase' => 'ausentes',
             'phase_label' => 'Marcando ausentes',
+            'percent' => 95,
         ]);
-        $missing = $this->marcarAusentes($businessKeys, $vctIni, $vctFim);
+        [$missing, $byEmpMissing] = $this->marcarAusentes($businessKeys, $vctIni, $vctFim);
+        $this->mergeEmpresasStats($run, [], $byEmpMissing);
 
         $run->update([
             'status' => PayableSyncRun::STATUS_SUCCESS,
@@ -228,6 +247,7 @@ class PayablesSyncService
         $this->patchProgress($run, [
             'phase' => 'enrich',
             'phase_label' => 'Enriquecendo lançadores / fornecedores',
+            'percent' => 98,
         ]);
         $this->enrichLaunchersAfterSync($enrichIds);
         $this->resolveDepartmentsAfterSync($enrichIds);
@@ -237,6 +257,9 @@ class PayablesSyncService
             'phase' => 'concluido',
             'phase_label' => 'Concluído',
             'percent' => 100,
+            'inserted_total' => $inserted,
+            'updated_total' => $updated,
+            'missing_total' => $missing,
         ]);
 
         return $run->fresh();
@@ -428,6 +451,10 @@ class PayablesSyncService
                 'cod_emp' => (int) $codEmp,
                 'status' => 'pendente',
                 'titulos' => 0,
+                'inserted' => 0,
+                'updated' => 0,
+                'missing' => 0,
+                'duration_seconds' => null,
                 'error' => null,
             ];
         }
@@ -446,6 +473,7 @@ class PayablesSyncService
 
         foreach ($emps as $index => $codEmp) {
             $empresas[$index]['status'] = 'em_andamento';
+            $t0 = microtime(true);
             $this->patchProgress($run, [
                 'phase' => 'coleta',
                 'phase_label' => "Consultando empresa {$codEmp}",
@@ -465,6 +493,7 @@ class PayablesSyncService
                 if ($e->isTransient()) {
                     $empresas[$index]['status'] = 'erro';
                     $empresas[$index]['error'] = $e->getMessage();
+                    $empresas[$index]['duration_seconds'] = (int) round(microtime(true) - $t0);
                     $this->patchProgress($run, [
                         'empresas' => $empresas,
                         'current_cod_emp' => (int) $codEmp,
@@ -479,6 +508,8 @@ class PayablesSyncService
                 $empresas[$index]['error'] = $e->getMessage();
                 $titulos = [];
             }
+
+            $empresas[$index]['duration_seconds'] = (int) round(microtime(true) - $t0);
 
             foreach ($titulos as $t) {
                 $all[] = $t;
@@ -500,6 +531,7 @@ class PayablesSyncService
                 'codEmp' => $codEmp,
                 'titulos' => count($titulos),
                 'total' => count($all),
+                'duration_s' => $empresas[$index]['duration_seconds'],
             ]);
         }
 
@@ -527,6 +559,10 @@ class PayablesSyncService
                 'cod_emp' => (int) $codEmp,
                 'status' => 'pendente',
                 'titulos' => 0,
+                'inserted' => 0,
+                'updated' => 0,
+                'missing' => 0,
+                'duration_seconds' => null,
                 'error' => null,
             ];
         }
@@ -882,8 +918,10 @@ class PayablesSyncService
     /**
      * Marca como ausentes os títulos de origem Senior não retornados (req 7.1).
      * No incremental, restringe à janela de vencimento consultada (vctIni/vctFim).
+     *
+     * @return array{0: int, 1: array<int, int>} [total, map codEmp => qtd]
      */
-    private function marcarAusentes(array $businessKeys, ?Carbon $vctIni = null, ?Carbon $vctFim = null): int
+    private function marcarAusentes(array $businessKeys, ?Carbon $vctIni = null, ?Carbon $vctFim = null): array
     {
         $query = Payable::whereNotNull('senior_id')->whereNull('senior_missing_at');
         if ($businessKeys !== []) {
@@ -910,7 +948,50 @@ class PayablesSyncService
             }
         }
 
-        return $query->update(['senior_missing_at' => now()]);
+        $byEmp = [];
+        foreach ((clone $query)->get(['codemp']) as $row) {
+            $cod = (int) ($row->codemp ?? 0);
+            if ($cod <= 0) {
+                continue;
+            }
+            $byEmp[$cod] = ($byEmp[$cod] ?? 0) + 1;
+        }
+
+        $total = (int) $query->update(['senior_missing_at' => now()]);
+
+        return [$total, $byEmp];
+    }
+
+    /**
+     * @param  array<int, array{inserted?:int, updated?:int}>  $mutations
+     * @param  array<int, int>  $missingByEmp
+     */
+    private function mergeEmpresasStats(?PayableSyncRun $run, array $mutations, array $missingByEmp): void
+    {
+        if ($run === null) {
+            return;
+        }
+
+        $empresas = $run->progress['empresas'] ?? [];
+        if (! is_array($empresas) || $empresas === []) {
+            return;
+        }
+
+        foreach ($empresas as $i => $emp) {
+            $cod = (int) ($emp['cod_emp'] ?? 0);
+            if ($cod <= 0) {
+                continue;
+            }
+            if (isset($mutations[$cod])) {
+                $empresas[$i]['inserted'] = (int) ($mutations[$cod]['inserted'] ?? 0);
+                $empresas[$i]['updated'] = (int) ($mutations[$cod]['updated'] ?? 0);
+            }
+            if (isset($missingByEmp[$cod])) {
+                $empresas[$i]['missing'] = (int) $missingByEmp[$cod];
+            }
+        }
+
+        $this->patchProgress($run, ['empresas' => $empresas]);
     }
 
     private function clamp(int $v, int $min, int $max): int
