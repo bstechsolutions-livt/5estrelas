@@ -168,3 +168,97 @@ export function useDueDatePresets(dueFrom, dueTo) {
         presetChipClass,
     }
 }
+
+/** Presets de data de emissão (histórico → hoje). */
+export const ISSUE_DATE_PRESET_GROUPS = [
+    {
+        id: 'emissao',
+        label: 'Data de emissão',
+        hint: 'Quando o título foi emitido',
+        presets: [
+            { key: 'em_hoje', label: 'Hoje' },
+            { key: 'em_ontem', label: 'Ontem' },
+            { key: 'em_semana', label: 'Esta semana' },
+            { key: 'em_mes', label: 'Este mês' },
+            { key: 'em_mes_passado', label: 'Mês passado' },
+            { key: 'em_ano', label: 'Este ano' },
+        ],
+    },
+]
+
+export const ISSUE_DATE_PRESETS = ISSUE_DATE_PRESET_GROUPS.flatMap((g) => g.presets)
+
+/** @returns {[string, string]} */
+export function issuePresetRange(key) {
+    const today = todayAtNoon()
+    const yesterday = addDays(today, -1)
+
+    switch (key) {
+        case 'em_hoje':
+            return [toYmd(today), toYmd(today)]
+        case 'em_ontem':
+            return [toYmd(yesterday), toYmd(yesterday)]
+        case 'em_semana':
+            return [toYmd(mondayOfWeek(today)), toYmd(today)]
+        case 'em_mes': {
+            const start = new Date(today.getFullYear(), today.getMonth(), 1, 12)
+            return [toYmd(start), toYmd(today)]
+        }
+        case 'em_mes_passado': {
+            const start = new Date(today.getFullYear(), today.getMonth() - 1, 1, 12)
+            const end = new Date(today.getFullYear(), today.getMonth(), 0, 12)
+            return [toYmd(start), toYmd(end)]
+        }
+        case 'em_ano': {
+            const start = new Date(today.getFullYear(), 0, 1, 12)
+            return [toYmd(start), toYmd(today)]
+        }
+        default:
+            return ['', '']
+    }
+}
+
+export function detectIssuePreset(issueFrom, issueTo) {
+    if (!issueFrom && !issueTo) return null
+    for (const preset of ISSUE_DATE_PRESETS) {
+        const [from, to] = issuePresetRange(preset.key)
+        if ((from || '') === (issueFrom || '') && (to || '') === (issueTo || '')) {
+            return preset.key
+        }
+    }
+    return null
+}
+
+export function useIssueDatePresets(issueFrom, issueTo) {
+    const issuePreset = ref(detectIssuePreset(issueFrom.value, issueTo.value))
+
+    function applyIssuePreset(key) {
+        const [from, to] = issuePresetRange(key)
+        issueFrom.value = from
+        issueTo.value = to
+        issuePreset.value = key
+    }
+
+    function clearIssuePreset() {
+        issuePreset.value = null
+    }
+
+    function onIssueDateManualChange() {
+        issuePreset.value = detectIssuePreset(issueFrom.value, issueTo.value)
+    }
+
+    function issuePresetChipClass(key) {
+        const active = issuePreset.value === key
+        return active
+            ? 'bg-emerald-600 text-white border-emerald-600'
+            : 'bg-white text-emerald-800 border-emerald-200 hover:border-emerald-400'
+    }
+
+    return {
+        issuePreset,
+        applyIssuePreset,
+        clearIssuePreset,
+        onIssueDateManualChange,
+        issuePresetChipClass,
+    }
+}
