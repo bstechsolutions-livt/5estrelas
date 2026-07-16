@@ -11,6 +11,7 @@ use App\Support\PayableEmpresaExclusion;
 use App\Services\AuditLogger;
 use App\Support\SeniorDueDatePolicy;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -60,22 +61,85 @@ class PayablesSyncService
             ]);
         }
 
-        // req 6.4/6.5: impede execução concorrente.
-        if (PayableSyncRun::where('status', PayableSyncRun::STATUS_RUNNING)->whereNull('finished_at')->exists()) {
+        // Lock Redis: cobre race entre dois processos que passam no EXISTS ao mesmo tempo.
+        // TTL alto (2h) — se o processo morrer, o lock expira sozinho.
+        $lock = Cache::lock('senior:sync-payables', 7200);
+        if (! $lock->get()) {
             AuditLogger::log(
                 event: 'contas_pagar.sync.sobreposicao',
                 module: 'financeiro.contas_pagar',
-                description: 'Execução do sync ignorada: já existe outra em andamento.',
+                description: 'Execução do sync ignorada: lock Redis já em uso.',
             );
 
             return PayableSyncRun::create([
                 'environment' => $env, 'mode' => $mode, 'trigger' => $trigger,
                 'status' => PayableSyncRun::STATUS_SKIPPED,
                 'started_at' => now(), 'finished_at' => now(),
-                'error_message' => 'Execução ignorada: já havia um sync em andamento.',
+                'error_message' => 'Execução ignorada: lock Redis indica outro sync em andamento.',
             ]);
         }
 
+        try {
+            $this->failStaleRunningRuns();
+
+            // req 6.4/6.5: impede execução concorrente (também no banco).
+            if (PayableSyncRun::where('status', PayableSyncRun::STATUS_RUNNING)->whereNull('finished_at')->exists()) {
+                AuditLogger::log(
+                    event: 'contas_pagar.sync.sobreposicao',
+                    module: 'financeiro.contas_pagar',
+                    description: 'Execução do sync ignorada: já existe outra em andamento.',
+                );
+
+                return PayableSyncRun::create([
+                    'environment' => $env, 'mode' => $mode, 'trigger' => $trigger,
+                    'status' => PayableSyncRun::STATUS_SKIPPED,
+                    'started_at' => now(), 'finished_at' => now(),
+                    'error_message' => 'Execução ignorada: já havia um sync em andamento.',
+                ]);
+            }
+
+            return $this->executeRun($mode, $trigger, $env, $windowFrom, $windowTo);
+        } finally {
+            optional($lock)->release();
+        }
+    }
+
+    /**
+     * Runs órfãos (processo morto / kill) bloqueariam o sync para sempre.
+     * Após N minutos em em_andamento, marca falha automaticamente.
+     */
+    private function failStaleRunningRuns(): void
+    {
+        $minutes = max(30, (int) config('senior.sync_stale_running_minutes', 120));
+        $cutoff = now()->subMinutes($minutes);
+
+        $stale = PayableSyncRun::query()
+            ->where('status', PayableSyncRun::STATUS_RUNNING)
+            ->whereNull('finished_at')
+            ->where('started_at', '<=', $cutoff)
+            ->get();
+
+        foreach ($stale as $run) {
+            $run->update([
+                'status' => PayableSyncRun::STATUS_FAILED,
+                'finished_at' => now(),
+                'error_message' => "Abortado automaticamente: sync em_andamento há mais de {$minutes} min (órfão/zumbi).",
+            ]);
+            Log::warning('[senior-cp] sync órfão marcado como falha', [
+                'run_id' => $run->id,
+                'started_at' => $run->started_at?->toIso8601String(),
+                'stale_minutes' => $minutes,
+            ]);
+        }
+    }
+
+    private function executeRun(
+        string $mode,
+        string $trigger,
+        string $env,
+        ?Carbon $windowFrom,
+        ?Carbon $windowTo,
+    ): PayableSyncRun {
         [$vctIni, $vctFim] = $this->window($mode, $windowFrom, $windowTo);
 
         $run = PayableSyncRun::create([
