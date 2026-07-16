@@ -62,6 +62,10 @@ const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
 const issueFrom = ref(props.filters?.issue_from || '')
 const issueTo = ref(props.filters?.issue_to || '')
+if ((dueFrom.value || dueTo.value) && (issueFrom.value || issueTo.value)) {
+    issueFrom.value = ''
+    issueTo.value = ''
+}
 const sortValue = ref(sortValueFromQuery(props.filters?.sort, props.filters?.dir))
 const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange, presetChipClass } = useDueDatePresets(dueFrom, dueTo)
 const { applyIssuePreset, clearIssuePreset, onIssueDateManualChange, issuePresetChipClass } = useIssueDatePresets(issueFrom, issueTo)
@@ -69,6 +73,11 @@ const dueFromDate = computed({
     get: () => parseApiDate(dueFrom.value),
     set: (v) => {
         dueFrom.value = v ? toApiDateString(v) : ''
+        if (v || dueTo.value) {
+            issueFrom.value = ''
+            issueTo.value = ''
+            clearIssuePreset()
+        }
         onDueDateManualChange()
     },
 })
@@ -76,6 +85,11 @@ const dueToDate = computed({
     get: () => parseApiDate(dueTo.value),
     set: (v) => {
         dueTo.value = v ? toApiDateString(v) : ''
+        if (v || dueFrom.value) {
+            issueFrom.value = ''
+            issueTo.value = ''
+            clearIssuePreset()
+        }
         onDueDateManualChange()
     },
 })
@@ -83,6 +97,11 @@ const issueFromDate = computed({
     get: () => parseApiDate(issueFrom.value),
     set: (v) => {
         issueFrom.value = v ? toApiDateString(v) : ''
+        if (v || issueTo.value) {
+            dueFrom.value = ''
+            dueTo.value = ''
+            clearDuePreset()
+        }
         onIssueDateManualChange()
     },
 })
@@ -90,16 +109,27 @@ const issueToDate = computed({
     get: () => parseApiDate(issueTo.value),
     set: (v) => {
         issueTo.value = v ? toApiDateString(v) : ''
+        if (v || issueFrom.value) {
+            dueFrom.value = ''
+            dueTo.value = ''
+            clearDuePreset()
+        }
         onIssueDateManualChange()
     },
 })
 
 function selectDuePreset(key) {
+    issueFrom.value = ''
+    issueTo.value = ''
+    clearIssuePreset()
     applyDuePreset(key)
     applyFilters()
 }
 
 function selectIssuePreset(key) {
+    dueFrom.value = ''
+    dueTo.value = ''
+    clearDuePreset()
     applyIssuePreset(key)
     applyFilters()
 }
@@ -221,6 +251,10 @@ onMounted(() => {
                 dueTo.value = f.due_to || ''
                 issueFrom.value = f.issue_from || ''
                 issueTo.value = f.issue_to || ''
+                if ((dueFrom.value || dueTo.value) && (issueFrom.value || issueTo.value)) {
+                    issueFrom.value = ''
+                    issueTo.value = ''
+                }
                 onDueDateManualChange()
                 onIssueDateManualChange()
                 const serverStatus = props.filters?.status || 'pendente'
