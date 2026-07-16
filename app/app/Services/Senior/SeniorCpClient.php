@@ -308,9 +308,31 @@ XML;
     }
 
     /**
-     * Consulta todos os títulos abertos de uma empresa/filial em uma chamada (bulk).
-     * Requer parâmetro global CliOpcAbr ativo na Senior (F000PGS) — validado em PRD 12/07/2026.
-     * Params: codEmp + codFil + retRat (+ janela vctIni/vctFim); codFor omitido.
+     * Consulta todos os títulos abertos de uma empresa em uma chamada (todas as filiais).
+     * Requer CliOpcAbr (F000PGS). Params: codEmp + retRat (+ janela); codFor/codFil omitidos.
+     * Validado em PRD 16/07/2026: emp 2 sem filial → 1386 títulos (filiais 1–6).
+     *
+     * @return array lista de títulos (cada um com 'rateios')
+     */
+    public function consultarTitulosAbertosPorEmpresa(int $codEmp, ?Carbon $vctIni, ?Carbon $vctFim): array
+    {
+        $params = [
+            'codEmp' => $codEmp,
+            'retRat' => $this->config['ret_rat'] ?? 'N',
+        ];
+        if ($vctIni) {
+            $params['vctIni'] = $vctIni->format('d/m/Y');
+        }
+        if ($vctFim) {
+            $params['vctFim'] = $vctFim->format('d/m/Y');
+        }
+
+        return $this->callOnce($params, $this->bulkEmpresaTimeout());
+    }
+
+    /**
+     * Consulta títulos abertos de uma empresa/filial (bulk estreito).
+     * Preferir consultarTitulosAbertosPorEmpresa no sync — menos round-trips.
      *
      * @return array lista de títulos (cada um com 'rateios')
      */
@@ -334,6 +356,18 @@ XML;
             ?? $this->config['timeout_response']
             ?? 60
         ));
+    }
+
+    /** Timeout SOAP do bulk por empresa (payload maior; default 180s). */
+    private function bulkEmpresaTimeout(): int
+    {
+        return (int) (
+            $this->config['sync_http_timeout_bulk_empresa']
+            ?? $this->config['sync_http_timeout']
+            ?? $this->config['cp_timeout_response']
+            ?? $this->config['timeout_response']
+            ?? 180
+        );
     }
 
     /** Uma chamada HTTP com timeout + retry (backoff 2/4/8s). */
