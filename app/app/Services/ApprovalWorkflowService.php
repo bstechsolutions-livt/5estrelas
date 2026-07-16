@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ApprovalFlowOverride;
 use App\Models\ApprovalStep;
 use App\Models\ApprovalTrail;
 use App\Models\Bordero;
@@ -454,7 +455,7 @@ class ApprovalWorkflowService
         ApprovalStep::where('payable_id', $payable->id)->delete();
 
         $order = 1;
-        foreach ($this->iterEffectiveTrailLevels($area, $department) as $item) {
+        foreach ($this->iterEffectiveTrailLevels($area, $department, $payable) as $item) {
             $level = $item['level'];
             $trailArea = $item['trail_area'];
             ApprovalStep::create([
@@ -465,7 +466,7 @@ class ApprovalWorkflowService
                 'approver_type' => $level->effectiveApproverType(),
                 'approver_department_id' => $level->approver_department_id,
                 'status' => 'pendente',
-                'assigned_to' => $this->resolveAssigneeId($level, $department, $trailArea),
+                'assigned_to' => $this->resolveAssigneeId($level, $department, $trailArea, $payable),
             ]);
         }
 
@@ -706,7 +707,7 @@ class ApprovalWorkflowService
      */
     public function buildPreviewStepsForPayable(Payable $payable): array
     {
-        return $this->buildPreviewFromDepartmentBase($this->validatePayableDepartment($payable));
+        return $this->buildPreviewFromDepartmentBase($this->validatePayableDepartment($payable), $payable);
     }
 
     /**
@@ -738,7 +739,7 @@ class ApprovalWorkflowService
      *   steps: array<int, array{order: int, level_name: string, level_label: string, role_label: string, assignee_id: ?int, assignee_name: ?string, configured: bool}>
      * }
      */
-    private function buildPreviewFromDepartmentBase(array $base): array
+    private function buildPreviewFromDepartmentBase(array $base, ?Payable $payable = null): array
     {
         if (! $base['department']) {
             return [
@@ -769,10 +770,10 @@ class ApprovalWorkflowService
 
         $steps = [];
         $order = 1;
-        foreach ($this->iterEffectiveTrailLevels($area, $department) as $item) {
+        foreach ($this->iterEffectiveTrailLevels($area, $department, $payable) as $item) {
             $level = $item['level'];
             $trailArea = $item['trail_area'];
-            $assigneeId = $this->resolveAssigneeId($level, $department, $trailArea);
+            $assigneeId = $this->resolveAssigneeId($level, $department, $trailArea, $payable);
             $assigneeName = $this->resolveAssigneeName($level, $assigneeId);
             $roleLabel = $level->role_label;
             $type = $level->effectiveApproverType();
@@ -916,8 +917,15 @@ class ApprovalWorkflowService
         return ApprovalTrail::trailFor($area)->isNotEmpty();
     }
 
-    private function resolveAssigneeId(ApprovalTrail $level, ?Department $department, ?string $area = null): ?int
+    private function resolveAssigneeId(ApprovalTrail $level, ?Department $department, ?string $area = null, ?Payable $payable = null): ?int
     {
+        if ($payable && $area) {
+            $override = ApprovalFlowOverride::findMatch($area, (int) $level->order, $payable);
+            if ($override) {
+                return (int) $override->approver_user_id;
+            }
+        }
+
         return match ($level->effectiveApproverType()) {
             ApprovalTrail::TYPE_GESTOR_DEPTO => $department?->manager_id
                 ?? ($area ? ApprovalTrail::where('area', $area)->where('level_name', 'gerencia')->value('default_user_id') : null),
@@ -950,13 +958,13 @@ class ApprovalWorkflowService
     }
 
     /** @return \Generator<int, array{level: ApprovalTrail, trail_area: string}> */
-    private function iterEffectiveTrailLevels(string $area, ?Department $department): \Generator
+    private function iterEffectiveTrailLevels(string $area, ?Department $department, ?Payable $payable = null): \Generator
     {
         foreach ($this->resolveTrails($area) as $trail) {
             $trailArea = $trail->first()?->area ?? $area;
 
             foreach ($trail as $level) {
-                if ($this->shouldSkipLevel($level, $department, $trailArea)) {
+                if ($this->shouldSkipLevel($level, $department, $trailArea, $payable)) {
                     continue;
                 }
                 yield ['level' => $level, 'trail_area' => $trailArea];
@@ -964,7 +972,7 @@ class ApprovalWorkflowService
         }
     }
 
-    private function shouldSkipLevel(ApprovalTrail $level, ?Department $department, string $area): bool
+    private function shouldSkipLevel(ApprovalTrail $level, ?Department $department, string $area, ?Payable $payable = null): bool
     {
         if ($level->level_name === 'gerencia' && $this->trailHasGestorDepto($area)) {
             return true;
@@ -981,11 +989,11 @@ class ApprovalWorkflowService
         }
 
         if ($type === ApprovalTrail::TYPE_DEPARTAMENTO) {
-            return $this->resolveAssigneeId($level, $department, $area) === null
+            return $this->resolveAssigneeId($level, $department, $area, $payable) === null
                 && ! $this->departmentHasMembers($level->approver_department_id);
         }
 
-        return $this->resolveAssigneeId($level, $department, $area) === null;
+        return $this->resolveAssigneeId($level, $department, $area, $payable) === null;
     }
 
     private function trailHasGestorDepto(string $area): bool
