@@ -268,7 +268,7 @@ class PayableController extends Controller
             'payables' => $pageData['payables'],
             'totals' => $pageData['totals'],
             'filters' => array_merge(
-                $request->only(['search', 'due_from', 'due_to', 'codemp', 'filial', 'branch_id', 'amount_min', 'amount_max', 'payment_priority', 'sort', 'dir', 'per_page']),
+                $request->only(['search', 'due_from', 'due_to', 'issue_from', 'issue_to', 'codemp', 'filial', 'branch_id', 'amount_min', 'amount_max', 'payment_priority', 'sort', 'dir', 'per_page']),
                 [
                     'status' => $pageData['status'],
                     'department_id' => $pageData['departmentContext']['department_id'],
@@ -523,10 +523,18 @@ class PayableController extends Controller
         $dueFrom = FilterDate::parse($request->input('due_from'));
         $dueTo = FilterDate::parse($request->input('due_to'));
         if ($dueFrom) {
-            $query->where('due_date', '>=', $dueFrom);
+            $query->whereDate('due_date', '>=', $dueFrom);
         }
         if ($dueTo) {
-            $query->where('due_date', '<=', $dueTo);
+            $query->whereDate('due_date', '<=', $dueTo);
+        }
+        $issueFrom = FilterDate::parse($request->input('issue_from'));
+        $issueTo = FilterDate::parse($request->input('issue_to'));
+        if ($issueFrom) {
+            $query->whereDate('issue_date', '>=', $issueFrom);
+        }
+        if ($issueTo) {
+            $query->whereDate('issue_date', '<=', $issueTo);
         }
         if ($request->filled('filial')) {
             $pair = $this->parseFilialFilter((string) $request->filial);

@@ -14,7 +14,12 @@ import Dialog from 'primevue/dialog'
 import DatePicker from 'primevue/datepicker'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 import PayableSyncStatusLine from '@/Components/Financeiro/PayableSyncStatusLine.vue'
-import { DUE_DATE_PRESET_GROUPS, useDueDatePresets } from '@/composables/useDueDatePresets'
+import {
+    DUE_DATE_PRESET_GROUPS,
+    ISSUE_DATE_PRESET_GROUPS,
+    useDueDatePresets,
+    useIssueDatePresets,
+} from '@/composables/useDueDatePresets'
 import { formatApiDate, parseApiDate, toApiDateString } from '@/utils/apiDate'
 import {
     PAYABLE_SORT_GROUPS,
@@ -66,8 +71,11 @@ const amountMax = ref(props.filters?.amount_max ? Number(props.filters.amount_ma
 const paymentPriority = ref(props.filters?.payment_priority || null)
 const dueFrom = ref(props.filters?.due_from || '')
 const dueTo = ref(props.filters?.due_to || '')
+const issueFrom = ref(props.filters?.issue_from || '')
+const issueTo = ref(props.filters?.issue_to || '')
 const sortValue = ref(sortValueFromQuery(props.filters?.sort, props.filters?.dir))
 const { duePreset, applyDuePreset, clearDuePreset, onDueDateManualChange, presetChipClass } = useDueDatePresets(dueFrom, dueTo)
+const { applyIssuePreset, clearIssuePreset, onIssueDateManualChange, issuePresetChipClass } = useIssueDatePresets(issueFrom, issueTo)
 const dueFromDate = computed({
     get: () => parseApiDate(dueFrom.value),
     set: (v) => {
@@ -80,6 +88,20 @@ const dueToDate = computed({
     set: (v) => {
         dueTo.value = v ? toApiDateString(v) : ''
         onDueDateManualChange()
+    },
+})
+const issueFromDate = computed({
+    get: () => parseApiDate(issueFrom.value),
+    set: (v) => {
+        issueFrom.value = v ? toApiDateString(v) : ''
+        onIssueDateManualChange()
+    },
+})
+const issueToDate = computed({
+    get: () => parseApiDate(issueTo.value),
+    set: (v) => {
+        issueTo.value = v ? toApiDateString(v) : ''
+        onIssueDateManualChange()
     },
 })
 
@@ -116,6 +138,11 @@ const advancedFilterCount = computed(() => {
 
 function selectDuePreset(key) {
     applyDuePreset(key)
+    applyFilters()
+}
+
+function selectIssuePreset(key) {
+    applyIssuePreset(key)
     applyFilters()
 }
 
@@ -188,6 +215,8 @@ function currentFilters() {
         payment_priority: paymentPriority.value || undefined,
         due_from: dueFrom.value || undefined,
         due_to: dueTo.value || undefined,
+        issue_from: issueFrom.value || undefined,
+        issue_to: issueTo.value || undefined,
         ...sortQueryFromValue(sortValue.value),
     }
 }
@@ -209,7 +238,7 @@ function selectStatus(s) {
 }
 
 const hasActiveFilters = computed(() => {
-    return hasAdvancedFilters.value || !!(dueFrom.value || dueTo.value)
+    return hasAdvancedFilters.value || !!(dueFrom.value || dueTo.value || issueFrom.value || issueTo.value)
 })
 
 const activeFilterCount = computed(() => {
@@ -224,6 +253,8 @@ const activeFilterCount = computed(() => {
     if (sortValue.value !== 'default') c++
     if (dueFrom.value) c++
     if (dueTo.value) c++
+    if (issueFrom.value) c++
+    if (issueTo.value) c++
     return c
 })
 
@@ -240,7 +271,10 @@ function clearFilters() {
     sortValue.value = 'default'
     dueFrom.value = ''
     dueTo.value = ''
+    issueFrom.value = ''
+    issueTo.value = ''
     clearDuePreset()
+    clearIssuePreset()
     applyFilters()
 }
 
@@ -284,11 +318,15 @@ onMounted(() => {
                 sortValue.value = sortValueFromQuery(f.sort, f.dir)
                 dueFrom.value = f.due_from || ''
                 dueTo.value = f.due_to || ''
+                issueFrom.value = f.issue_from || ''
+                issueTo.value = f.issue_to || ''
                 onDueDateManualChange()
+                onIssueDateManualChange()
                 const serverStatus = props.filters?.status || 'pendente'
                 const differs = status.value !== serverStatus || f.search || f.codemp || f.filial
                     || (props.canChangeDepartmentFilter && f.department_id)
                     || f.amount_min || f.amount_max || f.payment_priority || f.due_from || f.due_to
+                    || f.issue_from || f.issue_to
                     || (f.sort && f.sort !== 'default')
                 if (differs) {
                     applyFilters()
@@ -590,6 +628,31 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             </button>
                         </div>
                     </div>
+
+                    <div
+                        v-for="group in ISSUE_DATE_PRESET_GROUPS"
+                        :key="group.id"
+                        class="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2.5"
+                    >
+                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-2">
+                            <span class="text-xs font-semibold text-emerald-800">{{ group.label }}</span>
+                            <span class="text-[11px] text-gray-500">{{ group.hint }}</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button
+                                v-for="preset in group.presets"
+                                :key="preset.key"
+                                type="button"
+                                :class="[
+                                    'px-2.5 py-1 rounded-full text-xs font-medium transition-colors border',
+                                    issuePresetChipClass(preset.key),
+                                ]"
+                                @click="selectIssuePreset(preset.key)"
+                            >
+                                {{ preset.label }}
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
@@ -707,6 +770,14 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Vencimento até</label>
                             <DatePicker v-model="dueToDate" date-format="dd/mm/yy" placeholder="dd/mm/aaaa" show-icon class="w-full" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Emissão de</label>
+                            <DatePicker v-model="issueFromDate" date-format="dd/mm/yy" placeholder="dd/mm/aaaa" show-icon class="w-full" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Emissão até</label>
+                            <DatePicker v-model="issueToDate" date-format="dd/mm/yy" placeholder="dd/mm/aaaa" show-icon class="w-full" />
                         </div>
                     </div>
                 </div>
