@@ -458,10 +458,10 @@ class PayableController extends Controller
             ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number']);
 
         $status = $request->input('status') ?: 'pendente';
-        $query->where('status', $status);
+        $query->where('payables.status', $status);
 
         if ($status === 'pendente') {
-            $query->whereNull('bordero_id');
+            $query->whereNull('payables.bordero_id');
         }
 
         $this->applyPayablesListFilters($query, $request, $departmentContext['department_id'], $user);
@@ -589,6 +589,7 @@ class PayableController extends Controller
             'department_id',
             'department_nome',
             'codemp',
+            'workflow_moment',
         ];
 
         if (empty($sort) || $sort === 'default' || ! in_array($sort, $allowed, true)) {
@@ -619,7 +620,36 @@ class PayableController extends Controller
             return;
         }
 
+        if ($sort === 'workflow_moment') {
+            $this->applyWorkflowMomentOrdering($query, $direction);
+
+            return;
+        }
+
         $query->orderBy($sort, $direction);
+    }
+
+    private function applyWorkflowMomentOrdering(\Illuminate\Database\Eloquent\Builder $query, string $direction): void
+    {
+        $query->leftJoin('approval_steps as wf_current_step', function ($join) {
+            $join->on('wf_current_step.id', '=', \Illuminate\Support\Facades\DB::raw(
+                '(SELECT ast.id FROM approval_steps ast WHERE ast.payable_id = payables.id AND ast.status = \'pendente\' ORDER BY ast."order" ASC LIMIT 1)'
+            ));
+        })->leftJoin('users as wf_approver', 'wf_approver.id', '=', 'wf_current_step.assigned_to');
+
+        $sortExpr = "CASE
+            WHEN payables.status = 'pendente' AND payables.rejection_reason IS NOT NULL AND payables.rejection_reason <> '' THEN 'Recusado — corrigir'
+            WHEN payables.status = 'pendente' AND payables.bordero_id IS NOT NULL THEN 'No borderô'
+            WHEN payables.status = 'pendente' THEN 'Aguardando envio'
+            WHEN payables.status = 'em_preparacao' THEN 'Em preparação'
+            WHEN payables.status = 'aguardando_aprovacao' THEN COALESCE(wf_approver.name, wf_current_step.role_label, wf_current_step.level_name, 'Fluxo não iniciado')
+            WHEN payables.status = 'aprovado' THEN 'Aguardando pagamento'
+            WHEN payables.status IN ('pago', 'aguardando_conciliacao') THEN 'Aguardando conciliação'
+            ELSE COALESCE(payables.status, '')
+        END";
+
+        $query->orderByRaw("{$sortExpr} {$direction}")
+            ->select('payables.*');
     }
 
     /** @return array{0:int,1:int}|null */

@@ -134,4 +134,46 @@ class PayableWorkflowMomentTest extends TestCase
         $this->assertSame('Fluxo não iniciado', $row['workflow_moment']);
         $this->assertSame('Etapa de aprovação ausente', $row['workflow_moment_detail']);
     }
+
+    public function test_lista_ordenada_por_aprovador(): void
+    {
+        $assigneeA = User::factory()->create(['name' => 'Ana Aprovadora', 'is_active' => true]);
+        $assigneeZ = User::factory()->create(['name' => 'Zeca Aprovador', 'is_active' => true]);
+
+        $payableA = $this->makePayable(['status' => 'aguardando_aprovacao', 'supplier_name' => 'FornecedorA']);
+        $payableZ = $this->makePayable(['status' => 'aguardando_aprovacao', 'supplier_name' => 'FornecedorZ']);
+        $payableSem = $this->makePayable(['status' => 'aguardando_aprovacao', 'supplier_name' => 'FornecedorSem']);
+
+        foreach ([$payableA, $payableZ, $payableSem] as $payable) {
+            ApprovalStep::create([
+                'payable_id' => $payable->id,
+                'order' => 1,
+                'level_name' => 'financeiro',
+                'role_label' => 'Financeiro',
+                'status' => 'pendente',
+                'assigned_to' => match ($payable->supplier_name) {
+                    'FornecedorA' => $assigneeA->id,
+                    'FornecedorZ' => $assigneeZ->id,
+                    default => null,
+                },
+            ]);
+        }
+
+        ApprovalStep::where('payable_id', $payableSem->id)->update([
+            'role_label' => 'Financeiro (auditoria)',
+        ]);
+
+        $resp = $this->actingAs($this->activeUser())
+            ->withHeaders(['X-Json-Only' => '1'])
+            ->get('/financeiro/contas-pagar?status=aguardando_aprovacao&sort=workflow_moment&dir=asc')
+            ->assertOk();
+
+        $names = collect($resp->json('data'))
+            ->pluck('workflow_moment')
+            ->filter()
+            ->values()
+            ->all();
+
+        $this->assertSame(['Ana Aprovadora', 'Financeiro (auditoria)', 'Zeca Aprovador'], $names);
+    }
 }
