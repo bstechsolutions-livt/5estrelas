@@ -147,14 +147,19 @@ class PayablesSyncService
             'status' => PayableSyncRun::STATUS_RUNNING,
             'started_at' => now(),
             'window_start' => $vctIni, 'window_end' => $vctFim,
+            'progress' => $this->initialProgress(),
         ]);
 
         try {
-            $titulos = $this->collectTitulos($vctIni, $vctFim);
+            $titulos = $this->collectTitulos($vctIni, $vctFim, $run);
         } catch (\Throwable $e) {
             // req 2.3 / 9.4: falha de comunicação não altera dados; registra erro truncado.
             // Captura \Throwable (não só SeniorException) para que um erro inesperado
             // NÃO deixe a execução presa em RUNNING e bloqueie os próximos syncs (concorrência).
+            $this->patchProgress($run, [
+                'phase' => 'erro',
+                'phase_label' => 'Falha na coleta',
+            ]);
             $run->update([
                 'status' => PayableSyncRun::STATUS_FAILED,
                 'finished_at' => now(),
@@ -163,6 +168,12 @@ class PayablesSyncService
 
             return $run->fresh();
         }
+
+        $this->patchProgress($run, [
+            'phase' => 'gravacao',
+            'phase_label' => 'Gravando títulos no Hub',
+            'titulos_coletados' => count($titulos),
+        ]);
 
         $inserted = 0;
         $updated = 0;
@@ -190,6 +201,10 @@ class PayablesSyncService
         }
 
         // req 7: títulos ausentes na Senior — full (todos) ou incremental (janela vctIni/vctFim).
+        $this->patchProgress($run, [
+            'phase' => 'ausentes',
+            'phase_label' => 'Marcando ausentes',
+        ]);
         $missing = $this->marcarAusentes($businessKeys, $vctIni, $vctFim);
 
         $run->update([
@@ -210,9 +225,19 @@ class PayablesSyncService
         }
 
         // A cada ciclo (insert e update): UsuGer → depto; senão Financeiro; nome do fornecedor.
+        $this->patchProgress($run, [
+            'phase' => 'enrich',
+            'phase_label' => 'Enriquecendo lançadores / fornecedores',
+        ]);
         $this->enrichLaunchersAfterSync($enrichIds);
         $this->resolveDepartmentsAfterSync($enrichIds);
         $this->syncMissingSuppliersAfterPayables($enrichIds);
+
+        $this->patchProgress($run, [
+            'phase' => 'concluido',
+            'phase_label' => 'Concluído',
+            'percent' => 100,
+        ]);
 
         return $run->fresh();
     }
@@ -378,40 +403,99 @@ class PayablesSyncService
     /**
      * Coleta títulos conforme a estratégia configurada (bulk ou sweep).
      */
-    private function collectTitulos(?Carbon $vctIni, ?Carbon $vctFim): array
+    private function collectTitulos(?Carbon $vctIni, ?Carbon $vctFim, ?PayableSyncRun $run = null): array
     {
         if (config('senior.cp_strategy', 'bulk') === 'bulk') {
-            return $this->collectTitulosBulk($vctIni, $vctFim);
+            return $this->collectTitulosBulk($vctIni, $vctFim, $run);
         }
 
-        return $this->collectTitulosSweep($vctIni, $vctFim);
+        return $this->collectTitulosSweep($vctIni, $vctFim, $run);
     }
 
     /**
      * Bulk (CliOpcAbr): 1 chamada SOAP por empresa (todas as filiais) — sem codFor/codFil.
      * Validado em PRD 16/07/2026: reduz ~15 round-trips (emp×fil) para ~N empresas.
      */
-    private function collectTitulosBulk(?Carbon $vctIni, ?Carbon $vctFim): array
+    private function collectTitulosBulk(?Carbon $vctIni, ?Carbon $vctFim, ?PayableSyncRun $run = null): array
     {
         $all = [];
+        $emps = $this->activeCodEmps();
+        $total = count($emps);
 
-        foreach ($this->activeCodEmps() as $codEmp) {
+        $empresas = [];
+        foreach ($emps as $codEmp) {
+            $empresas[] = [
+                'cod_emp' => (int) $codEmp,
+                'status' => 'pendente',
+                'titulos' => 0,
+                'error' => null,
+            ];
+        }
+
+        $this->patchProgress($run, [
+            'phase' => 'coleta',
+            'phase_label' => 'Consultando Senior (por empresa)',
+            'strategy' => 'bulk',
+            'total_empresas' => $total,
+            'done_empresas' => 0,
+            'percent' => $total > 0 ? 0 : 100,
+            'current_cod_emp' => null,
+            'empresas' => $empresas,
+            'titulos_coletados' => 0,
+        ]);
+
+        foreach ($emps as $index => $codEmp) {
+            $empresas[$index]['status'] = 'em_andamento';
+            $this->patchProgress($run, [
+                'phase' => 'coleta',
+                'phase_label' => "Consultando empresa {$codEmp}",
+                'current_cod_emp' => (int) $codEmp,
+                'done_empresas' => $index,
+                'percent' => $total > 0 ? (int) floor(($index / $total) * 90) : 0,
+                'empresas' => $empresas,
+            ]);
+
             Log::info('[senior-cp] bulk', ['codEmp' => $codEmp, 'escopo' => 'empresa']);
+            $titulos = [];
             try {
                 $titulos = $this->client->consultarTitulosAbertosPorEmpresa((int) $codEmp, $vctIni, $vctFim);
+                $empresas[$index]['status'] = 'ok';
+                $empresas[$index]['titulos'] = count($titulos);
             } catch (SeniorException $e) {
                 if ($e->isTransient()) {
+                    $empresas[$index]['status'] = 'erro';
+                    $empresas[$index]['error'] = $e->getMessage();
+                    $this->patchProgress($run, [
+                        'empresas' => $empresas,
+                        'current_cod_emp' => (int) $codEmp,
+                    ]);
                     throw $e;
                 }
                 Log::warning('[senior-cp] bulk ignorado (erro de negócio)', [
                     'codEmp' => $codEmp,
                     'erro' => $e->getMessage(),
                 ]);
-                continue;
+                $empresas[$index]['status'] = 'ignorado';
+                $empresas[$index]['error'] = $e->getMessage();
+                $titulos = [];
             }
+
             foreach ($titulos as $t) {
                 $all[] = $t;
             }
+
+            $done = $index + 1;
+            $this->patchProgress($run, [
+                'done_empresas' => $done,
+                'percent' => $total > 0 ? (int) floor(($done / $total) * 90) : 90,
+                'empresas' => $empresas,
+                'titulos_coletados' => count($all),
+                'current_cod_emp' => null,
+                'phase_label' => $done >= $total
+                    ? 'Coleta concluída'
+                    : "Consultando Senior ({$done}/{$total} empresas)",
+            ]);
+
             Log::info('[senior-cp] bulk concluído', [
                 'codEmp' => $codEmp,
                 'titulos' => count($titulos),
@@ -426,7 +510,7 @@ class PayablesSyncService
      * Varre as empresas (cod_emps) × fornecedores (cod_for_start..cod_for_end).
      * Fallback quando CliOpcAbr não está ativo.
      */
-    private function collectTitulosSweep(?Carbon $vctIni, ?Carbon $vctFim): array
+    private function collectTitulosSweep(?Carbon $vctIni, ?Carbon $vctFim, ?PayableSyncRun $run = null): array
     {
         $codEmps = $this->activeCodEmps();
         $forStart = (int) config('senior.cod_for_start', 1);
@@ -436,8 +520,35 @@ class PayablesSyncService
 
         $all = [];
         $consecutiveTransport = 0;
-
+        $total = count($codEmps);
+        $empresas = [];
         foreach ($codEmps as $codEmp) {
+            $empresas[] = [
+                'cod_emp' => (int) $codEmp,
+                'status' => 'pendente',
+                'titulos' => 0,
+                'error' => null,
+            ];
+        }
+        $this->patchProgress($run, [
+            'phase' => 'coleta',
+            'phase_label' => 'Varredura por fornecedor',
+            'strategy' => 'sweep',
+            'total_empresas' => $total,
+            'done_empresas' => 0,
+            'percent' => 0,
+            'empresas' => $empresas,
+        ]);
+
+        foreach ($codEmps as $index => $codEmp) {
+            $empresas[$index]['status'] = 'em_andamento';
+            $this->patchProgress($run, [
+                'current_cod_emp' => (int) $codEmp,
+                'empresas' => $empresas,
+                'phase_label' => "Varredura empresa {$codEmp}",
+                'percent' => $total > 0 ? (int) floor(($index / $total) * 90) : 0,
+            ]);
+
             Log::info('[senior-cp] varredura', [
                 'codEmp' => $codEmp,
                 'codFor' => $forStart,
@@ -445,12 +556,14 @@ class PayablesSyncService
                 'evento' => 'empresa',
             ]);
 
+            $empTitulos = 0;
             for ($codFor = $forStart; $codFor <= $forEnd; $codFor++) {
                 try {
                     $titulos = $this->client->consultarTitulosPorFornecedor((int) $codEmp, $codFor, $vctIni, $vctFim);
                     $consecutiveTransport = 0;
                     foreach ($titulos as $t) {
                         $all[] = $t;
+                        $empTitulos++;
                     }
                 } catch (SeniorException $e) {
                     if ($e->isTransient()) {
@@ -461,6 +574,9 @@ class PayablesSyncService
                             'consecutivas' => $consecutiveTransport, 'erro' => $e->getMessage(),
                         ]);
                         if ($consecutiveTransport >= $maxTransport) {
+                            $empresas[$index]['status'] = 'erro';
+                            $empresas[$index]['error'] = $e->getMessage();
+                            $this->patchProgress($run, ['empresas' => $empresas]);
                             throw $e; // aborta o sync inteiro
                         }
                     } else {
@@ -484,9 +600,47 @@ class PayablesSyncService
                     usleep($delayMs * 1000);
                 }
             }
+
+            $empresas[$index]['status'] = 'ok';
+            $empresas[$index]['titulos'] = $empTitulos;
+            $done = $index + 1;
+            $this->patchProgress($run, [
+                'empresas' => $empresas,
+                'done_empresas' => $done,
+                'percent' => $total > 0 ? (int) floor(($done / $total) * 90) : 90,
+                'titulos_coletados' => count($all),
+                'current_cod_emp' => null,
+            ]);
         }
 
         return $this->dedupTitulos($all);
+    }
+
+    /** @return array<string, mixed> */
+    private function initialProgress(): array
+    {
+        return [
+            'phase' => 'iniciando',
+            'phase_label' => 'Iniciando sync',
+            'strategy' => (string) config('senior.cp_strategy', 'bulk'),
+            'total_empresas' => 0,
+            'done_empresas' => 0,
+            'percent' => 0,
+            'current_cod_emp' => null,
+            'empresas' => [],
+            'titulos_coletados' => 0,
+        ];
+    }
+
+    /** @param  array<string, mixed>  $patch */
+    private function patchProgress(?PayableSyncRun $run, array $patch): void
+    {
+        if ($run === null) {
+            return;
+        }
+
+        $progress = array_merge($run->progress ?? $this->initialProgress(), $patch);
+        $run->forceFill(['progress' => $progress])->save();
     }
 
     /** Remove títulos duplicados pela Business_Key. */

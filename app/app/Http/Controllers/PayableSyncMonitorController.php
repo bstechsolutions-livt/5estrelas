@@ -144,6 +144,8 @@ class PayableSyncMonitorController extends Controller
     /** @return array<string, mixed> */
     private function serializeRun(PayableSyncRun $run): array
     {
+        $progress = is_array($run->progress) ? $run->progress : null;
+
         return [
             'id' => $run->id,
             'environment' => $run->environment,
@@ -158,6 +160,7 @@ class PayableSyncMonitorController extends Controller
             'window_start' => optional($run->window_start)?->toDateString(),
             'window_end' => optional($run->window_end)?->toDateString(),
             'error_message' => $run->error_message,
+            'progress' => $progress,
             'duration_seconds' => $run->started_at && $run->finished_at
                 ? $run->started_at->diffInSeconds($run->finished_at)
                 : ($run->started_at && $run->status === PayableSyncRun::STATUS_RUNNING

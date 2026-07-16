@@ -1,11 +1,12 @@
 <script setup>
-import { computed } from 'vue'
-import { Head } from '@inertiajs/vue3'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { Head, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Tag from 'primevue/tag'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Chart from 'primevue/chart'
+import ProgressBar from 'primevue/progressbar'
 
 const props = defineProps({
     config: { type: Object, required: true },
@@ -28,18 +29,63 @@ const props = defineProps({
     next_steps: { type: Array, default: () => [] },
 })
 
+let pollTimer = null
+
+function startPolling() {
+    stopPolling()
+    if (!props.current_run) return
+    pollTimer = setInterval(() => {
+        router.reload({
+            only: ['current_run', 'runs', 'stats', 'charts_12h'],
+            preserveScroll: true,
+            preserveState: true,
+        })
+    }, 8000)
+}
+
+function stopPolling() {
+    if (pollTimer) {
+        clearInterval(pollTimer)
+        pollTimer = null
+    }
+}
+
+onMounted(startPolling)
+onUnmounted(stopPolling)
+watch(() => props.current_run?.id, startPolling)
+
 function statusSeverity(status) {
     switch (status) {
         case 'sucesso':
+        case 'ok':
             return 'success'
         case 'falha':
+        case 'erro':
             return 'danger'
         case 'em_andamento':
             return 'warn'
         case 'ignorado':
+        case 'pendente':
             return 'secondary'
         default:
             return 'info'
+    }
+}
+
+function empresaStatusLabel(status) {
+    switch (status) {
+        case 'ok':
+            return 'ok'
+        case 'em_andamento':
+            return 'agora'
+        case 'pendente':
+            return 'fila'
+        case 'erro':
+            return 'erro'
+        case 'ignorado':
+            return 'ignorada'
+        default:
+            return status || '—'
     }
 }
 
@@ -47,7 +93,6 @@ function formatDt(iso) {
     if (!iso) return '—'
     const d = new Date(iso)
     if (Number.isNaN(d.getTime())) return '—'
-    // Datetime com hora: locale pt-BR (dd/mm/yyyy HH:mm:ss)
     return d.toLocaleString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
@@ -77,6 +122,10 @@ function formatDuration(seconds) {
     const rem = total % 60
     return rem === 0 ? `${m}min` : `${m}min ${rem}s`
 }
+
+const progress = computed(() => props.current_run?.progress ?? null)
+const progressPercent = computed(() => Math.min(100, Math.max(0, Number(progress.value?.percent ?? 0))))
+const empresasProgress = computed(() => progress.value?.empresas ?? [])
 
 const lineOptions = {
     responsive: true,
@@ -216,12 +265,72 @@ const chartMutationsData = computed(() => {
                 dusk="sync-current-run"
             >
                 <div class="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-2">Run em andamento</div>
-                <div v-if="current_run" class="space-y-1 text-sm text-slate-700 dark:text-slate-200">
+                <div v-if="current_run" class="space-y-3 text-sm text-slate-700 dark:text-slate-200">
                     <div class="flex flex-wrap items-center gap-2">
                         <Tag :value="current_run.status" :severity="statusSeverity(current_run.status)" />
                         <span>#{{ current_run.id }} · {{ current_run.mode }} · {{ current_run.trigger }}</span>
                     </div>
-                    <div>Início: {{ formatDt(current_run.started_at) }} · duração {{ formatDuration(current_run.duration_seconds) }}</div>
+                    <div>
+                        Início: {{ formatDt(current_run.started_at) }} · duração {{ formatDuration(current_run.duration_seconds) }}
+                    </div>
+
+                    <div v-if="progress" class="space-y-3 pt-1">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <span class="font-medium">{{ progress.phase_label || progress.phase }}</span>
+                                <span v-if="progress.current_cod_emp" class="text-slate-500">
+                                    · emp {{ progress.current_cod_emp }}
+                                </span>
+                            </div>
+                            <div class="text-xs text-slate-500">
+                                {{ progress.done_empresas ?? 0 }}/{{ progress.total_empresas ?? 0 }} empresas
+                                <span v-if="progress.titulos_coletados != null">
+                                    · {{ progress.titulos_coletados }} títulos
+                                </span>
+                                · {{ progressPercent }}%
+                            </div>
+                        </div>
+                        <ProgressBar :value="progressPercent" :show-value="true" style="height: 1.1rem" />
+
+                        <div v-if="empresasProgress.length" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div
+                                v-for="emp in empresasProgress"
+                                :key="emp.cod_emp"
+                                class="rounded-lg border border-amber-200/80 dark:border-amber-800/60 bg-white/70 dark:bg-slate-900/40 px-3 py-2"
+                                :class="emp.status === 'em_andamento' ? 'ring-1 ring-amber-400' : ''"
+                            >
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="font-semibold">Emp {{ emp.cod_emp }}</span>
+                                    <Tag
+                                        :value="empresaStatusLabel(emp.status)"
+                                        :severity="statusSeverity(emp.status)"
+                                        class="text-xs"
+                                    />
+                                </div>
+                                <div class="mt-1 text-xs text-slate-500 flex justify-between gap-2">
+                                    <span>
+                                        {{
+                                            emp.status === 'ok' || emp.status === 'ignorado' || emp.status === 'erro'
+                                                ? '100%'
+                                                : emp.status === 'em_andamento'
+                                                    ? '…'
+                                                    : '0%'
+                                        }}
+                                    </span>
+                                    <span>{{ emp.titulos ?? 0 }} títulos</span>
+                                </div>
+                                <p
+                                    v-if="emp.error"
+                                    class="mt-1 text-xs text-red-600 dark:text-red-400 line-clamp-2"
+                                    :title="emp.error"
+                                >{{ emp.error }}</p>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-500">Atualiza a cada 8s enquanto o sync roda.</p>
+                    </div>
+                    <p v-else class="text-xs text-slate-500">
+                        Progresso por empresa aparece nos próximos ciclos (após o deploy desta melhoria).
+                    </p>
                 </div>
                 <p v-else class="text-sm text-slate-500">Nenhum sync em andamento no momento.</p>
             </div>
