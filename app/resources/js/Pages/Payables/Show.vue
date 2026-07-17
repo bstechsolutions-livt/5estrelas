@@ -648,9 +648,171 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                 @save-priority="submitPriority"
             />
 
-            <div :class="isMobile ? 'space-y-4' : (showSidebar) ? 'grid grid-cols-3 gap-6' : ''">
+            <!-- Aviso: está em borderô -->
+            <div v-if="inBordero" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <h3 class="text-sm font-semibold text-amber-700 mb-1 flex items-center gap-2">
+                    <i class="pi pi-list-check"></i>
+                    Em um borderô
+                    <i
+                        v-if="fieldOrigins?.bordero === 'hub'"
+                        class="pi pi-pencil text-[10px] text-blue-400"
+                        title="Borderô gerenciado na intranet Hub"
+                        aria-label="Borderô gerenciado na intranet Hub"
+                    />
+                </h3>
+                <p class="text-xs text-amber-600 mb-2">Este título faz parte de um borderô. O envio é feito pelo borderô; a aprovação segue o mesmo fluxo configurado (pode ser feita aqui ou no borderô).</p>
+                <Button label="Ver borderô" icon="pi pi-arrow-right" size="small" outlined class="w-full" @click="goToBordero" />
+            </div>
+
+            <!-- Ações do preparador (só se NÃO está em borderô) -->
+            <div v-if="canSendIndividual" class="bg-white rounded-xl border border-gray-100 p-4">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">Ações</h3>
+                <ApprovalFlowPreview :preview="approvalPreview" class="mb-3" />
+                <Button
+                    label="Enviar para Aprovação"
+                    icon="pi pi-send"
+                    class="w-full"
+                    dusk="btn-send-approval"
+                    :disabled="!canSubmitApproval"
+                    @click="sendForApproval"
+                />
+                <p v-if="approvalDeadlineBlocked && !canBypassApprovalDeadline" class="text-[11px] text-amber-600 text-center mt-2 flex items-center justify-center gap-1">
+                    <i class="pi pi-exclamation-triangle text-[10px]"></i>
+                    Vencimento antes do prazo de 72h (mín. {{ formatDate(minDueDateForApproval) }}). Aguarde ou solicite ao financeiro.
+                </p>
+                <label
+                    v-else-if="approvalDeadlineBlocked && canBypassApprovalDeadline"
+                    class="flex items-start gap-2 mt-2 text-[11px] text-amber-700 cursor-pointer"
+                >
+                    <input v-model="urgentBypass" type="checkbox" class="mt-0.5" dusk="urgent-approval-bypass" />
+                    <span>Enviar mesmo assim (urgência — fora do prazo de 72h)</span>
+                </label>
+                <p v-if="!hasDocuments" dusk="no-docs-hint" class="text-[11px] text-amber-600 text-center mt-2 flex items-center justify-center gap-1">
+                    <i class="pi pi-exclamation-triangle text-[10px]"></i> Anexe ao menos um documento para enviar.
+                </p>
+            </div>
+
+            <!-- Ações do aprovador (workflow multinível) -->
+            <div v-if="payable.status === 'aguardando_aprovacao' && approvalSteps?.length" class="bg-white rounded-xl border border-gray-100 p-4">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">Fluxo de Aprovação</h3>
+                <!-- Stepper visual -->
+                <div class="space-y-2 mb-4">
+                    <div v-for="step in approvalSteps" :key="step.id" class="flex items-start gap-2">
+                        <div class="mt-0.5">
+                            <i v-if="step.status === 'aprovado'" class="pi pi-check-circle text-green-500 text-sm"></i>
+                            <i v-else-if="step.status === 'reprovado'" class="pi pi-times-circle text-red-500 text-sm"></i>
+                            <i v-else-if="currentStep?.id === step.id" class="pi pi-circle-fill text-blue-500 text-sm"></i>
+                            <i v-else class="pi pi-circle text-gray-300 text-sm"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs font-medium" :class="step.status === 'aprovado' ? 'text-green-700' : step.status === 'reprovado' ? 'text-red-700' : currentStep?.id === step.id ? 'text-blue-700' : 'text-gray-500'">
+                                {{ stepDisplayName(step) }}
+                            </p>
+                            <p v-if="isDelegationActive(step)" class="text-[10px] text-amber-600">
+                                Delegado{{ step.delegation_expires_at ? ` até ${formatDate(step.delegation_expires_at)}` : '' }}
+                                <span v-if="step.delegation_set_by"> por {{ step.delegation_set_by.name }}</span>
+                            </p>
+                            <p v-if="step.resolver" class="text-[10px] text-gray-400">
+                                {{ step.status === 'aprovado' ? 'Aprovado' : 'Reprovado' }} por {{ step.resolver.name }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Botões de ação se o usuário pode aprovar o step atual -->
+                <div v-if="canApproveStep" class="space-y-2">
+                    <p class="text-xs text-blue-600 font-medium mb-2">Sua vez: {{ currentStep?.level_name }}</p>
+                    <Textarea
+                        v-model="approvalComment"
+                        placeholder="Comentário (opcional ao aprovar, vira o motivo ao reprovar)"
+                        rows="2"
+                        class="w-full"
+                        dusk="approval-comment"
+                    />
+                    <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="openApprove" />
+                    <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="openReject" />
+                    <p class="text-[10px] text-gray-400">O comentário aparece na timeline em <span class="text-green-600 font-medium">verde</span> se aprovar ou <span class="text-red-600 font-medium">vermelho</span> se reprovar.</p>
+                </div>
+                <div v-if="canDelegateStep" class="space-y-2 mt-3 pt-3 border-t border-gray-100">
+                    <p class="text-[11px] text-gray-500">Aprovador indisponível? Indique quem aprova temporariamente nesta etapa.</p>
+                    <Button
+                        :label="isDelegationActive(currentStep) ? 'Alterar substituto' : 'Delegar aprovação'"
+                        icon="pi pi-user-plus"
+                        severity="secondary"
+                        outlined
+                        class="w-full"
+                        size="small"
+                        @click="openDelegateDialog"
+                    />
+                    <Button
+                        v-if="isDelegationActive(currentStep)"
+                        label="Remover delegação"
+                        icon="pi pi-user-minus"
+                        severity="secondary"
+                        text
+                        class="w-full"
+                        size="small"
+                        @click="revokeDelegation"
+                    />
+                </div>
+            </div>
+
+            <!-- Aprovação antiga (fallback se não tem steps) -->
+            <div v-else-if="canApprove && !approvalSteps?.length" class="bg-white rounded-xl border border-gray-100 p-4">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">Aprovação</h3>
+                <div class="space-y-2">
+                    <Textarea
+                        v-model="approvalComment"
+                        placeholder="Comentário (opcional ao aprovar, vira o motivo ao reprovar)"
+                        rows="2"
+                        class="w-full"
+                    />
+                    <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="openApprove" />
+                    <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="openReject" />
+                </div>
+            </div>
+
+            <!-- Dialog de reprovação -->
+            <div v-if="showRejectDialog" class="bg-white rounded-xl border border-red-200 p-4">
+                <h3 class="text-sm font-semibold text-red-700 mb-2">Motivo da reprovação</h3>
+                <Textarea v-model="rejectForm.reason" placeholder="Justifique..." rows="3" class="w-full mb-2" />
+                <div class="flex gap-2">
+                    <Button label="Cancelar" severity="secondary" size="small" @click="showRejectDialog = false" class="flex-1" />
+                    <Button label="Confirmar" severity="danger" size="small" @click="reject" :disabled="!rejectForm.reason.trim()" class="flex-1" />
+                </div>
+            </div>
+
+            <!-- Timeline automática, próxima das ações de aprovação -->
+            <div class="bg-white rounded-xl border border-gray-100 p-4" dusk="payable-timeline">
+                <h3 class="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                    <i class="pi pi-history text-gray-400"></i>
+                    Timeline
+                </h3>
+                <p class="text-[10px] text-gray-400 mb-3">
+                    Histórico completo do título. Novas observações entram só ao aprovar ou reprovar.
+                </p>
+                <div class="space-y-3 max-h-80 overflow-y-auto">
+                    <div v-for="c in timelineEntries" :key="c.id" class="flex gap-2">
+                        <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-600">
+                            {{ c.user?.name?.charAt(0) || 'S' }}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs text-gray-500">
+                                <span class="font-medium text-gray-700">{{ c.user?.name || 'Sistema' }}</span>
+                                · {{ formatDateTime(c.created_at) }}
+                            </p>
+                            <p
+                                :class="['text-sm mt-0.5', c.type === 'rejection' ? 'text-red-600' : c.type === 'approval' ? 'text-green-600' : 'text-gray-700']"
+                                v-html="formatCommentBody(c.body)"
+                            ></p>
+                        </div>
+                    </div>
+                    <p v-if="!timelineEntries.length" class="text-sm text-gray-400">Nenhuma atividade no histórico.</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
                 <!-- Coluna principal -->
-                <div :class="isMobile ? '' : (showSidebar) ? 'col-span-2 space-y-4' : 'space-y-4'">
+                <div class="space-y-4">
                     <!-- Documentos -->
                     <div class="bg-white rounded-xl border border-gray-100 p-4">
                         <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -835,168 +997,6 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
 
                 <!-- Sidebar de ações -->
                 <div v-if="showSidebar" class="space-y-4">
-                    <!-- Aviso: está em borderô -->
-                    <div v-if="inBordero" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                        <h3 class="text-sm font-semibold text-amber-700 mb-1 flex items-center gap-2">
-                            <i class="pi pi-list-check"></i>
-                            Em um borderô
-                            <i
-                                v-if="fieldOrigins?.bordero === 'hub'"
-                                class="pi pi-pencil text-[10px] text-blue-400"
-                                title="Borderô gerenciado na intranet Hub"
-                                aria-label="Borderô gerenciado na intranet Hub"
-                            />
-                        </h3>
-                        <p class="text-xs text-amber-600 mb-2">Este título faz parte de um borderô. O envio é feito pelo borderô; a aprovação segue o mesmo fluxo configurado (pode ser feita aqui ou no borderô).</p>
-                        <Button label="Ver borderô" icon="pi pi-arrow-right" size="small" outlined class="w-full" @click="goToBordero" />
-                    </div>
-
-                    <!-- Ações do preparador (só se NÃO está em borderô) -->
-                    <div v-if="canSendIndividual" class="bg-white rounded-xl border border-gray-100 p-4">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Ações</h3>
-                        <ApprovalFlowPreview :preview="approvalPreview" class="mb-3" />
-                        <Button
-                            label="Enviar para Aprovação"
-                            icon="pi pi-send"
-                            class="w-full"
-                            dusk="btn-send-approval"
-                            :disabled="!canSubmitApproval"
-                            @click="sendForApproval"
-                        />
-                        <p v-if="approvalDeadlineBlocked && !canBypassApprovalDeadline" class="text-[11px] text-amber-600 text-center mt-2 flex items-center justify-center gap-1">
-                            <i class="pi pi-exclamation-triangle text-[10px]"></i>
-                            Vencimento antes do prazo de 72h (mín. {{ formatDate(minDueDateForApproval) }}). Aguarde ou solicite ao financeiro.
-                        </p>
-                        <label
-                            v-else-if="approvalDeadlineBlocked && canBypassApprovalDeadline"
-                            class="flex items-start gap-2 mt-2 text-[11px] text-amber-700 cursor-pointer"
-                        >
-                            <input v-model="urgentBypass" type="checkbox" class="mt-0.5" dusk="urgent-approval-bypass" />
-                            <span>Enviar mesmo assim (urgência — fora do prazo de 72h)</span>
-                        </label>
-                        <p v-if="!hasDocuments" dusk="no-docs-hint" class="text-[11px] text-amber-600 text-center mt-2 flex items-center justify-center gap-1">
-                            <i class="pi pi-exclamation-triangle text-[10px]"></i> Anexe ao menos um documento para enviar.
-                        </p>
-                    </div>
-
-                    <!-- Ações do aprovador (workflow multinível) -->
-                    <div v-if="payable.status === 'aguardando_aprovacao' && approvalSteps?.length" class="bg-white rounded-xl border border-gray-100 p-4">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Fluxo de Aprovação</h3>
-                        <!-- Stepper visual -->
-                        <div class="space-y-2 mb-4">
-                            <div v-for="step in approvalSteps" :key="step.id" class="flex items-start gap-2">
-                                <div class="mt-0.5">
-                                    <i v-if="step.status === 'aprovado'" class="pi pi-check-circle text-green-500 text-sm"></i>
-                                    <i v-else-if="step.status === 'reprovado'" class="pi pi-times-circle text-red-500 text-sm"></i>
-                                    <i v-else-if="currentStep?.id === step.id" class="pi pi-circle-fill text-blue-500 text-sm"></i>
-                                    <i v-else class="pi pi-circle text-gray-300 text-sm"></i>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <p class="text-xs font-medium" :class="step.status === 'aprovado' ? 'text-green-700' : step.status === 'reprovado' ? 'text-red-700' : currentStep?.id === step.id ? 'text-blue-700' : 'text-gray-500'">
-                                        {{ stepDisplayName(step) }}
-                                    </p>
-                                    <p v-if="isDelegationActive(step)" class="text-[10px] text-amber-600">
-                                        Delegado{{ step.delegation_expires_at ? ` até ${formatDate(step.delegation_expires_at)}` : '' }}
-                                        <span v-if="step.delegation_set_by"> por {{ step.delegation_set_by.name }}</span>
-                                    </p>
-                                    <p v-if="step.resolver" class="text-[10px] text-gray-400">
-                                        {{ step.status === 'aprovado' ? 'Aprovado' : 'Reprovado' }} por {{ step.resolver.name }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Botões de ação se o usuário pode aprovar o step atual -->
-                        <div v-if="canApproveStep" class="space-y-2">
-                            <p class="text-xs text-blue-600 font-medium mb-2">Sua vez: {{ currentStep?.level_name }}</p>
-                            <Textarea
-                                v-model="approvalComment"
-                                placeholder="Comentário (opcional ao aprovar, vira o motivo ao reprovar)"
-                                rows="2"
-                                class="w-full"
-                                dusk="approval-comment"
-                            />
-                            <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="openApprove" />
-                            <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="openReject" />
-                            <p class="text-[10px] text-gray-400">O comentário aparece na timeline em <span class="text-green-600 font-medium">verde</span> se aprovar ou <span class="text-red-600 font-medium">vermelho</span> se reprovar.</p>
-                        </div>
-                        <div v-if="canDelegateStep" class="space-y-2 mt-3 pt-3 border-t border-gray-100">
-                            <p class="text-[11px] text-gray-500">Aprovador indisponível? Indique quem aprova temporariamente nesta etapa.</p>
-                            <Button
-                                :label="isDelegationActive(currentStep) ? 'Alterar substituto' : 'Delegar aprovação'"
-                                icon="pi pi-user-plus"
-                                severity="secondary"
-                                outlined
-                                class="w-full"
-                                size="small"
-                                @click="openDelegateDialog"
-                            />
-                            <Button
-                                v-if="isDelegationActive(currentStep)"
-                                label="Remover delegação"
-                                icon="pi pi-user-minus"
-                                severity="secondary"
-                                text
-                                class="w-full"
-                                size="small"
-                                @click="revokeDelegation"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Aprovação antiga (fallback se não tem steps) -->
-                    <div v-else-if="canApprove && !approvalSteps?.length" class="bg-white rounded-xl border border-gray-100 p-4">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Aprovação</h3>
-                        <div class="space-y-2">
-                            <Textarea
-                                v-model="approvalComment"
-                                placeholder="Comentário (opcional ao aprovar, vira o motivo ao reprovar)"
-                                rows="2"
-                                class="w-full"
-                            />
-                            <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="openApprove" />
-                            <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="openReject" />
-                        </div>
-                    </div>
-
-                    <!-- Dialog de reprovação -->
-                    <div v-if="showRejectDialog" class="bg-white rounded-xl border border-red-200 p-4">
-                        <h3 class="text-sm font-semibold text-red-700 mb-2">Motivo da reprovação</h3>
-                        <Textarea v-model="rejectForm.reason" placeholder="Justifique..." rows="3" class="w-full mb-2" />
-                        <div class="flex gap-2">
-                            <Button label="Cancelar" severity="secondary" size="small" @click="showRejectDialog = false" class="flex-1" />
-                            <Button label="Confirmar" severity="danger" size="small" @click="reject" :disabled="!rejectForm.reason.trim()" class="flex-1" />
-                        </div>
-                    </div>
-
-                    <!-- Timeline automática, próxima das ações de aprovação -->
-                    <div class="bg-white rounded-xl border border-gray-100 p-4" dusk="payable-timeline">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                            <i class="pi pi-history text-gray-400"></i>
-                            Timeline
-                        </h3>
-                        <p class="text-[10px] text-gray-400 mb-3">
-                            Histórico completo do título. Novas observações entram só ao aprovar ou reprovar.
-                        </p>
-                        <div class="space-y-3 max-h-80 overflow-y-auto">
-                            <div v-for="c in timelineEntries" :key="c.id" class="flex gap-2">
-                                <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-600">
-                                    {{ c.user?.name?.charAt(0) || 'S' }}
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <p class="text-xs text-gray-500">
-                                        <span class="font-medium text-gray-700">{{ c.user?.name || 'Sistema' }}</span>
-                                        · {{ formatDateTime(c.created_at) }}
-                                    </p>
-                                    <p
-                                        :class="['text-sm mt-0.5', c.type === 'rejection' ? 'text-red-600' : c.type === 'approval' ? 'text-green-600' : 'text-gray-700']"
-                                        v-html="formatCommentBody(c.body)"
-                                    ></p>
-                                </div>
-                            </div>
-                            <p v-if="!timelineEntries.length" class="text-sm text-gray-400">Nenhuma atividade no histórico.</p>
-                        </div>
-                    </div>
-
                     <!-- Ação: registrar pagamento (governada pela alçada) -->
                     <div v-if="canPay" class="bg-white rounded-xl border border-gray-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Pagamento</h3>
