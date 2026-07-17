@@ -373,9 +373,7 @@ const canPrepare = ['pendente', 'em_preparacao'].includes(props.payable.status)
 const inBordero = !!props.payable.bordero_id
 const canSendIndividual = canPrepare && !inBordero
 const canApprove = props.payable.status === 'aguardando_aprovacao' && !inBordero && !props.approvalSteps?.length
-const timelineEntries = computed(() =>
-    (props.payable.comments || []).filter(comment => comment.type !== 'comment'),
-)
+const timelineEntries = computed(() => props.payable.comments || [])
 
 // Trava (feedback do cliente): não envia pra aprovação sem ao menos 1 documento.
 const hasDocuments = computed(() => (props.payable.documents?.length || 0) > 0)
@@ -977,7 +975,7 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                             Timeline
                         </h3>
                         <p class="text-[10px] text-gray-400 mb-3">
-                            Histórico automático. Observações são registradas somente ao aprovar ou reprovar.
+                            Histórico completo do título. Novas observações entram só ao aprovar ou reprovar.
                         </p>
                         <div class="space-y-3 max-h-80 overflow-y-auto">
                             <div v-for="c in timelineEntries" :key="c.id" class="flex gap-2">
@@ -995,7 +993,7 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                                     ></p>
                                 </div>
                             </div>
-                            <p v-if="!timelineEntries.length" class="text-sm text-gray-400">Nenhuma atividade automática.</p>
+                            <p v-if="!timelineEntries.length" class="text-sm text-gray-400">Nenhuma atividade no histórico.</p>
                         </div>
                     </div>
 

@@ -37,13 +37,13 @@ class PayableTimelineTest extends TestCase
         ]);
     }
 
-    public function test_show_exibe_apenas_atividades_automaticas_e_decisoes(): void
+    public function test_show_exibe_historico_completo_incluindo_observacoes_antigas(): void
     {
         $user = $this->activeAdmin();
         $payable = $this->payable();
 
         foreach ([
-            ['body' => 'Comentário manual antigo', 'type' => 'comment'],
+            ['body' => 'Chave Pix: 11999999999', 'type' => 'comment'],
             ['body' => 'Enviado para aprovação', 'type' => 'status_change'],
             ['body' => 'Aprovado com observação', 'type' => 'approval'],
             ['body' => 'Reprovado por divergência', 'type' => 'rejection'],
@@ -59,10 +59,12 @@ class PayableTimelineTest extends TestCase
             ->get("/financeiro/contas-pagar/{$payable->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('payable.comments', 3)
-                ->where('payable.comments.0.type', 'status_change')
-                ->where('payable.comments.1.type', 'approval')
-                ->where('payable.comments.2.type', 'rejection')
+                ->has('payable.comments', 4)
+                ->where('payable.comments.0.body', 'Chave Pix: 11999999999')
+                ->where('payable.comments.0.type', 'comment')
+                ->where('payable.comments.1.type', 'status_change')
+                ->where('payable.comments.2.type', 'approval')
+                ->where('payable.comments.3.type', 'rejection')
                 ->missing('mentionableUsers'));
     }
 

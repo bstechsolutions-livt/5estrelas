@@ -688,9 +688,7 @@ class PayableController extends Controller
             'conciliator:id,name',
             'prioritySetter:id,name',
             'documents.uploader:id,name',
-            'comments' => fn ($query) => $query
-                ->where('type', '<>', 'comment')
-                ->with('user:id,name,avatar_path'),
+            'comments.user:id,name,avatar_path',
             'allocationLines',
             'allocationImporter:id,name',
         ]);
