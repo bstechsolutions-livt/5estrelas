@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\ApprovalStep;
 use App\Models\ApprovalTrail;
 use App\Models\Bordero;
+use App\Models\BorderoDocument;
 use App\Models\Department;
 use App\Models\Notification;
 use App\Models\Payable;
@@ -13,6 +14,7 @@ use App\Models\PayableDocument;
 use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -32,6 +34,7 @@ class BorderoApprovalWorkflowTest extends TestCase
     {
         parent::setUp();
         Storage::fake('local');
+        Storage::fake('public');
 
         $this->gestorDept = User::factory()->create(['name' => 'Gestor Compras', 'is_active' => true]);
         $this->gestorDept->permissions()->attach(
@@ -124,7 +127,7 @@ class BorderoApprovalWorkflowTest extends TestCase
         return $payable;
     }
 
-    private function borderoPendente(array $payableIds): Bordero
+    private function borderoPendente(array $payableIds, bool $withDocument = true): Bordero
     {
         $bordero = Bordero::create([
             'number' => Bordero::generateNumber(),
@@ -135,7 +138,76 @@ class BorderoApprovalWorkflowTest extends TestCase
         Payable::whereIn('id', $payableIds)->update(['bordero_id' => $bordero->id]);
         $bordero->recalculate();
 
+        if ($withDocument) {
+            BorderoDocument::create([
+                'bordero_id' => $bordero->id,
+                'uploaded_by' => $this->sender->id,
+                'name' => 'documento-bordero.pdf',
+                'path' => "borderos/{$bordero->id}/documento-bordero.pdf",
+                'mime_type' => 'application/pdf',
+                'size' => 100,
+            ]);
+        }
+
         return $bordero;
+    }
+
+    public function test_anexo_do_bordero_substitui_exigencia_de_documento_por_titulo(): void
+    {
+        $payable = Payable::create([
+            'title_number' => 'BOR-SEM-DOC',
+            'supplier_name' => 'Fornecedor Borderô',
+            'amount' => 1500.00,
+            'due_date' => now()->addDays(5)->toDateString(),
+            'status' => 'pendente',
+            'department_id' => $this->department->id,
+        ]);
+        $bordero = $this->borderoPendente([$payable->id]);
+
+        $response = $this->actingAs($this->sender)
+            ->post("/financeiro/borderos/{$bordero->id}/enviar-aprovacao");
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+        $this->assertSame('aguardando_aprovacao', $bordero->fresh()->status);
+        $this->assertSame(0, $payable->documents()->count());
+    }
+
+    public function test_bordero_sem_anexo_nao_pode_ser_enviado(): void
+    {
+        $payable = $this->payableComDocumento();
+        $bordero = $this->borderoPendente([$payable->id], false);
+
+        $response = $this->actingAs($this->sender)
+            ->post("/financeiro/borderos/{$bordero->id}/enviar-aprovacao");
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error', 'Anexe ao menos um documento ao borderô antes de enviar.');
+        $this->assertSame('pendente', $bordero->fresh()->status);
+    }
+
+    public function test_usuario_preparador_pode_adicionar_e_remover_anexo_do_bordero(): void
+    {
+        $payable = $this->payableComDocumento();
+        $bordero = $this->borderoPendente([$payable->id], false);
+
+        $response = $this->actingAs($this->sender)->post(
+            "/financeiro/borderos/{$bordero->id}/documentos",
+            ['files' => [UploadedFile::fake()->create('nota-fiscal.pdf', 50, 'application/pdf')]]
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+        $document = BorderoDocument::where('bordero_id', $bordero->id)->firstOrFail();
+        Storage::disk('public')->assertExists($document->path);
+
+        $response = $this->actingAs($this->sender)->delete(
+            "/financeiro/borderos/{$bordero->id}/documentos/{$document->id}"
+        );
+
+        $response->assertRedirect();
+        $this->assertDatabaseMissing('bordero_documents', ['id' => $document->id]);
+        Storage::disk('public')->assertMissing($document->path);
     }
 
     public function test_enviar_bordero_cria_steps_de_aprovacao_para_cada_titulo(): void

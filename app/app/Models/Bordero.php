@@ -66,6 +66,11 @@ class Bordero extends Model
         return $this->hasMany(Payable::class);
     }
 
+    public function documents(): HasMany
+    {
+        return $this->hasMany(BorderoDocument::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
