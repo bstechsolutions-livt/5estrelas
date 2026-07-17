@@ -76,13 +76,17 @@ class PayableDepartmentClassifier
             ->values()
             ->all();
 
-        $query->where(function (Builder $q) use ($department, $launcherCodUsus) {
-            $q->where('department_id', $department->id);
+        // Colunas qualificadas: joins (ex.: ordenação por aprovador junta users,
+        // que também tem department_id/senior_cod_usu) tornam a referência ambígua.
+        $table = $query->getModel()->getTable();
+
+        $query->where(function (Builder $q) use ($table, $department, $launcherCodUsus) {
+            $q->where("{$table}.department_id", $department->id);
 
             if ($launcherCodUsus !== []) {
-                $q->orWhere(function (Builder $inner) use ($launcherCodUsus) {
-                    $inner->whereNull('department_id')
-                        ->whereIn('senior_cod_usu', $launcherCodUsus);
+                $q->orWhere(function (Builder $inner) use ($table, $launcherCodUsus) {
+                    $inner->whereNull("{$table}.department_id")
+                        ->whereIn("{$table}.senior_cod_usu", $launcherCodUsus);
                 });
             }
         });
