@@ -18,7 +18,10 @@ class PayablePagamentoTest extends TestCase
     use RefreshDatabase;
 
     /** Usuário ativo com as permissões dadas (default: ver contas a pagar). */
-    private function activeUser(array $keys = ['financeiro.contas_pagar.visualizar']): User
+    private function activeUser(array $keys = [
+        'financeiro.contas_pagar.visualizar',
+        'financeiro.contas_pagar.ver_todas_filiais',
+    ]): User
     {
         $user = User::factory()->create(['is_active' => true]);
         foreach ($keys as $key) {

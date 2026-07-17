@@ -226,6 +226,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/apelido', [PayableController::class, 'updateNickname'])->whereNumber('id')->name('payables.nickname');
         Route::post('/{id}/comentarios', [PayableController::class, 'addComment'])->name('payables.comment');
         Route::post('/{id}/documentos', [PayableController::class, 'addDocument'])->name('payables.document');
+        Route::post('/{id}/comprovante-pagamento', [PayableController::class, 'updatePaymentReceipt'])
+            ->middleware('permission:financeiro.contas_pagar.preparar')
+            ->whereNumber('id')
+            ->name('payables.payment-receipt.update');
+        Route::delete('/{id}/comprovante-pagamento', [PayableController::class, 'removePaymentReceipt'])
+            ->middleware('permission:financeiro.contas_pagar.preparar')
+            ->whereNumber('id')
+            ->name('payables.payment-receipt.remove');
         Route::post('/{id}/rateio/importar', [PayableController::class, 'importAllocations'])->whereNumber('id')->name('payables.allocation.import');
         Route::delete('/{payableId}/documentos/{docId}', [PayableController::class, 'removeDocument'])->name('payables.document.remove');
         Route::post('/{id}/vencimento', [PayableController::class, 'updateDueDate'])->whereNumber('id')->name('payables.due_date');

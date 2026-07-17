@@ -19,7 +19,10 @@ class PayableDocumentoTipoTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function activeUser(array $keys = ['financeiro.contas_pagar.visualizar']): User
+    private function activeUser(array $keys = [
+        'financeiro.contas_pagar.visualizar',
+        'financeiro.contas_pagar.ver_todas_filiais',
+    ]): User
     {
         $user = User::factory()->create(['is_active' => true]);
         foreach ($keys as $key) {

@@ -12,7 +12,9 @@ import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import DatePicker from 'primevue/datepicker'
 import Toast from 'primevue/toast'
+import ConfirmDialog from 'primevue/confirmdialog'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import BottomSheet from '@/Components/Mobile/BottomSheet.vue'
 import { useDevice } from '@/composables/useDevice'
 import PayableDocumentPreviewCard from '@/Components/Financeiro/PayableDocumentPreviewCard.vue'
@@ -37,6 +39,7 @@ const props = defineProps({
     canFinalSign: { type: Boolean, default: false },
     canEditDueDate: { type: Boolean, default: false },
     canManagePriority: { type: Boolean, default: false },
+    canManagePaymentReceipt: { type: Boolean, default: false },
     requiresPriorityOnApprove: { type: Boolean, default: false },
     priorityLabels: { type: Object, default: () => ({}) },
     priorityColors: { type: Object, default: () => ({}) },
@@ -74,6 +77,7 @@ function setDocsViewMode(mode) {
 const page = usePage()
 const authUser = page.props.auth?.user
 const toast = useToast()
+const confirm = useConfirm()
 
 const commentForm = useForm({ body: '' })
 const showRejectDialog = ref(false)
@@ -274,12 +278,41 @@ function uploadDoc(event, type = 'outro') {
     })
 }
 
+function uploadPaymentReceipt(event) {
+    const file = event.files?.[0]
+    if (!file) return
+
+    const formData = new FormData()
+    formData.append('file', file)
+    router.post(`/financeiro/contas-pagar/${props.payable.id}/comprovante-pagamento`, formData, {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => markBorderoStale(),
+    })
+}
+
+function confirmRemovePaymentReceipt() {
+    confirm.require({
+        message: 'Remover o comprovante de pagamento deste título? O arquivo será excluído.',
+        header: 'Remover comprovante',
+        icon: 'pi pi-exclamation-triangle',
+        rejectProps: { label: 'Cancelar', severity: 'secondary', outlined: true },
+        acceptProps: { label: 'Remover', severity: 'danger' },
+        accept: () => {
+            router.delete(`/financeiro/contas-pagar/${props.payable.id}/comprovante-pagamento`, {
+                preserveScroll: true,
+                onSuccess: () => markBorderoStale(),
+            })
+        },
+    })
+}
+
 // Tipos de documento (feedback do cliente): lista separada por tipo.
 const DOC_TYPES = [
     { key: 'nota_fiscal', label: 'Notas Fiscais', icon: 'pi-file-edit' },
     { key: 'boleto', label: 'Boletos', icon: 'pi-money-bill' },
     { key: 'relatorio', label: 'Relatórios', icon: 'pi-chart-bar' },
-    { key: 'comprovacao', label: 'Comprovações', icon: 'pi-check-circle' },
+    { key: 'comprovacao', label: 'Comprovante de pagamento', icon: 'pi-check-circle' },
     { key: 'outro', label: 'Outros', icon: 'pi-file' },
 ]
 const KNOWN_DOC_TYPES = ['nota_fiscal', 'boleto', 'relatorio', 'comprovacao']
@@ -550,6 +583,7 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
 <template>
     <component :is="isMobile ? AppLayoutMobile : AppLayout" :title="isMobile ? 'Detalhe' : undefined" :show-back="isMobile">
         <Toast />
+        <ConfirmDialog />
         <div :class="isMobile ? 'px-4 py-3 pb-20' : 'max-w-5xl mx-auto'">
             <!-- Header -->
             <div class="flex items-start justify-between mb-6">
@@ -712,7 +746,7 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                         </div>
                         <p v-if="!payable.documents?.length" class="text-sm text-gray-400 mb-4">Nenhum documento anexado.</p>
                         <div class="space-y-3">
-                            <div v-for="t in DOC_TYPES" :key="t.key" v-show="canPrepare || docsByType(t.key).length"
+                            <div v-for="t in DOC_TYPES" :key="t.key" v-show="canPrepare || (t.key === 'comprovacao' && canManagePaymentReceipt) || docsByType(t.key).length"
                                 :dusk="`doc-section-${t.key}`" class="border border-gray-100 rounded-lg p-3">
                                 <h4 class="text-xs font-semibold text-gray-600 flex items-center gap-1.5 mb-2">
                                     <i :class="['pi', t.icon, 'text-gray-400']"></i> {{ t.label }}
@@ -740,7 +774,12 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                                                 class="text-gray-400 hover:text-blue-600 p-1.5 cursor-pointer" title="Baixar">
                                                 <i class="pi pi-download"></i>
                                             </a>
-                                            <button v-if="canPrepare" @click="removeDoc(doc.id)" class="text-red-400 hover:text-red-600 p-1.5 cursor-pointer" title="Remover">
+                                            <button
+                                                v-if="t.key === 'comprovacao' ? canManagePaymentReceipt : canPrepare"
+                                                @click="t.key === 'comprovacao' ? confirmRemovePaymentReceipt() : removeDoc(doc.id)"
+                                                class="text-red-400 hover:text-red-600 p-1.5 cursor-pointer"
+                                                title="Remover"
+                                            >
                                                 <i class="pi pi-trash"></i>
                                             </button>
                                         </div>
@@ -754,20 +793,34 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                                         :key="doc.id"
                                         :doc="doc"
                                         :type-label="t.label.replace(/s$/, '')"
-                                        :can-remove="canPrepare"
+                                        :can-remove="t.key === 'comprovacao' ? canManagePaymentReceipt : canPrepare"
                                         @open="openViewer"
-                                        @remove="removeDoc"
+                                        @remove="(id) => t.key === 'comprovacao' ? confirmRemovePaymentReceipt() : removeDoc(id)"
                                     />
                                 </div>
 
                                 <p v-else-if="!docsByType(t.key).length" class="text-[11px] text-gray-400 mb-2">Nenhum anexo deste tipo.</p>
-                                <FileUpload v-if="canPrepare" mode="basic" multiple :auto="true" :choose-label="`Anexar ${t.label}`"
+                                <FileUpload
+                                    v-if="t.key === 'comprovacao' && canManagePaymentReceipt"
+                                    mode="basic"
+                                    :auto="true"
+                                    :choose-label="docsByType('comprovacao').length ? 'Substituir comprovante' : 'Adicionar comprovante'"
+                                    :max-file-size="maxDocumentBytes"
+                                    @select="uploadPaymentReceipt"
+                                    class="w-full"
+                                    dusk="payment-receipt-upload"
+                                    invalid-file-size-message="O arquivo é muito grande. O tamanho máximo permitido é {1}."
+                                />
+                                <FileUpload v-else-if="canPrepare && t.key !== 'comprovacao'" mode="basic" multiple :auto="true" :choose-label="`Anexar ${t.label}`"
                                     :max-file-size="maxDocumentBytes" @select="(e) => uploadDoc(e, t.key)" class="w-full"
                                     invalid-file-size-message="O arquivo é muito grande. O tamanho máximo permitido é {1}." />
-                                <p v-if="canPrepare" class="text-[11px] text-gray-400 mt-1">Ctrl ou Shift para selecionar vários arquivos de uma vez.</p>
+                                <p v-if="t.key === 'comprovacao' && canManagePaymentReceipt" class="text-[11px] text-gray-400 mt-1">
+                                    Disponível em qualquer status. Um novo arquivo substitui o comprovante atual.
+                                </p>
+                                <p v-else-if="canPrepare && t.key !== 'comprovacao'" class="text-[11px] text-gray-400 mt-1">Ctrl ou Shift para selecionar vários arquivos de uma vez.</p>
                             </div>
                         </div>
-                        <p v-if="canPrepare" class="text-[11px] text-gray-400 mt-2 text-center">Tamanho máximo por arquivo: {{ maxDocumentMb }} MB.</p>
+                        <p v-if="canPrepare || canManagePaymentReceipt" class="text-[11px] text-gray-400 mt-2 text-center">Tamanho máximo por arquivo: {{ maxDocumentMb }} MB.</p>
                     </div>
 
                     <!-- Rateio (planilha) -->
