@@ -421,6 +421,7 @@ class Payable extends Model
             'ctafin' => 'senior',
             'department_nome' => 'hub',
             'description' => 'senior',
+            'launcher_nome' => 'senior',
             'payment_priority' => 'hub',
             'payment_sla_date' => 'hub',
             'documents' => 'hub',
@@ -428,6 +429,51 @@ class Payable extends Model
             'status' => 'hub',
             'bordero' => 'hub',
         ];
+    }
+
+    /**
+     * Nome de quem lançou o título na Senior (UsuGer → payables.senior_cod_usu → users.senior_cod_usu).
+     * Sem usuário intranet mapeado: label com o código Senior.
+     *
+     * @param iterable<Payable> $payables
+     */
+    public static function attachLauncherNome(iterable $payables): void
+    {
+        $items = collect($payables);
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $cods = $items
+            ->map(fn (Payable $p) => (int) ($p->senior_cod_usu ?? 0))
+            ->filter(fn (int $c) => $c > 0)
+            ->unique()
+            ->values();
+
+        $usersByCod = $cods->isEmpty()
+            ? collect()
+            : User::query()
+                ->whereIn('senior_cod_usu', $cods->all())
+                ->get(['id', 'name', 'senior_cod_usu'])
+                ->groupBy(fn (User $u) => (int) $u->senior_cod_usu)
+                ->map(fn ($group) => $group->first());
+
+        foreach ($items as $p) {
+            $cod = (int) ($p->senior_cod_usu ?? 0);
+            if ($cod <= 0) {
+                $p->setAttribute('launcher_nome', null);
+                $p->setAttribute('launcher_label', null);
+
+                continue;
+            }
+
+            $nome = $usersByCod->get($cod)?->name;
+            $p->setAttribute('launcher_nome', $nome);
+            $p->setAttribute(
+                'launcher_label',
+                $nome ?: "Usuário Senior #{$cod}",
+            );
+        }
     }
 
     public static function attachFieldOrigins(Payable $payable): void
