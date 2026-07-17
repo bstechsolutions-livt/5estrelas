@@ -43,7 +43,6 @@ const props = defineProps({
     requiresPriorityOnApprove: { type: Boolean, default: false },
     priorityLabels: { type: Object, default: () => ({}) },
     priorityColors: { type: Object, default: () => ({}) },
-    mentionableUsers: { type: Array, default: () => [] },
     approvalPreview: { type: Object, default: () => ({ ok: false, errors: [], steps: [] }) },
     canImportAllocations: { type: Boolean, default: false },
     canBypassApprovalDeadline: { type: Boolean, default: false },
@@ -79,7 +78,6 @@ const authUser = page.props.auth?.user
 const toast = useToast()
 const confirm = useConfirm()
 
-const commentForm = useForm({ body: '' })
 const showRejectDialog = ref(false)
 const rejectForm = useForm({ reason: '' })
 const approvalComment = ref('')
@@ -137,74 +135,6 @@ function revokeDelegation() {
     router.delete(`/financeiro/contas-pagar/${props.payable.id}/delegar-etapa`, {
         data: { step_id: props.currentStep.id },
         preserveScroll: true,
-    })
-}
-
-// ── @Mention autocomplete ──
-const mentionQuery = ref('')
-const mentionActive = ref(false)
-const mentionedUsers = ref([]) // lista de {id, name} já mencionados
-const mentionResults = computed(() => {
-    if (!mentionQuery.value || !mentionActive.value) return []
-    const q = mentionQuery.value.toLowerCase()
-    const alreadyIds = new Set(mentionedUsers.value.map(u => u.id))
-    return (props.mentionableUsers || [])
-        .filter(u => u.name.toLowerCase().includes(q) && !alreadyIds.has(u.id))
-        .slice(0, 8)
-})
-const commentInput = ref(null)
-
-function onCommentInput(e) {
-    const val = commentForm.body
-    const cursorPos = e.target?.selectionStart || val.length
-    const textBefore = val.substring(0, cursorPos)
-    const atMatch = textBefore.match(/@([^\s@]*)$/)
-    if (atMatch) {
-        mentionQuery.value = atMatch[1]
-        mentionActive.value = true
-    } else {
-        mentionActive.value = false
-        mentionQuery.value = ''
-    }
-}
-
-function insertMention(user) {
-    // Remove o @query do texto
-    const val = commentForm.body
-    const atIdx = val.lastIndexOf('@' + mentionQuery.value)
-    if (atIdx >= 0) {
-        const before = val.substring(0, atIdx)
-        const after = val.substring(atIdx + 1 + mentionQuery.value.length)
-        commentForm.body = (before + after).trim()
-    }
-    // Adiciona ao array de mencionados (badge)
-    if (!mentionedUsers.value.find(u => u.id === user.id)) {
-        mentionedUsers.value.push({ id: user.id, name: user.name })
-    }
-    mentionActive.value = false
-    mentionQuery.value = ''
-}
-
-function removeMention(userId) {
-    mentionedUsers.value = mentionedUsers.value.filter(u => u.id !== userId)
-}
-
-function submitComment() {
-    // Monta o body incluindo as menções no formato @[Nome](id:N) no final
-    let body = commentForm.body.trim()
-    if (mentionedUsers.value.length > 0) {
-        const mentionTags = mentionedUsers.value.map(u => `@[${u.name}](id:${u.id})`).join(' ')
-        body = body ? `${body} ${mentionTags}` : mentionTags
-    }
-    if (!body) return
-
-    const form = useForm({ body })
-    form.post(`/financeiro/contas-pagar/${props.payable.id}/comentarios`, {
-        preserveScroll: true,
-        onSuccess: () => {
-            commentForm.reset()
-            mentionedUsers.value = []
-        },
     })
 }
 
@@ -434,6 +364,9 @@ const canPrepare = ['pendente', 'em_preparacao'].includes(props.payable.status)
 const inBordero = !!props.payable.bordero_id
 const canSendIndividual = canPrepare && !inBordero
 const canApprove = props.payable.status === 'aguardando_aprovacao' && !inBordero && !props.approvalSteps?.length
+const timelineEntries = computed(() =>
+    (props.payable.comments || []).filter(comment => comment.type !== 'comment'),
+)
 
 // Trava (feedback do cliente): não envia pra aprovação sem ao menos 1 documento.
 const hasDocuments = computed(() => (props.payable.documents?.length || 0) > 0)
@@ -465,6 +398,7 @@ const canSubmitApproval = computed(() =>
 // Sidebar de ações aparece quando há qualquer ação/condição lateral a mostrar.
 const showSidebar = computed(() =>
     canSendIndividual || canApprove || inBordero || showRejectDialog.value ||
+    props.approvalSteps?.length || timelineEntries.value.length ||
     props.canPay || isAwaitingConciliation.value ||
     (props.payable.status === 'aprovado' && !props.pagadorConfigured) ||
     props.canConciliate ||
@@ -895,64 +829,6 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                         </div>
                     </div>
 
-                    <!-- Timeline/Comentários -->
-                    <div class="bg-white rounded-xl border border-gray-100 p-4">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-                            Timeline
-                            <i
-                                v-if="fieldOrigins?.comments === 'hub'"
-                                class="pi pi-pencil text-[10px] text-blue-400"
-                                title="Comentários e atividades da intranet Hub"
-                                aria-label="Comentários e atividades da intranet Hub"
-                            />
-                        </h3>
-                        <div class="space-y-3 mb-4 max-h-80 overflow-y-auto">
-                            <div v-for="c in payable.comments" :key="c.id" class="flex gap-2">
-                                <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-600">
-                                    {{ c.user?.name?.charAt(0) || 'S' }}
-                                </div>
-                                <div class="flex-1">
-                                    <p class="text-xs text-gray-500">
-                                        <span class="font-medium text-gray-700">{{ c.user?.name || 'Sistema' }}</span>
-                                        · {{ formatDateTime(c.created_at) }}
-                                    </p>
-                                    <p :class="['text-sm mt-0.5', c.type === 'rejection' ? 'text-red-600' : c.type === 'approval' ? 'text-green-600' : 'text-gray-700']" v-html="formatCommentBody(c.body)">
-                                    </p>
-                                </div>
-                            </div>
-                            <p v-if="!payable.comments?.length" class="text-sm text-gray-400">Nenhuma atividade.</p>
-                        </div>
-
-                        <!-- Form de comentário com @mention -->
-                        <form @submit.prevent="submitComment" class="relative">
-                            <!-- Badges dos mencionados -->
-                            <div v-if="mentionedUsers.length" class="flex flex-wrap gap-1.5 mb-2">
-                                <span v-for="u in mentionedUsers" :key="u.id" class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                                    @{{ u.name }}
-                                    <button type="button" @click="removeMention(u.id)" class="text-blue-500 hover:text-blue-800 ml-0.5 cursor-pointer">
-                                        <i class="pi pi-times text-[9px]"></i>
-                                    </button>
-                                </span>
-                            </div>
-                            <div class="flex gap-2">
-                                <div class="flex-1 relative">
-                                    <Textarea v-model="commentForm.body" placeholder="Escreva um comentário... Use @ para mencionar" rows="2" class="w-full" @input="onCommentInput" ref="commentInput" />
-                                    <!-- @Mention autocomplete popup -->
-                                    <div v-if="mentionActive && mentionResults.length" class="absolute bottom-full left-0 mb-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-50">
-                                        <div v-for="u in mentionResults" :key="u.id" @click="insertMention(u)" class="px-3 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2">
-                                            <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-600">{{ u.name.charAt(0) }}</div>
-                                            <div>
-                                                <p class="text-sm font-medium text-gray-800">{{ u.name }}</p>
-                                                <p class="text-[10px] text-gray-400">{{ u.email }}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <Button type="submit" icon="pi pi-send" :loading="commentForm.processing" :disabled="!commentForm.body.trim() && !mentionedUsers.length" />
-                            </div>
-                            <p class="text-[10px] text-gray-400 mt-1">Use <strong>@nome</strong> para mencionar alguém e notificá-lo.</p>
-                        </form>
-                    </div>
                 </div>
 
                 <!-- Sidebar de ações -->
@@ -1087,6 +963,35 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                         <div class="flex gap-2">
                             <Button label="Cancelar" severity="secondary" size="small" @click="showRejectDialog = false" class="flex-1" />
                             <Button label="Confirmar" severity="danger" size="small" @click="reject" :disabled="!rejectForm.reason.trim()" class="flex-1" />
+                        </div>
+                    </div>
+
+                    <!-- Timeline automática, próxima das ações de aprovação -->
+                    <div class="bg-white rounded-xl border border-gray-100 p-4" dusk="payable-timeline">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                            <i class="pi pi-history text-gray-400"></i>
+                            Timeline
+                        </h3>
+                        <p class="text-[10px] text-gray-400 mb-3">
+                            Histórico automático. Observações são registradas somente ao aprovar ou reprovar.
+                        </p>
+                        <div class="space-y-3 max-h-80 overflow-y-auto">
+                            <div v-for="c in timelineEntries" :key="c.id" class="flex gap-2">
+                                <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-600">
+                                    {{ c.user?.name?.charAt(0) || 'S' }}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs text-gray-500">
+                                        <span class="font-medium text-gray-700">{{ c.user?.name || 'Sistema' }}</span>
+                                        · {{ formatDateTime(c.created_at) }}
+                                    </p>
+                                    <p
+                                        :class="['text-sm mt-0.5', c.type === 'rejection' ? 'text-red-600' : c.type === 'approval' ? 'text-green-600' : 'text-gray-700']"
+                                        v-html="formatCommentBody(c.body)"
+                                    ></p>
+                                </div>
+                            </div>
+                            <p v-if="!timelineEntries.length" class="text-sm text-gray-400">Nenhuma atividade automática.</p>
                         </div>
                     </div>
 
