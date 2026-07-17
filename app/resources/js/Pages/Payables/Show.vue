@@ -18,6 +18,8 @@ import { useConfirm } from 'primevue/useconfirm'
 import BottomSheet from '@/Components/Mobile/BottomSheet.vue'
 import { useDevice } from '@/composables/useDevice'
 import PayableDocumentPreviewCard from '@/Components/Financeiro/PayableDocumentPreviewCard.vue'
+import DocumentViewerDialog from '@/Components/Financeiro/DocumentViewerDialog.vue'
+import PayableDetailsOverview from '@/Components/Financeiro/PayableDetailsOverview.vue'
 import PayableFieldOriginLabel from '@/Components/Financeiro/PayableFieldOriginLabel.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import { formatApiDate, parseApiDate } from '@/utils/apiDate'
@@ -450,14 +452,12 @@ function isImage(doc) {
 
 // ── A2: visualizador de anexo inline (feedback do cliente: abrir na mesma
 // página, não em outra aba, com opção de voltar). ──
-const viewerDoc = ref(null)
-const showViewer = computed({
-    get: () => !!viewerDoc.value,
-    set: (v) => { if (!v) viewerDoc.value = null },
-})
-function openViewer(doc) { viewerDoc.value = doc }
-function closeViewer() { viewerDoc.value = null }
-function isPdf(doc) { return doc?.mime_type === 'application/pdf' }
+const showViewer = ref(false)
+const viewerInitialDocId = ref(null)
+function openViewer(doc) {
+    viewerInitialDocId.value = doc?.id ?? null
+    showViewer.value = true
+}
 
 // ── A4: edição de vencimento (restrita ao financeiro) ──
 const showDueDate = ref(false)
@@ -633,46 +633,43 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                 <p class="text-sm text-red-700">{{ payable.rejection_reason }}</p>
             </div>
 
+            <PayableDetailsOverview
+                class="mb-4"
+                :payable="payable"
+                :field-origins="fieldOrigins"
+                :natureza-gasto="naturezaGasto"
+                :centro-custo="centroCusto"
+                :conta-financeira="contaFinanceira"
+                :departamento-titulo="departamentoTitulo"
+                :can-manage-priority="canManagePriority"
+                :priority-form="priorityForm"
+                :priority-options="priorityOptions"
+                :priority-colors="priorityColors"
+                :sla-alert-class="slaAlertClass"
+                :format-date="formatDate"
+                @save-priority="submitPriority"
+            />
+
             <div :class="isMobile ? 'space-y-4' : (showSidebar) ? 'grid grid-cols-3 gap-6' : ''">
                 <!-- Coluna principal -->
                 <div :class="isMobile ? '' : (showSidebar) ? 'col-span-2 space-y-4' : 'space-y-4'">
-                    <!-- Info -->
-                    <div class="bg-white rounded-xl border border-gray-100 p-4">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Informações</h3>
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Empresa" field="empresa_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Empresa</p><p class="text-gray-800">{{ payable.empresa_nome || '—' }}</p></div>
-                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Filial" field="filial_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Filial</p><p class="text-gray-800">{{ payable.filial_label || payable.filial_nome || '—' }}</p></div>
-                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Natureza de gasto" field="codntg" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Natureza de gasto</p><p class="text-gray-800">{{ naturezaGasto || '—' }}</p></div>
-                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Centro de custo" field="codccu" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Centro de custo</p><p class="text-gray-800 text-xs" :class="centroCusto && !payable.centro_custo_nome ? 'font-mono' : ''">{{ centroCusto || '—' }}</p></div>
-                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Conta financeira" field="ctafin" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Conta financeira</p><p class="text-gray-800 text-xs" :class="contaFinanceira && !payable.conta_financeira_nome ? 'font-mono' : ''">{{ contaFinanceira || '—' }}</p></div>
-                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Departamento" field="department_nome" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Departamento</p><p class="text-gray-800">{{ departamentoTitulo || '—' }}</p></div>
-                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="Emissão" field="issue_date" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">Emissão</p><p class="text-gray-800">{{ formatDate(payable.issue_date) }}</p></div>
-                            <div><PayableFieldOriginLabel v-if="fieldOrigins" label="CNPJ" field="supplier_cnpj" :field-origins="fieldOrigins" /><p v-else class="text-xs text-gray-500">CNPJ</p><p class="text-gray-800 font-mono text-xs">{{ payable.supplier_cnpj || '—' }}</p></div>
-                            <div dusk="payable-lancado-por">
-                                <PayableFieldOriginLabel v-if="fieldOrigins" label="Lançado por (Senior)" field="launcher_nome" :field-origins="fieldOrigins" />
-                                <p v-else class="text-xs text-gray-500">Lançado por (Senior)</p>
-                                <p class="text-gray-800">{{ payable.launcher_label || '—' }}</p>
-                            </div>
-                            <div class="col-span-2 border-t border-gray-100 pt-3 mt-1">
-                                <PayableFieldOriginLabel v-if="fieldOrigins" label="Fornecedor" field="supplier_name" :field-origins="fieldOrigins" />
-                                <p v-else class="text-xs text-gray-500">Fornecedor</p>
-                                <p class="text-gray-800 font-medium">{{ payable.supplier_display_name || payable.supplier_name || '—' }}</p>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Documentos -->
                     <div class="bg-white rounded-xl border border-gray-100 p-4">
                         <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-                            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                                Documentos ({{ payable.documents?.length || 0 }})
-                                <i
-                                    v-if="fieldOrigins?.documents === 'hub'"
-                                    class="pi pi-pencil text-[10px] text-blue-400"
-                                    title="Anexos gerenciados na intranet Hub"
-                                    aria-label="Anexos gerenciados na intranet Hub"
-                                />
-                            </h3>
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                                    Documentos ({{ payable.documents?.length || 0 }})
+                                    <i
+                                        v-if="fieldOrigins?.documents === 'hub'"
+                                        class="pi pi-pencil text-[10px] text-blue-400"
+                                        title="Anexos gerenciados na intranet Hub"
+                                        aria-label="Anexos gerenciados na intranet Hub"
+                                    />
+                                </h3>
+                                <p v-if="payable.documents?.length" class="text-[11px] text-gray-400 mt-0.5">
+                                    Abra qualquer documento para analisar todos na mesma galeria.
+                                </p>
+                            </div>
                             <div class="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5" dusk="payable-docs-view-toggle">
                                 <button
                                     type="button"
@@ -1063,61 +1060,6 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                         <p class="text-xs text-green-600">Título finalizado com 2ª assinatura da Presidência.</p>
                     </div>
 
-                    <!-- Prioridade de pagamento -->
-                    <div
-                        v-if="canManagePriority || payable.payment_priority"
-                        class="bg-white rounded-xl border border-gray-100 p-4"
-                        dusk="payable-priority-section"
-                    >
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-                            Prioridade de pagamento
-                            <i
-                                v-if="fieldOrigins?.payment_priority === 'hub'"
-                                class="pi pi-pencil text-[10px] text-blue-400"
-                                title="Prioridade definida na intranet Hub"
-                                aria-label="Prioridade definida na intranet Hub"
-                            />
-                        </h3>
-                        <template v-if="canManagePriority && payable.status !== 'encerrado'">
-                            <div class="space-y-3">
-                                <div>
-                                    <PayableFieldOriginLabel v-if="fieldOrigins" label="Prioridade" field="payment_priority" :field-origins="fieldOrigins" class="block mb-1" />
-                                    <label v-else class="block text-xs font-medium text-gray-500 mb-1">Prioridade</label>
-                                    <Select v-model="priorityForm.payment_priority" :options="priorityOptions" option-label="label" option-value="value" class="w-full" />
-                                </div>
-                                <div>
-                                    <PayableFieldOriginLabel v-if="fieldOrigins" label="Prazo (SLA)" field="payment_sla_date" :field-origins="fieldOrigins" class="block mb-1" />
-                                    <label v-else class="block text-xs font-medium text-gray-500 mb-1">Prazo (SLA)</label>
-                                    <DatePicker v-model="priorityForm.payment_sla_date" date-format="dd/mm/yy" placeholder="dd/mm/aaaa" class="w-full" show-icon />
-                                </div>
-                                <Button label="Salvar prioridade" icon="pi pi-save" size="small" class="w-full" :loading="priorityForm.processing" @click="submitPriority" />
-                            </div>
-                        </template>
-                        <template v-else>
-                            <div class="text-sm space-y-2">
-                                <div>
-                                    <PayableFieldOriginLabel v-if="fieldOrigins" label="Prioridade" field="payment_priority" :field-origins="fieldOrigins" />
-                                    <p v-else class="text-xs text-gray-500">Prioridade</p>
-                                    <Tag
-                                        v-if="payable.payment_priority"
-                                        :value="payable.priority_label"
-                                        :severity="priorityColors[payable.payment_priority]"
-                                    />
-                                    <p v-else class="text-gray-400">Não definida</p>
-                                </div>
-                                <div v-if="payable.payment_sla_date">
-                                    <PayableFieldOriginLabel v-if="fieldOrigins" label="Prazo (SLA)" field="payment_sla_date" :field-origins="fieldOrigins" />
-                                    <p v-else class="text-xs text-gray-500">Prazo (SLA)</p>
-                                    <p :class="slaAlertClass">{{ formatDate(payable.payment_sla_date) }}</p>
-                                </div>
-                                <div v-if="payable.priority_setter">
-                                    <p class="text-xs text-gray-500">Definida por</p>
-                                    <p class="text-gray-800">{{ payable.priority_setter.name }}</p>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-
                     <!-- Info lateral -->
                     <div v-if="payable.preparer || payable.approver || payable.approved_at" class="bg-white rounded-xl border border-gray-100 p-4 text-sm">
                         <div v-if="payable.preparer" class="mb-2">
@@ -1296,31 +1238,11 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
             </div>
         </BottomSheet>
 
-        <!-- A2: Visualizador de anexo inline (abre na mesma página, com opção de voltar) -->
-        <Dialog v-model:visible="showViewer" modal :header="viewerDoc?.name || 'Documento'"
-            :style="{ width: '92vw', maxWidth: '1100px' }" :dismissable-mask="true">
-            <div dusk="doc-viewer" class="min-h-[50vh]">
-                <template v-if="viewerDoc">
-                    <iframe v-if="isPdf(viewerDoc)" :src="viewerDoc.url" class="w-full h-[75vh] border-0 rounded" title="Visualização do documento"></iframe>
-                    <div v-else-if="isImage(viewerDoc)" class="flex items-center justify-center bg-gray-50 rounded p-2">
-                        <img :src="viewerDoc.url" :alt="viewerDoc.name" class="max-w-full max-h-[75vh] object-contain" />
-                    </div>
-                    <div v-else class="flex flex-col items-center justify-center text-center py-16 text-gray-500">
-                        <i class="pi pi-file text-5xl mb-4 text-gray-300"></i>
-                        <p class="mb-4">Pré-visualização não disponível para este tipo de arquivo.</p>
-                        <a :href="viewerDoc.url" :download="viewerDoc.name" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">
-                            <i class="pi pi-download"></i> Baixar arquivo
-                        </a>
-                    </div>
-                </template>
-            </div>
-            <template #footer>
-                <Button label="Voltar" icon="pi pi-arrow-left" severity="secondary" text dusk="doc-viewer-close" @click="closeViewer" />
-                <a v-if="viewerDoc" :href="viewerDoc.url" :download="viewerDoc.name" class="inline-flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:underline">
-                    <i class="pi pi-download"></i> Baixar
-                </a>
-            </template>
-        </Dialog>
+        <DocumentViewerDialog
+            v-model:visible="showViewer"
+            :docs="payable.documents || []"
+            :initial-doc-id="viewerInitialDocId"
+        />
 
         <!-- A4: Editar vencimento (restrito ao financeiro) -->
         <Dialog v-model:visible="showDueDate" modal header="Alterar vencimento" :style="{ width: '380px' }">
