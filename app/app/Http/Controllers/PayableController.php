@@ -744,6 +744,7 @@ class PayableController extends Controller
             'canFinalSign' => $alcada->isAssigned($user, 'assinante') && $payable->status === 'conciliado',
             'canEditDueDate' => $user?->hasPermission('financeiro.contas_pagar.editar_vencimento') ?? false,
             'canManagePriority' => $user?->hasPermission('financeiro.contas_pagar.prioridade_gerenciar') ?? false,
+            'canManagePaymentReceipt' => $user?->hasPermission('financeiro.contas_pagar.preparar') ?? false,
             'requiresPriorityOnApprove' => $canApproveStep && $workflow->isFinanceStep($currentStep),
             'approvalSteps' => $approvalSteps,
             'currentStep' => $currentStep,
@@ -840,6 +841,19 @@ class PayableController extends Controller
         $user = $request->user();
         $names = [];
 
+        // Compatibilidade com o endpoint genérico: comprovante sempre usa o fluxo
+        // dedicado para preservar permissão, auditoria e unicidade.
+        if ($type === 'comprovacao') {
+            $this->ensureCanManagePaymentReceipt($user);
+            if (count($files) !== 1) {
+                return back()->with('error', 'Envie um único comprovante de pagamento.');
+            }
+
+            $action = $this->replacePaymentReceipt($payable, $user, $files[0]);
+
+            return back()->with('success', "Comprovante de pagamento {$action}.");
+        }
+
         foreach ($files as $file) {
             $path = $file->store('payables/docs', 'public');
 
@@ -877,6 +891,148 @@ class PayableController extends Controller
         ]);
 
         return back();
+    }
+
+    /**
+     * Adiciona ou substitui o comprovante de pagamento, sem restrição de status.
+     * A permissão é aplicada na rota; o escopo de filial permanece obrigatório.
+     */
+    public function updatePaymentReceipt(Request $request, int $id)
+    {
+        $payable = $this->findPayableForUser($id);
+        $user = $request->user();
+        $this->ensureCanManagePaymentReceipt($user);
+        $request->validate([
+            'file' => ['required', 'file', 'max:'.$this->maxDocumentKb()],
+        ]);
+
+        $action = $this->replacePaymentReceipt($payable, $user, $request->file('file'));
+
+        return back()->with('success', "Comprovante de pagamento {$action}.");
+    }
+
+    private function replacePaymentReceipt(
+        Payable $payable,
+        User $user,
+        \Illuminate\Http\UploadedFile $file,
+    ): string {
+        $newPath = $file->store('payables/docs', 'public');
+        $oldPaths = [];
+        $action = 'adicionado';
+
+        try {
+            DB::transaction(function () use ($payable, $user, $file, $newPath, &$oldPaths, &$action) {
+                $fresh = Payable::query()->whereKey($payable->id)->lockForUpdate()->firstOrFail();
+                $oldDocs = PayableDocument::query()
+                    ->where('payable_id', $fresh->id)
+                    ->where('doc_type', 'comprovacao')
+                    ->get();
+
+                $oldPaths = $oldDocs->pluck('path')->filter()->values()->all();
+                $oldNames = $oldDocs->pluck('name')->filter()->values()->all();
+                $action = $oldDocs->isEmpty() ? 'adicionado' : 'substituído';
+
+                PayableDocument::query()
+                    ->whereIn('id', $oldDocs->pluck('id'))
+                    ->delete();
+
+                PayableDocument::create([
+                    'payable_id' => $fresh->id,
+                    'uploaded_by' => $user->id,
+                    'name' => $file->getClientOriginalName(),
+                    'doc_type' => 'comprovacao',
+                    'path' => $newPath,
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                ]);
+
+                PayableComment::create([
+                    'payable_id' => $fresh->id,
+                    'user_id' => $user->id,
+                    'body' => "Comprovante de pagamento {$action}: {$file->getClientOriginalName()}",
+                    'type' => 'payment',
+                ]);
+
+                AuditLogger::log(
+                    event: 'contas_pagar.comprovante_atualizado',
+                    module: 'financeiro.contas_pagar',
+                    description: "Título {$fresh->title_number}: comprovante de pagamento {$action}",
+                    auditable: $fresh,
+                    oldValues: ['comprovantes' => $oldNames],
+                    newValues: ['comprovante' => $file->getClientOriginalName()],
+                );
+            });
+        } catch (\Throwable $e) {
+            Storage::disk('public')->delete($newPath);
+            throw $e;
+        }
+
+        if ($oldPaths !== []) {
+            Storage::disk('public')->delete($oldPaths);
+        }
+
+        return $action;
+    }
+
+    /**
+     * Remove o comprovante de pagamento, sem alterar o status ou dados do pagamento.
+     */
+    public function removePaymentReceipt(Request $request, int $id)
+    {
+        $payable = $this->findPayableForUser($id);
+        $user = $request->user();
+        $this->ensureCanManagePaymentReceipt($user);
+        $paths = [];
+        $removed = false;
+
+        DB::transaction(function () use ($payable, $user, &$paths, &$removed) {
+            $fresh = Payable::query()->whereKey($payable->id)->lockForUpdate()->firstOrFail();
+            $docs = PayableDocument::query()
+                ->where('payable_id', $fresh->id)
+                ->where('doc_type', 'comprovacao')
+                ->get();
+
+            if ($docs->isEmpty()) {
+                return;
+            }
+
+            $paths = $docs->pluck('path')->filter()->values()->all();
+            $names = $docs->pluck('name')->filter()->values()->all();
+            PayableDocument::query()->whereIn('id', $docs->pluck('id'))->delete();
+
+            PayableComment::create([
+                'payable_id' => $fresh->id,
+                'user_id' => $user->id,
+                'body' => 'Comprovante de pagamento removido: '.implode(', ', $names),
+                'type' => 'payment',
+            ]);
+
+            AuditLogger::log(
+                event: 'contas_pagar.comprovante_removido',
+                module: 'financeiro.contas_pagar',
+                description: "Título {$fresh->title_number}: comprovante de pagamento removido",
+                auditable: $fresh,
+                oldValues: ['comprovantes' => $names],
+                newValues: ['comprovante' => null],
+            );
+
+            $removed = true;
+        });
+
+        if (! $removed) {
+            return back()->with('error', 'Este título não possui comprovante de pagamento.');
+        }
+
+        Storage::disk('public')->delete($paths);
+
+        return back()->with('success', 'Comprovante de pagamento removido.');
+    }
+
+    private function ensureCanManagePaymentReceipt(?User $user): void
+    {
+        if (! $user?->hasPermission('financeiro.contas_pagar.preparar')) {
+            abort(403, 'Você não tem permissão para gerenciar o comprovante de pagamento.');
+        }
     }
 
     public function sendForApproval(Request $request, int $id)
@@ -1051,7 +1207,8 @@ class PayableController extends Controller
             'file' => ['nullable', 'file', 'max:'.$this->maxDocumentKb()], // comprovante opcional
         ]);
 
-        $paid = DB::transaction(function () use ($payable, $user, $data, $request) {
+        $oldReceiptPaths = [];
+        $paid = DB::transaction(function () use ($payable, $user, $data, $request, &$oldReceiptPaths) {
             // Trava o registro para evitar pagamento concorrente (idempotência).
             $fresh = Payable::whereKey($payable->id)->lockForUpdate()->first();
 
@@ -1073,6 +1230,13 @@ class PayableController extends Controller
             if ($request->hasFile('file')) {
                 $file = $request->file('file');
                 $path = $file->store('payables/docs', 'public');
+                $oldReceipts = PayableDocument::query()
+                    ->where('payable_id', $fresh->id)
+                    ->where('doc_type', 'comprovacao')
+                    ->get();
+                $oldReceiptPaths = $oldReceipts->pluck('path')->filter()->values()->all();
+                PayableDocument::query()->whereIn('id', $oldReceipts->pluck('id'))->delete();
+
                 PayableDocument::create([
                     'payable_id' => $fresh->id,
                     'uploaded_by' => $user->id,
@@ -1116,6 +1280,10 @@ class PayableController extends Controller
 
         if (! $paid) {
             return back()->with('error', 'Este título não está apto a ser pago.');
+        }
+
+        if ($oldReceiptPaths !== []) {
+            Storage::disk('public')->delete($oldReceiptPaths);
         }
 
         return back()->with('success', 'Pagamento registrado.');
@@ -1366,10 +1534,14 @@ class PayableController extends Controller
         ]);
     }
 
-    public function removeDocument(int $payableId, int $docId)
+    public function removeDocument(Request $request, int $payableId, int $docId)
     {
         $this->findPayableForUser($payableId);
         $doc = PayableDocument::where('payable_id', $payableId)->findOrFail($docId);
+        if ($doc->doc_type === 'comprovacao') {
+            return $this->removePaymentReceipt($request, $payableId);
+        }
+
         Storage::disk('public')->delete($doc->path);
         $doc->delete();
 
