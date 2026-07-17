@@ -5,6 +5,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import FileUpload from 'primevue/fileupload'
+import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
@@ -12,6 +13,7 @@ import { useToast } from 'primevue/usetoast'
 const props = defineProps({
     imports: Object,
     isConciliador: Boolean,
+    bankAccounts: { type: Array, default: () => [] },
 })
 
 const toast = useToast()
@@ -26,7 +28,7 @@ watch(() => page.props.flash, (flash) => {
     }
 }, { deep: true })
 
-const uploadForm = useForm({ file: null })
+const uploadForm = useForm({ file: null, bank_account_id: null })
 
 function onUpload(event) {
     uploadForm.file = event.files[0]
@@ -75,6 +77,19 @@ function statusLabel(status) {
             <!-- Upload area - only for conciliador -->
             <div v-if="isConciliador" class="bg-white rounded-xl border border-gray-100 p-6 mb-6" dusk="upload-ofx">
                 <h2 class="text-sm font-semibold text-gray-700 mb-3">Importar extrato OFX</h2>
+                <div v-if="bankAccounts.length" class="mb-3 max-w-md">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Conta bancária (opcional)</label>
+                    <Select
+                        v-model="uploadForm.bank_account_id"
+                        :options="bankAccounts"
+                        option-label="label"
+                        option-value="id"
+                        placeholder="Detectar automaticamente pelo OFX"
+                        show-clear
+                        class="w-full"
+                    />
+                    <p class="text-[11px] text-gray-400 mt-1">Se vazio, o sistema tenta casar banco/conta do arquivo com o cadastro.</p>
+                </div>
                 <FileUpload
                     mode="basic"
                     accept=".ofx"
@@ -105,8 +120,13 @@ function statusLabel(status) {
                             <span :dusk="`import-row-${data.id}`">{{ formatDate(data.created_at) }}</span>
                         </template>
                     </Column>
-                    <Column field="bank_name" header="Banco" style="min-width: 150px" />
-                    <Column field="account_number" header="Conta" style="width: 150px" />
+                    <Column header="Conta Hub" style="min-width: 160px">
+                        <template #body="{ data }">
+                            <span class="text-sm">{{ data.bank_account?.name || '—' }}</span>
+                        </template>
+                    </Column>
+                    <Column field="bank_name" header="Banco OFX" style="min-width: 140px" />
+                    <Column field="account_number" header="Conta OFX" style="width: 140px" />
                     <Column header="Periodo" style="min-width: 180px">
                         <template #body="{ data }">
                             {{ formatPeriod(data.period_start, data.period_end) }}

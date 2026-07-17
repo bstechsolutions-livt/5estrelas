@@ -6,6 +6,7 @@ import IndexMobile from './Index.mobile.vue'
 defineProps({
     imports: Object,
     isConciliador: Boolean,
+    bankAccounts: { type: Array, default: () => [] },
 })
 
 const { isMobile } = useDevice()

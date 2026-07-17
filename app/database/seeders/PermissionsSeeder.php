@@ -52,6 +52,8 @@ class PermissionsSeeder extends Seeder
             ['key' => 'financeiro.borderos.reprovar', 'label' => 'Reprovar borderô inteiro', 'module' => 'financeiro', 'description' => 'Devolver o borderô montado para pendente na lista de borderôs, sem desmanchar o pacote.'],
             ['key' => 'financeiro.borderos.desfazer', 'label' => 'Desfazer borderô', 'module' => 'financeiro', 'description' => 'Dissolver borderô pendente ou em preparação e liberar todos os títulos para CP avulso.'],
             ['key' => 'financeiro.conciliacao.visualizar', 'label' => 'Ver conciliação bancária', 'module' => 'financeiro', 'description' => 'Acessar módulo de conciliação com extratos OFX.'],
+            ['key' => 'financeiro.bancos.visualizar', 'label' => 'Ver contas bancárias', 'module' => 'financeiro', 'description' => 'Listar contas bancárias cadastradas para conciliação.'],
+            ['key' => 'financeiro.bancos.gerenciar', 'label' => 'Gerenciar contas bancárias', 'module' => 'financeiro', 'description' => 'Cadastrar, editar e ativar/desativar contas bancárias.'],
             ['key' => 'financeiro.workflows.configurar', 'label' => 'Configurar fluxos de aprovação', 'module' => 'financeiro', 'description' => 'Editar trilhas de aprovação por área/departamento.'],
 
             ['key' => 'backups.gerenciar', 'label' => 'Gerenciar backups', 'module' => 'backups', 'description' => 'Executar e restaurar backups do sistema.'],

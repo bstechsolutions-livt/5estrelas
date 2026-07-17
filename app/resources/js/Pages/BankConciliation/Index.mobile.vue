@@ -9,6 +9,7 @@ import { useToast } from 'primevue/usetoast'
 const props = defineProps({
     imports: Object,
     isConciliador: Boolean,
+    bankAccounts: { type: Array, default: () => [] },
 })
 
 const toast = useToast()
@@ -23,7 +24,7 @@ watch(() => page.props.flash, (flash) => {
     }
 }, { deep: true })
 
-const uploadForm = useForm({ file: null })
+const uploadForm = useForm({ file: null, bank_account_id: null })
 const fileInput = ref(null)
 
 function triggerUpload() {
@@ -100,8 +101,8 @@ function statusLabel(status) {
                 >
                     <div class="flex justify-between items-start mb-2">
                         <div>
-                            <p class="text-sm font-semibold text-gray-800">{{ item.bank_name || 'Banco' }}</p>
-                            <p class="text-xs text-gray-500">Conta: {{ item.account_number }}</p>
+                            <p class="text-sm font-semibold text-gray-800">{{ item.bank_account?.name || item.bank_name || 'Banco' }}</p>
+                            <p class="text-xs text-gray-500">OFX: {{ item.account_number }}</p>
                         </div>
                         <Tag :value="statusLabel(item.status)" :severity="statusSeverity(item.status)" class="text-xs" />
                     </div>

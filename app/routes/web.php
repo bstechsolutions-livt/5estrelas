@@ -9,6 +9,7 @@ use App\Http\Controllers\BackupController;
 use App\Http\Controllers\BorderoController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankConciliationController;
 use App\Http\Controllers\PayableController;
 use App\Http\Controllers\PayableAlcadaController;
@@ -184,6 +185,26 @@ Route::middleware('auth')->group(function () {
     Route::prefix('financeiro/contas-pagar/classificacao-departamentos')->middleware('permission:financeiro.contas_pagar.classificacao_gerenciar')->group(function () {
         Route::get('/', [PayableDepartmentRulesController::class, 'index'])->name('payables.department-rules.index');
         Route::post('/', [PayableDepartmentRulesController::class, 'update'])->name('payables.department-rules.update');
+    });
+
+    // Financeiro - Contas bancárias (cadastro Hub; import one-shot Senior)
+    Route::prefix('financeiro/bancos')->middleware('permission:financeiro.bancos.visualizar')->group(function () {
+        Route::get('/', [BankAccountController::class, 'index'])->name('bank-accounts.index');
+        Route::get('/criar', [BankAccountController::class, 'create'])
+            ->middleware('permission:financeiro.bancos.gerenciar')
+            ->name('bank-accounts.create');
+        Route::post('/', [BankAccountController::class, 'store'])
+            ->middleware('permission:financeiro.bancos.gerenciar')
+            ->name('bank-accounts.store');
+        Route::get('/{bankAccount}/editar', [BankAccountController::class, 'edit'])
+            ->middleware('permission:financeiro.bancos.gerenciar')
+            ->name('bank-accounts.edit');
+        Route::put('/{bankAccount}', [BankAccountController::class, 'update'])
+            ->middleware('permission:financeiro.bancos.gerenciar')
+            ->name('bank-accounts.update');
+        Route::post('/{bankAccount}/toggle', [BankAccountController::class, 'toggle'])
+            ->middleware('permission:financeiro.bancos.gerenciar')
+            ->name('bank-accounts.toggle');
     });
 
     // Financeiro - Conciliação Bancária (OFX) — ANTES do grupo genérico /financeiro/contas-pagar

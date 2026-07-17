@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BankAccount;
 use App\Models\BankStatementImport;
 use App\Models\BankTransaction;
 use App\Models\Payable;
 use App\Services\AuditLogger;
+use App\Services\BankAccountMatcher;
 use App\Services\BankMatchingService;
 use App\Services\BatchConciliationService;
 use App\Services\OfxParserService;
@@ -25,7 +27,7 @@ class BankConciliationController extends Controller
     public function index(Request $request): Response
     {
         $imports = BankStatementImport::query()
-            ->with('user:id,name')
+            ->with(['user:id,name', 'bankAccount:id,name,bank_code,account_number'])
             ->orderByDesc('created_at')
             ->paginate(15)
             ->withQueryString();
@@ -36,6 +38,25 @@ class BankConciliationController extends Controller
         return Inertia::render('BankConciliation/Index', [
             'imports' => $imports,
             'isConciliador' => $isConciliador,
+            'bankAccounts' => BankAccount::query()
+                ->active()
+                ->orderBy('name')
+                ->get(['id', 'name', 'bank_code', 'bank_name', 'account_number', 'account_digit'])
+                ->map(function (BankAccount $a) {
+                    $suffix = collect([
+                        $a->bank_code,
+                        $a->account_number
+                            ? $a->account_number.($a->account_digit ? '-'.$a->account_digit : '')
+                            : null,
+                    ])->filter()->implode(' / ');
+
+                    return [
+                        'id' => $a->id,
+                        'name' => $a->name,
+                        'bank_code' => $a->bank_code,
+                        'label' => $suffix !== '' ? "{$a->name} — {$suffix}" : $a->name,
+                    ];
+                }),
         ]);
     }
 
@@ -79,8 +100,12 @@ class BankConciliationController extends Controller
     /**
      * Upload e processamento de arquivo OFX.
      */
-    public function upload(Request $request, OfxParserService $parser, BankMatchingService $matcher): RedirectResponse
-    {
+    public function upload(
+        Request $request,
+        OfxParserService $parser,
+        BankMatchingService $matcher,
+        BankAccountMatcher $accountMatcher,
+    ): RedirectResponse {
         $alcada = app(PayableAlcadaService::class);
         if (!$alcada->isAssigned($request->user(), 'conciliador')) {
             abort(403, 'Você não está na alçada como conciliador.');
@@ -88,6 +113,7 @@ class BankConciliationController extends Controller
 
         $request->validate([
             'file' => ['required', 'file', 'max:10240'],
+            'bank_account_id' => ['nullable', 'integer', 'exists:bank_accounts,id'],
         ], [
             'file.max' => 'O arquivo não pode exceder 10MB.',
         ]);
@@ -107,9 +133,14 @@ class BankConciliationController extends Controller
             return back()->withErrors(['file' => $e->getMessage()]);
         }
 
+        $bankAccountId = $request->filled('bank_account_id')
+            ? (int) $request->bank_account_id
+            : $accountMatcher->suggest($result->meta->bankId, $result->meta->accountId)?->id;
+
         // Create import record
         $import = BankStatementImport::create([
             'user_id' => $request->user()->id,
+            'bank_account_id' => $bankAccountId,
             'bank_name' => $result->meta->orgName,
             'bank_id' => $result->meta->bankId,
             'account_number' => $result->meta->accountId ?? 'N/A',
