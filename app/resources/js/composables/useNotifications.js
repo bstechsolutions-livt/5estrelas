@@ -201,6 +201,7 @@ export function useNotifications() {
         activeRefs++
         if (activeRefs === 1) {
             refreshCount()
+            window.addEventListener('notifications:refresh', fetchList)
 
             const page = usePage()
             const userId = page.props.auth?.user?.id
@@ -216,6 +217,7 @@ export function useNotifications() {
     onBeforeUnmount(() => {
         activeRefs = Math.max(0, activeRefs - 1)
         if (activeRefs === 0) {
+            window.removeEventListener('notifications:refresh', fetchList)
             stopPolling()
             unsubscribeRealtime()
         }

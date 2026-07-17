@@ -127,6 +127,8 @@ class ApprovalWorkflowService
             'comment' => $comment,
         ]);
 
+        $this->archiveApprovalNotifications($payable);
+
         PayableComment::create([
             'payable_id' => $payable->id,
             'user_id' => $approver->id,
@@ -1229,10 +1231,10 @@ class ApprovalWorkflowService
             $notification = Notification::create([
                 'user_id' => $userId,
                 'title' => 'Aprovação pendente',
-                'body' => "Título {$payable->title_number} (R$ " . number_format($payable->amount, 2, ',', '.') . ") aguarda sua aprovação na etapa: " . ($step->role_label ?: (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name)),
+                'message' => "Título {$payable->title_number} (R$ " . number_format($payable->amount, 2, ',', '.') . ") aguarda sua aprovação na etapa: " . ($step->role_label ?: (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name)),
                 'type' => 'approval_pending',
                 'link' => "/financeiro/contas-pagar/{$payable->id}",
-                'data' => [
+                'metadata' => [
                     'payable_id' => $payable->id,
                     'step_id' => $step->id,
                     'level' => $step->level_name,
@@ -1247,6 +1249,23 @@ class ApprovalWorkflowService
                 }
             }
         }
+    }
+
+    private function archiveApprovalNotifications(Payable $payable): void
+    {
+        $now = now();
+
+        Notification::query()
+            ->where('type', 'approval_pending')
+            ->whereNull('archived_at')
+            ->where(function ($query) use ($payable) {
+                $query->where('metadata->payable_id', $payable->id)
+                    ->orWhere('link', "/financeiro/contas-pagar/{$payable->id}");
+            })
+            ->update([
+                'read_at' => $now,
+                'archived_at' => $now,
+            ]);
     }
 
     public function activeDelegatedTo(ApprovalStep $step): ?int
