@@ -688,7 +688,9 @@ class PayableController extends Controller
             'conciliator:id,name',
             'prioritySetter:id,name',
             'documents.uploader:id,name',
-            'comments.user:id,name,avatar_path',
+            'comments' => fn ($query) => $query
+                ->where('type', '<>', 'comment')
+                ->with('user:id,name,avatar_path'),
             'allocationLines',
             'allocationImporter:id,name',
         ]);
@@ -752,7 +754,6 @@ class PayableController extends Controller
             'canApproveStep' => $canApproveStep,
             'canDelegateStep' => $canDelegateStep,
             'delegateUsers' => $delegateUsers,
-            'mentionableUsers' => app(\App\Services\MentionService::class)->mentionableUsers($user, $id),
             'approvalPreview' => $workflow->buildPreviewStepsForPayable($payable),
             'canImportAllocations' => in_array($payable->status, self::ALLOCATION_IMPORT_STATUSES, true),
             'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
@@ -788,35 +789,6 @@ class PayableController extends Controller
         }
 
         return back()->with('success', $message);
-    }
-
-    public function addComment(Request $request, int $id)
-    {
-        $payable = $this->findPayableForUser($id);
-
-        $data = $request->validate([
-            'body' => ['required', 'string', 'max:2000'],
-        ]);
-
-        $comment = PayableComment::create([
-            'payable_id' => $payable->id,
-            'user_id' => $request->user()->id,
-            'body' => $data['body'],
-            'type' => 'comment',
-        ]);
-
-        // Processa @menções (notificação + visibilidade)
-        app(\App\Services\MentionService::class)->processComment($comment);
-
-        // Se estava pendente, marca como em preparação
-        if ($payable->status === 'pendente') {
-            $payable->update([
-                'status' => 'em_preparacao',
-                'prepared_by' => $request->user()->id,
-            ]);
-        }
-
-        return back();
     }
 
     public function addDocument(Request $request, int $id)
@@ -1586,17 +1558,6 @@ class PayableController extends Controller
         );
 
         return back()->with('success', 'Ciclo encerrado (2ª assinatura).');
-    }
-
-    /**
-     * Lista usuários mencionáveis em comentários deste payable (pra autocomplete @mention).
-     */
-    public function mentionableUsers(Request $request, int $id)
-    {
-        $mentionService = app(\App\Services\MentionService::class);
-        $users = $mentionService->mentionableUsers($request->user(), $id);
-
-        return response()->json($users);
     }
 
     private function maxDocumentKb(): int

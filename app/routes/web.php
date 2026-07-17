@@ -224,7 +224,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/lote/prioridade', [PayableController::class, 'batchUpdatePriority'])->name('payables.batch_priority');
         Route::get('/{id}', [PayableController::class, 'show'])->whereNumber('id')->name('payables.show');
         Route::post('/{id}/apelido', [PayableController::class, 'updateNickname'])->whereNumber('id')->name('payables.nickname');
-        Route::post('/{id}/comentarios', [PayableController::class, 'addComment'])->name('payables.comment');
         Route::post('/{id}/documentos', [PayableController::class, 'addDocument'])->name('payables.document');
         Route::post('/{id}/comprovante-pagamento', [PayableController::class, 'updatePaymentReceipt'])
             ->middleware('permission:financeiro.contas_pagar.preparar')
@@ -244,7 +243,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/registrar-pagamento', [PayableController::class, 'pay'])->whereNumber('id')->name('payables.pay');
         Route::post('/{id}/conciliar', [PayableController::class, 'conciliate'])->whereNumber('id')->name('payables.conciliate');
         Route::post('/{id}/divergencia', [PayableController::class, 'diverge'])->whereNumber('id')->name('payables.diverge');
-        Route::get('/{id}/mentionable-users', [PayableController::class, 'mentionableUsers'])->whereNumber('id')->name('payables.mentionable');
         Route::post('/{id}/encerrar', [PayableController::class, 'finalSign'])->whereNumber('id')->name('payables.final-sign');
     });
 
