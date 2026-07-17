@@ -281,6 +281,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [BorderoController::class, 'index'])->name('borderos.index');
         Route::post('/', [BorderoController::class, 'store'])->name('borderos.store');
         Route::get('/{id}', [BorderoController::class, 'show'])->name('borderos.show');
+        Route::post('/{id}/documentos', [BorderoController::class, 'addDocuments'])
+            ->middleware('permission:financeiro.contas_pagar.preparar')
+            ->name('borderos.documents.store');
+        Route::delete('/{id}/documentos/{documentId}', [BorderoController::class, 'removeDocument'])
+            ->middleware('permission:financeiro.contas_pagar.preparar')
+            ->name('borderos.documents.destroy');
         Route::delete('/{borderoId}/titulos/{payableId}', [BorderoController::class, 'removePayable'])->name('borderos.remove_payable');
         Route::post('/{borderoId}/titulos/{payableId}/liberar', [BorderoController::class, 'liberarTitulo'])->name('borderos.liberar_titulo');
         Route::post('/{borderoId}/titulos/{payableId}/expulsar', [BorderoController::class, 'expulsarTitulo'])->name('borderos.expulsar_titulo');
