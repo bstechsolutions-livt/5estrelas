@@ -24,11 +24,13 @@ class Notification extends Model
         'icon',
         'metadata',
         'read_at',
+        'archived_at',
     ];
 
     protected $casts = [
         'metadata' => 'array',
         'read_at' => 'datetime',
+        'archived_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

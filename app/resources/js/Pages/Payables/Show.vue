@@ -310,7 +310,11 @@ function confirmApproveWithPriority() {
         }))
         .post(`/financeiro/contas-pagar/${props.payable.id}/aprovar`, {
             preserveScroll: true,
-            onSuccess: () => { showPriorityDialog.value = false; approvalComment.value = '' },
+            onSuccess: () => {
+                showPriorityDialog.value = false
+                approvalComment.value = ''
+                window.dispatchEvent(new Event('notifications:refresh'))
+            },
         })
 }
 
@@ -319,7 +323,10 @@ function approve() {
         comment: approvalComment.value.trim() || undefined,
     }, {
         preserveScroll: true,
-        onSuccess: () => { approvalComment.value = '' },
+        onSuccess: () => {
+            approvalComment.value = ''
+            window.dispatchEvent(new Event('notifications:refresh'))
+        },
     })
 }
 

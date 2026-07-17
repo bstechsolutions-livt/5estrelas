@@ -400,6 +400,37 @@ class ApprovalWorkflowTest extends TestCase
         }
     }
 
+    public function test_approval_archives_the_title_notification_from_the_bell(): void
+    {
+        $sender = User::factory()->create(['is_active' => true]);
+        $payable = $this->makePayable();
+        $this->workflow->sendForApproval($payable, $sender, 'matriz');
+
+        $approver = User::where('name', 'Gerente')->firstOrFail();
+        $notification = Notification::query()
+            ->where('user_id', $approver->id)
+            ->where('type', 'approval_pending')
+            ->where('metadata->payable_id', $payable->id)
+            ->firstOrFail();
+
+        $this->assertSame($payable->id, (int) $notification->metadata['payable_id']);
+
+        // Notificações já existentes em produção não possuíam metadata; o link mantém a compatibilidade.
+        $notification->forceFill(['metadata' => null])->save();
+
+        $this->workflow->approve($payable, $approver);
+
+        $notification->refresh();
+        $this->assertNotNull($notification->read_at);
+        $this->assertNotNull($notification->archived_at);
+
+        $this->actingAs($approver)
+            ->getJson('/notificacoes')
+            ->assertOk()
+            ->assertJsonPath('unread_count', 0)
+            ->assertJsonMissing(['id' => $notification->id]);
+    }
+
     // ─── Minhas pendências ───────────────────────────────────────────────
 
     public function test_my_pending_approvals_returns_assigned_payables(): void

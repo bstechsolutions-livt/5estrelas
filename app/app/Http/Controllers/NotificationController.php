@@ -21,6 +21,7 @@ class NotificationController extends Controller
         $limit = max(1, min($limit, 100));
 
         $query = Notification::where('user_id', $user->id)
+            ->whereNull('archived_at')
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 
@@ -48,7 +49,10 @@ class NotificationController extends Controller
 
         $items = $query->limit($limit)->get();
 
-        $unreadCount = Notification::where('user_id', $user->id)->whereNull('read_at')->count();
+        $unreadCount = Notification::where('user_id', $user->id)
+            ->whereNull('archived_at')
+            ->whereNull('read_at')
+            ->count();
 
         return response()->json([
             'items' => $items,
@@ -62,6 +66,7 @@ class NotificationController extends Controller
     public function unreadCount(Request $request): JsonResponse
     {
         $count = Notification::where('user_id', $request->user()->id)
+            ->whereNull('archived_at')
             ->whereNull('read_at')
             ->count();
 
@@ -93,6 +98,7 @@ class NotificationController extends Controller
     public function markAllRead(Request $request): JsonResponse
     {
         $affected = Notification::where('user_id', $request->user()->id)
+            ->whereNull('archived_at')
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
 
