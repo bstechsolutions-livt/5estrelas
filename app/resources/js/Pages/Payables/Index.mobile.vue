@@ -135,8 +135,8 @@ function selectIssuePreset(key) {
 }
 
 const statusList = [
-    { label: 'Pendentes', value: 'pendente' },
     { label: 'Aguard. sync', value: 'aguardando_vinculo_departamento' },
+    { label: 'Pendentes', value: 'pendente' },
     { label: 'Preparação', value: 'em_preparacao' },
     { label: 'Em Aprovação', value: 'aguardando_aprovacao' },
     { label: 'Aprovados', value: 'aprovado' },
@@ -422,7 +422,7 @@ const currentTotal = computed(() => {
                     ]"
                 >
                     {{ s.label }}
-                    <span v-if="totals?.[s.value]" class="ml-1 opacity-75">({{ totals[s.value]?.count || 0 }})</span>
+                    <span class="ml-1 opacity-75">({{ totals?.[s.value]?.count ?? 0 }})</span>
                 </button>
             </div>
             <p v-if="statusTabHint" class="text-[11px] text-gray-500 mt-2">{{ statusTabHint }}</p>

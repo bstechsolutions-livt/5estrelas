@@ -17,19 +17,22 @@ class SyncSeniorPayables extends Command
         {--from= : Data inicial da janela de vencimento (Y-m-d)}
         {--to= : Data final da janela de vencimento (Y-m-d)}
         {--scheduled : Marca a execução como agendada (default: manual)}
-        {--backfill-depto-fornecedor : Só backfill depto (Financeiro) + nomes de fornecedor em títulos abertos}';
+        {--backfill-depto-fornecedor : Backfill UsuGer/fornecedor + reclassifica aguardando sync em títulos abertos}';
 
     protected $description = 'Sincroniza os títulos a pagar da Senior (Contas a Pagar)';
 
     public function handle(): int
     {
         if ($this->option('backfill-depto-fornecedor')) {
-            $result = PayablesSyncService::make()->backfillOpenSupplierAndDepartment();
+            $result = PayablesSyncService::make()->reconcileOpenSyncReadiness();
             $this->info(sprintf(
-                'Backfill: %d fornecedores consultados, %d nomes enriquecidos, %d departamentos atribuídos.',
+                'Backfill: %d UsuGer (%d ok), %d fornecedores (%d nomes), %d reclassificados, %d em aguardando sync.',
+                $result['launchers_looked_up'],
+                $result['launchers_updated'],
                 $result['suppliers_looked_up'],
                 $result['suppliers_enriched'],
-                $result['departments_assigned'],
+                $result['readiness_changed'],
+                $result['moved_to_aguardando'],
             ));
 
             return self::SUCCESS;
