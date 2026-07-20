@@ -471,41 +471,91 @@ class PayablesSyncService
     }
 
     /**
-     * Backfill: fornecedores faltantes + depto (UsuGer já gravado ou Financeiro) em títulos abertos.
+     * Backfill: UsuGer + fornecedor + reclassifica títulos abertos (aguardando sync vs pendente).
      *
-     * @return array{suppliers_looked_up:int, suppliers_enriched:int, departments_assigned:int}
+     * @return array{launchers_looked_up:int, launchers_updated:int, suppliers_looked_up:int, suppliers_enriched:int, readiness_changed:int, moved_to_aguardando:int}
      */
-    public function backfillOpenSupplierAndDepartment(?int $supplierMaxLookups = null): array
+    public function reconcileOpenSyncReadiness(?int $supplierMaxLookups = null, ?int $launcherMaxLookups = null): array
     {
-        $supplierMax = $supplierMaxLookups ?? max(200, (int) config('senior.post_sync_supplier_lookups', 200));
+        $launcherMax = $launcherMaxLookups ?? max(200, (int) config('senior.enrich_launcher_max_lookups', 400));
+        $launcherIds = Payable::query()
+            ->whereNotNull('senior_id')
+            ->whereNull('senior_missing_at')
+            ->whereIn('status', ['pendente', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO, 'em_preparacao'])
+            ->where(function ($q) {
+                $q->whereNull('senior_cod_usu')->orWhere('senior_cod_usu', '<=', 0);
+            })
+            ->orderByDesc('id')
+            ->limit($launcherMax)
+            ->pluck('id')
+            ->all();
+
+        $launcher = ['looked_up' => 0, 'updated' => 0];
+        if ($launcherIds !== []) {
+            try {
+                $launcher = PayableLauncherSyncService::make()->enrichByPayableIds(
+                    $launcherIds,
+                    maxLookups: $launcherMax,
+                    trigger: 'reconcile-open',
+                );
+            } catch (\Throwable $e) {
+                Log::warning('[senior-cp] reconcile lançadores falhou', ['erro' => $e->getMessage()]);
+            }
+        }
+
+        $supplierMax = $supplierMaxLookups ?? max(500, (int) config('senior.post_sync_supplier_lookups', 80));
         $sup = ['looked_up' => 0, 'enriched' => 0, 'enriched_desc' => 0];
         try {
             $sup = FornecedoresSyncService::make()->syncMissingFromPayables(
-                'backfill-open',
+                'reconcile-open',
                 maxLookups: $supplierMax,
             );
         } catch (\Throwable $e) {
-            Log::warning('[senior-cp] backfill fornecedores falhou', ['erro' => $e->getMessage()]);
+            Log::warning('[senior-cp] reconcile fornecedores falhou', ['erro' => $e->getMessage()]);
         }
 
         $openIds = Payable::query()
+            ->whereNotNull('senior_id')
             ->whereNull('senior_missing_at')
-            ->whereNotIn('status', ['pago', 'aguardando_conciliacao', 'conciliado', 'encerrado'])
-            ->where(function ($q) {
-                $q->whereNull('department_id')
-                    ->orWhereNull('supplier_name')
-                    ->orWhere('supplier_name', 'like', 'Fornecedor %');
-            })
+            ->whereIn('status', ['pendente', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO, 'em_preparacao'])
+            ->whereNull('bordero_id')
             ->orderByDesc('id')
             ->pluck('id')
             ->all();
 
-        $depts = $this->resolveDepartmentsAfterSync($openIds);
+        $beforeAguardando = Payable::query()
+            ->whereIn('id', $openIds)
+            ->where('status', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO)
+            ->count();
+
+        $readinessChanged = $this->resolveDepartmentsAfterSync($openIds);
+
+        $afterAguardando = Payable::query()
+            ->whereIn('id', $openIds)
+            ->where('status', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO)
+            ->count();
 
         return [
+            'launchers_looked_up' => (int) ($launcher['looked_up'] ?? 0),
+            'launchers_updated' => (int) ($launcher['updated'] ?? 0),
             'suppliers_looked_up' => (int) ($sup['looked_up'] ?? 0),
             'suppliers_enriched' => (int) (($sup['enriched'] ?? 0) + ($sup['enriched_desc'] ?? 0)),
-            'departments_assigned' => $depts,
+            'readiness_changed' => $readinessChanged,
+            'moved_to_aguardando' => max(0, $afterAguardando - $beforeAguardando),
+        ];
+    }
+
+    /**
+     * @return array{suppliers_looked_up:int, suppliers_enriched:int, departments_assigned:int}
+     */
+    public function backfillOpenSupplierAndDepartment(?int $supplierMaxLookups = null): array
+    {
+        $result = $this->reconcileOpenSyncReadiness($supplierMaxLookups);
+
+        return [
+            'suppliers_looked_up' => $result['suppliers_looked_up'],
+            'suppliers_enriched' => $result['suppliers_enriched'],
+            'departments_assigned' => $result['readiness_changed'],
         ];
     }
 
@@ -529,6 +579,13 @@ class PayablesSyncService
         }
 
         if ($payable->department_id) {
+            if ($financeiroId && (int) $payable->department_id === (int) $financeiroId) {
+                $codUsu = (int) ($payable->senior_cod_usu ?? 0);
+                if ($codUsu <= 0) {
+                    return null;
+                }
+            }
+
             return (int) $payable->department_id;
         }
 
