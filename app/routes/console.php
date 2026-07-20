@@ -16,11 +16,11 @@ Schedule::command('backup:run --only-db')->daily()->at('03:00');
 // Só agenda quando a integração está habilitada (evita execuções ignoradas em série
 // localmente / com a whitelist pendente). O comando manual continua disponível.
 if (config('senior.enabled', false)) {
-    $interval = (int) config('senior.sync_interval_minutes', 5);
+    $interval = (int) config('senior.sync_interval_minutes', 10);
     if ($interval < 1 || $interval > 1440) {
-        // req 6.3: intervalo inválido → mantém o padrão de 5 minutos e registra erro.
-        \Illuminate\Support\Facades\Log::error("[senior-cp] intervalo de sync inválido ({$interval}); usando 5 minutos.");
-        $interval = 5;
+        // req 6.3: intervalo inválido → mantém o padrão de 10 minutos e registra erro.
+        \Illuminate\Support\Facades\Log::error("[senior-cp] intervalo de sync inválido ({$interval}); usando 10 minutos.");
+        $interval = 10;
     }
     $cron = $interval < 60
         ? "*/{$interval} * * * *"
