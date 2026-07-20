@@ -56,6 +56,11 @@ class FornecedoresSyncService
             return $this->skippedResult();
         }
 
+        $prioritizePayableIds = array_values(array_unique(array_filter(array_merge(
+            $prioritizePayableIds ?? [],
+            PayablesSyncService::make()->awaitingSyncPayableIds(200),
+        ), fn ($id) => (int) $id > 0)));
+
         $missingPairs = $this->missingSupplierPairs($prioritizePayableIds);
         $missingByEmp = $missingPairs
             ->groupBy(fn ($pair) => (int) $pair->codemp)
@@ -102,21 +107,8 @@ class FornecedoresSyncService
         $enriched = $this->enrichPayables($prioritizePayableIds);
         $enrichedDesc = $this->enrichFromDescriptions($prioritizePayableIds);
 
-        $reevalIds = array_values(array_unique(array_filter(array_map('intval', $prioritizePayableIds ?? []), fn (int $id) => $id > 0)));
-        if ($reevalIds === [] && ($enriched > 0 || $enrichedDesc > 0 || $lookedUp > 0)) {
-            $reevalIds = Payable::query()
-                ->whereNotNull('senior_id')
-                ->whereNull('senior_missing_at')
-                ->where(function ($q) {
-                    $q->where('status', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO)
-                        ->orWhere('supplier_name', 'like', 'Fornecedor %');
-                })
-                ->orderByDesc('id')
-                ->limit(500)
-                ->pluck('id')
-                ->all();
-        }
-        if ($reevalIds !== [] && ($enriched > 0 || $enrichedDesc > 0 || $lookedUp > 0)) {
+        $reevalIds = PayablesSyncService::make()->awaitingSyncPayableIds(500);
+        if ($reevalIds !== []) {
             PayablesSyncService::make()->resolveDepartmentsAfterSync($reevalIds);
         }
 

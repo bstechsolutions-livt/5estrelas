@@ -179,9 +179,11 @@ class PayableLauncherSyncService
             $query->where('codfil', $codFil);
         }
 
-        // Mais novos primeiro — evita backlog antigo empurrar títulos recém-sincronizados.
-        // Carrega IDs em ordem desc e processa em fatias (chunkById ignoraria o orderByDesc).
-        $candidateIds = (clone $query)->orderByDesc('id')->pluck('id');
+        // Prioriza fila aguardando sync, depois os mais novos.
+        $candidateIds = (clone $query)
+            ->orderByRaw("CASE WHEN status = '".Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO."' THEN 0 ELSE 1 END")
+            ->orderByDesc('id')
+            ->pluck('id');
         foreach ($candidateIds->chunk(100) as $idChunk) {
             $chunk = Payable::query()->whereIn('id', $idChunk->all())->get()->keyBy('id');
             foreach ($idChunk as $id) {
@@ -224,6 +226,11 @@ class PayableLauncherSyncService
             'errors' => $errors,
             'skipped' => $skipped,
         ]);
+
+        $awaitingIds = PayablesSyncService::make()->awaitingSyncPayableIds(500);
+        if ($awaitingIds !== []) {
+            PayablesSyncService::make()->resolveDepartmentsAfterSync($awaitingIds);
+        }
 
         return [
             'status' => 'ok',
