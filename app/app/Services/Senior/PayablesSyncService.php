@@ -430,6 +430,7 @@ class PayablesSyncService
 
         Payable::query()
             ->whereIn('id', $ids)
+            ->whereIn('status', Payable::SYNC_READINESS_STATUSES)
             ->orderBy('id')
             ->chunkById(200, function ($chunk) use ($financeiroId, &$changed) {
                 foreach ($chunk as $payable) {
@@ -469,6 +470,10 @@ class PayablesSyncService
             return false;
         }
 
+        if (! $payable->isSyncReadinessEligible()) {
+            return false;
+        }
+
         $ready = $hasDept && $hasSupplier;
         $updates = [];
 
@@ -487,7 +492,7 @@ class PayablesSyncService
             if ($payable->status === Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO) {
                 $updates['status'] = 'pendente';
             }
-        } elseif ($payable->status !== Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO) {
+        } elseif (in_array($payable->status, ['pendente', 'em_preparacao'], true)) {
             $updates['status'] = Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO;
         }
 
@@ -1109,7 +1114,9 @@ class PayablesSyncService
             $existing->save();
             $this->syncRateios($existing, $titulo);
             $updated++;
-            $enrichIds[] = (int) $existing->id;
+            if ($this->needsPostSyncEnrich($existing)) {
+                $enrichIds[] = (int) $existing->id;
+            }
         } elseif ($voltouDaAusencia) {
             // Conteúdo igual mas estava marcado como ausente: só limpa o flag (req 7.4).
             $existing->update(['senior_missing_at' => null]);
@@ -1122,6 +1129,10 @@ class PayablesSyncService
     /** Título ainda sem depto materializado, aguardando vínculo ou com fornecedor genérico. */
     private function needsPostSyncEnrich(Payable $payable): bool
     {
+        if (! $payable->isSyncReadinessEligible()) {
+            return false;
+        }
+
         if ($payable->status === Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO) {
             return true;
         }

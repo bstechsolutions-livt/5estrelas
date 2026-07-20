@@ -200,6 +200,18 @@ class Payable extends Model
 
     public const STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO = 'aguardando_vinculo_departamento';
 
+    /** Status elegíveis para enrich Senior e reclassificação pendente ↔ aguardando sync. */
+    public const SYNC_READINESS_STATUSES = [
+        'pendente',
+        'em_preparacao',
+        self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO,
+    ];
+
+    public function isSyncReadinessEligible(): bool
+    {
+        return in_array($this->status, self::SYNC_READINESS_STATUSES, true);
+    }
+
     // Status labels
     public const STATUS_LABELS = [
         'pendente' => 'Pendente',
