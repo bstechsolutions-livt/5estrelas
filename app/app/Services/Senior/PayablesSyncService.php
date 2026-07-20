@@ -331,12 +331,14 @@ class PayablesSyncService
                 $this->enrichLaunchersAfterSync($enrichIds);
             }
 
-            // Depto depende de UsuGer (local, sem SOAP extra).
-            $this->resolveDepartmentsAfterSync($enrichIds);
-
             if ($supplierMax > 0 && microtime(true) < $deadline) {
                 $this->syncMissingSuppliersAfterPayables($enrichIds);
-            } elseif ($supplierMax > 0) {
+            }
+
+            // Depto + status (depende de UsuGer e nome do fornecedor).
+            $this->resolveDepartmentsAfterSync($enrichIds);
+
+            if ($supplierMax > 0 && microtime(true) >= $deadline) {
                 Log::warning('[senior-cp] enrich fornecedores pulado (teto de tempo)', [
                     'run_id' => $run->id,
                     'max_seconds' => $maxSec,
@@ -378,8 +380,7 @@ class PayablesSyncService
     }
 
     /**
-     * Materializa department_id a partir do UsuGer. Sem fallback Financeiro —
-     * títulos Senior sem depto ficam em aguardando_vinculo_departamento.
+     * Materializa department_id e status de prontidão (depto + fornecedor).
      *
      * @param  list<int>  $payableIds
      */
@@ -398,45 +399,60 @@ class PayablesSyncService
             ->orderBy('id')
             ->chunkById(200, function ($chunk) use ($financeiroId, &$changed) {
                 foreach ($chunk as $payable) {
-                    if ($this->applyDepartmentResolution($payable, $financeiroId)) {
+                    if ($this->applyPostSyncReadiness($payable, $financeiroId)) {
                         $changed++;
                     }
                 }
             });
 
         if ($changed > 0) {
-            Log::info('[senior-cp] departamentos materializados pós-sync', ['changed' => $changed]);
+            Log::info('[senior-cp] prontidão pós-sync (depto/fornecedor)', ['changed' => $changed]);
         }
 
         return $changed;
     }
 
     /**
-     * Resolve department_id e status após enrich de UsuGer.
-     * Retorna true se houve alteração no registro.
+     * Resolve department_id e status após enrich de UsuGer/fornecedor.
+     * Título Senior só libera (pendente) com depto e nome real do fornecedor.
      */
-    public function applyDepartmentResolution(Payable $payable, ?int $financeiroId = null): bool
+    public function applyPostSyncReadiness(Payable $payable, ?int $financeiroId = null): bool
     {
         $financeiroId ??= Department::financeDepartmentId();
-        $nextId = $this->resolveDepartmentIdForPayable($payable, $financeiroId);
+        $resolver = new SupplierDisplayNameResolver();
+        $nextDeptId = $this->resolveDepartmentIdForPayable($payable, $financeiroId);
+        $hasDept = $nextDeptId !== null;
+        $hasSupplier = ! $resolver->isGeneric($payable->supplier_name);
+
+        if (! $payable->senior_id) {
+            if ($hasDept && (int) $payable->department_id !== $nextDeptId) {
+                $payable->update(['department_id' => $nextDeptId]);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        $ready = $hasDept && $hasSupplier;
         $updates = [];
 
-        if ($nextId !== null) {
-            if ((int) $payable->department_id !== $nextId) {
-                $updates['department_id'] = $nextId;
+        if ($hasDept) {
+            if ((int) $payable->department_id !== $nextDeptId) {
+                $updates['department_id'] = $nextDeptId;
             }
+        } elseif ($payable->department_id !== null
+            && $financeiroId
+            && (int) $payable->department_id === (int) $financeiroId) {
+            $updates['department_id'] = null;
+        }
+
+        if ($ready) {
             if ($payable->status === Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO) {
                 $updates['status'] = 'pendente';
             }
-        } elseif ($payable->senior_id) {
-            if ($payable->department_id !== null
-                && $financeiroId
-                && (int) $payable->department_id === (int) $financeiroId) {
-                $updates['department_id'] = null;
-            }
-            if ($payable->status !== Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO) {
-                $updates['status'] = Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO;
-            }
+        } elseif ($payable->status !== Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO) {
+            $updates['status'] = Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO;
         }
 
         if ($updates === []) {
@@ -446,6 +462,12 @@ class PayablesSyncService
         $payable->update($updates);
 
         return true;
+    }
+
+    /** @deprecated Use applyPostSyncReadiness */
+    public function applyDepartmentResolution(Payable $payable, ?int $financeiroId = null): bool
+    {
+        return $this->applyPostSyncReadiness($payable, $financeiroId);
     }
 
     /**

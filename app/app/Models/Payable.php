@@ -203,7 +203,7 @@ class Payable extends Model
     // Status labels
     public const STATUS_LABELS = [
         'pendente' => 'Pendente',
-        self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO => 'Aguard. vínculo depto',
+        self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO => 'Aguard. sincronização',
         'em_preparacao' => 'Em Preparação',
         'aguardando_aprovacao' => 'Em Aprovação',
         'aprovado' => 'Aprovado',
@@ -331,10 +331,38 @@ class Payable extends Model
         return $this->status === 'pendente' && filled($this->rejection_reason);
     }
 
-    /** Importado da Senior sem departamento resolvível (sem fallback Financeiro). */
+    /** Importado da Senior aguardando dept/fornecedor na sincronização. */
     public function isAwaitingDepartmentLink(): bool
     {
         return $this->status === self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO;
+    }
+
+    /** @alias isAwaitingDepartmentLink */
+    public function isAwaitingSeniorSync(): bool
+    {
+        return $this->isAwaitingDepartmentLink();
+    }
+
+    /** Motivo legível quando status = aguardando sincronização. */
+    public function awaitingSyncDetail(): ?string
+    {
+        if (! $this->isAwaitingSeniorSync()) {
+            return null;
+        }
+
+        $parts = [];
+        if ($this->department_id === null) {
+            $parts[] = 'departamento';
+        }
+        if ((new \App\Services\Senior\SupplierDisplayNameResolver())->isGeneric($this->supplier_name)) {
+            $parts[] = 'fornecedor';
+        }
+
+        if ($parts === []) {
+            return 'Dados Senior pendentes';
+        }
+
+        return 'Aguardando '.implode(' e ', $parts).' na sincronização';
     }
 
     /**
@@ -837,8 +865,8 @@ class Payable extends Model
                     ? ['No borderô', null, 'info']
                     : ['Aguardando envio', null, 'warn']),
             self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO => [
-                'Aguard. vínculo depto',
-                'Lançador Senior sem departamento no Hub',
+                'Aguard. sincronização',
+                $payable->awaitingSyncDetail(),
                 'secondary',
             ],
             'em_preparacao' => ['Em preparação', null, 'info'],

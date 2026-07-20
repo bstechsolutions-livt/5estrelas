@@ -102,6 +102,24 @@ class FornecedoresSyncService
         $enriched = $this->enrichPayables($prioritizePayableIds);
         $enrichedDesc = $this->enrichFromDescriptions($prioritizePayableIds);
 
+        $reevalIds = array_values(array_unique(array_filter(array_map('intval', $prioritizePayableIds ?? []), fn (int $id) => $id > 0)));
+        if ($reevalIds === [] && ($enriched > 0 || $enrichedDesc > 0 || $lookedUp > 0)) {
+            $reevalIds = Payable::query()
+                ->whereNotNull('senior_id')
+                ->whereNull('senior_missing_at')
+                ->where(function ($q) {
+                    $q->where('status', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO)
+                        ->orWhere('supplier_name', 'like', 'Fornecedor %');
+                })
+                ->orderByDesc('id')
+                ->limit(500)
+                ->pluck('id')
+                ->all();
+        }
+        if ($reevalIds !== [] && ($enriched > 0 || $enrichedDesc > 0 || $lookedUp > 0)) {
+            PayablesSyncService::make()->resolveDepartmentsAfterSync($reevalIds);
+        }
+
         if ($lookedUp > 0 || $enriched > 0 || $enrichedDesc > 0) {
             Log::info('[senior-fornecedor] sync delta concluído', [
                 'trigger' => $trigger,

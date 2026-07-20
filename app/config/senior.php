@@ -152,7 +152,7 @@ return [
 
     // Pós-sync: quantos codFor faltantes buscar no cad_fornecedor (prioriza títulos novos).
     // 0 = desliga (cron/fornecedores separado cobre).
-    'post_sync_supplier_lookups' => (int) env('SENIOR_POST_SYNC_SUPPLIER_LOOKUPS', 0),
+    'post_sync_supplier_lookups' => (int) env('SENIOR_POST_SYNC_SUPPLIER_LOOKUPS', 80),
 
     // Teto de parede (segundos) para enrich pós-sync; estouro pula o restante.
     'post_sync_enrich_max_seconds' => (int) env('SENIOR_POST_SYNC_ENRICH_MAX_SECONDS', 30),

@@ -312,7 +312,7 @@ class PayablePostSyncEnrichTest extends TestCase
 
         $payable = Payable::create([
             'title_number' => 'T-UNLOCK',
-            'supplier_name' => 'ACME',
+            'supplier_name' => 'ACME LTDA',
             'amount' => 10,
             'due_date' => '2026-08-01',
             'status' => Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO,
@@ -335,6 +335,42 @@ class PayablePostSyncEnrichTest extends TestCase
         $fresh = $payable->fresh();
         $this->assertSame($compras->id, (int) $fresh->department_id);
         $this->assertSame('pendente', $fresh->status);
+    }
+
+    public function test_aguarda_sync_quando_fornecedor_generico(): void
+    {
+        $compras = Department::create(['name' => 'Compras', 'slug' => 'compras', 'is_active' => true]);
+        User::factory()->create([
+            'is_active' => true,
+            'senior_cod_usu' => 77,
+            'department_id' => $compras->id,
+        ]);
+
+        $payable = Payable::create([
+            'title_number' => 'T-SUP',
+            'supplier_name' => 'Fornecedor 999',
+            'amount' => 10,
+            'due_date' => '2026-08-01',
+            'status' => 'pendente',
+            'senior_id' => '2-1-T-SUP-01-1',
+            'senior_cod_usu' => 77,
+        ]);
+
+        $changed = (new PayablesSyncService(
+            new class extends SeniorCpClient {
+                public function __construct()
+                {
+                    parent::__construct(config('senior'));
+                }
+            },
+            new PayableMapper(),
+            new StatusMapper(),
+        ))->resolveDepartmentsAfterSync([$payable->id]);
+
+        $this->assertSame(1, $changed);
+        $fresh = $payable->fresh();
+        $this->assertSame($compras->id, (int) $fresh->department_id);
+        $this->assertSame(Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO, $fresh->status);
     }
 
     public function test_sync_insert_aguarda_vinculo_sem_lancador(): void
