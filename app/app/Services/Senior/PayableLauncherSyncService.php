@@ -320,6 +320,8 @@ class PayableLauncherSyncService
 
         $payable->update($this->launcherUpdatePayload($payable, $usuGer));
 
+        PayablesSyncService::make()->applyDepartmentResolution($payable->fresh());
+
         return 'updated';
     }
 

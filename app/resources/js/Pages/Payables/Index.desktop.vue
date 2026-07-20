@@ -179,6 +179,7 @@ function selectIssuePreset(key) {
 
 const statusList = [
     { label: 'Pendentes', value: 'pendente', color: 'amber' },
+    { label: 'Aguard. vínculo', value: 'aguardando_vinculo_departamento', color: 'gray' },
     { label: 'Em Preparação', value: 'em_preparacao', color: 'blue' },
     { label: 'Em Aprovação', value: 'aguardando_aprovacao', color: 'orange' },
     { label: 'Aprovados', value: 'aprovado', color: 'green' },
@@ -189,6 +190,7 @@ const statusList = [
 const statusTabHint = computed(() => {
     const hints = {
         pendente: 'Títulos que ainda não foram enviados para aprovação.',
+        aguardando_vinculo_departamento: 'Importados da Senior sem departamento identificado. Não podem ser abertos até a sincronização vincular o lançador.',
         em_preparacao: 'Títulos em preparação antes do envio.',
         aguardando_aprovacao: 'Títulos em fluxo de aprovação — a coluna Etapa mostra em qual nível cada um está.',
         aprovado: 'Títulos aprovados aguardando pagamento.',
@@ -386,6 +388,19 @@ function goShow(id) {
     const main = document.querySelector('main.overflow-y-auto')
     if (main) sessionStorage.setItem('payables_scroll', main.scrollTop.toString())
     router.visit(`/financeiro/contas-pagar/${id}`)
+}
+
+function isAwaitingDepartmentLink(payable) {
+    return payable.status === 'aguardando_vinculo_departamento'
+}
+
+function onRowClick(payable) {
+    if (isAwaitingDepartmentLink(payable)) return
+    goShow(payable.id)
+}
+
+function payableRowClass(payable) {
+    return isAwaitingDepartmentLink(payable) ? 'payable-row-awaiting-dept' : ''
 }
 
 // Seleção e ações em lote
@@ -623,6 +638,18 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                 </button>
             </div>
             <p v-if="statusTabHint" class="text-xs text-gray-500 mb-4 -mt-3">{{ statusTabHint }}</p>
+
+            <div
+                v-if="status === 'aguardando_vinculo_departamento'"
+                class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                dusk="awaiting-dept-banner"
+            >
+                <p class="font-medium">Aguardando vínculo do departamento</p>
+                <p class="mt-1 text-xs text-amber-800">
+                    Estes títulos foram importados da Senior, mas o lançador ainda não tem departamento no Hub.
+                    Eles ficam bloqueados até a próxima sincronização resolver o vínculo — não use Financeiro como fallback.
+                </p>
+            </div>
 
             <!-- Filtros -->
             <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 space-y-3">
@@ -862,7 +889,9 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
 
             <!-- Tabela -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 payables-table overflow-hidden">
-                <DataTable :value="payables.data" striped-rows size="small" class="cursor-pointer w-full"
+                <DataTable :value="payables.data" striped-rows size="small"
+                    :class="status === 'aguardando_vinculo_departamento' ? 'w-full' : 'cursor-pointer w-full'"
+                    :row-class="payableRowClass"
                     table-style="table-layout: fixed; width: 100%"
                     :lazy="true" :paginator="true" :rows="payables.per_page" :total-records="payables.total"
                     :first="(payables.current_page - 1) * payables.per_page"
@@ -890,8 +919,16 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </Column>
                     <Column field="title_number" header="Nº" style="width: 7%" sortable>
                         <template #body="{ data }">
-                            <div class="flex flex-col items-start gap-0.5 py-0.5 min-w-0" @click="goShow(data.id)">
+                            <div class="flex flex-col items-start gap-0.5 py-0.5 min-w-0" @click="onRowClick(data)">
                                 <span class="text-xs font-medium whitespace-nowrap leading-none" :title="data.title_number">{{ data.title_number }}</span>
+                                <Tag
+                                    v-if="isAwaitingDepartmentLink(data)"
+                                    value="Sem depto"
+                                    severity="warn"
+                                    class="!text-[9px] !px-1.5 !py-0 leading-tight"
+                                    title="Aguardando vínculo do departamento na sincronização"
+                                    dusk="awaiting-dept-tag"
+                                />
                                 <Tag
                                     v-if="wasRejectedBack(data)"
                                     value="Recusado"
@@ -927,33 +964,38 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </Column>
                     <Column field="department_nome" header="Depto" style="width: 9%" sortable dusk="col-departamento">
                         <template #body="{ data }">
-                            <span class="cell-truncate text-xs text-gray-600" :title="data.department_nome" @click="goShow(data.id)">{{ data.department_nome || '—' }}</span>
+                            <span
+                                class="cell-truncate text-xs"
+                                :class="isAwaitingDepartmentLink(data) ? 'text-amber-700 italic' : 'text-gray-600'"
+                                :title="isAwaitingDepartmentLink(data) ? 'Aguardando vínculo do departamento' : data.department_nome"
+                                @click="onRowClick(data)"
+                            >{{ isAwaitingDepartmentLink(data) ? 'Aguardando vínculo' : (data.department_nome || '—') }}</span>
                         </template>
                     </Column>
                     <Column field="filial_nome" header="Filial" style="width: 10%" sortable dusk="col-filial">
                         <template #body="{ data }">
                             <span class="cell-truncate text-xs font-medium text-gray-800" :title="data.filial_label || data.filial_nome"
-                                @click="goShow(data.id)">{{ data.filial_label || data.filial_nome || '—' }}</span>
+                                @click="onRowClick(data)">{{ data.filial_label || data.filial_nome || '—' }}</span>
                         </template>
                     </Column>
                     <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '20%' : '18%' }" sortable>
                         <template #body="{ data }">
-                            <span class="cell-truncate text-xs" :title="data.supplier_display_name || data.supplier_name" @click="goShow(data.id)">{{ data.supplier_display_name || data.supplier_name }}</span>
+                            <span class="cell-truncate text-xs" :title="data.supplier_display_name || data.supplier_name" @click="onRowClick(data)">{{ data.supplier_display_name || data.supplier_name }}</span>
                         </template>
                     </Column>
                     <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '18%' : '16%' }" sortable>
                         <template #body="{ data }">
-                            <span class="cell-truncate text-xs text-gray-600" :title="data.description" @click="goShow(data.id)">{{ data.description || '—' }}</span>
+                            <span class="cell-truncate text-xs text-gray-600" :title="data.description" @click="onRowClick(data)">{{ data.description || '—' }}</span>
                         </template>
                     </Column>
                     <Column field="amount" header="Valor" style="width: 10%" sortable>
                         <template #body="{ data }">
-                            <span class="text-xs font-semibold whitespace-nowrap" @click="goShow(data.id)">{{ formatMoney(data.amount) }}</span>
+                            <span class="text-xs font-semibold whitespace-nowrap" @click="onRowClick(data)">{{ formatMoney(data.amount) }}</span>
                         </template>
                     </Column>
                     <Column field="due_date" header="Vencimento" style="width: 8%" sortable>
                         <template #body="{ data }">
-                            <span class="text-xs whitespace-nowrap" @click="goShow(data.id)">{{ formatDate(data.due_date) }}</span>
+                            <span class="text-xs whitespace-nowrap" @click="onRowClick(data)">{{ formatDate(data.due_date) }}</span>
                         </template>
                     </Column>
                     <Column v-if="status !== 'pendente'" field="payment_priority" header="Prioridade" style="width: 7%" sortable>
@@ -963,14 +1005,14 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                                 :value="data.priority_label"
                                 :severity="prioritySeverity[data.payment_priority] || 'secondary'"
                                 class="!text-[10px] whitespace-nowrap"
-                                @click="goShow(data.id)"
+                                @click="onRowClick(data)"
                             />
-                            <span v-else class="text-xs text-gray-300" @click="goShow(data.id)">—</span>
+                            <span v-else class="text-xs text-gray-300" @click="onRowClick(data)">—</span>
                         </template>
                     </Column>
                     <Column v-if="!['pago', 'aguardando_conciliacao', 'conciliado'].includes(status)" field="workflow_moment" header="Aprovador" style="width: 14%; min-width: 8.5rem" sortable dusk="col-etapa">
                         <template #body="{ data }">
-                            <div class="flex flex-col gap-0.5 min-w-0" @click="goShow(data.id)">
+                            <div class="flex flex-col gap-0.5 min-w-0" @click="onRowClick(data)">
                                 <span
                                     class="cell-truncate text-xs font-medium"
                                     :class="workflowMomentTextClass(data)"
@@ -1098,5 +1140,13 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
     background: #fff;
     color: #1f2937;
     border-color: #fff;
+}
+.payables-table :deep(tr.payable-row-awaiting-dept) {
+    opacity: 0.65;
+    cursor: not-allowed;
+    background-color: #fffbeb;
+}
+.payables-table :deep(tr.payable-row-awaiting-dept:hover) {
+    background-color: #fef3c7 !important;
 }
 </style>

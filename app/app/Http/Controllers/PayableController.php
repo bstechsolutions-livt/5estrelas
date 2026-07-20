@@ -460,7 +460,7 @@ class PayableController extends Controller
         $status = $request->input('status') ?: 'pendente';
         $query->where('payables.status', $status);
 
-        if ($status === 'pendente') {
+        if (in_array($status, ['pendente', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO], true)) {
             $query->whereNull('payables.bordero_id');
         }
 
@@ -483,7 +483,7 @@ class PayableController extends Controller
         $totalsQuery = Payable::query()
             ->excludeMissingInSenior()
             ->where(function ($q) {
-                $q->where('status', '!=', 'pendente')
+                $q->whereNotIn('status', ['pendente', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO])
                     ->orWhereNull('bordero_id');
             });
         $this->applyPayablesListFilters($totalsQuery, $request, $departmentContext['department_id'], $user);
@@ -680,6 +680,13 @@ class PayableController extends Controller
     public function show(int $id, PayableAlcadaService $alcada)
     {
         $payable = $this->findPayableForUser($id);
+
+        if ($payable->isAwaitingDepartmentLink()) {
+            return redirect()
+                ->route('payables.index', ['status' => Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO])
+                ->with('warning', 'Este título aguarda o vínculo do departamento (lançador Senior). Será liberado automaticamente após a sincronização identificar o departamento.');
+        }
+
         $payable->load([
             'branch:id,name',
             'preparer:id,name',
