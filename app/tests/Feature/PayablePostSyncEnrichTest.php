@@ -270,9 +270,9 @@ class PayablePostSyncEnrichTest extends TestCase
         $this->assertSame($compras->id, (int) $payable->fresh()->department_id);
     }
 
-    public function test_depto_fallback_financeiro_quando_sem_lancador(): void
+    public function test_depto_aguarda_vinculo_quando_sem_lancador(): void
     {
-        $financeiro = Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
+        Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
 
         $payable = Payable::create([
             'title_number' => 'T-FIN',
@@ -280,9 +280,10 @@ class PayablePostSyncEnrichTest extends TestCase
             'amount' => 10,
             'due_date' => '2026-08-01',
             'status' => 'pendente',
+            'senior_id' => '2-1-T-FIN-01-1',
         ]);
 
-        $assigned = (new PayablesSyncService(
+        $changed = (new PayablesSyncService(
             new class extends SeniorCpClient {
                 public function __construct()
                 {
@@ -293,13 +294,52 @@ class PayablePostSyncEnrichTest extends TestCase
             new StatusMapper(),
         ))->resolveDepartmentsAfterSync([$payable->id]);
 
-        $this->assertSame(1, $assigned);
-        $this->assertSame($financeiro->id, (int) $payable->fresh()->department_id);
+        $this->assertSame(1, $changed);
+        $fresh = $payable->fresh();
+        $this->assertNull($fresh->department_id);
+        $this->assertSame(Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO, $fresh->status);
     }
 
-    public function test_sync_insert_aplica_fallback_financeiro(): void
+    public function test_depto_liberado_quando_usuger_mapeado(): void
     {
-        $financeiro = Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
+        $compras = Department::create(['name' => 'Compras', 'slug' => 'compras', 'is_active' => true]);
+        Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
+        User::factory()->create([
+            'is_active' => true,
+            'senior_cod_usu' => 55,
+            'department_id' => $compras->id,
+        ]);
+
+        $payable = Payable::create([
+            'title_number' => 'T-UNLOCK',
+            'supplier_name' => 'ACME',
+            'amount' => 10,
+            'due_date' => '2026-08-01',
+            'status' => Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO,
+            'senior_id' => '2-1-T-UNLOCK-01-1',
+            'senior_cod_usu' => 55,
+        ]);
+
+        $changed = (new PayablesSyncService(
+            new class extends SeniorCpClient {
+                public function __construct()
+                {
+                    parent::__construct(config('senior'));
+                }
+            },
+            new PayableMapper(),
+            new StatusMapper(),
+        ))->resolveDepartmentsAfterSync([$payable->id]);
+
+        $this->assertSame(1, $changed);
+        $fresh = $payable->fresh();
+        $this->assertSame($compras->id, (int) $fresh->department_id);
+        $this->assertSame('pendente', $fresh->status);
+    }
+
+    public function test_sync_insert_aguarda_vinculo_sem_lancador(): void
+    {
+        Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
 
         config([
             'senior.enabled' => true,
@@ -334,6 +374,7 @@ class PayablePostSyncEnrichTest extends TestCase
             ->run(PayableSyncRun::MODE_FULL);
 
         $payable = Payable::where('title_number', 'T-FB')->firstOrFail();
-        $this->assertSame($financeiro->id, (int) $payable->department_id);
+        $this->assertNull($payable->department_id);
+        $this->assertSame(Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO, $payable->status);
     }
 }

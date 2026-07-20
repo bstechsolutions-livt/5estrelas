@@ -136,6 +136,7 @@ function selectIssuePreset(key) {
 
 const statusList = [
     { label: 'Pendentes', value: 'pendente' },
+    { label: 'Aguard. vínculo', value: 'aguardando_vinculo_departamento' },
     { label: 'Preparação', value: 'em_preparacao' },
     { label: 'Em Aprovação', value: 'aguardando_aprovacao' },
     { label: 'Aprovados', value: 'aprovado' },
@@ -146,6 +147,7 @@ const statusList = [
 const statusTabHint = computed(() => {
     const hints = {
         pendente: 'Títulos que ainda não foram enviados para aprovação.',
+        aguardando_vinculo_departamento: 'Sem departamento identificado — bloqueados até a sincronização vincular o lançador.',
         em_preparacao: 'Títulos em preparação antes do envio.',
         aguardando_aprovacao: 'A etiqueta Etapa indica em qual nível de aprovação cada título está.',
         aprovado: 'Títulos aprovados aguardando pagamento.',
@@ -316,6 +318,10 @@ function goShow(id) {
     router.visit(`/financeiro/contas-pagar/${id}`)
 }
 
+function isAwaitingDepartmentLink(payable) {
+    return payable.status === 'aguardando_vinculo_departamento'
+}
+
 // Seleção pra criar borderô (mobile)
 const selectableStatuses = ['pendente', 'em_preparacao']
 const canSelect = computed(() => selectableStatuses.includes(status.value))
@@ -330,6 +336,7 @@ function toggleSelectionMode() {
     if (!selectionMode.value) selected.value = []
 }
 function onCardTap(p) {
+    if (isAwaitingDepartmentLink(p)) return
     if (selectionMode.value && canSelect.value) {
         const i = selected.value.indexOf(p.id)
         if (i >= 0) selected.value.splice(i, 1)
@@ -419,6 +426,12 @@ const currentTotal = computed(() => {
                 </button>
             </div>
             <p v-if="statusTabHint" class="text-[11px] text-gray-500 mt-2">{{ statusTabHint }}</p>
+            <div
+                v-if="status === 'aguardando_vinculo_departamento'"
+                class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900"
+            >
+                Títulos bloqueados até a sincronização identificar o departamento do lançador na Senior.
+            </div>
         </div>
 
         <!-- Resumo da aba ativa -->
@@ -512,9 +525,13 @@ const currentTotal = computed(() => {
         <!-- Lista -->
         <div v-if="payables.data.length" class="px-4 space-y-2" :class="selectionMode && selected.length ? 'pb-28' : 'pb-20'">
             <button v-for="p in payables.data" :key="p.id" @click="onCardTap(p)"
-                :class="['w-full bg-white rounded-xl border p-3 text-left active:bg-gray-50 transition-colors',
-                    selectionMode && isSelected(p.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200']">
-                <p v-if="p.department_nome" class="text-[11px] text-gray-500 truncate mb-0.5" dusk="m-departamento">{{ p.department_nome }}</p>
+                :class="['w-full rounded-xl border p-3 text-left transition-colors',
+                    isAwaitingDepartmentLink(p)
+                        ? 'bg-amber-50/80 border-amber-200 opacity-70 cursor-not-allowed'
+                        : 'bg-white border-gray-200 active:bg-gray-50',
+                    selectionMode && isSelected(p.id) ? 'border-blue-500 ring-2 ring-blue-200' : '']">
+                <p v-if="isAwaitingDepartmentLink(p)" class="text-[11px] text-amber-800 font-medium mb-0.5">Aguardando vínculo do departamento</p>
+                <p v-else-if="p.department_nome" class="text-[11px] text-gray-500 truncate mb-0.5" dusk="m-departamento">{{ p.department_nome }}</p>
                 <p v-if="p.filial_label || p.filial_nome" class="text-[11px] text-gray-600 truncate mb-0.5" dusk="m-filial">{{ p.filial_label || p.filial_nome }}</p>
                 <div class="flex items-start justify-between gap-2 mb-1">
                     <div class="flex items-center gap-2 flex-1 min-w-0">

@@ -198,9 +198,12 @@ class Payable extends Model
         };
     }
 
+    public const STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO = 'aguardando_vinculo_departamento';
+
     // Status labels
     public const STATUS_LABELS = [
         'pendente' => 'Pendente',
+        self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO => 'Aguard. vínculo depto',
         'em_preparacao' => 'Em Preparação',
         'aguardando_aprovacao' => 'Em Aprovação',
         'aprovado' => 'Aprovado',
@@ -214,6 +217,7 @@ class Payable extends Model
 
     public const STATUS_COLORS = [
         'pendente' => 'warn',
+        self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO => 'secondary',
         'em_preparacao' => 'info',
         'aguardando_aprovacao' => 'warn',
         'aprovado' => 'success',
@@ -325,6 +329,12 @@ class Payable extends Model
     public function wasRejectedBack(): bool
     {
         return $this->status === 'pendente' && filled($this->rejection_reason);
+    }
+
+    /** Importado da Senior sem departamento resolvível (sem fallback Financeiro). */
+    public function isAwaitingDepartmentLink(): bool
+    {
+        return $this->status === self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO;
     }
 
     /**
@@ -826,6 +836,11 @@ class Payable extends Model
                 : ($payable->bordero_id
                     ? ['No borderô', null, 'info']
                     : ['Aguardando envio', null, 'warn']),
+            self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO => [
+                'Aguard. vínculo depto',
+                'Lançador Senior sem departamento no Hub',
+                'secondary',
+            ],
             'em_preparacao' => ['Em preparação', null, 'info'],
             'aguardando_aprovacao' => self::workflowMomentFromApprovalStep($currentStep),
             'aprovado' => ['Aguardando pagamento', null, 'success'],

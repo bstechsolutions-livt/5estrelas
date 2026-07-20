@@ -148,7 +148,7 @@ return [
 
     // Pós-sync AbertosCP: quantos Exportar E de UsuGer rodar imediatamente nos inserts.
     // 0 = desliga (recomendado em PRD; use o cron senior:enrich-payable-launchers).
-    'post_sync_launcher_lookups' => (int) env('SENIOR_POST_SYNC_LAUNCHER_LOOKUPS', 0),
+    'post_sync_launcher_lookups' => (int) env('SENIOR_POST_SYNC_LAUNCHER_LOOKUPS', 80),
 
     // Pós-sync: quantos codFor faltantes buscar no cad_fornecedor (prioriza títulos novos).
     // 0 = desliga (cron/fornecedores separado cobre).
