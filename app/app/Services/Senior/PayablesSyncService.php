@@ -456,7 +456,8 @@ class PayablesSyncService
         $resolver = new SupplierDisplayNameResolver();
         $nextDeptId = $this->resolveDepartmentIdForPayable($payable, $financeiroId);
         $hasDept = $nextDeptId !== null;
-        $hasSupplier = ! $resolver->isGeneric($payable->supplier_name);
+        $resolvedSupplier = $resolver->resolveForPayable($payable);
+        $hasSupplier = ! $resolver->isGeneric($resolvedSupplier);
 
         if (! $payable->senior_id) {
             if ($hasDept && (int) $payable->department_id !== $nextDeptId) {
@@ -471,10 +472,11 @@ class PayablesSyncService
         $ready = $hasDept && $hasSupplier;
         $updates = [];
 
-        if ($hasDept) {
-            if ((int) $payable->department_id !== $nextDeptId) {
-                $updates['department_id'] = $nextDeptId;
-            }
+        if ($hasDept && (int) $payable->department_id !== $nextDeptId) {
+            $updates['department_id'] = $nextDeptId;
+        }
+        if ($hasSupplier && $payable->supplier_name !== $resolvedSupplier) {
+            $updates['supplier_name'] = $resolvedSupplier;
         } elseif ($payable->department_id !== null
             && $financeiroId
             && (int) $payable->department_id === (int) $financeiroId) {

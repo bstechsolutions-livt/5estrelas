@@ -51,6 +51,16 @@ class ReconcilePayableSyncReadiness extends Command
         }
 
         $before = count($ids);
+        $cacheEnriched = FornecedoresSyncService::make()->enrichPayables($ids);
+        PayablesSyncService::make()->resolveDepartmentsAfterSync($ids);
+        $ids = PayablesSyncService::make()->awaitingSyncPayableIds();
+        if ($ids === []) {
+            $this->info("Cache: {$cacheEnriched} nome(s) materializado(s). Fila esvaziada.");
+
+            return self::SUCCESS;
+        }
+        $before = count($ids);
+
         $launcher = PayableLauncherSyncService::make()->enrichByPayableIds(
             $ids,
             maxLookups: (int) $this->option('launcher-max'),
