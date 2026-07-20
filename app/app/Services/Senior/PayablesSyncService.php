@@ -632,6 +632,13 @@ class PayablesSyncService
                     }
                 }
             }
+
+            $legacyDeptId = Department::departmentIdForLegacySeniorCodUsu($codUsu);
+            if ($legacyDeptId !== null) {
+                if ($payable->department_id === null || (int) $payable->department_id === (int) $financeiroId) {
+                    return $legacyDeptId;
+                }
+            }
         }
 
         if ($payable->department_id) {

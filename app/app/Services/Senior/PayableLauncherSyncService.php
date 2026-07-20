@@ -351,6 +351,12 @@ class PayableLauncherSyncService
                     $payload['department_id'] = (int) $dept->id;
                 }
             }
+        } else {
+            $legacyDeptId = Department::departmentIdForLegacySeniorCodUsu($usuGer);
+            if ($legacyDeptId !== null
+                && ($payable->department_id === null || (int) $payable->department_id === (int) $financeiroId)) {
+                $payload['department_id'] = $legacyDeptId;
+            }
         }
 
         return $payload;

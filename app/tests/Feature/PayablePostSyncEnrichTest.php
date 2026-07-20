@@ -471,4 +471,35 @@ class PayablePostSyncEnrichTest extends TestCase
         $this->assertSame(0, $changed);
         $this->assertSame('aguardando_aprovacao', $payable->fresh()->status);
     }
+
+    public function test_usuger_legado_95_vai_para_financeiro_sem_usuario_intranet(): void
+    {
+        $financeiro = Department::create(['name' => 'Financeiro', 'slug' => 'financeiro', 'is_active' => true]);
+
+        $payable = Payable::create([
+            'title_number' => 'T-LEG95',
+            'supplier_name' => 'ACME LTDA',
+            'amount' => 10,
+            'due_date' => '2026-08-01',
+            'status' => Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO,
+            'senior_id' => '2-1-T-LEG95-01-1',
+            'senior_cod_usu' => 95,
+        ]);
+
+        $changed = (new PayablesSyncService(
+            new class extends SeniorCpClient {
+                public function __construct()
+                {
+                    parent::__construct(config('senior'));
+                }
+            },
+            new PayableMapper(),
+            new StatusMapper(),
+        ))->resolveDepartmentsAfterSync([$payable->id]);
+
+        $this->assertSame(1, $changed);
+        $fresh = $payable->fresh();
+        $this->assertSame($financeiro->id, (int) $fresh->department_id);
+        $this->assertSame('pendente', $fresh->status);
+    }
 }
