@@ -160,6 +160,15 @@ return [
     // Cron enrich UsuGer: teto de Exportar E por ciclo (após bulk ConsultarGeral).
     'enrich_launcher_max_lookups' => (int) env('SENIOR_ENRICH_LAUNCHER_MAX', 400),
 
+    // Enrich via fila Redis (recomendado em PRD): desacopla SOAP do sync CP.
+    'enrich_use_queue' => filter_var(env('SENIOR_ENRICH_USE_QUEUE', false), FILTER_VALIDATE_BOOL),
+    'enrich_launcher_queue' => env('SENIOR_ENRICH_LAUNCHER_QUEUE', 'senior-launcher'),
+    'enrich_supplier_queue' => env('SENIOR_ENRICH_SUPPLIER_QUEUE', 'senior-supplier'),
+    'enrich_readiness_queue' => env('SENIOR_ENRICH_READINESS_QUEUE', 'senior-readiness'),
+    'enrich_job_chunk_size' => (int) env('SENIOR_ENRICH_JOB_CHUNK_SIZE', 40),
+    'enrich_cron_launcher_max' => (int) env('SENIOR_ENRICH_CRON_LAUNCHER_MAX', 80),
+    'enrich_cron_supplier_max' => (int) env('SENIOR_ENRICH_CRON_SUPPLIER_MAX', 80),
+
     // Tamanho de lote para upsert e paginação (requirement 4.6 / 1.8).
     'batch_size' => 500,
 ];

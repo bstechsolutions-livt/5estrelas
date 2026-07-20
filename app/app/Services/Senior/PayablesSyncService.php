@@ -321,6 +321,12 @@ class PayablesSyncService
      */
     private function safePostSyncEnrich(PayableSyncRun $run, array $enrichIds): void
     {
+        if (config('senior.enrich_use_queue', false)) {
+            PayableEnrichQueueDispatcher::make()->dispatchPostSync($enrichIds);
+
+            return;
+        }
+
         $launcherMax = (int) config('senior.post_sync_launcher_lookups', 80);
         $supplierMax = (int) config('senior.post_sync_supplier_lookups', 0);
         $maxSec = max(15, (int) config('senior.post_sync_enrich_max_seconds', 90));
@@ -397,6 +403,15 @@ class PayablesSyncService
         }
 
         return $query->pluck('id')->all();
+    }
+
+    /**
+     * @param  list<int>  $enrichIds
+     * @return list<int>
+     */
+    public function mergedEnrichPayableIds(array $enrichIds, int $awaitingLimit = 80): array
+    {
+        return $this->mergeEnrichIdsWithAwaitingSync($enrichIds, $awaitingLimit);
     }
 
     /**
