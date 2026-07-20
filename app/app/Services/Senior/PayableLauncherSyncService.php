@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Preenche payables.senior_cod_usu a partir do UsuGer (lançador) do prj.contaspagar.
+ * Sempre pontual: 1 título = 1 Exportar E. Sem ConsultarGeral em lote.
  * Sem fallback: se a Senior não devolver UsuGer > 0, o título permanece sem lançador.
  */
 class PayableLauncherSyncService
@@ -23,7 +24,8 @@ class PayableLauncherSyncService
     }
 
     /**
-     * Enrich imediato pós-insert do sync AbertosCP (só os IDs novos).
+     * Enrich pontual (fila / pós-sync): 1 título = 1 Exportar E na Senior.
+     * Sem ConsultarGeral em lote — sync AbertosCP já trouxe os títulos.
      *
      * @param  list<int>  $payableIds
      * @return array{status:string, bulk_matched:int, looked_up:int, updated:int, errors:int, skipped:int, message:?string}
@@ -51,44 +53,12 @@ class PayableLauncherSyncService
             ->orderByDesc('id')
             ->get();
 
-        $bulkMatched = 0;
-        $errors = 0;
-        $pairs = $payables
-            ->map(fn (Payable $p) => [(int) $p->codemp, (int) $p->codfil])
-            ->unique(fn (array $pair) => $pair[0] . '-' . $pair[1])
-            ->values();
-
-        foreach ($pairs as [$codEmp, $codFil]) {
-            if ($codEmp < 1 || $codFil < 1) {
-                continue;
-            }
-            try {
-                $bulkMatched += $this->applyBulkConsultarGeral($codEmp, $codFil);
-            } catch (SeniorException $e) {
-                $errors++;
-                Log::warning('[senior-launcher] ConsultarGeral falhou (pos-insert)', [
-                    'codEmp' => $codEmp,
-                    'codFil' => $codFil,
-                    'erro' => $e->getMessage(),
-                    'trigger' => $trigger,
-                ]);
-            }
-        }
-
-        // Recarrega quem ainda falta após o bulk.
-        $remaining = Payable::query()
-            ->whereIn('id', $ids)
-            ->where(function ($q) {
-                $q->whereNull('senior_cod_usu')->orWhere('senior_cod_usu', '<=', 0);
-            })
-            ->orderByDesc('id')
-            ->get();
-
         $lookedUp = 0;
-        $updated = $bulkMatched;
+        $updated = 0;
+        $errors = 0;
         $skipped = 0;
 
-        foreach ($remaining as $payable) {
+        foreach ($payables as $payable) {
             if ($maxLookups !== null && $lookedUp >= $maxLookups) {
                 break;
             }
@@ -107,10 +77,9 @@ class PayableLauncherSyncService
             }
         }
 
-        Log::info('[senior-launcher] enrich por IDs concluído', [
+        Log::info('[senior-launcher] enrich pontual por IDs', [
             'trigger' => $trigger,
             'ids' => count($ids),
-            'bulk_matched' => $bulkMatched,
             'looked_up' => $lookedUp,
             'updated' => $updated,
             'errors' => $errors,
@@ -119,7 +88,7 @@ class PayableLauncherSyncService
 
         return [
             'status' => 'ok',
-            'bulk_matched' => $bulkMatched,
+            'bulk_matched' => 0,
             'looked_up' => $lookedUp,
             'updated' => $updated,
             'errors' => $errors,
@@ -129,6 +98,8 @@ class PayableLauncherSyncService
     }
 
     /**
+     * Cron/manual: UsuGer só via Exportar pontual (1 título por chamada).
+     *
      * @return array{status:string, bulk_matched:int, looked_up:int, updated:int, errors:int, skipped:int, message:?string}
      */
     public function run(
@@ -141,27 +112,10 @@ class PayableLauncherSyncService
             return $this->emptyResult('skipped', 'Integração Senior desabilitada.');
         }
 
-        $bulkMatched = 0;
         $updated = 0;
         $errors = 0;
         $lookedUp = 0;
         $skipped = 0;
-
-        $bulkPairs = $this->bulkPairsForRun($codEmp, $codFil);
-        foreach ($bulkPairs as [$emp, $fil]) {
-            try {
-                $bulkMatched += $this->applyBulkConsultarGeral($emp, $fil);
-            } catch (SeniorException $e) {
-                $errors++;
-                Log::warning('[senior-launcher] ConsultarGeral falhou', [
-                    'codEmp' => $emp,
-                    'codFil' => $fil,
-                    'erro' => $e->getMessage(),
-                    'trigger' => $trigger,
-                ]);
-            }
-        }
-        $updated += $bulkMatched;
 
         $query = Payable::query()
             ->whereNotNull('codemp')
@@ -216,11 +170,10 @@ class PayableLauncherSyncService
             }
         }
 
-        Log::info('[senior-launcher] enrich concluído', [
+        Log::info('[senior-launcher] enrich pontual concluído', [
             'trigger' => $trigger,
             'codEmp' => $codEmp,
             'codFil' => $codFil,
-            'bulk_matched' => $bulkMatched,
             'looked_up' => $lookedUp,
             'updated' => $updated,
             'errors' => $errors,
@@ -234,7 +187,7 @@ class PayableLauncherSyncService
 
         return [
             'status' => 'ok',
-            'bulk_matched' => $bulkMatched,
+            'bulk_matched' => 0,
             'looked_up' => $lookedUp,
             'updated' => $updated,
             'errors' => $errors,
@@ -257,44 +210,6 @@ class PayableLauncherSyncService
             'skipped' => 0,
             'message' => $message,
         ];
-    }
-
-    /**
-     * Pares (codEmp, codFil) para bulk ConsultarGeral.
-     * Sem filtro: todas as filiais ativas com títulos ainda sem lançador.
-     *
-     * @return list<array{0:int,1:int}>
-     */
-    private function bulkPairsForRun(?int $codEmp, ?int $codFil): array
-    {
-        if ($codEmp && $codFil) {
-            return [[$codEmp, $codFil]];
-        }
-
-        $query = Payable::query()
-            ->select('codemp', 'codfil')
-            ->whereNotNull('codemp')
-            ->whereNotNull('codfil')
-            ->where(function ($q) {
-                $q->whereNull('senior_cod_usu')->orWhere('senior_cod_usu', '<=', 0);
-            });
-
-        if ($codEmp) {
-            $query->where('codemp', $codEmp);
-        }
-        if ($codFil) {
-            $query->where('codfil', $codFil);
-        }
-
-        return $query
-            ->distinct()
-            ->orderBy('codemp')
-            ->orderBy('codfil')
-            ->get()
-            ->map(fn ($row) => [(int) $row->codemp, (int) $row->codfil])
-            ->filter(fn (array $pair) => $pair[0] > 0 && $pair[1] > 0)
-            ->values()
-            ->all();
     }
 
     /** @return 'updated'|'looked'|'error'|'skipped' */
@@ -360,47 +275,5 @@ class PayableLauncherSyncService
         }
 
         return $payload;
-    }
-
-    private function applyBulkConsultarGeral(int $codEmp, int $codFil): int
-    {
-        $rows = $this->client->consultarGeral($codEmp, $codFil);
-        $updated = 0;
-
-        foreach ($rows as $row) {
-            $usuGer = (int) ($row['UsuGer'] ?? 0);
-            if ($usuGer <= 0) {
-                continue;
-            }
-
-            $numTit = ltrim((string) $row['NumTit'], '0');
-            if ($numTit === '') {
-                $numTit = (string) $row['NumTit'];
-            }
-
-            $query = Payable::query()
-                ->where('codemp', (int) $row['CodEmp'])
-                ->where('codfil', (int) $row['CodFil'])
-                ->where('codfor', (int) $row['CodFor'])
-                ->where(function ($q) {
-                    $q->whereNull('senior_cod_usu')->orWhere('senior_cod_usu', '<=', 0);
-                })
-                ->where(function ($q) use ($row, $numTit) {
-                    $q->where('title_number', (string) $row['NumTit'])
-                        ->orWhere('title_number', $numTit);
-                });
-
-            if ($row['CodTpt'] !== '') {
-                $query->where('codtpt', $row['CodTpt']);
-            }
-
-            $payables = $query->get();
-            foreach ($payables as $payable) {
-                $payable->update($this->launcherUpdatePayload($payable, $usuGer));
-                $updated++;
-            }
-        }
-
-        return $updated;
     }
 }
