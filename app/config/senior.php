@@ -162,7 +162,7 @@ return [
     // Teto de parede (segundos) para enrich pós-sync; estouro pula o restante.
     'post_sync_enrich_max_seconds' => (int) env('SENIOR_POST_SYNC_ENRICH_MAX_SECONDS', 30),
 
-    // Cron enrich UsuGer: teto de Exportar E por ciclo (após bulk ConsultarGeral).
+    // Cron enrich UsuGer: teto de Exportar E pontual por ciclo.
     'enrich_launcher_max_lookups' => (int) env('SENIOR_ENRICH_LAUNCHER_MAX', 400),
 
     // Enrich via fila Redis (recomendado em PRD): desacopla SOAP do sync CP.
