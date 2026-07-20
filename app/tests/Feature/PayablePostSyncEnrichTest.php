@@ -444,4 +444,31 @@ class PayablePostSyncEnrichTest extends TestCase
         $this->assertNull($payable->department_id);
         $this->assertSame(Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO, $payable->status);
     }
+
+    public function test_nao_reclassifica_titulo_em_aprovacao(): void
+    {
+        $payable = Payable::create([
+            'title_number' => 'T-APROV',
+            'supplier_name' => 'Fornecedor 123',
+            'amount' => 10,
+            'due_date' => '2026-08-01',
+            'status' => 'aguardando_aprovacao',
+            'senior_id' => '2-1-T-APROV-01-1',
+            'department_id' => null,
+        ]);
+
+        $changed = (new PayablesSyncService(
+            new class extends SeniorCpClient {
+                public function __construct()
+                {
+                    parent::__construct(config('senior'));
+                }
+            },
+            new PayableMapper(),
+            new StatusMapper(),
+        ))->resolveDepartmentsAfterSync([$payable->id]);
+
+        $this->assertSame(0, $changed);
+        $this->assertSame('aguardando_aprovacao', $payable->fresh()->status);
+    }
 }
