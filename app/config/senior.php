@@ -134,7 +134,8 @@ return [
     'timeout_response' => (int) env('SENIOR_TIMEOUT_RESPONSE', 60),
 
     // Tentativas adicionais em erro transitório (requirement 1.10 / 2.4).
-    'max_retries' => 3,
+    // Em PRD com middleware saturado, 1 evita job estourar timeout no retry.
+    'max_retries' => max(0, (int) env('SENIOR_MAX_RETRIES', 1)),
 
     // Data-base da janela de vencimento (vctIni) no sync incremental.
     // Títulos com vencimento a partir desta data entram na varredura a cada ciclo.

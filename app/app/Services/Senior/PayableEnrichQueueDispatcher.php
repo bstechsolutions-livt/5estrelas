@@ -89,18 +89,25 @@ class PayableEnrichQueueDispatcher
         $launcherJobs = 0;
         $supplierJobs = 0;
         $readinessJobs = 0;
+        $launcherBudget = $launcherMax;
+        $supplierBudget = $supplierMax;
 
         foreach (array_chunk($ids, $chunkSize) as $chunk) {
-            if ($launcherMax > 0) {
-                EnrichPayableLaunchersJob::dispatch($chunk, $launcherMax, $trigger)
+            // Cap por job = tamanho do chunk (evita 80 SOAP num job de 10 títulos → timeout).
+            if ($launcherBudget > 0) {
+                $chunkLauncherMax = min($launcherBudget, count($chunk));
+                EnrichPayableLaunchersJob::dispatch($chunk, $chunkLauncherMax, $trigger)
                     ->onQueue($launcherQueue);
                 $launcherJobs++;
+                $launcherBudget -= $chunkLauncherMax;
             }
 
-            if ($supplierMax > 0) {
-                SyncPayableSuppliersJob::dispatch($chunk, $supplierMax, $trigger)
+            if ($supplierBudget > 0) {
+                $chunkSupplierMax = min($supplierBudget, count($chunk));
+                SyncPayableSuppliersJob::dispatch($chunk, $chunkSupplierMax, $trigger)
                     ->onQueue($supplierQueue);
                 $supplierJobs++;
+                $supplierBudget -= $chunkSupplierMax;
             }
 
             ResolvePayableReadinessJob::dispatch($chunk, $trigger)
