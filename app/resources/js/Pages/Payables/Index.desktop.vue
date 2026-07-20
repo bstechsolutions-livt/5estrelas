@@ -179,7 +179,7 @@ function selectIssuePreset(key) {
 
 const statusList = [
     { label: 'Pendentes', value: 'pendente', color: 'amber' },
-    { label: 'Aguard. vínculo', value: 'aguardando_vinculo_departamento', color: 'gray' },
+    { label: 'Aguard. sincronização', value: 'aguardando_vinculo_departamento', color: 'gray' },
     { label: 'Em Preparação', value: 'em_preparacao', color: 'blue' },
     { label: 'Em Aprovação', value: 'aguardando_aprovacao', color: 'orange' },
     { label: 'Aprovados', value: 'aprovado', color: 'green' },
@@ -190,7 +190,7 @@ const statusList = [
 const statusTabHint = computed(() => {
     const hints = {
         pendente: 'Títulos que ainda não foram enviados para aprovação.',
-        aguardando_vinculo_departamento: 'Importados da Senior sem departamento identificado. Não podem ser abertos até a sincronização vincular o lançador.',
+        aguardando_vinculo_departamento: 'Importados da Senior sem departamento ou nome de fornecedor. Bloqueados até a sincronização completar.',
         em_preparacao: 'Títulos em preparação antes do envio.',
         aguardando_aprovacao: 'Títulos em fluxo de aprovação — a coluna Etapa mostra em qual nível cada um está.',
         aprovado: 'Títulos aprovados aguardando pagamento.',
@@ -644,10 +644,10 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                 class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
                 dusk="awaiting-dept-banner"
             >
-                <p class="font-medium">Aguardando vínculo do departamento</p>
+                <p class="font-medium">Aguardando sincronização</p>
                 <p class="mt-1 text-xs text-amber-800">
-                    Estes títulos foram importados da Senior, mas o lançador ainda não tem departamento no Hub.
-                    Eles ficam bloqueados até a próxima sincronização resolver o vínculo — não use Financeiro como fallback.
+                    Estes títulos foram importados da Senior, mas ainda faltam dados do lançador (departamento)
+                    ou do fornecedor (nome real no cadastro). Ficam bloqueados até a próxima sincronização resolver.
                 </p>
             </div>
 
@@ -923,10 +923,10 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                                 <span class="text-xs font-medium whitespace-nowrap leading-none" :title="data.title_number">{{ data.title_number }}</span>
                                 <Tag
                                     v-if="isAwaitingDepartmentLink(data)"
-                                    value="Sem depto"
+                                    value="Sem sync"
                                     severity="warn"
                                     class="!text-[9px] !px-1.5 !py-0 leading-tight"
-                                    title="Aguardando vínculo do departamento na sincronização"
+                                    title="Aguardando sincronização (departamento ou fornecedor)"
                                     dusk="awaiting-dept-tag"
                                 />
                                 <Tag
@@ -967,9 +967,9 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                             <span
                                 class="cell-truncate text-xs"
                                 :class="isAwaitingDepartmentLink(data) ? 'text-amber-700 italic' : 'text-gray-600'"
-                                :title="isAwaitingDepartmentLink(data) ? 'Aguardando vínculo do departamento' : data.department_nome"
+                                :title="isAwaitingDepartmentLink(data) ? (data.workflow_moment_detail || 'Aguardando sincronização') : data.department_nome"
                                 @click="onRowClick(data)"
-                            >{{ isAwaitingDepartmentLink(data) ? 'Aguardando vínculo' : (data.department_nome || '—') }}</span>
+                            >{{ isAwaitingDepartmentLink(data) ? 'Aguardando sync' : (data.department_nome || '—') }}</span>
                         </template>
                     </Column>
                     <Column field="filial_nome" header="Filial" style="width: 10%" sortable dusk="col-filial">

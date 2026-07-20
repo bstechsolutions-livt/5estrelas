@@ -684,7 +684,7 @@ class PayableController extends Controller
         if ($payable->isAwaitingDepartmentLink()) {
             return redirect()
                 ->route('payables.index', ['status' => Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO])
-                ->with('warning', 'Este título aguarda o vínculo do departamento (lançador Senior). Será liberado automaticamente após a sincronização identificar o departamento.');
+                ->with('warning', 'Este título aguarda sincronização (departamento e/ou fornecedor). Será liberado automaticamente quando a Senior completar os dados.');
         }
 
         $payable->load([

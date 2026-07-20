@@ -136,7 +136,7 @@ function selectIssuePreset(key) {
 
 const statusList = [
     { label: 'Pendentes', value: 'pendente' },
-    { label: 'Aguard. vínculo', value: 'aguardando_vinculo_departamento' },
+    { label: 'Aguard. sync', value: 'aguardando_vinculo_departamento' },
     { label: 'Preparação', value: 'em_preparacao' },
     { label: 'Em Aprovação', value: 'aguardando_aprovacao' },
     { label: 'Aprovados', value: 'aprovado' },
@@ -147,7 +147,7 @@ const statusList = [
 const statusTabHint = computed(() => {
     const hints = {
         pendente: 'Títulos que ainda não foram enviados para aprovação.',
-        aguardando_vinculo_departamento: 'Sem departamento identificado — bloqueados até a sincronização vincular o lançador.',
+        aguardando_vinculo_departamento: 'Sem departamento ou fornecedor — bloqueados até a sincronização.',
         em_preparacao: 'Títulos em preparação antes do envio.',
         aguardando_aprovacao: 'A etiqueta Etapa indica em qual nível de aprovação cada título está.',
         aprovado: 'Títulos aprovados aguardando pagamento.',
@@ -430,7 +430,7 @@ const currentTotal = computed(() => {
                 v-if="status === 'aguardando_vinculo_departamento'"
                 class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900"
             >
-                Títulos bloqueados até a sincronização identificar o departamento do lançador na Senior.
+                Títulos bloqueados até a sincronização identificar departamento e nome do fornecedor.
             </div>
         </div>
 
@@ -530,7 +530,7 @@ const currentTotal = computed(() => {
                         ? 'bg-amber-50/80 border-amber-200 opacity-70 cursor-not-allowed'
                         : 'bg-white border-gray-200 active:bg-gray-50',
                     selectionMode && isSelected(p.id) ? 'border-blue-500 ring-2 ring-blue-200' : '']">
-                <p v-if="isAwaitingDepartmentLink(p)" class="text-[11px] text-amber-800 font-medium mb-0.5">Aguardando vínculo do departamento</p>
+                <p v-if="isAwaitingDepartmentLink(p)" class="text-[11px] text-amber-800 font-medium mb-0.5">{{ p.workflow_moment_detail || 'Aguardando sincronização' }}</p>
                 <p v-else-if="p.department_nome" class="text-[11px] text-gray-500 truncate mb-0.5" dusk="m-departamento">{{ p.department_nome }}</p>
                 <p v-if="p.filial_label || p.filial_nome" class="text-[11px] text-gray-600 truncate mb-0.5" dusk="m-filial">{{ p.filial_label || p.filial_nome }}</p>
                 <div class="flex items-start justify-between gap-2 mb-1">
