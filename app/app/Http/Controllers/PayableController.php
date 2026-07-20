@@ -371,7 +371,7 @@ class PayableController extends Controller
      */
     private function payablesSyncStatusProps(?User $user): array
     {
-        $interval = max(1, (int) config('senior.sync_interval_minutes', 5));
+        $interval = max(1, (int) config('senior.sync_interval_minutes', 10));
         $tz = 'America/Sao_Paulo';
         $now = Carbon::now($tz);
 

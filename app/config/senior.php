@@ -165,7 +165,7 @@ return [
     'enrich_launcher_queue' => env('SENIOR_ENRICH_LAUNCHER_QUEUE', 'senior-launcher'),
     'enrich_supplier_queue' => env('SENIOR_ENRICH_SUPPLIER_QUEUE', 'senior-supplier'),
     'enrich_readiness_queue' => env('SENIOR_ENRICH_READINESS_QUEUE', 'senior-readiness'),
-    'enrich_job_chunk_size' => (int) env('SENIOR_ENRICH_JOB_CHUNK_SIZE', 40),
+    'enrich_job_chunk_size' => (int) env('SENIOR_ENRICH_JOB_CHUNK_SIZE', 10),
     'enrich_cron_launcher_max' => (int) env('SENIOR_ENRICH_CRON_LAUNCHER_MAX', 80),
     'enrich_cron_supplier_max' => (int) env('SENIOR_ENRICH_CRON_SUPPLIER_MAX', 80),
 
