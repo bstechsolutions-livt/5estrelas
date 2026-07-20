@@ -325,6 +325,7 @@ class PayablesSyncService
         $supplierMax = (int) config('senior.post_sync_supplier_lookups', 0);
         $maxSec = max(15, (int) config('senior.post_sync_enrich_max_seconds', 90));
         $deadline = microtime(true) + $maxSec;
+        $enrichIds = $this->mergeEnrichIdsWithAwaitingSync($enrichIds, $launcherMax);
 
         try {
             if ($launcherMax > 0 && microtime(true) < $deadline) {
@@ -335,7 +336,7 @@ class PayablesSyncService
                 $this->syncMissingSuppliersAfterPayables($enrichIds);
             }
 
-            // Depto + status (depende de UsuGer e nome do fornecedor).
+            // Depto + status: inclui fila aguardando sync (não só inserts/updates do run).
             $this->resolveDepartmentsAfterSync($enrichIds);
 
             if ($supplierMax > 0 && microtime(true) >= $deadline) {
@@ -377,6 +378,39 @@ class PayablesSyncService
         } catch (\Throwable $e) {
             Log::warning('[senior-cp] lançadores pós-sync falhou', ['erro' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * IDs de títulos Senior bloqueados aguardando dept/fornecedor.
+     *
+     * @return list<int>
+     */
+    public function awaitingSyncPayableIds(?int $limit = null): array
+    {
+        $query = Payable::query()
+            ->where('status', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO)
+            ->whereNull('senior_missing_at')
+            ->orderByDesc('id');
+
+        if ($limit !== null && $limit > 0) {
+            $query->limit($limit);
+        }
+
+        return $query->pluck('id')->all();
+    }
+
+    /**
+     * @param  list<int>  $enrichIds
+     * @return list<int>
+     */
+    private function mergeEnrichIdsWithAwaitingSync(array $enrichIds, int $awaitingLimit = 80): array
+    {
+        $awaiting = $this->awaitingSyncPayableIds(max(1, $awaitingLimit));
+
+        return array_values(array_unique(array_merge(
+            array_map('intval', $enrichIds),
+            $awaiting,
+        )));
     }
 
     /**
