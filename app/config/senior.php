@@ -169,6 +169,16 @@ return [
     'enrich_cron_launcher_max' => (int) env('SENIOR_ENRICH_CRON_LAUNCHER_MAX', 80),
     'enrich_cron_supplier_max' => (int) env('SENIOR_ENRICH_CRON_SUPPLIER_MAX', 80),
 
+    /**
+     * UsuGer Senior sem login intranet → slug de departamento.
+     * Gambiarra operacional: ex. 95 era Financeiro na Senior.
+     *
+     * @var array<int|string, string>
+     */
+    'legacy_usu_ger_department_slugs' => [
+        95 => 'financeiro',
+    ],
+
     // Tamanho de lote para upsert e paginação (requirement 4.6 / 1.8).
     'batch_size' => 500,
 ];

@@ -68,6 +68,25 @@ class Department extends Model
         return static::where('slug', self::FINANCE_SLUG)->where('is_active', true)->value('id');
     }
 
+    /** UsuGer Senior sem usuário intranet — mapa configurável (ex.: 95 → financeiro). */
+    public static function departmentIdForLegacySeniorCodUsu(int $codUsu): ?int
+    {
+        if ($codUsu <= 0) {
+            return null;
+        }
+
+        $map = config('senior.legacy_usu_ger_department_slugs', []);
+        $slug = $map[$codUsu] ?? $map[(string) $codUsu] ?? null;
+        if (! is_string($slug) || $slug === '') {
+            return null;
+        }
+
+        return static::query()
+            ->where('slug', $slug)
+            ->where('is_active', true)
+            ->value('id');
+    }
+
     public static function financeApprovers(): \Illuminate\Database\Eloquent\Builder
     {
         $financeId = self::financeDepartmentId();
