@@ -120,12 +120,12 @@ watch(() => page.props.flash?.error, (msg) => {
 
             <div class="bg-white rounded-xl border border-gray-200 p-5">
                 <div class="mb-4">
-                    <div class="relative max-w-md">
-                        <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                    <div class="relative max-w-md users-search">
+                        <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none z-10"></i>
                         <InputText
                             v-model="search"
                             placeholder="Buscar por nome ou e-mail..."
-                            class="w-full pl-9"
+                            class="w-full"
                         />
                     </div>
                 </div>
@@ -258,3 +258,9 @@ watch(() => page.props.flash?.error, (msg) => {
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+.users-search :deep(.p-inputtext) {
+    padding-left: 2.5rem;
+}
+</style>

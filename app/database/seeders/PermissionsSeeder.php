@@ -43,6 +43,7 @@ class PermissionsSeeder extends Seeder
             ['key' => 'financeiro.contas_pagar.editar_vencimento', 'label' => 'Editar vencimento de contas a pagar (financeiro)', 'module' => 'financeiro', 'description' => 'Alterar data de vencimento de títulos no módulo financeiro.'],
             ['key' => 'financeiro.contas_pagar.enviar_aprovacao_urgente', 'label' => 'Enviar para aprovação fora do prazo de 72h (CP)', 'module' => 'financeiro', 'description' => 'Liberar envio para aprovação de títulos com vencimento em menos de 72 horas (casos urgentes).'],
             ['key' => 'financeiro.contas_pagar.prioridade_gerenciar', 'label' => 'Gerenciar prioridade e SLA de pagamento (CP)', 'module' => 'financeiro', 'description' => 'Definir prioridade e prazo (SLA) na etapa financeira de aprovação.'],
+            ['key' => 'financeiro.contas_pagar.mencionar', 'label' => 'Mencionar usuários em comentários (CP)', 'module' => 'financeiro', 'description' => 'Usar @ no comentário para marcar qualquer usuário ativo; a pessoa recebe notificação e passa a poder abrir o título.'],
             ['key' => 'financeiro.contas_receber.visualizar', 'label' => 'Ver contas a receber', 'module' => 'financeiro', 'description' => 'Consultar títulos a receber espelhados da Senior (somente leitura).'],
             ['key' => 'financeiro.contas_receber.ver_todas_filiais', 'label' => 'Ver títulos a receber de todas as filiais (CR)', 'module' => 'financeiro', 'description' => 'Visualizar CR de todas as filiais além das liberadas ao usuário.'],
             ['key' => 'financeiro.plano_contas.visualizar', 'label' => 'Ver plano de contas', 'module' => 'financeiro', 'description' => 'Consultar plano de contas derivado de CP/CR.'],
@@ -78,6 +79,13 @@ class PermissionsSeeder extends Seeder
                 ['key' => $row['key']],
                 $row,
             );
+        }
+
+        // Removida: mencionar_todos — quem tem "mencionar" já lista todos os ativos.
+        $legacy = Permission::where('key', 'financeiro.contas_pagar.mencionar_todos')->first();
+        if ($legacy) {
+            $legacy->users()->detach();
+            $legacy->delete();
         }
     }
 }

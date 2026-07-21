@@ -13,6 +13,7 @@ use App\Models\PayableComment;
 use App\Models\User;
 use App\Models\UserRepresentative;
 use App\Events\NotificationCreated;
+use App\Services\MentionService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -129,13 +130,14 @@ class ApprovalWorkflowService
 
         $this->archiveApprovalNotifications($payable);
 
-        PayableComment::create([
+        $approvalComment = PayableComment::create([
             'payable_id' => $payable->id,
             'user_id' => $approver->id,
             'body' => "Aprovado na etapa: " . ($step->role_label ?: (ApprovalStep::LEVEL_LABELS[$step->level_name] ?? $step->level_name))
                 . ($comment ? " — {$comment}" : ''),
             'type' => 'approval',
         ]);
+        app(MentionService::class)->processComment($approvalComment);
 
         $nextStep = $this->currentStep($payable);
         if (!$nextStep) {
@@ -189,12 +191,13 @@ class ApprovalWorkflowService
                 'approved_at' => null,
             ]);
 
-            PayableComment::create([
+            $rejectionComment = PayableComment::create([
                 'payable_id' => $payable->id,
                 'user_id' => $rejector->id,
                 'body' => "Reprovado na etapa {$stepLabel} e devolvido para pendente: {$reason}",
                 'type' => 'rejection',
             ]);
+            app(MentionService::class)->processComment($rejectionComment);
 
             $this->syncBorderoAfterPayableReject($payable, $rejector, $reason);
         });

@@ -52,6 +52,7 @@ const form = useForm({
     codtns: '',
     codtpt: '',
     payment_priority: null,
+    requester_comment: '',
 })
 
 const filialList = computed(() =>
@@ -88,6 +89,7 @@ function submit() {
             codtpt: data.codtpt?.trim() || null,
             due_date: data.due_date ? toApiDateString(data.due_date) : null,
             issue_date: data.issue_date ? toApiDateString(data.issue_date) : null,
+            requester_comment: data.requester_comment?.trim() || null,
         }))
         .post('/financeiro/contas-pagar')
 }
@@ -324,15 +326,31 @@ watch(() => page.props.flash?.error, (msg) => {
                     <div class="px-4 py-3 border-b border-gray-100">
                         <h2 class="text-sm font-semibold text-gray-800">Observações</h2>
                     </div>
-                    <div class="p-4">
-                        <Textarea
-                            v-model="form.description"
-                            rows="3"
-                            class="w-full"
-                            placeholder="Observação do título (máx. 255 caracteres)"
-                            :invalid="!!form.errors.description"
-                        />
-                        <small v-if="form.errors.description" class="text-red-500 text-xs mt-1 block">{{ form.errors.description }}</small>
+                    <div class="p-4 space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Observação do título</label>
+                            <Textarea
+                                v-model="form.description"
+                                rows="3"
+                                class="w-full"
+                                placeholder="Observação do título (máx. 255 caracteres)"
+                                :invalid="!!form.errors.description"
+                            />
+                            <small v-if="form.errors.description" class="text-red-500 text-xs mt-1 block">{{ form.errors.description }}</small>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Comentário do solicitante</label>
+                            <Textarea
+                                v-model="form.requester_comment"
+                                rows="3"
+                                class="w-full"
+                                placeholder="Fica fixo no topo da timeline do título"
+                                dusk="payable-create-requester-comment"
+                                :invalid="!!form.errors.requester_comment"
+                            />
+                            <p class="text-[11px] text-gray-400 mt-1">Visível para todos os aprovadores, fixado no histórico.</p>
+                            <small v-if="form.errors.requester_comment" class="text-red-500 text-xs mt-1 block">{{ form.errors.requester_comment }}</small>
+                        </div>
                     </div>
                 </div>
 

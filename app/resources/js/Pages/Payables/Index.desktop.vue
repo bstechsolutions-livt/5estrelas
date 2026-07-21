@@ -433,8 +433,13 @@ function assignDepartmentSync(payable) {
     })
 }
 
-function onRowClick(payable) {
-    if (isAwaitingDepartmentLink(payable)) return
+function onRowClick(event) {
+    const payable = event?.data ?? event
+    if (!payable?.id || isAwaitingDepartmentLink(payable)) return
+
+    const target = event?.originalEvent?.target
+    if (target?.closest?.('input, button, a, label, .payable-select-cell, .p-select, .dept-sync-select')) return
+
     goShow(payable.id)
 }
 
@@ -939,27 +944,37 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     :sort-order="tableSortOrder"
                     @page="onPage"
                     @sort="onTableSort"
+                    @row-click="onRowClick"
                     paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
                     :rows-per-page-options="[20, 50, 100, 200, 500, 1000]"
                 >
-                    <Column v-if="canSelect" header="" style="width: 2.5rem">
+                    <Column v-if="canSelect" header="" style="width: 2.5rem" body-class="payable-select-cell" header-class="payable-select-cell">
                         <template #header>
-                            <input
-                                type="checkbox"
-                                :checked="allPageSelected"
-                                :indeterminate="somePageSelected"
-                                class="w-4 h-4 cursor-pointer"
-                                dusk="select-all-payables"
-                                @click.stop="toggleSelectAll"
-                            />
+                            <div class="payable-select-cell inline-flex" @click.stop @mousedown.stop>
+                                <input
+                                    type="checkbox"
+                                    :checked="allPageSelected"
+                                    :indeterminate="somePageSelected"
+                                    class="w-4 h-4 cursor-pointer"
+                                    dusk="select-all-payables"
+                                    @click.stop="toggleSelectAll"
+                                />
+                            </div>
                         </template>
                         <template #body="{ data }">
-                            <input type="checkbox" :checked="isSelected(data.id)" @click.stop="toggleSelect(data.id)" class="w-4 h-4 cursor-pointer" />
+                            <div class="payable-select-cell inline-flex" @click.stop @mousedown.stop>
+                                <input
+                                    type="checkbox"
+                                    :checked="isSelected(data.id)"
+                                    class="w-4 h-4 cursor-pointer"
+                                    @click.stop="toggleSelect(data.id)"
+                                />
+                            </div>
                         </template>
                     </Column>
                     <Column field="title_number" header="Nº" style="width: 7%" sortable>
                         <template #body="{ data }">
-                            <div class="flex flex-col items-start gap-0.5 py-0.5 min-w-0" @click="onRowClick(data)">
+                            <div class="flex flex-col items-start gap-0.5 py-0.5 min-w-0">
                                 <span class="text-xs font-medium whitespace-nowrap leading-none" :title="data.title_number">{{ data.title_number }}</span>
                                 <Tag
                                     v-if="isAwaitingDepartmentLink(data)"
@@ -1004,7 +1019,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </Column>
                     <Column field="department_nome" header="Depto" style="width: 9%" sortable dusk="col-departamento">
                         <template #body="{ data }">
-                            <div class="flex flex-col gap-0.5 min-w-0" @click.stop>
+                            <div class="flex flex-col gap-0.5 min-w-0">
                                 <template v-if="hasManualDepartmentAssignment(data) || (isAwaitingDepartmentLink(data) && data.department_nome)">
                                     <span
                                         class="cell-truncate text-xs text-gray-600"
@@ -1018,51 +1033,52 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                                     >{{ data.department_assigned_by_name }}</span>
                                 </template>
                                 <template v-else-if="canAssignDepartmentFor(data)">
-                                    <Select
-                                        v-model="departmentAssignForms[data.id]"
-                                        :options="departmentAssignOptions()"
-                                        option-label="label"
-                                        option-value="value"
-                                        placeholder="Aguardando sync"
-                                        class="w-full text-xs dept-sync-select"
-                                        size="small"
-                                        dusk="dept-sync-select"
-                                        @change="assignDepartmentSync(data)"
-                                    />
+                                    <div class="dept-sync-select" @click.stop @mousedown.stop>
+                                        <Select
+                                            v-model="departmentAssignForms[data.id]"
+                                            :options="departmentAssignOptions()"
+                                            option-label="label"
+                                            option-value="value"
+                                            placeholder="Aguardando sync"
+                                            class="w-full text-xs"
+                                            size="small"
+                                            dusk="dept-sync-select"
+                                            @change="assignDepartmentSync(data)"
+                                        />
+                                    </div>
                                 </template>
                                 <span
                                     v-else
-                                    class="cell-truncate text-xs text-amber-700 italic"
+                                    class="cell-truncate text-xs"
+                                    :class="isAwaitingDepartmentLink(data) ? 'text-amber-700 italic' : 'text-gray-600'"
                                     :title="isAwaitingDepartmentLink(data) ? (data.workflow_moment_detail || 'Aguardando sincronização') : data.department_nome"
-                                    @click="onRowClick(data)"
                                 >{{ isAwaitingDepartmentLink(data) ? 'Aguardando sync' : (data.department_nome || '—') }}</span>
                             </div>
                         </template>
                     </Column>
                     <Column field="filial_nome" header="Filial" style="width: 10%" sortable dusk="col-filial">
                         <template #body="{ data }">
-                            <span class="cell-truncate text-xs font-medium text-gray-800" :title="data.filial_label || data.filial_nome"
-                                @click="onRowClick(data)">{{ data.filial_label || data.filial_nome || '—' }}</span>
+                            <span class="cell-truncate text-xs font-medium text-gray-800" :title="data.filial_label || data.filial_nome">{{ data.filial_label || data.filial_nome || '—' }}</span>
                         </template>
                     </Column>
                     <Column field="supplier_name" header="Fornecedor" :style="{ width: status === 'pendente' ? '20%' : '18%' }" sortable>
                         <template #body="{ data }">
-                            <span class="cell-truncate text-xs" :title="data.supplier_display_name || data.supplier_name" @click="onRowClick(data)">{{ data.supplier_display_name || data.supplier_name }}</span>
+                            <span class="cell-truncate text-xs" :title="data.supplier_display_name || data.supplier_name">{{ data.supplier_display_name || data.supplier_name }}</span>
                         </template>
                     </Column>
                     <Column field="description" header="Descrição" :style="{ width: status === 'pendente' ? '18%' : '16%' }" sortable>
                         <template #body="{ data }">
-                            <span class="cell-truncate text-xs text-gray-600" :title="data.description" @click="onRowClick(data)">{{ data.description || '—' }}</span>
+                            <span class="cell-truncate text-xs text-gray-600" :title="data.description">{{ data.description || '—' }}</span>
                         </template>
                     </Column>
                     <Column field="amount" header="Valor" style="width: 10%" sortable>
                         <template #body="{ data }">
-                            <span class="text-xs font-semibold whitespace-nowrap" @click="onRowClick(data)">{{ formatMoney(data.amount, data.codmoe) }}</span>
+                            <span class="text-xs font-semibold whitespace-nowrap">{{ formatMoney(data.amount, data.codmoe) }}</span>
                         </template>
                     </Column>
                     <Column field="due_date" header="Vencimento" style="width: 8%" sortable>
                         <template #body="{ data }">
-                            <span class="text-xs whitespace-nowrap" @click="onRowClick(data)">{{ formatDate(data.due_date) }}</span>
+                            <span class="text-xs whitespace-nowrap">{{ formatDate(data.due_date) }}</span>
                         </template>
                     </Column>
                     <Column v-if="status !== 'pendente'" field="payment_priority" header="Prioridade" style="width: 7%" sortable>
@@ -1072,14 +1088,13 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                                 :value="data.priority_label"
                                 :severity="prioritySeverity[data.payment_priority] || 'secondary'"
                                 class="!text-[10px] whitespace-nowrap"
-                                @click="onRowClick(data)"
                             />
-                            <span v-else class="text-xs text-gray-300" @click="onRowClick(data)">—</span>
+                            <span v-else class="text-xs text-gray-300">—</span>
                         </template>
                     </Column>
                     <Column v-if="!['pago', 'aguardando_conciliacao', 'conciliado'].includes(status)" field="workflow_moment" header="Aprovador" style="width: 14%; min-width: 8.5rem" sortable dusk="col-etapa">
                         <template #body="{ data }">
-                            <div class="flex flex-col gap-0.5 min-w-0" @click="onRowClick(data)">
+                            <div class="flex flex-col gap-0.5 min-w-0">
                                 <span
                                     class="cell-truncate text-xs font-medium"
                                     :class="workflowMomentTextClass(data)"

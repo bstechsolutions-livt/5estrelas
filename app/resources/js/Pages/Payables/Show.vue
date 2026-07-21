@@ -20,7 +20,7 @@ import { useDevice } from '@/composables/useDevice'
 import PayableDocumentPreviewCard from '@/Components/Financeiro/PayableDocumentPreviewCard.vue'
 import DocumentViewerDialog from '@/Components/Financeiro/DocumentViewerDialog.vue'
 import PayableDetailsOverview from '@/Components/Financeiro/PayableDetailsOverview.vue'
-import PayableFieldOriginLabel from '@/Components/Financeiro/PayableFieldOriginLabel.vue'
+import PayableMentionInput from '@/Components/Financeiro/PayableMentionInput.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import { formatApiDate, parseApiDate } from '@/utils/apiDate'
 import { formatPayableMoney } from '@/utils/seniorCurrency'
@@ -43,6 +43,7 @@ const props = defineProps({
     canEditDueDate: { type: Boolean, default: false },
     canManagePriority: { type: Boolean, default: false },
     canManagePaymentReceipt: { type: Boolean, default: false },
+    canMention: { type: Boolean, default: false },
     requiresPriorityOnApprove: { type: Boolean, default: false },
     priorityLabels: { type: Object, default: () => ({}) },
     priorityColors: { type: Object, default: () => ({}) },
@@ -51,6 +52,7 @@ const props = defineProps({
     canBypassApprovalDeadline: { type: Boolean, default: false },
     minDueDateForApproval: { type: String, default: null },
     maxDocumentBytes: { type: Number, default: 15 * 1024 * 1024 },
+    mentionableUsers: { type: Array, default: () => [] },
 })
 
 const maxDocumentMb = computed(() => Math.round(props.maxDocumentBytes / 1024 / 1024))
@@ -374,7 +376,16 @@ const canPrepare = ['pendente', 'em_preparacao'].includes(props.payable.status)
 const inBordero = !!props.payable.bordero_id
 const canSendIndividual = canPrepare && !inBordero
 const canApprove = props.payable.status === 'aguardando_aprovacao' && !inBordero && !props.approvalSteps?.length
-const timelineEntries = computed(() => props.payable.comments || [])
+const timelineEntries = computed(() => {
+    const all = [...(props.payable.comments || [])]
+    const pinned = all.filter((c) => c.type === 'requester' || c.metadata?.pinned)
+    const rest = all.filter((c) => !(c.type === 'requester' || c.metadata?.pinned))
+    return [...pinned, ...rest]
+})
+
+function isPinnedComment(c) {
+    return c.type === 'requester' || !!c.metadata?.pinned
+}
 
 // Trava (feedback do cliente): não envia pra aprovação sem ao menos 1 documento.
 const hasDocuments = computed(() => (props.payable.documents?.length || 0) > 0)
@@ -490,7 +501,6 @@ const slaAlertClass = computed(() => {
     return 'text-gray-600'
 })
 
-const fieldOrigins = computed(() => props.payable.field_origins ?? null)
 const isFromSenior = computed(() => !!props.payable.origem_senior)
 
 const naturezaGasto = computed(() => {
@@ -535,19 +545,7 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                         <h1 :class="isMobile ? 'text-lg font-bold text-gray-800' : 'text-2xl font-bold text-gray-800'">
                             {{ payable.title_number || payable.nickname || 'Título' }}
                         </h1>
-                        <i
-                            v-if="fieldOrigins?.title_number === 'senior'"
-                            class="pi pi-cloud-download text-sm text-slate-400"
-                            title="Número do título preenchido automaticamente pela Senior (ERP)"
-                            aria-label="Número do título preenchido automaticamente pela Senior (ERP)"
-                        />
                         <Tag :value="statusLabels[payable.status]" :severity="statusColors[payable.status]" />
-                        <i
-                            v-if="fieldOrigins?.status === 'hub'"
-                            class="pi pi-pencil text-[10px] text-blue-400"
-                            title="Status do fluxo de aprovação na intranet Hub"
-                            aria-label="Status do fluxo de aprovação na intranet Hub"
-                        />
                         <Tag
                             v-if="payable.payment_priority"
                             :value="payable.priority_label || priorityLabels[payable.payment_priority]"
@@ -559,22 +557,25 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                         <Tag v-if="isFromSenior" value="Senior" severity="secondary" class="!text-xs" dusk="origem-senior-badge" title="Importado da Senior (ERP)" />
                     </div>
                     <p class="text-sm text-gray-500 mt-1 flex flex-wrap items-center gap-x-1">
-                        <PayableFieldOriginLabel v-if="fieldOrigins" label="Vencimento:" field="due_date" :field-origins="fieldOrigins" class="!inline-flex shrink-0" />
-                        <span v-else class="text-sm text-gray-500">Vencimento:</span>
-                        <span>{{ formatDate(payable.due_date) }}</span>
-                        <button v-if="canEditDueDate" @click="showDueDate = true" dusk="btn-edit-due-date"
-                            class="ml-1 text-blue-600 hover:text-blue-800 cursor-pointer align-middle" title="Alterar vencimento (financeiro)">
+                        <span>Vencimento:</span>
+                        <span class="font-medium text-gray-700">{{ formatDate(payable.due_date) }}</span>
+                        <button
+                            v-if="canEditDueDate"
+                            @click="showDueDate = true"
+                            dusk="btn-edit-due-date"
+                            class="ml-1 text-blue-600 hover:text-blue-800 cursor-pointer align-middle"
+                            title="Alterar vencimento"
+                        >
                             <i class="pi pi-pencil text-xs"></i>
                         </button>
                     </p>
                     <p v-if="payable.filial_label" class="text-sm text-gray-600 mt-1 flex items-center gap-1.5" dusk="payable-filial-label">
                         <i class="pi pi-building text-xs text-gray-400" aria-hidden="true" />
-                        <PayableFieldOriginLabel v-if="fieldOrigins" label="" field="filial_nome" :field-origins="fieldOrigins" class="!inline-flex shrink-0" />
                         <span class="font-medium text-gray-700">{{ payable.filial_label }}</span>
                     </p>
                 </div>
                 <div class="text-right">
-                    <PayableFieldOriginLabel v-if="fieldOrigins" label="Valor" field="amount" :field-origins="fieldOrigins" class="justify-end mb-0.5" />
+                    <p class="text-xs text-gray-500 mb-0.5">Valor</p>
                     <p class="text-xl font-bold text-gray-800">{{ formatMoney(payable.amount) }}</p>
                 </div>
             </div>
@@ -584,27 +585,8 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                 class="bg-white border border-gray-100 rounded-xl p-4 mb-4"
                 dusk="payable-observacao"
             >
-                <PayableFieldOriginLabel v-if="fieldOrigins" label="Observação" field="description" :field-origins="fieldOrigins" class="mb-1" />
-                <p v-else class="text-xs font-medium text-gray-500 mb-1">Observação</p>
+                <p class="text-xs font-medium text-gray-500 mb-1">Observação</p>
                 <p class="text-sm text-gray-800 leading-relaxed">{{ payable.description }}</p>
-            </div>
-
-            <div
-                v-if="isFromSenior"
-                class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 text-sm text-slate-700"
-                dusk="origem-senior-legend"
-            >
-                <p class="font-medium text-slate-800 mb-1 flex items-center gap-2">
-                    <i class="pi pi-info-circle text-slate-500"></i>
-                    Campos importados da Senior
-                </p>
-                <p class="text-xs text-slate-600">
-                    <i class="pi pi-cloud-download text-[10px] text-slate-400"></i>
-                    <span class="ml-1">Dados do ERP (fornecedor, valor, vencimento, nº título, empresa)</span>
-                    <span class="mx-2">·</span>
-                    <i class="pi pi-pencil text-[10px] text-blue-400"></i>
-                    <span class="ml-1">Campos da intranet (prioridade, SLA, anexos, comentários, status)</span>
-                </p>
             </div>
 
             <div
@@ -635,7 +617,6 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
             <PayableDetailsOverview
                 class="mb-4"
                 :payable="payable"
-                :field-origins="fieldOrigins"
                 :natureza-gasto="naturezaGasto"
                 :centro-custo="centroCusto"
                 :conta-financeira="contaFinanceira"
@@ -654,12 +635,6 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                 <h3 class="text-sm font-semibold text-amber-700 mb-1 flex items-center gap-2">
                     <i class="pi pi-list-check"></i>
                     Em um borderô
-                    <i
-                        v-if="fieldOrigins?.bordero === 'hub'"
-                        class="pi pi-pencil text-[10px] text-blue-400"
-                        title="Borderô gerenciado na intranet Hub"
-                        aria-label="Borderô gerenciado na intranet Hub"
-                    />
                 </h3>
                 <p class="text-xs text-amber-600 mb-2">Este título faz parte de um borderô. O envio é feito pelo borderô; a aprovação segue o mesmo fluxo configurado (pode ser feita aqui ou no borderô).</p>
                 <Button label="Ver borderô" icon="pi pi-arrow-right" size="small" outlined class="w-full" @click="goToBordero" />
@@ -722,13 +697,24 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                 <!-- Botões de ação se o usuário pode aprovar o step atual -->
                 <div v-if="canApproveStep" class="space-y-2">
                     <p class="text-xs text-blue-600 font-medium mb-2">Sua vez: {{ currentStep?.level_name }}</p>
-                    <Textarea
-                        v-model="approvalComment"
-                        placeholder="Comentário (opcional ao aprovar, vira o motivo ao reprovar)"
-                        rows="2"
-                        class="w-full"
-                        dusk="approval-comment"
-                    />
+                    <div class="relative">
+                        <PayableMentionInput
+                            v-if="canMention"
+                            v-model="approvalComment"
+                            :mentionable-users="mentionableUsers"
+                            placeholder="Comentário (opcional). Use @nome para mencionar e liberar acesso."
+                        />
+                        <Textarea
+                            v-else
+                            v-model="approvalComment"
+                            placeholder="Comentário (opcional)"
+                            rows="3"
+                            class="w-full"
+                        />
+                    </div>
+                    <p v-if="canMention" class="text-[11px] text-blue-600 bg-blue-50 rounded-lg px-2.5 py-1.5">
+                        Ao mencionar alguém com @, a pessoa recebe notificação e passa a ter acesso para abrir este título.
+                    </p>
                     <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="openApprove" />
                     <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="openReject" />
                     <p class="text-[10px] text-gray-400">O comentário aparece na timeline em <span class="text-green-600 font-medium">verde</span> se aprovar ou <span class="text-red-600 font-medium">vermelho</span> se reprovar.</p>
@@ -761,12 +747,22 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
             <div v-else-if="canApprove && !approvalSteps?.length" class="bg-white rounded-xl border border-gray-100 p-4">
                 <h3 class="text-sm font-semibold text-gray-700 mb-3">Aprovação</h3>
                 <div class="space-y-2">
-                    <Textarea
+                    <PayableMentionInput
+                        v-if="canMention"
                         v-model="approvalComment"
-                        placeholder="Comentário (opcional ao aprovar, vira o motivo ao reprovar)"
-                        rows="2"
+                        :mentionable-users="mentionableUsers"
+                        placeholder="Comentário (opcional). Use @nome para mencionar e liberar acesso."
+                    />
+                    <Textarea
+                        v-else
+                        v-model="approvalComment"
+                        placeholder="Comentário (opcional)"
+                        rows="3"
                         class="w-full"
                     />
+                    <p v-if="canMention" class="text-[11px] text-blue-600 bg-blue-50 rounded-lg px-2.5 py-1.5">
+                        Ao mencionar alguém com @, a pessoa recebe notificação e passa a ter acesso para abrir este título.
+                    </p>
                     <Button label="Aprovar" icon="pi pi-check" severity="success" class="w-full" @click="openApprove" />
                     <Button label="Reprovar" icon="pi pi-times" severity="danger" outlined class="w-full" @click="openReject" />
                 </div>
@@ -789,14 +785,21 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                     Timeline
                 </h3>
                 <p class="text-[10px] text-gray-400 mb-3">
-                    Histórico completo do título. Novas observações entram só ao aprovar ou reprovar.
+                    Histórico do título. O comentário do solicitante fica fixo no topo.
                 </p>
                 <div class="space-y-3 max-h-80 overflow-y-auto">
-                    <div v-for="c in timelineEntries" :key="c.id" class="flex gap-2">
+                    <div
+                        v-for="c in timelineEntries"
+                        :key="c.id"
+                        :class="['flex gap-2', isPinnedComment(c) ? 'bg-[#fbfaf3] border border-[#efe7c9] rounded-xl p-3' : '']"
+                    >
                         <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-600">
                             {{ c.user?.name?.charAt(0) || 'S' }}
                         </div>
                         <div class="flex-1 min-w-0">
+                            <p v-if="isPinnedComment(c)" class="text-[11px] font-semibold text-amber-700 mb-0.5 flex items-center gap-1">
+                                <span aria-hidden="true">📌</span> Comentário do solicitante
+                            </p>
                             <p class="text-xs text-gray-500">
                                 <span class="font-medium text-gray-700">{{ c.user?.name || 'Sistema' }}</span>
                                 · {{ formatDateTime(c.created_at) }}
@@ -820,12 +823,6 @@ const departamentoTitulo = computed(() => props.payable.department_nome || null)
                             <div>
                                 <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
                                     Documentos ({{ payable.documents?.length || 0 }})
-                                    <i
-                                        v-if="fieldOrigins?.documents === 'hub'"
-                                        class="pi pi-pencil text-[10px] text-blue-400"
-                                        title="Anexos gerenciados na intranet Hub"
-                                        aria-label="Anexos gerenciados na intranet Hub"
-                                    />
                                 </h3>
                                 <p v-if="payable.documents?.length" class="text-[11px] text-gray-400 mt-0.5">
                                     Abra qualquer documento para analisar todos na mesma galeria.

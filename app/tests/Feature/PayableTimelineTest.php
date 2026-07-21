@@ -65,7 +65,8 @@ class PayableTimelineTest extends TestCase
                 ->where('payable.comments.1.type', 'status_change')
                 ->where('payable.comments.2.type', 'approval')
                 ->where('payable.comments.3.type', 'rejection')
-                ->missing('mentionableUsers'));
+                ->has('mentionableUsers')
+                ->has('canMention'));
     }
 
     public function test_endpoint_de_comentario_manual_nao_esta_disponivel(): void

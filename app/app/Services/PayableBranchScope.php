@@ -146,6 +146,14 @@ class PayableBranchScope
             return false;
         }
 
+        // @menção em comentário concede acesso ao título (mesmo fora do escopo de filial).
+        if (\App\Models\CommentMention::query()
+            ->where('mentioned_user_id', $user->id)
+            ->whereHas('comment', fn ($q) => $q->where('payable_id', $payable->id))
+            ->exists()) {
+            return true;
+        }
+
         $scope = $this->resolve($user);
         if (!$scope['restricted']) {
             return true;

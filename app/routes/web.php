@@ -245,6 +245,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/lote/aprovar', [PayableController::class, 'batchApprove'])->name('payables.batch_approve');
         Route::post('/lote/prioridade', [PayableController::class, 'batchUpdatePriority'])->name('payables.batch_priority');
         Route::get('/{id}', [PayableController::class, 'show'])->whereNumber('id')->name('payables.show');
+        Route::get('/{id}/mentionable-users', [PayableController::class, 'mentionableUsers'])->whereNumber('id')->name('payables.mentionable');
         Route::post('/{id}/apelido', [PayableController::class, 'updateNickname'])->whereNumber('id')->name('payables.nickname');
         Route::post('/{id}/documentos', [PayableController::class, 'addDocument'])->name('payables.document');
         Route::post('/{id}/comprovante-pagamento', [PayableController::class, 'updatePaymentReceipt'])

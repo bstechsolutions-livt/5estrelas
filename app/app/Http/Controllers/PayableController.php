@@ -351,6 +351,17 @@ class PayableController extends Controller
             'type' => 'status_change',
         ]);
 
+        $requesterComment = trim((string) $request->input('requester_comment', ''));
+        if ($requesterComment !== '') {
+            PayableComment::create([
+                'payable_id' => $payable->id,
+                'user_id' => $user->id,
+                'body' => $requesterComment,
+                'type' => 'requester',
+                'metadata' => ['pinned' => true],
+            ]);
+        }
+
         AuditLogger::log(
             event: 'contas_pagar.lancado_manual',
             module: 'financeiro.contas_pagar',
@@ -762,6 +773,10 @@ class PayableController extends Controller
             ? $workflow->delegateCandidateUsers()
             : collect();
 
+        $canMention = $user
+            ? app(\App\Services\MentionService::class)->canMention($user)
+            : false;
+
         return Inertia::render('Payables/Show', [
             'payable' => $payable,
             'statusLabels' => Payable::STATUS_LABELS,
@@ -777,6 +792,7 @@ class PayableController extends Controller
             'canEditDueDate' => $user?->hasPermission('financeiro.contas_pagar.editar_vencimento') ?? false,
             'canManagePriority' => $user?->hasPermission('financeiro.contas_pagar.prioridade_gerenciar') ?? false,
             'canManagePaymentReceipt' => $user?->hasPermission('financeiro.contas_pagar.preparar') ?? false,
+            'canMention' => $canMention,
             'requiresPriorityOnApprove' => $canApproveStep && $workflow->isFinanceStep($currentStep),
             'approvalSteps' => $approvalSteps,
             'currentStep' => $currentStep,
@@ -788,7 +804,25 @@ class PayableController extends Controller
             'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
             'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
             'maxDocumentBytes' => $this->maxDocumentKb() * 1024,
+            'mentionableUsers' => ($user && $canMention)
+                ? app(\App\Services\MentionService::class)->mentionableUsers($user, (int) $payable->id)
+                : [],
         ]);
+    }
+
+    public function mentionableUsers(int $id)
+    {
+        $payable = $this->findPayableForUser($id);
+        $user = request()->user();
+        $mentionService = app(\App\Services\MentionService::class);
+
+        if (! $user || ! $mentionService->canMention($user)) {
+            return response()->json([]);
+        }
+
+        return response()->json(
+            $mentionService->mentionableUsers($user, (int) $payable->id)
+        );
     }
 
     public function importAllocations(Request $request, int $id, PayableAllocationImportService $importService)

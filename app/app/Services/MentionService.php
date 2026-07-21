@@ -15,16 +15,27 @@ use App\Events\NotificationCreated;
  * - Extrair @menções do texto do comentário
  * - Criar registros de CommentMention
  * - Gerar notificações pro sininho
- * - Listar usuários "mencionáveis" (mesmo dept + participantes do processo)
+ * - Listar usuários mencionáveis (todos ativos, se tiver permissão)
  */
 class MentionService
 {
+    public const PERMISSION_MENTION = 'financeiro.contas_pagar.mencionar';
+
     /**
      * Processa @menções no body de um comentário já criado.
      * Formato reconhecido: @[Nome do Usuário](id:123)
+     * Só aplica se o autor tiver permissão de mencionar.
      */
     public function processComment(PayableComment $comment): void
     {
+        $author = $comment->relationLoaded('user')
+            ? $comment->user
+            : User::find($comment->user_id);
+
+        if (! $author || ! $this->canMention($author)) {
+            return;
+        }
+
         $mentions = $this->extractMentions($comment->body);
 
         foreach ($mentions as $userId) {
@@ -43,6 +54,11 @@ class MentionService
         }
     }
 
+    public function canMention(User $user): bool
+    {
+        return $user->hasPermission('*') || $user->hasPermission(self::PERMISSION_MENTION);
+    }
+
     /**
      * Extrai IDs de usuário das @menções no texto.
      * Formato: @[Nome](id:123) ou @[Nome](123)
@@ -58,50 +74,22 @@ class MentionService
     }
 
     /**
-     * Lista usuários que podem ser mencionados neste payable.
-     * Regras:
-     * - Pessoas do mesmo departamento do usuário logado
-     * - Pessoas que já participaram do processo (comentaram, aprovaram, criaram)
-     * - Com permissão especial: qualquer pessoa ativa
+     * Lista usuários que podem ser mencionados.
+     * Com permissão de mencionar: todos os usuários ativos (exceto o próprio).
      */
     public function mentionableUsers(User $currentUser, int $payableId): array
     {
-        $query = User::where('is_active', true)->where('id', '!=', $currentUser->id);
-
-        // Se o usuário tem permissão ampla, retorna todos
-        if ($currentUser->hasPermission('*') || $currentUser->hasPermission('financeiro.contas_pagar.mencionar_todos')) {
-            return $query->orderBy('name')
-                ->get(['id', 'name', 'email', 'department_id'])
-                ->map(fn($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email])
-                ->values()->all();
+        if (! $this->canMention($currentUser)) {
+            return [];
         }
 
-        // Senão: mesmo departamento + participantes do processo
-        $deptId = $currentUser->department_id;
-        $participantIds = collect();
-
-        // Quem já comentou neste payable
-        $commenters = PayableComment::where('payable_id', $payableId)->pluck('user_id');
-        $participantIds = $participantIds->merge($commenters);
-
-        // Quem já foi mencionado
-        $mentioned = CommentMention::whereHas('comment', fn($q) => $q->where('payable_id', $payableId))
-            ->pluck('mentioned_user_id');
-        $participantIds = $participantIds->merge($mentioned);
-
-        $query->where(function ($q) use ($deptId, $participantIds) {
-            if ($deptId) {
-                $q->where('department_id', $deptId);
-            }
-            if ($participantIds->isNotEmpty()) {
-                $q->orWhereIn('id', $participantIds->unique());
-            }
-        });
-
-        return $query->orderBy('name')
+        return User::where('is_active', true)
+            ->where('id', '!=', $currentUser->id)
+            ->orderBy('name')
             ->get(['id', 'name', 'email'])
-            ->map(fn($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email])
-            ->values()->all();
+            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email])
+            ->values()
+            ->all();
     }
 
     /**

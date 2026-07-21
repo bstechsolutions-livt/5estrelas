@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\CommentMention;
-use App\Models\Department;
 use App\Models\Notification;
 use App\Models\Payable;
 use App\Models\PayableComment;
@@ -34,6 +33,16 @@ class MentionServiceTest extends TestCase
             'due_date' => now()->addDays(5)->toDateString(),
             'status' => 'pendente',
         ]);
+    }
+
+    private function grantMention(User $user): void
+    {
+        $user->permissions()->attach(
+            Permission::firstOrCreate(
+                ['key' => MentionService::PERMISSION_MENTION],
+                ['label' => 'Mencionar', 'module' => 'financeiro']
+            )->id
+        );
     }
 
     // ─── extractMentions ─────────────────────────────────────────────────
@@ -74,6 +83,7 @@ class MentionServiceTest extends TestCase
     {
         $payable = $this->makePayable();
         $sender = User::factory()->create(['is_active' => true]);
+        $this->grantMention($sender);
         $mentioned = User::factory()->create(['is_active' => true]);
 
         $comment = PayableComment::create([
@@ -95,10 +105,36 @@ class MentionServiceTest extends TestCase
         ]);
     }
 
+    public function test_process_comment_without_permission_skips_mention(): void
+    {
+        $payable = $this->makePayable();
+        $sender = User::factory()->create(['is_active' => true]);
+        $mentioned = User::factory()->create(['is_active' => true]);
+
+        $comment = PayableComment::create([
+            'payable_id' => $payable->id,
+            'user_id' => $sender->id,
+            'body' => "Verificar com @[{$mentioned->name}](id:{$mentioned->id}) por favor",
+            'type' => 'comment',
+        ]);
+
+        $this->service->processComment($comment);
+
+        $this->assertDatabaseMissing('comment_mentions', [
+            'payable_comment_id' => $comment->id,
+            'mentioned_user_id' => $mentioned->id,
+        ]);
+        $this->assertDatabaseMissing('notifications', [
+            'user_id' => $mentioned->id,
+            'type' => 'mention',
+        ]);
+    }
+
     public function test_process_comment_does_not_self_mention(): void
     {
         $payable = $this->makePayable();
         $sender = User::factory()->create(['is_active' => true]);
+        $this->grantMention($sender);
 
         $comment = PayableComment::create([
             'payable_id' => $payable->id,
@@ -118,6 +154,7 @@ class MentionServiceTest extends TestCase
     {
         $payable = $this->makePayable();
         $sender = User::factory()->create(['is_active' => true]);
+        $this->grantMention($sender);
         $mentioned = User::factory()->create(['is_active' => true]);
 
         $comment = PayableComment::create([
@@ -134,6 +171,18 @@ class MentionServiceTest extends TestCase
     }
 
     // ─── mentionableUsers ────────────────────────────────────────────────
+
+    public function test_mentionable_users_without_permission_returns_empty(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $other = User::factory()->create(['is_active' => true]);
+        $payable = $this->makePayable();
+
+        $users = $this->service->mentionableUsers($user, $payable->id);
+
+        $this->assertSame([], $users);
+        $this->assertFalse(collect($users)->pluck('id')->contains($other->id));
+    }
 
     public function test_mentionable_users_with_wildcard_returns_all_active(): void
     {
@@ -153,18 +202,21 @@ class MentionServiceTest extends TestCase
         $this->assertFalse($ids->contains($admin->id)); // não inclui a si mesmo
     }
 
-    public function test_mentionable_users_same_department(): void
+    public function test_mentionable_users_with_permission_returns_all_active(): void
     {
-        $dept = Department::create(['name' => 'TI', 'is_active' => true]);
-        $user = User::factory()->create(['is_active' => true, 'department_id' => $dept->id]);
-        $colleague = User::factory()->create(['is_active' => true, 'department_id' => $dept->id]);
-        $outsider = User::factory()->create(['is_active' => true, 'department_id' => null]);
+        $user = User::factory()->create(['is_active' => true]);
+        $this->grantMention($user);
+        $colleague = User::factory()->create(['is_active' => true]);
+        $outsider = User::factory()->create(['is_active' => true]);
+        $inactive = User::factory()->create(['is_active' => false]);
         $payable = $this->makePayable();
 
         $users = $this->service->mentionableUsers($user, $payable->id);
         $ids = collect($users)->pluck('id');
 
         $this->assertTrue($ids->contains($colleague->id));
-        // outsider pode não aparecer (sem dept em comum, sem participar do processo)
+        $this->assertTrue($ids->contains($outsider->id));
+        $this->assertFalse($ids->contains($inactive->id));
+        $this->assertFalse($ids->contains($user->id));
     }
 }
