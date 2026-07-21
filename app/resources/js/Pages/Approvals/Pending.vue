@@ -5,6 +5,7 @@ import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import { useDevice } from '@/composables/useDevice'
+import { formatPayableMoney } from '@/utils/seniorCurrency'
 
 const props = defineProps({
     payables: { type: Array, default: () => [] },
@@ -13,8 +14,8 @@ const props = defineProps({
 
 const { isMobile } = useDevice()
 
-function formatMoney(val) {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+function formatMoney(val, codMoe = null) {
+    return formatPayableMoney(val, codMoe)
 }
 function formatDate(d) {
     if (!d) return '—'
@@ -59,7 +60,7 @@ function goToPayable(id) {
                             </p>
                         </div>
                         <div class="text-right">
-                            <p class="text-sm font-bold text-gray-800">{{ formatMoney(p.amount) }}</p>
+                            <p class="text-sm font-bold text-gray-800">{{ formatMoney(p.amount, p.codmoe) }}</p>
                             <Tag value="Aguardando" severity="warn" class="mt-1" />
                         </div>
                     </div>

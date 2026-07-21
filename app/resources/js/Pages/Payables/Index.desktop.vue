@@ -21,6 +21,7 @@ import {
     useIssueDatePresets,
 } from '@/composables/useDueDatePresets'
 import { formatApiDate, parseApiDate, toApiDateString } from '@/utils/apiDate'
+import { formatPayableMoney } from '@/utils/seniorCurrency'
 import {
     PAYABLE_SORT_GROUPS,
     sortQueryFromValue,
@@ -598,8 +599,8 @@ function applyBatchPriority() {
         })
 }
 
-function formatMoney(val) {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+function formatMoney(val, codMoe = null) {
+    return formatPayableMoney(val, codMoe)
 }
 
 function formatDate(d) {
@@ -1056,7 +1057,7 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </Column>
                     <Column field="amount" header="Valor" style="width: 10%" sortable>
                         <template #body="{ data }">
-                            <span class="text-xs font-semibold whitespace-nowrap" @click="onRowClick(data)">{{ formatMoney(data.amount) }}</span>
+                            <span class="text-xs font-semibold whitespace-nowrap" @click="onRowClick(data)">{{ formatMoney(data.amount, data.codmoe) }}</span>
                         </template>
                     </Column>
                     <Column field="due_date" header="Vencimento" style="width: 8%" sortable>

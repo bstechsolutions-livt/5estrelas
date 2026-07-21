@@ -15,6 +15,7 @@ import PayableDocumentPreviewCard from '@/Components/Financeiro/PayableDocumentP
 import DueDatePeriodChips from '@/Components/Financeiro/DueDatePeriodChips.vue'
 import DocumentViewerDialog from '@/Components/Financeiro/DocumentViewerDialog.vue'
 import { formatApiDate } from '@/utils/apiDate'
+import { formatPayableMoney } from '@/utils/seniorCurrency'
 
 const VIEW_STORAGE_KEY = 'presidency_desk_view_mode'
 
@@ -78,8 +79,8 @@ watch(() => page.props.flash?.error, (msg) => {
     if (msg) toast.add({ severity: 'error', summary: 'Erro', detail: msg, life: 5000 })
 })
 
-function formatMoney(val) {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+function formatMoney(val, codMoe = null) {
+    return formatPayableMoney(val, codMoe)
 }
 
 function formatDateTime(d) {
@@ -293,7 +294,7 @@ function goToPayable(id) {
                             <Tag v-if="p.origem_senior" value="Senior" severity="secondary" class="!text-[9px] !py-0 shrink-0" />
                         </div>
                         <div class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
-                            <span class="font-semibold text-gray-800 shrink-0">{{ formatMoney(p.amount) }}</span>
+                            <span class="font-semibold text-gray-800 shrink-0">{{ formatMoney(p.amount, p.codmoe) }}</span>
                             <span class="shrink-0">Venc. {{ formatApiDate(p.due_date) }}</span>
                             <span v-if="p.empresa_nome" class="truncate min-w-0 max-w-[12rem]">{{ p.empresa_nome }}</span>
                             <span v-if="p.filial_nome" class="truncate min-w-0 max-w-[10rem]">{{ p.filial_nome }}</span>
@@ -370,7 +371,7 @@ function goToPayable(id) {
                             <p v-if="p.description" class="text-xs text-gray-500 mt-1 line-clamp-2">{{ p.description }}</p>
                         </div>
                         <div class="text-right shrink-0">
-                            <p class="text-lg font-bold text-gray-900">{{ formatMoney(p.amount) }}</p>
+                            <p class="text-lg font-bold text-gray-900">{{ formatMoney(p.amount, p.codmoe) }}</p>
                             <p class="text-xs text-gray-500">Venc. {{ formatApiDate(p.due_date) }}</p>
                         </div>
                     </div>

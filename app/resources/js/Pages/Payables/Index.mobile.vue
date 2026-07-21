@@ -18,6 +18,7 @@ import {
     useIssueDatePresets,
 } from '@/composables/useDueDatePresets'
 import { formatApiDate, parseApiDate, toApiDateString } from '@/utils/apiDate'
+import { formatPayableMoney } from '@/utils/seniorCurrency'
 import { PAYABLE_SORT_GROUPS, sortQueryFromValue, sortValueFromQuery } from '@/composables/usePayableSort'
 
 const props = defineProps({
@@ -401,8 +402,8 @@ function createBordero() {
     })
 }
 
-function formatMoney(val) {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+function formatMoney(val, codMoe = null) {
+    return formatPayableMoney(val, codMoe)
 }
 function formatDate(d) {
     return formatApiDate(d)
@@ -603,7 +604,7 @@ const currentTotal = computed(() => {
                     />
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm font-semibold text-gray-700">{{ formatMoney(p.amount) }}</span>
+                    <span class="text-sm font-semibold text-gray-700">{{ formatMoney(p.amount, p.codmoe) }}</span>
                     <span class="text-xs text-gray-400">Venc: {{ formatDate(p.due_date) }}</span>
                 </div>
                 <p v-if="p.description" class="text-[11px] text-gray-500 truncate mt-1">{{ p.description }}</p>

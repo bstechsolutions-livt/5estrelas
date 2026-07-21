@@ -12,6 +12,7 @@ import DatePicker from 'primevue/datepicker'
 import FileUpload from 'primevue/fileupload'
 import ApprovalFlowPreview from '@/Components/Financeiro/ApprovalFlowPreview.vue'
 import { useDevice } from '@/composables/useDevice'
+import { formatPayableMoney } from '@/utils/seniorCurrency'
 
 const props = defineProps({
     bordero: Object,
@@ -186,8 +187,8 @@ function confirmDesfazer() {
     })
 }
 
-function formatMoney(val) {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+function formatMoney(val, codMoe = null) {
+    return formatPayableMoney(val, codMoe)
 }
 function formatDate(d) {
     if (!d) return '—'
@@ -384,7 +385,7 @@ onMounted(reloadIfStale)
                                 <p class="text-xs text-gray-500">Venc: {{ formatDate(row.payable.due_date) }} · {{ row.payable.empresa_nome || row.payable.filial_nome || '' }}</p>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span class="text-sm font-semibold text-gray-700">{{ formatMoney(row.payable.amount) }}</span>
+                                <span class="text-sm font-semibold text-gray-700">{{ formatMoney(row.payable.amount, row.payable.codmoe) }}</span>
                                 <button
                                     v-if="isEditable"
                                     @click.stop="removePayable(row.payable.id)"

@@ -23,6 +23,7 @@ import PayableDetailsOverview from '@/Components/Financeiro/PayableDetailsOvervi
 import PayableFieldOriginLabel from '@/Components/Financeiro/PayableFieldOriginLabel.vue'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
 import { formatApiDate, parseApiDate } from '@/utils/apiDate'
+import { formatPayableMoney } from '@/utils/seniorCurrency'
 
 const props = defineProps({
     payable: Object,
@@ -351,8 +352,8 @@ function reject() {
     })
 }
 
-function formatMoney(val) {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+function formatMoney(val, codMoe = null) {
+    return formatPayableMoney(val, codMoe ?? props.payable?.codmoe)
 }
 
 function formatCommentBody(body) {

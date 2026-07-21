@@ -7,6 +7,7 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import BranchAccessBlocked from '@/Components/Financeiro/BranchAccessBlocked.vue'
 import { useDevice } from '@/composables/useDevice'
+import { formatPayableMoney } from '@/utils/seniorCurrency'
 
 const props = defineProps({
     summary: Object,
@@ -29,8 +30,8 @@ const activeItems = computed(() =>
     activeTab.value === 'my_action' ? props.my_action : props.in_approval
 )
 
-function formatMoney(val) {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+function formatMoney(val, codMoe = null) {
+    return formatPayableMoney(val, codMoe)
 }
 
 function formatDate(d) {
@@ -154,7 +155,7 @@ function typeSeverity(type) {
                             </p>
                         </div>
                         <div class="text-right shrink-0">
-                            <p class="text-sm font-bold text-slate-800 dark:text-slate-100">{{ formatMoney(item.amount) }}</p>
+                            <p class="text-sm font-bold text-slate-800 dark:text-slate-100">{{ formatMoney(item.amount, item.codmoe) }}</p>
                             <Tag :value="item.status_label" severity="warn" class="mt-1" />
                         </div>
                     </div>
