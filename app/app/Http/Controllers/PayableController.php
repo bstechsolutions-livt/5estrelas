@@ -474,7 +474,12 @@ class PayableController extends Controller
         $status = $request->input('status') ?: 'pendente';
         $query->where('payables.status', $status);
 
-        if (in_array($status, ['pendente', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO], true)) {
+        // Títulos já agrupados em borderô saem das abas avulsas (pendente / em preparação / sync).
+        if (in_array($status, [
+            'pendente',
+            'em_preparacao',
+            Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO,
+        ], true)) {
             $query->whereNull('payables.bordero_id');
         }
 
@@ -498,8 +503,11 @@ class PayableController extends Controller
         $totalsQuery = Payable::query()
             ->excludeMissingInSenior()
             ->where(function ($q) {
-                $q->whereNotIn('status', ['pendente', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO])
-                    ->orWhereNull('bordero_id');
+                $q->whereNotIn('status', [
+                    'pendente',
+                    'em_preparacao',
+                    Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO,
+                ])->orWhereNull('bordero_id');
             });
         $this->applyPayablesListFilters($totalsQuery, $request, $departmentContext['department_id'], $user);
         $totals = $totalsQuery
@@ -656,6 +664,7 @@ class PayableController extends Controller
             WHEN payables.status = 'pendente' AND payables.rejection_reason IS NOT NULL AND payables.rejection_reason <> '' THEN 'Recusado — corrigir'
             WHEN payables.status = 'pendente' AND payables.bordero_id IS NOT NULL THEN 'No borderô'
             WHEN payables.status = 'pendente' THEN 'Aguardando envio'
+            WHEN payables.status = 'em_preparacao' AND payables.bordero_id IS NOT NULL THEN 'No borderô'
             WHEN payables.status = 'em_preparacao' THEN 'Em preparação'
             WHEN payables.status = 'aguardando_aprovacao' THEN COALESCE(wf_approver.name, wf_current_step.role_label, wf_current_step.level_name, 'Fluxo não iniciado')
             WHEN payables.status = 'aprovado' THEN 'Aguardando pagamento'
