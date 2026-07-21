@@ -23,6 +23,8 @@ defineProps({
     canBypassApprovalDeadline: { type: Boolean, default: false },
     minDueDateForApproval: { type: String, default: null },
     syncStatus: { type: Object, default: null },
+    canViewAwaitingSync: { type: Boolean, default: false },
+    canAssignDepartmentSync: { type: Boolean, default: false },
 })
 
 const { isMobile } = useDevice()

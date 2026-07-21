@@ -48,6 +48,7 @@ class Payable extends Model
     public const WORKFLOW_FIELDS = [
         'status', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'department_id',
+        'department_assigned_by', 'department_assigned_at',
         'nickname',
         'paid_at', 'payment_method', 'paid_by',
         'payment_priority', 'payment_sla_date', 'priority_set_by', 'priority_set_at',
@@ -132,7 +133,7 @@ class Payable extends Model
     protected $fillable = [
         'title_number', 'nickname', 'supplier_name', 'supplier_cnpj', 'amount',
         'due_date', 'issue_date', 'description', 'category', 'status',
-        'branch_id', 'department_id', 'senior_cod_usu', 'prepared_by', 'approved_by', 'sent_for_approval_at',
+        'branch_id', 'department_id', 'department_assigned_by', 'department_assigned_at', 'senior_cod_usu', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'senior_id',
         'paid_at', 'payment_method', 'paid_by',
         'payment_priority', 'payment_sla_date', 'priority_set_by', 'priority_set_at',
@@ -162,6 +163,7 @@ class Payable extends Model
             'paid_at' => 'date',
             'payment_sla_date' => 'date',
             'priority_set_at' => 'datetime',
+            'department_assigned_at' => 'datetime',
             'conciliated_at' => 'date',
             'allocation_imported_at' => 'datetime',
             'senior_missing_at' => 'datetime',
@@ -265,6 +267,16 @@ class Payable extends Model
         return $this->belongsTo(Department::class);
     }
 
+    public function departmentAssigner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'department_assigned_by');
+    }
+
+    public function hasManualDepartmentAssignment(): bool
+    {
+        return $this->department_assigned_by !== null;
+    }
+
     public function preparer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'prepared_by');
@@ -363,7 +375,7 @@ class Payable extends Model
         }
 
         $parts = [];
-        if ($this->department_id === null) {
+        if ($this->department_id === null && ! $this->hasManualDepartmentAssignment()) {
             $parts[] = 'departamento';
         }
         if ((new \App\Services\Senior\SupplierDisplayNameResolver())->isGeneric($this->supplier_name)) {
@@ -813,6 +825,18 @@ class Payable extends Model
     /**
      * @param iterable<Payable> $payables
      */
+    public static function attachDepartmentAssignerMeta(iterable $payables): void
+    {
+        foreach ($payables as $payable) {
+            $payable->setAttribute(
+                'department_assigned_by_name',
+                $payable->relationLoaded('departmentAssigner') && $payable->departmentAssigner
+                    ? $payable->departmentAssigner->name
+                    : null,
+            );
+        }
+    }
+
     public static function attachPriorityMeta(iterable $payables): void
     {
         foreach ($payables as $payable) {

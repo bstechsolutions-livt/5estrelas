@@ -49,6 +49,8 @@ const props = defineProps({
     canBypassApprovalDeadline: { type: Boolean, default: false },
     minDueDateForApproval: { type: String, default: null },
     syncStatus: { type: Object, default: null },
+    canViewAwaitingSync: { type: Boolean, default: false },
+    canAssignDepartmentSync: { type: Boolean, default: false },
 })
 
 const { can } = useAuth()
@@ -177,20 +179,26 @@ function selectIssuePreset(key) {
     applyFilters()
 }
 
-const statusList = [
-    { label: 'Aguard. sincronização', value: 'aguardando_vinculo_departamento', color: 'gray' },
-    { label: 'Pendentes', value: 'pendente', color: 'amber' },
-    { label: 'Em Preparação', value: 'em_preparacao', color: 'blue' },
-    { label: 'Em Aprovação', value: 'aguardando_aprovacao', color: 'orange' },
-    { label: 'Aprovados', value: 'aprovado', color: 'green' },
-    { label: 'Ag. Conciliação', value: 'aguardando_conciliacao', color: 'amber' },
-    { label: 'Conciliados', value: 'conciliado', color: 'emerald' },
-]
+const statusList = computed(() => {
+    const tabs = [
+        { label: 'Aguard. sincronização', value: 'aguardando_vinculo_departamento', color: 'gray' },
+        { label: 'Pendentes', value: 'pendente', color: 'amber' },
+        { label: 'Em Preparação', value: 'em_preparacao', color: 'blue' },
+        { label: 'Em Aprovação', value: 'aguardando_aprovacao', color: 'orange' },
+        { label: 'Aprovados', value: 'aprovado', color: 'green' },
+        { label: 'Ag. Conciliação', value: 'aguardando_conciliacao', color: 'amber' },
+        { label: 'Conciliados', value: 'conciliado', color: 'emerald' },
+    ]
+    if (!props.canViewAwaitingSync) {
+        return tabs.filter(s => s.value !== 'aguardando_vinculo_departamento')
+    }
+    return tabs
+})
 
 const statusTabHint = computed(() => {
     const hints = {
         pendente: 'Títulos que ainda não foram enviados para aprovação.',
-        aguardando_vinculo_departamento: 'Importados da Senior sem departamento ou nome de fornecedor. Bloqueados até a sincronização completar.',
+        aguardando_vinculo_departamento: 'Importados da Senior sem departamento ou fornecedor. Você pode vincular o departamento manualmente; após isso, a sync não altera mais o depto.',
         em_preparacao: 'Títulos em preparação antes do envio.',
         aguardando_aprovacao: 'Títulos em fluxo de aprovação — a coluna Etapa mostra em qual nível cada um está.',
         aprovado: 'Títulos aprovados aguardando pagamento.',
@@ -392,6 +400,36 @@ function goShow(id) {
 
 function isAwaitingDepartmentLink(payable) {
     return payable.status === 'aguardando_vinculo_departamento'
+}
+
+function hasManualDepartmentAssignment(payable) {
+    return !!payable.department_assigned_by
+}
+
+function canAssignDepartmentFor(payable) {
+    return props.canAssignDepartmentSync
+        && isAwaitingDepartmentLink(payable)
+        && !hasManualDepartmentAssignment(payable)
+}
+
+const departmentAssignForms = ref({})
+
+function departmentAssignOptions() {
+    return (props.departments || []).map(d => ({ label: d.name, value: d.id }))
+}
+
+function assignDepartmentSync(payable) {
+    const departmentId = departmentAssignForms.value[payable.id]
+    if (!departmentId) return
+
+    router.post(`/financeiro/contas-pagar/${payable.id}/departamento-sync`, {
+        department_id: departmentId,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            delete departmentAssignForms.value[payable.id]
+        },
+    })
 }
 
 function onRowClick(payable) {
@@ -647,7 +685,8 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                 <p class="font-medium">Aguardando sincronização</p>
                 <p class="mt-1 text-xs text-amber-800">
                     Estes títulos foram importados da Senior, mas ainda faltam dados do lançador (departamento)
-                    ou do fornecedor (nome real no cadastro). Ficam bloqueados até a próxima sincronização resolver.
+                    ou do fornecedor (nome real no cadastro). Clique em <strong>Aguardando sync</strong> na coluna Depto
+                    para vincular manualmente — depois disso a sincronização não altera mais o departamento.
                 </p>
             </div>
 
@@ -964,12 +1003,39 @@ const countAprovado = computed(() => props.totals?.aprovado?.count || 0)
                     </Column>
                     <Column field="department_nome" header="Depto" style="width: 9%" sortable dusk="col-departamento">
                         <template #body="{ data }">
-                            <span
-                                class="cell-truncate text-xs"
-                                :class="isAwaitingDepartmentLink(data) ? 'text-amber-700 italic' : 'text-gray-600'"
-                                :title="isAwaitingDepartmentLink(data) ? (data.workflow_moment_detail || 'Aguardando sincronização') : data.department_nome"
-                                @click="onRowClick(data)"
-                            >{{ isAwaitingDepartmentLink(data) ? 'Aguardando sync' : (data.department_nome || '—') }}</span>
+                            <div class="flex flex-col gap-0.5 min-w-0" @click.stop>
+                                <template v-if="hasManualDepartmentAssignment(data) || (isAwaitingDepartmentLink(data) && data.department_nome)">
+                                    <span
+                                        class="cell-truncate text-xs text-gray-600"
+                                        :title="data.department_nome"
+                                    >{{ data.department_nome || '—' }}</span>
+                                    <span
+                                        v-if="data.department_assigned_by_name"
+                                        class="text-[9px] text-gray-400 truncate"
+                                        :title="`Definido por ${data.department_assigned_by_name}`"
+                                        dusk="dept-assigned-by"
+                                    >{{ data.department_assigned_by_name }}</span>
+                                </template>
+                                <template v-else-if="canAssignDepartmentFor(data)">
+                                    <Select
+                                        v-model="departmentAssignForms[data.id]"
+                                        :options="departmentAssignOptions()"
+                                        option-label="label"
+                                        option-value="value"
+                                        placeholder="Aguardando sync"
+                                        class="w-full text-xs dept-sync-select"
+                                        size="small"
+                                        dusk="dept-sync-select"
+                                        @change="assignDepartmentSync(data)"
+                                    />
+                                </template>
+                                <span
+                                    v-else
+                                    class="cell-truncate text-xs text-amber-700 italic"
+                                    :title="isAwaitingDepartmentLink(data) ? (data.workflow_moment_detail || 'Aguardando sincronização') : data.department_nome"
+                                    @click="onRowClick(data)"
+                                >{{ isAwaitingDepartmentLink(data) ? 'Aguardando sync' : (data.department_nome || '—') }}</span>
+                            </div>
                         </template>
                     </Column>
                     <Column field="filial_nome" header="Filial" style="width: 10%" sortable dusk="col-filial">

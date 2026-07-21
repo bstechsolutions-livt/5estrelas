@@ -469,14 +469,17 @@ class PayablesSyncService
     public function applyPostSyncReadiness(Payable $payable, ?int $financeiroId = null): bool
     {
         $financeiroId ??= Department::financeDepartmentId();
+        $manualDept = $payable->hasManualDepartmentAssignment();
         $resolver = new SupplierDisplayNameResolver();
-        $nextDeptId = $this->resolveDepartmentIdForPayable($payable, $financeiroId);
+        $nextDeptId = $manualDept
+            ? ($payable->department_id ? (int) $payable->department_id : null)
+            : $this->resolveDepartmentIdForPayable($payable, $financeiroId);
         $hasDept = $nextDeptId !== null;
         $resolvedSupplier = $resolver->resolveForPayable($payable);
         $hasSupplier = ! $resolver->isGeneric($resolvedSupplier);
 
         if (! $payable->senior_id) {
-            if ($hasDept && (int) $payable->department_id !== $nextDeptId) {
+            if (! $manualDept && $hasDept && (int) $payable->department_id !== $nextDeptId) {
                 $payable->update(['department_id' => $nextDeptId]);
 
                 return true;
@@ -492,12 +495,12 @@ class PayablesSyncService
         $ready = $hasDept && $hasSupplier;
         $updates = [];
 
-        if ($hasDept && (int) $payable->department_id !== $nextDeptId) {
+        if (! $manualDept && $hasDept && (int) $payable->department_id !== $nextDeptId) {
             $updates['department_id'] = $nextDeptId;
         }
         if ($hasSupplier && $payable->supplier_name !== $resolvedSupplier) {
             $updates['supplier_name'] = $resolvedSupplier;
-        } elseif ($payable->department_id !== null
+        } elseif (! $manualDept && $payable->department_id !== null
             && $financeiroId
             && (int) $payable->department_id === (int) $financeiroId) {
             $updates['department_id'] = null;
@@ -617,6 +620,10 @@ class PayablesSyncService
 
     private function resolveDepartmentIdForPayable(Payable $payable, ?int $financeiroId): ?int
     {
+        if ($payable->hasManualDepartmentAssignment()) {
+            return $payable->department_id ? (int) $payable->department_id : null;
+        }
+
         $codUsu = (int) ($payable->senior_cod_usu ?? 0);
         if ($codUsu > 0) {
             $user = User::query()
