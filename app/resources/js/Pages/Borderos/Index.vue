@@ -126,6 +126,11 @@ function wasRejectedBack(bordero) {
                     @row-click="(e) => goShow(e.data.id)"
                 >
                     <Column field="number" header="Número" />
+                    <Column field="description" header="Descrição">
+                        <template #body="{ data }">
+                            <span class="text-gray-700">{{ data.description || '—' }}</span>
+                        </template>
+                    </Column>
                     <Column header="Status">
                         <template #body="{ data }">
                             <Tag
@@ -153,6 +158,7 @@ function wasRejectedBack(bordero) {
                         <div class="flex justify-between items-start">
                             <div>
                                 <p class="font-semibold text-gray-800">{{ b.number }}</p>
+                                <p v-if="b.description" class="text-xs text-gray-600 mt-0.5">{{ b.description }}</p>
                                 <p class="text-xs text-gray-500">{{ b.items_count }} títulos</p>
                             </div>
                             <Tag
