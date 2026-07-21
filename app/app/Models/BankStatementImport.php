@@ -12,7 +12,7 @@ class BankStatementImport extends Model
     use Auditable;
 
     protected $fillable = [
-        'user_id', 'bank_account_id', 'bank_name', 'bank_id', 'account_number', 'branch_number',
+        'user_id', 'bank_account_id', 'conciliation_session_id', 'bank_name', 'bank_id', 'account_number', 'branch_number',
         'file_name', 'file_path', 'period_start', 'period_end', 'balance',
         'status', 'transaction_count', 'matched_count', 'error_message',
     ];
@@ -38,6 +38,11 @@ class BankStatementImport extends Model
     public function bankAccount(): BelongsTo
     {
         return $this->belongsTo(BankAccount::class);
+    }
+
+    public function conciliationSession(): BelongsTo
+    {
+        return $this->belongsTo(ConciliationSession::class);
     }
 
     public function transactions(): HasMany

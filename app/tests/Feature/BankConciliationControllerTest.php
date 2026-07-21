@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BankAccount;
 use App\Models\AuditLog;
 use App\Models\BankStatementImport;
 use App\Models\BankTransaction;
@@ -68,6 +69,30 @@ class BankConciliationControllerTest extends TestCase
         ], $overrides));
     }
 
+    private function createBankAccount(): BankAccount
+    {
+        return BankAccount::create([
+            'name' => 'MATRIZ — BRB',
+            'is_active' => true,
+            'bank_code' => '070',
+            'bank_name' => 'BRB',
+            'agency' => '046',
+            'account_number' => '000132',
+            'account_digit' => '9',
+        ]);
+    }
+
+    private function uploadPayload(UploadedFile $file, ?BankAccount $account = null): array
+    {
+        $account ??= $this->createBankAccount();
+
+        return [
+            'file' => $file,
+            'bank_account_id' => $account->id,
+            'date' => now()->toDateString(),
+        ];
+    }
+
     private function realOfxFile(): UploadedFile
     {
         $path = base_path('tests/fixtures/ofx/brb.ofx');
@@ -82,9 +107,7 @@ class BankConciliationControllerTest extends TestCase
         $user = $this->conciliador();
 
         $response = $this->actingAs($user)
-            ->post(route('bank-conciliation.upload'), [
-                'file' => $this->realOfxFile(),
-            ]);
+            ->post(route('bank-conciliation.upload'), $this->uploadPayload($this->realOfxFile()));
 
         $response->assertRedirect();
         $response->assertSessionHas('success');
@@ -109,9 +132,7 @@ class BankConciliationControllerTest extends TestCase
         $user = $this->activeUser();
 
         $response = $this->actingAs($user)
-            ->post(route('bank-conciliation.upload'), [
-                'file' => $this->realOfxFile(),
-            ]);
+            ->post(route('bank-conciliation.upload'), $this->uploadPayload($this->realOfxFile()));
 
         $response->assertStatus(403);
     }
@@ -123,9 +144,9 @@ class BankConciliationControllerTest extends TestCase
         $user = $this->conciliador();
 
         $response = $this->actingAs($user)
-            ->post(route('bank-conciliation.upload'), [
-                'file' => UploadedFile::fake()->create('report.pdf', 100, 'application/pdf'),
-            ]);
+            ->post(route('bank-conciliation.upload'), $this->uploadPayload(
+                UploadedFile::fake()->create('report.pdf', 100, 'application/pdf'),
+            ));
 
         $response->assertRedirect();
         $response->assertSessionHasErrors('file');

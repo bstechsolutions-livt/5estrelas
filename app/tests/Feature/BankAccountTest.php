@@ -285,7 +285,11 @@ class BankAccountTest extends TestCase
         $file = new UploadedFile($path, 'brb.ofx', 'application/octet-stream', null, true);
 
         $this->actingAs($user)
-            ->post(route('bank-conciliation.upload'), ['file' => $file])
+            ->post(route('bank-conciliation.upload'), [
+                'file' => $file,
+                'bank_account_id' => $account->id,
+                'date' => '2026-06-02',
+            ])
             ->assertRedirect();
 
         $import = BankStatementImport::first();

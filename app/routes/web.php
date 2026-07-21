@@ -213,6 +213,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/search-payables', [BankConciliationController::class, 'searchPayables'])->name('bank-conciliation.search-payables');
         Route::get('/{importId}', [BankConciliationController::class, 'show'])->whereNumber('importId')->name('bank-conciliation.show');
         Route::post('/upload', [BankConciliationController::class, 'upload'])->name('bank-conciliation.upload');
+        Route::post('/upload-batch', [BankConciliationController::class, 'uploadBatch'])->name('bank-conciliation.upload-batch');
         Route::post('/transactions/{id}/accept', [BankConciliationController::class, 'accept'])->whereNumber('id')->name('bank-conciliation.accept');
         Route::post('/transactions/{id}/reject', [BankConciliationController::class, 'reject'])->whereNumber('id')->name('bank-conciliation.reject');
         Route::post('/transactions/{id}/link', [BankConciliationController::class, 'link'])->whereNumber('id')->name('bank-conciliation.link');

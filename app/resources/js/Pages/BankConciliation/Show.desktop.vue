@@ -17,6 +17,7 @@ const props = defineProps({
     counters: Object,
     isConciliador: Boolean,
     filters: Object,
+    sessionContext: { type: Object, default: null },
 })
 
 // 'import' is a reserved word in JS — alias it to avoid Vue compiler issues
@@ -83,7 +84,11 @@ async function searchPayables() {
     if (searchQuery.value.length < 2) return
     searching.value = true
     try {
-        const response = await fetch(`/financeiro/contas-pagar/conciliacao/search-payables?query=${encodeURIComponent(searchQuery.value)}`)
+        const params = new URLSearchParams({ query: searchQuery.value })
+        if (props.sessionContext?.date) {
+            params.set('date', props.sessionContext.date)
+        }
+        const response = await fetch(`/financeiro/contas-pagar/conciliacao/search-payables?${params}`)
         searchResults.value = await response.json()
     } catch (e) {
         searchResults.value = []
@@ -125,6 +130,17 @@ function matchStatusLabel(status) {
 }
 
 const canBatch = computed(() => props.counters?.matched > 0)
+
+function backToWorkspace() {
+    if (props.sessionContext) {
+        router.get('/financeiro/contas-pagar/conciliacao', {
+            bank_account_id: props.sessionContext.bank_account_id,
+            date: props.sessionContext.date,
+        })
+        return
+    }
+    router.visit('/financeiro/contas-pagar/conciliacao')
+}
 </script>
 
 <template>
@@ -133,8 +149,8 @@ const canBatch = computed(() => props.counters?.matched > 0)
         <div class="max-w-7xl mx-auto">
             <!-- Header + back -->
             <div class="mb-6">
-                <button @click="router.visit('/financeiro/contas-pagar/conciliacao')" class="text-sm text-blue-600 hover:underline mb-2 inline-flex items-center gap-1">
-                    <i class="pi pi-arrow-left text-xs"></i> Voltar
+                <button @click="backToWorkspace" class="text-sm text-blue-600 hover:underline mb-2 inline-flex items-center gap-1">
+                    <i class="pi pi-arrow-left text-xs"></i> Voltar{{ sessionContext ? ` — ${sessionContext.period_label}` : '' }}
                 </button>
                 <h1 class="text-2xl font-bold text-gray-800">{{ stmtImport.bank_name || 'Importacao OFX' }}</h1>
                 <p class="text-sm text-gray-500 mt-1">Conta: {{ stmtImport.account_number }} &middot; Periodo: {{ formatDate(stmtImport.period_start) }} a {{ formatDate(stmtImport.period_end) }}</p>

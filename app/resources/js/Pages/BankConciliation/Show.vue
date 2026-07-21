@@ -9,6 +9,7 @@ defineProps({
     counters: Object,
     isConciliador: Boolean,
     filters: Object,
+    sessionContext: { type: Object, default: null },
 })
 
 const { isMobile } = useDevice()
