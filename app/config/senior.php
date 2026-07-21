@@ -56,6 +56,10 @@ return [
     'fornecedor_service' => 'sapiens_Synccom_senior_g5_co_cad_fornecedor',
     'fornecedor_page_size' => (int) env('SENIOR_FORNECEDOR_PAGE_SIZE', 100),
     'fornecedor_max_pages' => (int) env('SENIOR_FORNECEDOR_MAX_PAGES', 500),
+    // Lookups pontuais via Exportar no sync delta / schedule de fornecedores.
+    'fornecedor_max_lookups_per_sync' => (int) env('SENIOR_FORNECEDOR_MAX_LOOKUPS', 40),
+    // Cooldown (minutos) de stub unresolved: libera o teto de lookups sem bloquear forever.
+    'fornecedor_unresolved_ttl_minutes' => (int) env('SENIOR_FORNECEDOR_UNRESOLVED_TTL', 360),
     // codFor máximo observado no cad_fornecedor (ConsultarGeral). Acima disso são
     // favorecidos de folha (GFD/TRCT) — nome vem de obsTcp, não do cadastro.
     'fornecedor_catalog_max_cod' => (int) env('SENIOR_FORNECEDOR_CATALOG_MAX_COD', 120),
@@ -136,7 +140,8 @@ return [
     'timeout_response' => (int) env('SENIOR_TIMEOUT_RESPONSE', 60),
 
     // Tentativas adicionais em erro transitório (requirement 1.10 / 2.4).
-    'max_retries' => 3,
+    // Em PRD com middleware saturado, 1 evita job estourar timeout no retry.
+    'max_retries' => max(0, (int) env('SENIOR_MAX_RETRIES', 1)),
 
     // Data-base da janela de vencimento (vctIni) no sync incremental.
     // Títulos com vencimento a partir desta data entram na varredura a cada ciclo.
@@ -154,17 +159,36 @@ return [
 
     // Pós-sync AbertosCP: quantos Exportar E de UsuGer rodar imediatamente nos inserts.
     // 0 = desliga (recomendado em PRD; use o cron senior:enrich-payable-launchers).
-    'post_sync_launcher_lookups' => (int) env('SENIOR_POST_SYNC_LAUNCHER_LOOKUPS', 0),
+    'post_sync_launcher_lookups' => (int) env('SENIOR_POST_SYNC_LAUNCHER_LOOKUPS', 80),
 
     // Pós-sync: quantos codFor faltantes buscar no cad_fornecedor (prioriza títulos novos).
     // 0 = desliga (cron/fornecedores separado cobre).
-    'post_sync_supplier_lookups' => (int) env('SENIOR_POST_SYNC_SUPPLIER_LOOKUPS', 0),
+    'post_sync_supplier_lookups' => (int) env('SENIOR_POST_SYNC_SUPPLIER_LOOKUPS', 80),
 
     // Teto de parede (segundos) para enrich pós-sync; estouro pula o restante.
     'post_sync_enrich_max_seconds' => (int) env('SENIOR_POST_SYNC_ENRICH_MAX_SECONDS', 30),
 
-    // Cron enrich UsuGer: teto de Exportar E por ciclo (após bulk ConsultarGeral).
+    // Cron enrich UsuGer: teto de Exportar E pontual por ciclo.
     'enrich_launcher_max_lookups' => (int) env('SENIOR_ENRICH_LAUNCHER_MAX', 400),
+
+    // Enrich via fila Redis (recomendado em PRD): desacopla SOAP do sync CP.
+    'enrich_use_queue' => filter_var(env('SENIOR_ENRICH_USE_QUEUE', false), FILTER_VALIDATE_BOOL),
+    'enrich_launcher_queue' => env('SENIOR_ENRICH_LAUNCHER_QUEUE', 'senior-launcher'),
+    'enrich_supplier_queue' => env('SENIOR_ENRICH_SUPPLIER_QUEUE', 'senior-supplier'),
+    'enrich_readiness_queue' => env('SENIOR_ENRICH_READINESS_QUEUE', 'senior-readiness'),
+    'enrich_job_chunk_size' => (int) env('SENIOR_ENRICH_JOB_CHUNK_SIZE', 10),
+    'enrich_cron_launcher_max' => (int) env('SENIOR_ENRICH_CRON_LAUNCHER_MAX', 80),
+    'enrich_cron_supplier_max' => (int) env('SENIOR_ENRICH_CRON_SUPPLIER_MAX', 80),
+
+    /**
+     * UsuGer Senior sem login intranet → slug de departamento.
+     * Gambiarra operacional: ex. 95 era Financeiro na Senior.
+     *
+     * @var array<int|string, string>
+     */
+    'legacy_usu_ger_department_slugs' => [
+        95 => 'financeiro',
+    ],
 
     // Tamanho de lote para upsert e paginação (requirement 4.6 / 1.8).
     'batch_size' => 500,

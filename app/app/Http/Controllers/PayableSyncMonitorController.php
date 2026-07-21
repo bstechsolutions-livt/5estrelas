@@ -51,7 +51,7 @@ class PayableSyncMonitorController extends Controller
             'config' => [
                 'enabled' => (bool) config('senior.enabled', false),
                 'environment' => (string) config('senior.environment', 'PRD'),
-                'sync_interval_minutes' => (int) config('senior.sync_interval_minutes', 5),
+                'sync_interval_minutes' => (int) config('senior.sync_interval_minutes', 10),
                 'sync_http_timeout' => (int) config('senior.sync_http_timeout', config('senior.cp_timeout_response', 60)),
                 'cp_strategy' => (string) config('senior.cp_strategy', 'bulk'),
                 'cod_emps' => config('senior.cod_emps', []),

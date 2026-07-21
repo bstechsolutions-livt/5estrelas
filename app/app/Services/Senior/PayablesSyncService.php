@@ -321,21 +321,31 @@ class PayablesSyncService
      */
     private function safePostSyncEnrich(PayableSyncRun $run, array $enrichIds): void
     {
-        $launcherMax = (int) config('senior.post_sync_launcher_lookups', 0);
+        if (config('senior.enrich_use_queue', false)) {
+            PayableEnrichQueueDispatcher::make()->dispatchPostSync($enrichIds);
+
+            return;
+        }
+
+        $launcherMax = (int) config('senior.post_sync_launcher_lookups', 80);
         $supplierMax = (int) config('senior.post_sync_supplier_lookups', 0);
         $maxSec = max(15, (int) config('senior.post_sync_enrich_max_seconds', 90));
         $deadline = microtime(true) + $maxSec;
+        $enrichIds = $this->mergeEnrichIdsWithAwaitingSync($enrichIds, $launcherMax);
 
         try {
-            // Depto é local (sem SOAP) — barato e útil.
-            $this->resolveDepartmentsAfterSync($enrichIds);
-
             if ($launcherMax > 0 && microtime(true) < $deadline) {
                 $this->enrichLaunchersAfterSync($enrichIds);
             }
+
             if ($supplierMax > 0 && microtime(true) < $deadline) {
                 $this->syncMissingSuppliersAfterPayables($enrichIds);
-            } elseif ($supplierMax > 0) {
+            }
+
+            // Depto + status: inclui fila aguardando sync (não só inserts/updates do run).
+            $this->resolveDepartmentsAfterSync($enrichIds);
+
+            if ($supplierMax > 0 && microtime(true) >= $deadline) {
                 Log::warning('[senior-cp] enrich fornecedores pulado (teto de tempo)', [
                     'run_id' => $run->id,
                     'max_seconds' => $maxSec,
@@ -377,8 +387,49 @@ class PayablesSyncService
     }
 
     /**
-     * Materializa department_id: usuário do UsuGer → depto; se não houver → Financeiro.
-     * Não sobrescreve department_id já definido (exceto upgrade do fallback Financeiro via launcher).
+     * IDs de títulos Senior bloqueados aguardando dept/fornecedor.
+     *
+     * @return list<int>
+     */
+    public function awaitingSyncPayableIds(?int $limit = null): array
+    {
+        $query = Payable::query()
+            ->where('status', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO)
+            ->whereNull('senior_missing_at')
+            ->orderByDesc('id');
+
+        if ($limit !== null && $limit > 0) {
+            $query->limit($limit);
+        }
+
+        return $query->pluck('id')->all();
+    }
+
+    /**
+     * @param  list<int>  $enrichIds
+     * @return list<int>
+     */
+    public function mergedEnrichPayableIds(array $enrichIds, int $awaitingLimit = 80): array
+    {
+        return $this->mergeEnrichIdsWithAwaitingSync($enrichIds, $awaitingLimit);
+    }
+
+    /**
+     * @param  list<int>  $enrichIds
+     * @return list<int>
+     */
+    private function mergeEnrichIdsWithAwaitingSync(array $enrichIds, int $awaitingLimit = 80): array
+    {
+        $awaiting = $this->awaitingSyncPayableIds(max(1, $awaitingLimit));
+
+        return array_values(array_unique(array_merge(
+            array_map('intval', $enrichIds),
+            $awaiting,
+        )));
+    }
+
+    /**
+     * Materializa department_id e status de prontidão (depto + fornecedor).
      *
      * @param  list<int>  $payableIds
      */
@@ -390,70 +441,189 @@ class PayablesSyncService
         }
 
         $financeiroId = Department::financeDepartmentId();
-        $assigned = 0;
+        $changed = 0;
 
         Payable::query()
             ->whereIn('id', $ids)
+            ->whereIn('status', Payable::SYNC_READINESS_STATUSES)
             ->orderBy('id')
-            ->chunkById(200, function ($chunk) use ($financeiroId, &$assigned) {
+            ->chunkById(200, function ($chunk) use ($financeiroId, &$changed) {
                 foreach ($chunk as $payable) {
-                    $nextId = $this->resolveDepartmentIdForPayable($payable, $financeiroId);
-                    if ($nextId === null || (int) $payable->department_id === $nextId) {
-                        continue;
+                    if ($this->applyPostSyncReadiness($payable, $financeiroId)) {
+                        $changed++;
                     }
-                    $payable->update(['department_id' => $nextId]);
-                    $assigned++;
                 }
             });
 
-        if ($assigned > 0) {
-            Log::info('[senior-cp] departamentos materializados pós-sync', ['assigned' => $assigned]);
+        if ($changed > 0) {
+            Log::info('[senior-cp] prontidão pós-sync (depto/fornecedor)', ['changed' => $changed]);
         }
 
-        return $assigned;
+        return $changed;
     }
 
     /**
-     * Backfill: fornecedores faltantes + depto (UsuGer já gravado ou Financeiro) em títulos abertos.
-     *
-     * @return array{suppliers_looked_up:int, suppliers_enriched:int, departments_assigned:int}
+     * Resolve department_id e status após enrich de UsuGer/fornecedor.
+     * Título Senior só libera (pendente) com depto e nome real do fornecedor.
      */
-    public function backfillOpenSupplierAndDepartment(?int $supplierMaxLookups = null): array
+    public function applyPostSyncReadiness(Payable $payable, ?int $financeiroId = null): bool
     {
-        $supplierMax = $supplierMaxLookups ?? max(200, (int) config('senior.post_sync_supplier_lookups', 200));
+        $financeiroId ??= Department::financeDepartmentId();
+        $manualDept = $payable->hasManualDepartmentAssignment();
+        $resolver = new SupplierDisplayNameResolver();
+        $nextDeptId = $manualDept
+            ? ($payable->department_id ? (int) $payable->department_id : null)
+            : $this->resolveDepartmentIdForPayable($payable, $financeiroId);
+        $hasDept = $nextDeptId !== null;
+        $resolvedSupplier = $resolver->resolveForPayable($payable);
+        $hasSupplier = ! $resolver->isGeneric($resolvedSupplier);
+
+        if (! $payable->senior_id) {
+            if (! $manualDept && $hasDept && (int) $payable->department_id !== $nextDeptId) {
+                $payable->update(['department_id' => $nextDeptId]);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        if (! $payable->isSyncReadinessEligible()) {
+            return false;
+        }
+
+        $ready = $hasDept && $hasSupplier;
+        $updates = [];
+
+        if (! $manualDept && $hasDept && (int) $payable->department_id !== $nextDeptId) {
+            $updates['department_id'] = $nextDeptId;
+        }
+        if ($hasSupplier && $payable->supplier_name !== $resolvedSupplier) {
+            $updates['supplier_name'] = $resolvedSupplier;
+        } elseif (! $manualDept && $payable->department_id !== null
+            && $financeiroId
+            && (int) $payable->department_id === (int) $financeiroId) {
+            $updates['department_id'] = null;
+        }
+
+        if ($ready) {
+            if ($payable->status === Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO) {
+                $updates['status'] = 'pendente';
+            }
+        } elseif (in_array($payable->status, ['pendente', 'em_preparacao'], true)) {
+            $updates['status'] = Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO;
+        }
+
+        if ($updates === []) {
+            return false;
+        }
+
+        $payable->update($updates);
+
+        return true;
+    }
+
+    /** @deprecated Use applyPostSyncReadiness */
+    public function applyDepartmentResolution(Payable $payable, ?int $financeiroId = null): bool
+    {
+        return $this->applyPostSyncReadiness($payable, $financeiroId);
+    }
+
+    /**
+     * Backfill: UsuGer + fornecedor + reclassifica títulos abertos (aguardando sync vs pendente).
+     *
+     * @return array{launchers_looked_up:int, launchers_updated:int, suppliers_looked_up:int, suppliers_enriched:int, readiness_changed:int, moved_to_aguardando:int}
+     */
+    public function reconcileOpenSyncReadiness(?int $supplierMaxLookups = null, ?int $launcherMaxLookups = null): array
+    {
+        $launcherMax = $launcherMaxLookups ?? max(200, (int) config('senior.enrich_launcher_max_lookups', 400));
+        $launcherIds = Payable::query()
+            ->whereNotNull('senior_id')
+            ->whereNull('senior_missing_at')
+            ->whereIn('status', ['pendente', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO, 'em_preparacao'])
+            ->where(function ($q) {
+                $q->whereNull('senior_cod_usu')->orWhere('senior_cod_usu', '<=', 0);
+            })
+            ->orderByDesc('id')
+            ->limit($launcherMax)
+            ->pluck('id')
+            ->all();
+
+        $launcher = ['looked_up' => 0, 'updated' => 0];
+        if ($launcherIds !== []) {
+            try {
+                $launcher = PayableLauncherSyncService::make()->enrichByPayableIds(
+                    $launcherIds,
+                    maxLookups: $launcherMax,
+                    trigger: 'reconcile-open',
+                );
+            } catch (\Throwable $e) {
+                Log::warning('[senior-cp] reconcile lançadores falhou', ['erro' => $e->getMessage()]);
+            }
+        }
+
+        $supplierMax = $supplierMaxLookups ?? max(500, (int) config('senior.post_sync_supplier_lookups', 80));
         $sup = ['looked_up' => 0, 'enriched' => 0, 'enriched_desc' => 0];
         try {
             $sup = FornecedoresSyncService::make()->syncMissingFromPayables(
-                'backfill-open',
+                'reconcile-open',
                 maxLookups: $supplierMax,
             );
         } catch (\Throwable $e) {
-            Log::warning('[senior-cp] backfill fornecedores falhou', ['erro' => $e->getMessage()]);
+            Log::warning('[senior-cp] reconcile fornecedores falhou', ['erro' => $e->getMessage()]);
         }
 
         $openIds = Payable::query()
+            ->whereNotNull('senior_id')
             ->whereNull('senior_missing_at')
-            ->whereNotIn('status', ['pago', 'aguardando_conciliacao', 'conciliado', 'encerrado'])
-            ->where(function ($q) {
-                $q->whereNull('department_id')
-                    ->orWhereNull('supplier_name')
-                    ->orWhere('supplier_name', 'like', 'Fornecedor %');
-            })
+            ->whereIn('status', ['pendente', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO, 'em_preparacao'])
+            ->whereNull('bordero_id')
             ->orderByDesc('id')
             ->pluck('id')
             ->all();
 
-        $depts = $this->resolveDepartmentsAfterSync($openIds);
+        $beforeAguardando = Payable::query()
+            ->whereIn('id', $openIds)
+            ->where('status', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO)
+            ->count();
+
+        $readinessChanged = $this->resolveDepartmentsAfterSync($openIds);
+
+        $afterAguardando = Payable::query()
+            ->whereIn('id', $openIds)
+            ->where('status', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO)
+            ->count();
 
         return [
+            'launchers_looked_up' => (int) ($launcher['looked_up'] ?? 0),
+            'launchers_updated' => (int) ($launcher['updated'] ?? 0),
             'suppliers_looked_up' => (int) ($sup['looked_up'] ?? 0),
             'suppliers_enriched' => (int) (($sup['enriched'] ?? 0) + ($sup['enriched_desc'] ?? 0)),
-            'departments_assigned' => $depts,
+            'readiness_changed' => $readinessChanged,
+            'moved_to_aguardando' => max(0, $afterAguardando - $beforeAguardando),
+        ];
+    }
+
+    /**
+     * @return array{suppliers_looked_up:int, suppliers_enriched:int, departments_assigned:int}
+     */
+    public function backfillOpenSupplierAndDepartment(?int $supplierMaxLookups = null): array
+    {
+        $result = $this->reconcileOpenSyncReadiness($supplierMaxLookups);
+
+        return [
+            'suppliers_looked_up' => $result['suppliers_looked_up'],
+            'suppliers_enriched' => $result['suppliers_enriched'],
+            'departments_assigned' => $result['readiness_changed'],
         ];
     }
 
     private function resolveDepartmentIdForPayable(Payable $payable, ?int $financeiroId): ?int
     {
+        if ($payable->hasManualDepartmentAssignment()) {
+            return $payable->department_id ? (int) $payable->department_id : null;
+        }
+
         $codUsu = (int) ($payable->senior_cod_usu ?? 0);
         if ($codUsu > 0) {
             $user = User::query()
@@ -469,13 +639,27 @@ class PayablesSyncService
                     }
                 }
             }
+
+            $legacyDeptId = Department::departmentIdForLegacySeniorCodUsu($codUsu);
+            if ($legacyDeptId !== null) {
+                if ($payable->department_id === null || (int) $payable->department_id === (int) $financeiroId) {
+                    return $legacyDeptId;
+                }
+            }
         }
 
         if ($payable->department_id) {
+            if ($financeiroId && (int) $payable->department_id === (int) $financeiroId) {
+                $codUsu = (int) ($payable->senior_cod_usu ?? 0);
+                if ($codUsu <= 0) {
+                    return null;
+                }
+            }
+
             return (int) $payable->department_id;
         }
 
-        return $financeiroId;
+        return null;
     }
 
     /**
@@ -959,7 +1143,9 @@ class PayablesSyncService
             $existing->save();
             $this->syncRateios($existing, $titulo);
             $updated++;
-            $enrichIds[] = (int) $existing->id;
+            if ($this->needsPostSyncEnrich($existing)) {
+                $enrichIds[] = (int) $existing->id;
+            }
         } elseif ($voltouDaAusencia) {
             // Conteúdo igual mas estava marcado como ausente: só limpa o flag (req 7.4).
             $existing->update(['senior_missing_at' => null]);
@@ -969,9 +1155,17 @@ class PayablesSyncService
         }
     }
 
-    /** Título ainda sem depto materializado ou com fornecedor genérico. */
+    /** Título ainda sem depto materializado, aguardando vínculo ou com fornecedor genérico. */
     private function needsPostSyncEnrich(Payable $payable): bool
     {
+        if (! $payable->isSyncReadinessEligible()) {
+            return false;
+        }
+
+        if ($payable->status === Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO) {
+            return true;
+        }
+
         if ($payable->department_id === null) {
             return true;
         }

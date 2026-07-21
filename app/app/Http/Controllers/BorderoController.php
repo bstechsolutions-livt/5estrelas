@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ApprovalStep;
 use App\Models\Bordero;
+use App\Models\BorderoDocument;
 use App\Models\Payable;
 use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogger;
@@ -13,6 +14,7 @@ use App\Services\PayableBranchScope;
 use App\Support\PayableApprovalDeadline;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -76,6 +78,7 @@ class BorderoController extends Controller
         $bordero = Bordero::with([
             'creator:id,name',
             'approver:id,name',
+            'documents.uploader:id,name',
             'payables' => fn ($q) => $q->with('branch:id,name')->withCount('documents')->orderBy('due_date'),
         ])->findOrFail($id);
 
@@ -129,6 +132,8 @@ class BorderoController extends Controller
             'canReprovarBordero' => $actions->canReprovarBordero($bordero, $user),
             'canLiberarTitulo' => $actions->canLiberarTitulo($user),
             'canDesfazer' => $actions->canDesfazer($user) && $bordero->isEditable(),
+            'canManageDocuments' => $bordero->isEditable()
+                && $user->hasPermission('financeiro.contas_pagar.preparar'),
             'approvableCount' => $approvableCount,
             'currentStepLabel' => $currentStepLabel,
             'requiresPriorityOnApprove' => $canApproveStep && $currentStepLabel === 'financeiro',
@@ -138,6 +143,7 @@ class BorderoController extends Controller
                 : $workflow->buildPreviewStepsForSender($user),
             'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
             'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
+            'maxDocumentBytes' => (int) config('payables.max_document_kb', 15360) * 1024,
         ]);
     }
 
@@ -237,11 +243,8 @@ class BorderoController extends Controller
             }
         }
 
-        $withoutDocs = $bordero->payables->filter(fn (Payable $p) => $p->documents()->count() === 0);
-        if ($withoutDocs->isNotEmpty()) {
-            $nums = $withoutDocs->pluck('title_number')->take(3)->join(', ');
-
-            return back()->with('error', "Anexe ao menos um documento em cada título antes de enviar. Sem anexo: {$nums}.");
+        if (! $bordero->documents()->exists()) {
+            return back()->with('error', 'Anexe ao menos um documento ao borderô antes de enviar.');
         }
 
         $urgent = $request->boolean('urgente');
@@ -283,6 +286,65 @@ class BorderoController extends Controller
         );
 
         return back()->with('success', 'Borderô enviado para o fluxo de aprovação.');
+    }
+
+    public function addDocuments(Request $request, int $id)
+    {
+        $bordero = Bordero::findOrFail($id);
+        if (! $bordero->isEditable()) {
+            return back()->with('error', 'Só é possível anexar documentos a um borderô pendente ou em preparação.');
+        }
+
+        $request->validate([
+            'files' => ['required', 'array', 'min:1'],
+            'files.*' => ['required', 'file', 'max:'.(int) config('payables.max_document_kb', 15360)],
+        ]);
+
+        $names = [];
+        foreach ($request->file('files') as $file) {
+            $path = $file->store("borderos/{$bordero->id}", 'public');
+            $bordero->documents()->create([
+                'uploaded_by' => $request->user()->id,
+                'name' => $file->getClientOriginalName(),
+                'path' => $path,
+                'mime_type' => $file->getMimeType(),
+                'size' => $file->getSize(),
+            ]);
+            $names[] = $file->getClientOriginalName();
+        }
+
+        AuditLogger::log(
+            event: 'bordero.documentos_adicionados',
+            module: 'financeiro.contas_pagar',
+            description: count($names).' documento(s) anexado(s) ao borderô '.$bordero->number,
+            auditable: $bordero,
+            metadata: ['documents' => $names],
+        );
+
+        return back()->with('success', count($names).' documento(s) anexado(s) ao borderô.');
+    }
+
+    public function removeDocument(Request $request, int $id, int $documentId)
+    {
+        $bordero = Bordero::findOrFail($id);
+        if (! $bordero->isEditable()) {
+            return back()->with('error', 'Só é possível remover documentos de um borderô pendente ou em preparação.');
+        }
+
+        $document = BorderoDocument::where('bordero_id', $bordero->id)->findOrFail($documentId);
+        $name = $document->name;
+        $path = $document->path;
+        $document->delete();
+        Storage::disk('public')->delete($path);
+
+        AuditLogger::log(
+            event: 'bordero.documento_removido',
+            module: 'financeiro.contas_pagar',
+            description: "Documento {$name} removido do borderô {$bordero->number}",
+            auditable: $bordero,
+        );
+
+        return back()->with('success', 'Documento removido do borderô.');
     }
 
     public function approve(Request $request, int $id)

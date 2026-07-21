@@ -48,6 +48,7 @@ class Payable extends Model
     public const WORKFLOW_FIELDS = [
         'status', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'department_id',
+        'department_assigned_by', 'department_assigned_at',
         'nickname',
         'paid_at', 'payment_method', 'paid_by',
         'payment_priority', 'payment_sla_date', 'priority_set_by', 'priority_set_at',
@@ -132,7 +133,7 @@ class Payable extends Model
     protected $fillable = [
         'title_number', 'nickname', 'supplier_name', 'supplier_cnpj', 'amount',
         'due_date', 'issue_date', 'description', 'category', 'status',
-        'branch_id', 'department_id', 'senior_cod_usu', 'prepared_by', 'approved_by', 'sent_for_approval_at',
+        'branch_id', 'department_id', 'department_assigned_by', 'department_assigned_at', 'senior_cod_usu', 'prepared_by', 'approved_by', 'sent_for_approval_at',
         'approved_at', 'rejection_reason', 'bordero_id', 'senior_id',
         'paid_at', 'payment_method', 'paid_by',
         'payment_priority', 'payment_sla_date', 'priority_set_by', 'priority_set_at',
@@ -162,6 +163,7 @@ class Payable extends Model
             'paid_at' => 'date',
             'payment_sla_date' => 'date',
             'priority_set_at' => 'datetime',
+            'department_assigned_at' => 'datetime',
             'conciliated_at' => 'date',
             'allocation_imported_at' => 'datetime',
             'senior_missing_at' => 'datetime',
@@ -198,9 +200,24 @@ class Payable extends Model
         };
     }
 
+    public const STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO = 'aguardando_vinculo_departamento';
+
+    /** Status elegíveis para enrich Senior e reclassificação pendente ↔ aguardando sync. */
+    public const SYNC_READINESS_STATUSES = [
+        'pendente',
+        'em_preparacao',
+        self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO,
+    ];
+
+    public function isSyncReadinessEligible(): bool
+    {
+        return in_array($this->status, self::SYNC_READINESS_STATUSES, true);
+    }
+
     // Status labels
     public const STATUS_LABELS = [
         'pendente' => 'Pendente',
+        self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO => 'Aguard. sincronização',
         'em_preparacao' => 'Em Preparação',
         'aguardando_aprovacao' => 'Em Aprovação',
         'aprovado' => 'Aprovado',
@@ -214,6 +231,7 @@ class Payable extends Model
 
     public const STATUS_COLORS = [
         'pendente' => 'warn',
+        self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO => 'secondary',
         'em_preparacao' => 'info',
         'aguardando_aprovacao' => 'warn',
         'aprovado' => 'success',
@@ -247,6 +265,16 @@ class Payable extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function departmentAssigner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'department_assigned_by');
+    }
+
+    public function hasManualDepartmentAssignment(): bool
+    {
+        return $this->department_assigned_by !== null;
     }
 
     public function preparer(): BelongsTo
@@ -325,6 +353,40 @@ class Payable extends Model
     public function wasRejectedBack(): bool
     {
         return $this->status === 'pendente' && filled($this->rejection_reason);
+    }
+
+    /** Importado da Senior aguardando dept/fornecedor na sincronização. */
+    public function isAwaitingDepartmentLink(): bool
+    {
+        return $this->status === self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO;
+    }
+
+    /** @alias isAwaitingDepartmentLink */
+    public function isAwaitingSeniorSync(): bool
+    {
+        return $this->isAwaitingDepartmentLink();
+    }
+
+    /** Motivo legível quando status = aguardando sincronização. */
+    public function awaitingSyncDetail(): ?string
+    {
+        if (! $this->isAwaitingSeniorSync()) {
+            return null;
+        }
+
+        $parts = [];
+        if ($this->department_id === null && ! $this->hasManualDepartmentAssignment()) {
+            $parts[] = 'departamento';
+        }
+        if ((new \App\Services\Senior\SupplierDisplayNameResolver())->isGeneric($this->supplier_name)) {
+            $parts[] = 'fornecedor';
+        }
+
+        if ($parts === []) {
+            return 'Dados Senior pendentes';
+        }
+
+        return 'Aguardando '.implode(' e ', $parts).' na sincronização';
     }
 
     /**
@@ -763,6 +825,18 @@ class Payable extends Model
     /**
      * @param iterable<Payable> $payables
      */
+    public static function attachDepartmentAssignerMeta(iterable $payables): void
+    {
+        foreach ($payables as $payable) {
+            $payable->setAttribute(
+                'department_assigned_by_name',
+                $payable->relationLoaded('departmentAssigner') && $payable->departmentAssigner
+                    ? $payable->departmentAssigner->name
+                    : null,
+            );
+        }
+    }
+
     public static function attachPriorityMeta(iterable $payables): void
     {
         foreach ($payables as $payable) {
@@ -826,6 +900,11 @@ class Payable extends Model
                 : ($payable->bordero_id
                     ? ['No borderô', null, 'info']
                     : ['Aguardando envio', null, 'warn']),
+            self::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO => [
+                'Aguard. sincronização',
+                $payable->awaitingSyncDetail(),
+                'secondary',
+            ],
             'em_preparacao' => ['Em preparação', null, 'info'],
             'aguardando_aprovacao' => self::workflowMomentFromApprovalStep($currentStep),
             'aprovado' => ['Aguardando pagamento', null, 'success'],

@@ -39,11 +39,14 @@ class FornecedoresSyncService
             return $this->syncFullCatalog($trigger);
         }
 
-        return $this->syncMissingFromPayables($trigger);
+        return $this->syncMissingFromPayables(
+            $trigger,
+            maxLookups: (int) config('senior.fornecedor_max_lookups_per_sync', 40),
+        );
     }
 
     /**
-     * Delta: busca na Senior só os codFor que aparecem em títulos e ainda não estão no cache.
+     * Delta: busca na Senior só os codFor que aparecem em títulos e ainda não estão no cache resolvido.
      *
      * @param  list<int>|null  $prioritizePayableIds  Pares destes títulos entram primeiro (pós-insert).
      */
@@ -56,7 +59,15 @@ class FornecedoresSyncService
             return $this->skippedResult();
         }
 
+        $prioritizePayableIds = array_values(array_unique(array_filter(array_merge(
+            $prioritizePayableIds ?? [],
+            PayablesSyncService::make()->awaitingSyncPayableIds(200),
+        ), fn ($id) => (int) $id > 0)));
+
         $missingPairs = $this->missingSupplierPairs($prioritizePayableIds);
+        $cooldownKeys = $this->unresolvedCooldownKeys(
+            $missingPairs->map(fn ($p) => [(int) $p->codemp, (int) $p->codfor])->all()
+        );
         $missingByEmp = $missingPairs
             ->groupBy(fn ($pair) => (int) $pair->codemp)
             ->map(fn ($rows) => $rows->pluck('codfor')->map(fn ($v) => (int) $v)->unique()->values()->all());
@@ -75,6 +86,9 @@ class FornecedoresSyncService
                 if ($codFor < 1) {
                     continue;
                 }
+                if (isset($cooldownKeys[$codEmp . '-' . $codFor])) {
+                    continue;
+                }
                 $lookedUp++;
                 try {
                     $fornecedor = $this->client->consultarPorCodFor((int) $codEmp, (int) $codFor, $codFil);
@@ -85,10 +99,13 @@ class FornecedoresSyncService
                         'codFor' => $codFor,
                         'erro' => $e->getMessage(),
                     ]);
+                    // Cooldown: evita monopolizar o teto de lookups; ainda conta como faltante após TTL.
+                    $this->rememberUnresolved((int) $codEmp, (int) $codFor);
                     continue;
                 }
 
                 if ($fornecedor === null) {
+                    $this->rememberUnresolved((int) $codEmp, (int) $codFor);
                     continue;
                 }
 
@@ -101,6 +118,11 @@ class FornecedoresSyncService
 
         $enriched = $this->enrichPayables($prioritizePayableIds);
         $enrichedDesc = $this->enrichFromDescriptions($prioritizePayableIds);
+
+        $reevalIds = PayablesSyncService::make()->awaitingSyncPayableIds(500);
+        if ($reevalIds !== []) {
+            PayablesSyncService::make()->resolveDepartmentsAfterSync($reevalIds);
+        }
 
         if ($lookedUp > 0 || $enriched > 0 || $enrichedDesc > 0) {
             Log::info('[senior-fornecedor] sync delta concluído', [
@@ -128,7 +150,8 @@ class FornecedoresSyncService
     }
 
     /**
-     * Pares (codemp, codfor) presentes em payables mas ausentes em senior_suppliers.
+     * Pares (codemp, codfor) presentes em payables sem cache resolvido.
+     * Stubs unresolved (ou com retry_after expirado) continuam como faltantes.
      * Prioriza pares dos títulos recém-inseridos e, em seguida, os mais novos.
      *
      * @param  list<int>|null  $prioritizePayableIds
@@ -143,12 +166,8 @@ class FornecedoresSyncService
                 ->whereIn('id', $ids)
                 ->whereNotNull('codemp')
                 ->whereNotNull('codfor')
-                ->whereNotExists(function ($q) {
-                    $q->select(DB::raw(1))
-                        ->from('senior_suppliers as s')
-                        ->whereColumn('s.cod_emp', 'payables.codemp')
-                        ->whereColumn('s.cod_for', 'payables.codfor');
-                })
+                ->where('codfor', '>', 0)
+                ->whereNotExists($this->resolvedOrCooldownSupplierExists())
                 ->groupBy('codemp', 'codfor')
                 ->orderByDesc('latest_id')
                 ->get();
@@ -158,12 +177,8 @@ class FornecedoresSyncService
             ->select('codemp', 'codfor', DB::raw('MAX(id) as latest_id'))
             ->whereNotNull('codemp')
             ->whereNotNull('codfor')
-            ->whereNotExists(function ($q) {
-                $q->select(DB::raw(1))
-                    ->from('senior_suppliers as s')
-                    ->whereColumn('s.cod_emp', 'payables.codemp')
-                    ->whereColumn('s.cod_for', 'payables.codfor');
-            })
+            ->where('codfor', '>', 0)
+            ->whereNotExists($this->resolvedOrCooldownSupplierExists())
             ->groupBy('codemp', 'codfor')
             ->orderByDesc('latest_id')
             ->get();
@@ -187,6 +202,72 @@ class FornecedoresSyncService
     }
 
     /**
+     * Existe cache resolvido (não-stub). Stubs unresolved NÃO satisfazem — o par continua faltante.
+     * O cooldown de retry é aplicado em PHP (ver unresolvedCooldownKeys), portável SQLite/Pg.
+     */
+    private function resolvedOrCooldownSupplierExists(): \Closure
+    {
+        return function ($q) {
+            $q->select(DB::raw(1))
+                ->from('senior_suppliers as s')
+                ->whereColumn('s.cod_emp', 'payables.codemp')
+                ->whereColumn('s.cod_for', 'payables.codfor')
+                ->where(function ($resolved) {
+                    $driver = DB::connection()->getDriverName();
+                    if ($driver === 'pgsql') {
+                        $resolved->whereNull('s.senior_raw')
+                            ->orWhereRaw("coalesce((s.senior_raw->>'unresolved')::boolean, false) = false");
+
+                        return;
+                    }
+
+                    // SQLite / demais: json_extract; ausência de chave = resolvido.
+                    $resolved->whereNull('s.senior_raw')
+                        ->orWhereRaw("json_extract(s.senior_raw, '$.unresolved') is null")
+                        ->orWhereRaw("json_extract(s.senior_raw, '$.unresolved') = 0");
+                });
+        };
+    }
+
+    /**
+     * @param  list<array{0:int,1:int}>  $pairs
+     * @return array<string, true>  chaves "codEmp-codFor" ainda em cooldown
+     */
+    private function unresolvedCooldownKeys(array $pairs): array
+    {
+        if ($pairs === []) {
+            return [];
+        }
+
+        $query = SeniorSupplier::query()->where(function ($q) use ($pairs) {
+            foreach ($pairs as [$codEmp, $codFor]) {
+                $q->orWhere(fn ($qq) => $qq->where('cod_emp', $codEmp)->where('cod_for', $codFor));
+            }
+        });
+
+        $keys = [];
+        foreach ($query->get(['cod_emp', 'cod_for', 'senior_raw']) as $row) {
+            if (! SeniorSupplier::isUnresolvedRaw($row->senior_raw)) {
+                continue;
+            }
+            $retryAfter = $row->senior_raw['retry_after'] ?? null;
+            if (! is_string($retryAfter) || $retryAfter === '') {
+                // Stub legado sem TTL: elegível para retry imediato (não bloqueia).
+                continue;
+            }
+            try {
+                if (now()->lt(\Illuminate\Support\Carbon::parse($retryAfter))) {
+                    $keys[$row->cod_emp . '-' . $row->cod_for] = true;
+                }
+            } catch (\Throwable) {
+                $keys[$row->cod_emp . '-' . $row->cod_for] = true;
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
      * Full: pagina o catálogo inteiro via ConsultarGeral (bootstrap / manutenção noturna).
      *
      * @return array{status:string, inserted:int, updated:int, errors:int, enriched:int, enriched_desc:int, message:?string, looked_up:int}
@@ -202,9 +283,9 @@ class FornecedoresSyncService
         $maxPages = max(1, (int) config('senior.fornecedor_max_pages', 500));
 
         foreach ($codEmps as $codEmp) {
-            $indicePagina = 1;
             $pages = 0;
             while ($pages < $maxPages) {
+                $indicePagina = SeniorFornecedorClient::offsetForPage($pages + 1, $pageSize);
                 try {
                     $fornecedores = $this->client->consultarGeral((int) $codEmp, 1, $indicePagina, $pageSize);
                     if ($fornecedores === []) {
@@ -216,11 +297,17 @@ class FornecedoresSyncService
                             $this->upsert($fornecedor, $inserted, $updated);
                         });
                     }
-                    $indicePagina++;
                     $pages++;
+                    if (count($fornecedores) < $pageSize) {
+                        break;
+                    }
                 } catch (SeniorException $e) {
                     $errors++;
-                    Log::warning('[senior-fornecedor] erro na empresa (full)', ['codEmp' => $codEmp, 'erro' => $e->getMessage()]);
+                    Log::warning('[senior-fornecedor] erro na empresa (full)', [
+                        'codEmp' => $codEmp,
+                        'indicePagina' => $indicePagina,
+                        'erro' => $e->getMessage(),
+                    ]);
                     break;
                 }
             }
@@ -253,6 +340,81 @@ class FornecedoresSyncService
     public function countMissingSuppliers(): int
     {
         return $this->missingSupplierPairs()->count();
+    }
+
+    /**
+     * Remove stubs unresolved do cache (liberam retry imediato no próximo delta).
+     */
+    public function purgeUnresolvedStubs(): int
+    {
+        return $this->unresolvedStubsQuery()->delete();
+    }
+
+    public function countUnresolvedStubs(): int
+    {
+        return $this->unresolvedStubsQuery()->count();
+    }
+
+    private function unresolvedStubsQuery()
+    {
+        $q = SeniorSupplier::query();
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'pgsql') {
+            return $q->whereRaw("coalesce((senior_raw->>'unresolved')::boolean, false) = true");
+        }
+
+        return $q->whereRaw("json_extract(senior_raw, '$.unresolved') = 1");
+    }
+
+    /**
+     * Marca codFor sem retorno no Exportar com cooldown (TTL).
+     * Não bloqueia forever: após retry_after o par volta a faltar em missingSupplierPairs.
+     */
+    private function rememberUnresolved(int $codEmp, int $codFor): void
+    {
+        if ($codEmp < 1 || $codFor < 1) {
+            return;
+        }
+
+        $ttlMinutes = max(1, (int) config('senior.fornecedor_unresolved_ttl_minutes', 360));
+        $retryAfter = now()->addMinutes($ttlMinutes)->toIso8601String();
+        $payload = [
+            'unresolved' => true,
+            'at' => now()->toIso8601String(),
+            'retry_after' => $retryAfter,
+        ];
+
+        $existing = SeniorSupplier::query()
+            ->where('cod_emp', $codEmp)
+            ->where('cod_for', $codFor)
+            ->first();
+
+        if ($existing && ! SeniorSupplier::isUnresolvedRaw($existing->senior_raw)) {
+            // Já tem cache real — não sobrescrever.
+            return;
+        }
+
+        if ($existing) {
+            $existing->update([
+                'name' => 'Fornecedor ' . $codFor,
+                'trade_name' => null,
+                'cnpj' => null,
+                'senior_raw' => $payload,
+                'senior_synced_at' => now(),
+            ]);
+
+            return;
+        }
+
+        SeniorSupplier::create([
+            'cod_emp' => $codEmp,
+            'cod_for' => $codFor,
+            'name' => 'Fornecedor ' . $codFor,
+            'trade_name' => null,
+            'cnpj' => null,
+            'senior_raw' => $payload,
+            'senior_synced_at' => now(),
+        ]);
     }
 
     private function skippedResult(): array
@@ -349,6 +511,9 @@ class FornecedoresSyncService
             foreach ($payables as $payable) {
                 $key = (int) $payable->codemp . '-' . (int) $payable->codfor;
                 $supplier = $supplierByPair->get($key);
+                if ($supplier && SeniorSupplier::isUnresolvedRaw($supplier->senior_raw)) {
+                    $supplier = null;
+                }
                 $resolved = $this->displayNameResolver->resolveForPayable($payable, $supplier);
 
                 $dirty = false;

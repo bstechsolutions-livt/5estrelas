@@ -9,6 +9,7 @@ import Textarea from 'primevue/textarea'
 import Dialog from 'primevue/dialog'
 import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
+import FileUpload from 'primevue/fileupload'
 import ApprovalFlowPreview from '@/Components/Financeiro/ApprovalFlowPreview.vue'
 import { useDevice } from '@/composables/useDevice'
 
@@ -21,6 +22,7 @@ const props = defineProps({
     canReprovarBordero: { type: Boolean, default: false },
     canLiberarTitulo: { type: Boolean, default: false },
     canDesfazer: { type: Boolean, default: false },
+    canManageDocuments: { type: Boolean, default: false },
     approvableCount: { type: Number, default: 0 },
     currentStepLabel: { type: String, default: null },
     requiresPriorityOnApprove: { type: Boolean, default: false },
@@ -28,6 +30,7 @@ const props = defineProps({
     approvalPreview: { type: Object, default: () => ({ ok: false, errors: [], steps: [] }) },
     canBypassApprovalDeadline: { type: Boolean, default: false },
     minDueDateForApproval: { type: String, default: null },
+    maxDocumentBytes: { type: Number, default: 15 * 1024 * 1024 },
 })
 
 const { isMobile } = useDevice()
@@ -73,6 +76,25 @@ function sendForApproval() {
     }, { preserveScroll: true })
 }
 
+function uploadBorderoDocuments(event) {
+    const files = [...(event.files || [])]
+    if (!files.length) return
+
+    const formData = new FormData()
+    files.forEach((file) => formData.append('files[]', file))
+    router.post(`/financeiro/borderos/${props.bordero.id}/documentos`, formData, {
+        preserveScroll: true,
+        forceFormData: true,
+    })
+}
+
+function removeBorderoDocument(documentId) {
+    if (!confirm('Remover este documento do borderô?')) return
+    router.delete(`/financeiro/borderos/${props.bordero.id}/documentos/${documentId}`, {
+        preserveScroll: true,
+    })
+}
+
 function parseDueDate(val) {
     if (!val) return null
     const d = new Date(val)
@@ -91,7 +113,7 @@ const approvalDeadlineBlocked = computed(() => {
 })
 
 const canSubmitApproval = computed(() =>
-    props.approvalPreview?.ok && allHaveDocuments.value &&
+    props.approvalPreview?.ok && hasBorderoDocuments.value &&
     (!approvalDeadlineBlocked.value || (props.canBypassApprovalDeadline && urgentBypass.value))
 )
 
@@ -176,9 +198,7 @@ const isPending = computed(() => props.bordero.status === 'pendente')
 const isPreparing = computed(() => props.bordero.status === 'em_preparacao')
 const isEditable = computed(() => isPending.value || isPreparing.value)
 const isAwaitingApproval = computed(() => props.bordero.status === 'aguardando_aprovacao')
-const allHaveDocuments = computed(() =>
-    props.payablesWorkflow.every((row) => (row.payable.documents_count || 0) > 0)
-)
+const hasBorderoDocuments = computed(() => (props.bordero.documents || []).length > 0)
 const levelLabels = {
     departamento: 'Departamento',
     gerencia: 'Gerência / Head',
@@ -242,6 +262,58 @@ onMounted(reloadIfStale)
                 <Button label="Desfazer borderô" icon="pi pi-undo" severity="danger" outlined size="small" @click="showDesfazerDialog = true" />
             </div>
 
+            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-700">Documentos do borderô</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Estes anexos valem para todos os títulos deste borderô.</p>
+                    </div>
+                    <FileUpload
+                        v-if="canManageDocuments"
+                        mode="basic"
+                        multiple
+                        :auto="true"
+                        choose-label="Anexar documentos"
+                        :max-file-size="maxDocumentBytes"
+                        @select="uploadBorderoDocuments"
+                        invalid-file-size-message="O arquivo é muito grande. O tamanho máximo permitido é {1}."
+                        dusk="bordero-document-upload"
+                    />
+                </div>
+
+                <div v-if="bordero.documents?.length" class="space-y-2">
+                    <div
+                        v-for="document in bordero.documents"
+                        :key="document.id"
+                        class="flex items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2"
+                    >
+                        <a
+                            :href="document.url"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="min-w-0 flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                        >
+                            <i class="pi pi-paperclip text-xs"></i>
+                            <span class="truncate">{{ document.name }}</span>
+                        </a>
+                        <Button
+                            v-if="canManageDocuments"
+                            icon="pi pi-trash"
+                            severity="danger"
+                            text
+                            rounded
+                            size="small"
+                            aria-label="Remover documento"
+                            @click="removeBorderoDocument(document.id)"
+                        />
+                    </div>
+                </div>
+                <p v-else class="text-xs text-amber-600 flex items-center gap-1">
+                    <i class="pi pi-exclamation-triangle text-[10px]"></i>
+                    Nenhum documento anexado ao borderô.
+                </p>
+            </div>
+
             <div v-if="isEditable" class="bg-white rounded-xl border border-gray-100 p-4 mb-4">
                 <h3 class="text-sm font-semibold text-gray-700 mb-3">Enviar para aprovação</h3>
                 <p class="text-xs text-gray-500 mb-3">Todos os títulos seguirão o fluxo do departamento de quem envia.</p>
@@ -264,9 +336,9 @@ onMounted(reloadIfStale)
                     <input v-model="urgentBypass" type="checkbox" class="mt-0.5" dusk="urgent-bordero-bypass" />
                     <span>Enviar mesmo assim (urgência — fora do prazo de 72h)</span>
                 </label>
-                <p v-if="!allHaveDocuments" class="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
+                <p v-if="!hasBorderoDocuments" class="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
                     <i class="pi pi-exclamation-triangle text-[10px]"></i>
-                    Todos os títulos precisam de ao menos um documento anexado.
+                    Anexe ao menos um documento ao borderô antes de enviar.
                 </p>
             </div>
 

@@ -20,6 +20,7 @@ use App\Services\PayableBranchScope;
 use App\Services\PayableDepartmentClassifier;
 use App\Services\PayableAllocationImportService;
 use App\Services\PayableDocumentPairAlert;
+use App\Services\Senior\SupplierDisplayNameResolver;
 use App\Support\FilterDate;
 use App\Support\PayableApprovalDeadline;
 use Illuminate\Http\Request;
@@ -39,6 +40,17 @@ class PayableController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
+        $canViewAwaitingSync = $user?->hasPermission('financeiro.contas_pagar.vincular_departamento_sync') ?? false;
+        $requestedStatus = $request->input('status') ?: 'pendente';
+
+        if ($requestedStatus === Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO && ! $canViewAwaitingSync) {
+            return redirect()->route('payables.index', array_merge(
+                $request->query(),
+                ['status' => 'pendente'],
+            ));
+        }
+
         $pageData = $this->resolvePayablesPageData($request, defaultPerPage: 20);
 
         if ($request->wantsJson() || $request->header('X-Json-Only') === '1') {
@@ -290,6 +302,8 @@ class PayableController extends Controller
             'canBypassApprovalDeadline' => PayableApprovalDeadline::canBypass($user),
             'minDueDateForApproval' => PayableApprovalDeadline::minDueDateForApproval()->toDateString(),
             'syncStatus' => $this->payablesSyncStatusProps($user),
+            'canViewAwaitingSync' => $user?->hasPermission('financeiro.contas_pagar.vincular_departamento_sync') ?? false,
+            'canAssignDepartmentSync' => $user?->hasPermission('financeiro.contas_pagar.vincular_departamento_sync') ?? false,
         ];
     }
 
@@ -371,7 +385,7 @@ class PayableController extends Controller
      */
     private function payablesSyncStatusProps(?User $user): array
     {
-        $interval = max(1, (int) config('senior.sync_interval_minutes', 5));
+        $interval = max(1, (int) config('senior.sync_interval_minutes', 10));
         $tz = 'America/Sao_Paulo';
         $now = Carbon::now($tz);
 
@@ -455,12 +469,12 @@ class PayableController extends Controller
 
         $query = Payable::query()
             ->excludeMissingInSenior()
-            ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number']);
+            ->with(['branch:id,name', 'preparer:id,name', 'bordero:id,number', 'departmentAssigner:id,name']);
 
         $status = $request->input('status') ?: 'pendente';
         $query->where('payables.status', $status);
 
-        if ($status === 'pendente') {
+        if (in_array($status, ['pendente', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO], true)) {
             $query->whereNull('payables.bordero_id');
         }
 
@@ -477,13 +491,14 @@ class PayableController extends Controller
         Payable::attachOrigemHub($payables->getCollection());
         Payable::attachOrigemSenior($payables->getCollection());
         Payable::attachPriorityMeta($payables->getCollection());
+        Payable::attachDepartmentAssignerMeta($payables->getCollection());
         Payable::attachWorkflowMoment($payables->getCollection());
 
         // Totals das abas: mesmos filtros da lista (exceto status da aba ativa).
         $totalsQuery = Payable::query()
             ->excludeMissingInSenior()
             ->where(function ($q) {
-                $q->where('status', '!=', 'pendente')
+                $q->whereNotIn('status', ['pendente', Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO])
                     ->orWhereNull('bordero_id');
             });
         $this->applyPayablesListFilters($totalsQuery, $request, $departmentContext['department_id'], $user);
@@ -680,6 +695,13 @@ class PayableController extends Controller
     public function show(int $id, PayableAlcadaService $alcada)
     {
         $payable = $this->findPayableForUser($id);
+
+        if ($payable->isAwaitingDepartmentLink()) {
+            return redirect()
+                ->route('payables.index', ['status' => Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO])
+                ->with('warning', 'Este título aguarda sincronização (departamento e/ou fornecedor). Será liberado automaticamente quando a Senior completar os dados.');
+        }
+
         $payable->load([
             'branch:id,name',
             'preparer:id,name',
@@ -1493,6 +1515,64 @@ class PayableController extends Controller
         );
 
         return back()->with('success', 'Prioridade de pagamento atualizada.');
+    }
+
+    public function assignDepartmentSync(Request $request, int $id)
+    {
+        $user = $request->user();
+
+        if (! $user?->hasPermission('financeiro.contas_pagar.vincular_departamento_sync')) {
+            abort(403, 'Você não tem permissão para vincular departamento em títulos aguardando sincronização.');
+        }
+
+        $payable = $this->findPayableForUser($id, $user);
+
+        if ($payable->status !== Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO) {
+            return back()->with('error', 'Só é possível vincular departamento em títulos aguardando sincronização.');
+        }
+
+        if ($payable->hasManualDepartmentAssignment()) {
+            return back()->with('error', 'Este título já teve departamento definido manualmente.');
+        }
+
+        $data = $request->validate([
+            'department_id' => ['required', 'integer', Rule::exists('departments', 'id')->where('is_active', true)],
+        ]);
+
+        $department = Department::query()->findOrFail($data['department_id']);
+
+        $payable->update([
+            'department_id' => $department->id,
+            'department_assigned_by' => $user->id,
+            'department_assigned_at' => now(),
+        ]);
+
+        $payable->refresh();
+        $resolver = new SupplierDisplayNameResolver();
+        $hasSupplier = ! $resolver->isGeneric($resolver->resolveForPayable($payable));
+        if ($hasSupplier && $payable->status === Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO) {
+            $payable->update(['status' => 'pendente']);
+        }
+
+        PayableComment::create([
+            'payable_id' => $payable->id,
+            'user_id' => $user->id,
+            'body' => "Departamento definido manualmente: {$department->name}",
+            'type' => 'status_change',
+        ]);
+
+        AuditLogger::log(
+            event: 'contas_pagar.departamento_sync_manual',
+            module: 'financeiro.contas_pagar',
+            description: "Título {$payable->title_number}: departamento {$department->name} definido manualmente por {$user->name}",
+            auditable: $payable,
+            newValues: [
+                'department_id' => $department->id,
+                'department_assigned_by' => $user->id,
+            ],
+        );
+
+        return back()->with('success', "Departamento {$department->name} vinculado ao título.");
     }
 
     private function applyPaymentPriority(Payable $payable, User $user, array $data): void

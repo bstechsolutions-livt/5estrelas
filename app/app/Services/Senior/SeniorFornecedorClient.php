@@ -5,7 +5,10 @@ namespace App\Services\Senior;
 use Illuminate\Support\Facades\Http;
 
 /**
- * Cliente SOAP read-only do cadastro de fornecedores (cad_fornecedor / ConsultarGeral).
+ * Cliente SOAP read-only do cadastro de fornecedores (cad_fornecedor).
+ *
+ * - ConsultarGeral: catálogo paginado (indicePagina = deslocamento 1-based).
+ * - Exportar (tipoIntegracao=E + codFor): lookup pontual pelo código do título.
  */
 class SeniorFornecedorClient
 {
@@ -44,12 +47,13 @@ class SeniorFornecedorClient
         return htmlspecialchars($v, ENT_XML1);
     }
 
-    public function buildEnvelope(array $params): string
+    public function buildEnvelope(array $params, string $operation = 'ConsultarGeral'): string
     {
         $cred = $this->config['credentials'];
         $user = $this->esc($this->sanitize((string) ($cred['user'] ?? '')));
         $pass = $this->esc($this->sanitize((string) ($cred['password'] ?? '')));
         $enc = $this->esc($this->sanitize((string) ($cred['encryption'] ?? '0')));
+        $op = preg_replace('/[^A-Za-z0-9_]/', '', $operation) ?: 'ConsultarGeral';
 
         $paramXml = '';
         foreach ($params as $k => $v) {
@@ -64,12 +68,12 @@ class SeniorFornecedorClient
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="{$this->soapNs()}">
   <soapenv:Header/>
   <soapenv:Body>
-    <ser:ConsultarGeral>
+    <ser:{$op}>
       <user>{$user}</user>
       <password>{$pass}</password>
       <encryption>{$enc}</encryption>
       <parameters>{$paramXml}</parameters>
-    </ser:ConsultarGeral>
+    </ser:{$op}>
   </soapenv:Body>
 </soapenv:Envelope>
 XML;
@@ -154,6 +158,11 @@ XML;
     {
         $raw = $flat['fornecedor'] ?? $flat['fornecedores'] ?? [];
         if (!is_array($raw) || $raw === []) {
+            // Exportar às vezes devolve campos no próprio result.
+            if (isset($flat['codFor']) || isset($flat['nomFor'])) {
+                return [$flat];
+            }
+
             return [];
         }
         if (!isset($raw[0]) && !isset($raw['codFor']) && !isset($raw['codEmp'])) {
@@ -195,56 +204,89 @@ XML;
         return [];
     }
 
-    /** @return array<int, array<string, mixed>> */
+    /**
+     * ConsultarGeral de fornecedores.
+     *
+     * Atenção Senior: `indicePagina` é **deslocamento 1-based do primeiro registro**,
+     * não número de página. Ex.: para a 2ª fatia de 100 registros, use indice=101.
+     *
+     * @return array<int, array<string, mixed>>
+     */
     public function consultarGeral(int $codEmp, int $codFil = 1, int $indicePagina = 1, int $limitePagina = 100): array
     {
         $params = [
             'codEmp' => $codEmp,
             'codFil' => $codFil,
             'identificadorSistema' => $this->config['identificador_sistema'] ?? 'EASYTECH',
-            'indicePagina' => $indicePagina,
-            'limitePagina' => $limitePagina,
+            'indicePagina' => max(1, $indicePagina),
+            'limitePagina' => max(1, $limitePagina),
         ];
 
-        return $this->callOnce($params);
+        return $this->callOnce($params, 'ConsultarGeral');
     }
 
     /**
-     * Busca um fornecedor pelo codFor varrendo páginas do ConsultarGeral.
-     * A Senior ignora o parâmetro codFor no envelope — não dá pra filtrar direto.
+     * Converte página 1-based em deslocamento Senior (`indicePagina`).
+     * Página 1 → 1, página 2 com limite 100 → 101, etc.
      */
-    public function consultarPorCodFor(int $codEmp, int $codFor, int $codFil = 1): ?array
+    public static function offsetForPage(int $page, int $pageSize): int
     {
-        $pageSize = max(10, (int) ($this->config['fornecedor_page_size'] ?? 100));
-        $maxPages = max(1, (int) ($this->config['fornecedor_max_pages'] ?? 500));
+        $page = max(1, $page);
+        $pageSize = max(1, $pageSize);
 
-        for ($page = 1; $page <= $maxPages; $page++) {
-            try {
-                $rows = $this->consultarGeral($codEmp, $codFil, $page, $pageSize);
-            } catch (SeniorException $e) {
-                if ($e->kind === SeniorException::KIND_BUSINESS) {
-                    break;
-                }
-                throw $e;
+        return (($page - 1) * $pageSize) + 1;
+    }
+
+    /**
+     * Lookup pontual via Exportar (tipoIntegracao=E + codFor).
+     * Contrato validado em PRD 14/07/2026 — ~2s por fornecedor.
+     */
+    public function exportarPorCodFor(int $codEmp, int $codFor, int $codFil = 1): ?array
+    {
+        if ($codFor < 1) {
+            return null;
+        }
+
+        $params = [
+            'codEmp' => $codEmp,
+            'codFil' => $codFil,
+            'identificadorSistema' => $this->config['identificador_sistema'] ?? 'EASYTECH',
+            'codFor' => (string) $codFor,
+            'tipoIntegracao' => 'E',
+            'quantidadeRegistros' => 1,
+        ];
+
+        try {
+            $rows = $this->callOnce($params, 'Exportar');
+        } catch (SeniorException $e) {
+            if ($e->kind === SeniorException::KIND_BUSINESS) {
+                return null;
             }
+            throw $e;
+        }
 
-            if ($rows === []) {
-                break;
-            }
+        foreach ($rows as $row) {
+            if ((int) ($row['codFor'] ?? 0) === $codFor) {
+                $row['codEmp'] ??= $codEmp;
 
-            foreach ($rows as $row) {
-                if ((int) ($row['codFor'] ?? 0) === $codFor) {
-                    return $row;
-                }
+                return $row;
             }
         }
 
-        return null;
+        return $rows[0] ?? null;
     }
 
-    private function callOnce(array $params): array
+    /**
+     * Busca um fornecedor pelo codFor do título (Exportar pontual).
+     */
+    public function consultarPorCodFor(int $codEmp, int $codFor, int $codFil = 1): ?array
     {
-        $envelope = $this->buildEnvelope($params);
+        return $this->exportarPorCodFor($codEmp, $codFor, $codFil);
+    }
+
+    private function callOnce(array $params, string $operation = 'ConsultarGeral'): array
+    {
+        $envelope = $this->buildEnvelope($params, $operation);
         $connect = $this->clamp((int) ($this->config['timeout_connect'] ?? 60), 5, 300);
         $response = $this->clamp((int) ($this->config['timeout_response'] ?? 60), 5, 300);
         $maxRetries = (int) ($this->config['max_retries'] ?? 3);

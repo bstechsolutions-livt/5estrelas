@@ -24,8 +24,29 @@ class SeniorSupplier extends Model
             return null;
         }
 
-        return static::where('cod_emp', $codEmp)
+        $row = static::where('cod_emp', $codEmp)
             ->where('cod_for', (int) $codFor)
-            ->value('name');
+            ->first(['name', 'senior_raw']);
+
+        if ($row === null || static::isUnresolvedRaw($row->senior_raw)) {
+            return null;
+        }
+
+        return $row->name;
+    }
+
+    /** Stub gravado quando Exportar não achou o codFor (não é cadastro real). */
+    public static function isUnresolvedRaw(mixed $seniorRaw): bool
+    {
+        if (! is_array($seniorRaw)) {
+            return false;
+        }
+
+        return (bool) ($seniorRaw['unresolved'] ?? false);
+    }
+
+    public function isUnresolved(): bool
+    {
+        return static::isUnresolvedRaw($this->senior_raw);
     }
 }

@@ -37,6 +37,8 @@ const props = defineProps({
     canLancar: { type: Boolean, default: false },
     priorityOptions: { type: Object, default: () => ({}) },
     syncStatus: { type: Object, default: null },
+    canViewAwaitingSync: { type: Boolean, default: false },
+    canAssignDepartmentSync: { type: Boolean, default: false },
 })
 
 const { can } = useAuth()
@@ -134,18 +136,26 @@ function selectIssuePreset(key) {
     applyFilters()
 }
 
-const statusList = [
-    { label: 'Pendentes', value: 'pendente' },
-    { label: 'Preparação', value: 'em_preparacao' },
-    { label: 'Em Aprovação', value: 'aguardando_aprovacao' },
-    { label: 'Aprovados', value: 'aprovado' },
-    { label: 'Ag. Conciliação', value: 'aguardando_conciliacao' },
-    { label: 'Conciliados', value: 'conciliado' },
-]
+const statusList = computed(() => {
+    const tabs = [
+        { label: 'Aguard. sync', value: 'aguardando_vinculo_departamento' },
+        { label: 'Pendentes', value: 'pendente' },
+        { label: 'Preparação', value: 'em_preparacao' },
+        { label: 'Em Aprovação', value: 'aguardando_aprovacao' },
+        { label: 'Aprovados', value: 'aprovado' },
+        { label: 'Ag. Conciliação', value: 'aguardando_conciliacao' },
+        { label: 'Conciliados', value: 'conciliado' },
+    ]
+    if (!props.canViewAwaitingSync) {
+        return tabs.filter(s => s.value !== 'aguardando_vinculo_departamento')
+    }
+    return tabs
+})
 
 const statusTabHint = computed(() => {
     const hints = {
         pendente: 'Títulos que ainda não foram enviados para aprovação.',
+        aguardando_vinculo_departamento: 'Sem departamento ou fornecedor — vincule o depto manualmente se tiver permissão.',
         em_preparacao: 'Títulos em preparação antes do envio.',
         aguardando_aprovacao: 'A etiqueta Etapa indica em qual nível de aprovação cada título está.',
         aprovado: 'Títulos aprovados aguardando pagamento.',
@@ -316,6 +326,40 @@ function goShow(id) {
     router.visit(`/financeiro/contas-pagar/${id}`)
 }
 
+function isAwaitingDepartmentLink(payable) {
+    return payable.status === 'aguardando_vinculo_departamento'
+}
+
+function hasManualDepartmentAssignment(payable) {
+    return !!payable.department_assigned_by
+}
+
+function canAssignDepartmentFor(payable) {
+    return props.canAssignDepartmentSync
+        && isAwaitingDepartmentLink(payable)
+        && !hasManualDepartmentAssignment(payable)
+}
+
+const departmentAssignForms = ref({})
+
+function departmentAssignOptions() {
+    return (props.departments || []).map(d => ({ label: d.name, value: d.id }))
+}
+
+function assignDepartmentSync(payable) {
+    const departmentId = departmentAssignForms.value[payable.id]
+    if (!departmentId) return
+
+    router.post(`/financeiro/contas-pagar/${payable.id}/departamento-sync`, {
+        department_id: departmentId,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            delete departmentAssignForms.value[payable.id]
+        },
+    })
+}
+
 // Seleção pra criar borderô (mobile)
 const selectableStatuses = ['pendente', 'em_preparacao']
 const canSelect = computed(() => selectableStatuses.includes(status.value))
@@ -330,6 +374,7 @@ function toggleSelectionMode() {
     if (!selectionMode.value) selected.value = []
 }
 function onCardTap(p) {
+    if (isAwaitingDepartmentLink(p)) return
     if (selectionMode.value && canSelect.value) {
         const i = selected.value.indexOf(p.id)
         if (i >= 0) selected.value.splice(i, 1)
@@ -415,10 +460,16 @@ const currentTotal = computed(() => {
                     ]"
                 >
                     {{ s.label }}
-                    <span v-if="totals?.[s.value]" class="ml-1 opacity-75">({{ totals[s.value]?.count || 0 }})</span>
+                    <span class="ml-1 opacity-75">({{ totals?.[s.value]?.count ?? 0 }})</span>
                 </button>
             </div>
             <p v-if="statusTabHint" class="text-[11px] text-gray-500 mt-2">{{ statusTabHint }}</p>
+            <div
+                v-if="status === 'aguardando_vinculo_departamento'"
+                class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900"
+            >
+                Vincule o departamento pelo seletor em cada título. Depois disso a sync não altera mais o depto.
+            </div>
         </div>
 
         <!-- Resumo da aba ativa -->
@@ -512,9 +563,30 @@ const currentTotal = computed(() => {
         <!-- Lista -->
         <div v-if="payables.data.length" class="px-4 space-y-2" :class="selectionMode && selected.length ? 'pb-28' : 'pb-20'">
             <button v-for="p in payables.data" :key="p.id" @click="onCardTap(p)"
-                :class="['w-full bg-white rounded-xl border p-3 text-left active:bg-gray-50 transition-colors',
-                    selectionMode && isSelected(p.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200']">
-                <p v-if="p.department_nome" class="text-[11px] text-gray-500 truncate mb-0.5" dusk="m-departamento">{{ p.department_nome }}</p>
+                :class="['w-full rounded-xl border p-3 text-left transition-colors',
+                    isAwaitingDepartmentLink(p)
+                        ? 'bg-amber-50/80 border-amber-200'
+                        : 'bg-white border-gray-200 active:bg-gray-50',
+                    selectionMode && isSelected(p.id) ? 'border-blue-500 ring-2 ring-blue-200' : '']">
+                <div v-if="isAwaitingDepartmentLink(p)" class="mb-1" @click.stop>
+                    <template v-if="hasManualDepartmentAssignment(p) || p.department_nome">
+                        <p class="text-[11px] text-gray-600 truncate font-medium">{{ p.department_nome }}</p>
+                        <p v-if="p.department_assigned_by_name" class="text-[9px] text-gray-400 truncate">{{ p.department_assigned_by_name }}</p>
+                    </template>
+                    <Select
+                        v-else-if="canAssignDepartmentFor(p)"
+                        v-model="departmentAssignForms[p.id]"
+                        :options="departmentAssignOptions()"
+                        option-label="label"
+                        option-value="value"
+                        placeholder="Escolher departamento"
+                        class="w-full text-xs"
+                        size="small"
+                        @change="assignDepartmentSync(p)"
+                    />
+                    <p v-else class="text-[11px] text-amber-800 font-medium">{{ p.workflow_moment_detail || 'Aguardando sincronização' }}</p>
+                </div>
+                <p v-else-if="p.department_nome" class="text-[11px] text-gray-500 truncate mb-0.5" dusk="m-departamento">{{ p.department_nome }}</p>
                 <p v-if="p.filial_label || p.filial_nome" class="text-[11px] text-gray-600 truncate mb-0.5" dusk="m-filial">{{ p.filial_label || p.filial_nome }}</p>
                 <div class="flex items-start justify-between gap-2 mb-1">
                     <div class="flex items-center gap-2 flex-1 min-w-0">

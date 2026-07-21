@@ -16,11 +16,11 @@ Schedule::command('backup:run --only-db')->daily()->at('03:00');
 // Só agenda quando a integração está habilitada (evita execuções ignoradas em série
 // localmente / com a whitelist pendente). O comando manual continua disponível.
 if (config('senior.enabled', false)) {
-    $interval = (int) config('senior.sync_interval_minutes', 5);
+    $interval = (int) config('senior.sync_interval_minutes', 10);
     if ($interval < 1 || $interval > 1440) {
-        // req 6.3: intervalo inválido → mantém o padrão de 5 minutos e registra erro.
-        \Illuminate\Support\Facades\Log::error("[senior-cp] intervalo de sync inválido ({$interval}); usando 5 minutos.");
-        $interval = 5;
+        // req 6.3: intervalo inválido → mantém o padrão de 10 minutos e registra erro.
+        \Illuminate\Support\Facades\Log::error("[senior-cp] intervalo de sync inválido ({$interval}); usando 10 minutos.");
+        $interval = 10;
     }
     $cron = $interval < 60
         ? "*/{$interval} * * * *"
@@ -36,19 +36,25 @@ if (config('senior.enabled', false)) {
         // inteiro parava. Anti-empilhamento = Cache::lock + em_andamento no service.
         ->runInBackground();
 
-    // Lançador Senior (UsuGer) → senior_cod_usu → departamento do usuário intranet.
-    // Teto alto + bulk por empresa no service; prioriza títulos sem UsuGer mais novos.
-    $enrichMax = max(1, (int) config('senior.enrich_launcher_max_lookups', 400));
-    Schedule::command("senior:enrich-payable-launchers --max={$enrichMax} --scheduled")
-        ->cron($cron)
-        ->withoutOverlapping(120)
-        ->runInBackground();
+    if (config('senior.enrich_use_queue', false)) {
+        // Fila dedicada: despacha jobs leves; workers SOAP separados do sync CP.
+        Schedule::command('senior:dispatch-enrich-jobs --scheduled')
+            ->cron($cron)
+            ->withoutOverlapping(10)
+            ->runInBackground();
+    } else {
+        // Legado: crons SOAP inline (pode travar mutex se SOAP demorar).
+        $enrichMax = max(1, (int) config('senior.enrich_launcher_max_lookups', 400));
+        Schedule::command("senior:enrich-payable-launchers --max={$enrichMax} --scheduled")
+            ->cron($cron)
+            ->withoutOverlapping(120)
+            ->runInBackground();
 
-    // Fornecedores faltantes / placeholders “Fornecedor N” — acompanha o ciclo do CP.
-    Schedule::command('senior:sync-fornecedores --scheduled')
-        ->cron($cron)
-        ->withoutOverlapping(120)
-        ->runInBackground();
+        Schedule::command('senior:sync-fornecedores --scheduled')
+            ->cron($cron)
+            ->withoutOverlapping(120)
+            ->runInBackground();
+    }
 
     // Sync de filiais/empresas (cad_filial) — muda pouco, roda 1x/dia de madrugada.
     Schedule::command('senior:sync-filiais --scheduled')
