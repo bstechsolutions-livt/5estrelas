@@ -281,4 +281,51 @@ class BorderoAutoRuleTest extends TestCase
         $this->assertSame(4, Payable::whereNotNull('bordero_id')->count());
         $this->assertSame(0, Payable::where('description', 'like', '%LINHA VOZ%')->whereNotNull('bordero_id')->count());
     }
+
+    public function test_filtro_agrupa_por_mes_de_vencimento(): void
+    {
+        $month = now()->startOfMonth()->addMonth();
+        $dayA = $month->copy()->day(1)->toDateString();
+        $dayB = $month->copy()->day(3)->toDateString();
+        $otherMonth = $month->copy()->addMonth()->day(5)->toDateString();
+
+        $this->makePayable([
+            'description' => 'CARTAO CREDITO — parcela A',
+            'due_date' => $dayA,
+            'amount' => 50,
+        ]);
+        $this->makePayable([
+            'description' => 'CARTAO CREDITO — parcela B',
+            'due_date' => $dayB,
+            'amount' => 40,
+        ]);
+        $this->makePayable([
+            'description' => 'CARTAO CREDITO — outro mes 1',
+            'due_date' => $otherMonth,
+            'amount' => 30,
+        ]);
+        $this->makePayable([
+            'description' => 'CARTAO CREDITO — outro mes 2',
+            'due_date' => $otherMonth,
+            'amount' => 25,
+        ]);
+
+        $this->actingAs($this->manager())
+            ->post('/financeiro/borderos/automatico', [
+                'name' => 'Cartão de crédito',
+                'filters' => [
+                    ['field' => 'description', 'operator' => 'contains', 'value' => 'CARTAO CREDITO'],
+                ],
+                'filter_logic' => 'and',
+                'min_titles_per_group' => 2,
+                'due_grouping' => BorderoAutoRule::DUE_SAME_MONTH,
+                'max_due_span_days' => 7,
+                'eligibility_mode' => BorderoAutoRule::ELIGIBILITY_ALL,
+                'apply_mode' => 'now',
+            ])
+            ->assertRedirect('/financeiro/borderos?status=pendente');
+
+        $this->assertSame(2, Bordero::count());
+        $this->assertSame(4, Payable::whereNotNull('bordero_id')->count());
+    }
 }

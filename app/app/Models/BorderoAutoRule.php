@@ -12,6 +12,8 @@ class BorderoAutoRule extends Model
 
     public const DUE_SAME_DAY = 'same_day';
 
+    public const DUE_SAME_MONTH = 'same_month';
+
     public const DUE_MAX_SPAN = 'max_span';
 
     public const ELIGIBILITY_ALL = 'all_pending';
@@ -109,6 +111,7 @@ class BorderoAutoRule extends Model
         return [
             self::DUE_NONE => 'Um borderô com todos os títulos',
             self::DUE_SAME_DAY => 'Separar por mesmo dia de vencimento',
+            self::DUE_SAME_MONTH => 'Separar por mesmo mês de vencimento',
             self::DUE_MAX_SPAN => 'Separar por diferença máxima de dias',
         ];
     }

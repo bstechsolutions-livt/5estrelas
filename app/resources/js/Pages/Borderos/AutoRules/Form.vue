@@ -207,7 +207,7 @@ watch(() => page.props.flash?.error, (msg) => {
                 </h1>
                 <p class="text-sm text-gray-500 mt-1 max-w-2xl">
                     Defina <strong>quando</strong> criar o borderô — por exemplo descrição contendo “FUNDO FIXO: TIAGO”, filial, CCU, etc.
-                    O agrupamento dos títulos que batem continua sendo por <strong>data de vencimento</strong> (opções abaixo).
+                    O agrupamento dos títulos que batem continua sendo por <strong>vencimento</strong> — dia, mês ou faixa de dias (opções abaixo).
                 </p>
             </div>
 

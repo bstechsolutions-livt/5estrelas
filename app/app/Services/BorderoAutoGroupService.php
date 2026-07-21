@@ -208,6 +208,7 @@ class BorderoAutoGroupService
 
         $chunks = match ($rule->due_grouping) {
             BorderoAutoRule::DUE_SAME_DAY => $this->splitBySameDay($base),
+            BorderoAutoRule::DUE_SAME_MONTH => $this->splitBySameMonth($base),
             BorderoAutoRule::DUE_MAX_SPAN => $this->splitByMaxSpan($base, max(1, (int) $rule->max_due_span_days)),
             default => [$base],
         };
@@ -237,6 +238,29 @@ class BorderoAutoGroupService
             $chunks[] = array_merge($base, [
                 'payables' => $items,
                 'due_date_key' => $dateKey,
+            ]);
+        }
+
+        return $chunks;
+    }
+
+    /** @param array<string, mixed> $base */
+    private function splitBySameMonth(array $base): array
+    {
+        $byMonth = [];
+
+        foreach ($base['payables'] as $payable) {
+            $monthKey = $payable->due_date
+                ? Carbon::parse($payable->due_date)->format('Y-m')
+                : 'sem-vencimento';
+            $byMonth[$monthKey][] = $payable;
+        }
+
+        $chunks = [];
+        foreach ($byMonth as $monthKey => $items) {
+            $chunks[] = array_merge($base, [
+                'payables' => $items,
+                'due_date_key' => $monthKey,
             ]);
         }
 
@@ -317,6 +341,10 @@ class BorderoAutoGroupService
             $key .= '|date:' . ($chunk['due_date_key'] ?? $index);
         }
 
+        if ($rule->due_grouping === BorderoAutoRule::DUE_SAME_MONTH) {
+            $key .= '|month:' . ($chunk['due_date_key'] ?? $index);
+        }
+
         if ($rule->due_grouping === BorderoAutoRule::DUE_MAX_SPAN) {
             $key .= '|span:' . ($chunk['due_date_key'] ?? $index);
         }
@@ -334,6 +362,15 @@ class BorderoAutoGroupService
             }
 
             return 'Venc. ' . Carbon::parse($key)->format('d/m/Y');
+        }
+
+        if ($rule->due_grouping === BorderoAutoRule::DUE_SAME_MONTH) {
+            $key = $chunk['due_date_key'] ?? null;
+            if ($key === 'sem-vencimento' || ! $key) {
+                return 'Sem vencimento';
+            }
+
+            return 'Venc. ' . Carbon::parse($key . '-01')->format('m/Y');
         }
 
         if ($rule->due_grouping === BorderoAutoRule::DUE_MAX_SPAN) {

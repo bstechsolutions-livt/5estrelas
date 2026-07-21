@@ -205,6 +205,7 @@ class BorderoAutoRuleController extends Controller
             'due_grouping' => ['required', Rule::in([
                 BorderoAutoRule::DUE_NONE,
                 BorderoAutoRule::DUE_SAME_DAY,
+                BorderoAutoRule::DUE_SAME_MONTH,
                 BorderoAutoRule::DUE_MAX_SPAN,
             ])],
             'max_due_span_days' => ['required', 'integer', 'min:1', 'max:90'],
