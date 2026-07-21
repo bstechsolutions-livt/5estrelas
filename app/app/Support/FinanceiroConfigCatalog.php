@@ -52,6 +52,14 @@ class FinanceiroConfigCatalog
                 'href' => '/financeiro/sync-senior',
                 'permission' => 'financeiro.workflows.configurar',
             ],
+            [
+                'key' => 'bancos',
+                'label' => 'Contas bancárias',
+                'description' => 'Cadastro de contas para conciliação OFX (importação inicial da Senior, gestão na intranet).',
+                'icon' => 'pi pi-building',
+                'href' => '/financeiro/bancos',
+                'permission' => 'financeiro.bancos.visualizar',
+            ],
         ];
     }
 

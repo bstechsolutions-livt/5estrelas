@@ -9,6 +9,7 @@ use App\Http\Controllers\BackupController;
 use App\Http\Controllers\BorderoController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankConciliationController;
 use App\Http\Controllers\PayableController;
 use App\Http\Controllers\PayableAlcadaController;
@@ -186,12 +187,33 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [PayableDepartmentRulesController::class, 'update'])->name('payables.department-rules.update');
     });
 
+    // Financeiro - Contas bancárias (cadastro Hub; import one-shot Senior)
+    Route::prefix('financeiro/bancos')->middleware('permission:financeiro.bancos.visualizar')->group(function () {
+        Route::get('/', [BankAccountController::class, 'index'])->name('bank-accounts.index');
+        Route::get('/criar', [BankAccountController::class, 'create'])
+            ->middleware('permission:financeiro.bancos.gerenciar')
+            ->name('bank-accounts.create');
+        Route::post('/', [BankAccountController::class, 'store'])
+            ->middleware('permission:financeiro.bancos.gerenciar')
+            ->name('bank-accounts.store');
+        Route::get('/{bankAccount}/editar', [BankAccountController::class, 'edit'])
+            ->middleware('permission:financeiro.bancos.gerenciar')
+            ->name('bank-accounts.edit');
+        Route::put('/{bankAccount}', [BankAccountController::class, 'update'])
+            ->middleware('permission:financeiro.bancos.gerenciar')
+            ->name('bank-accounts.update');
+        Route::post('/{bankAccount}/toggle', [BankAccountController::class, 'toggle'])
+            ->middleware('permission:financeiro.bancos.gerenciar')
+            ->name('bank-accounts.toggle');
+    });
+
     // Financeiro - Conciliação Bancária (OFX) — ANTES do grupo genérico /financeiro/contas-pagar
     Route::prefix('financeiro/contas-pagar/conciliacao')->middleware('permission:financeiro.conciliacao.visualizar')->group(function () {
         Route::get('/', [BankConciliationController::class, 'index'])->name('bank-conciliation.index');
         Route::get('/search-payables', [BankConciliationController::class, 'searchPayables'])->name('bank-conciliation.search-payables');
         Route::get('/{importId}', [BankConciliationController::class, 'show'])->whereNumber('importId')->name('bank-conciliation.show');
         Route::post('/upload', [BankConciliationController::class, 'upload'])->name('bank-conciliation.upload');
+        Route::post('/upload-batch', [BankConciliationController::class, 'uploadBatch'])->name('bank-conciliation.upload-batch');
         Route::post('/transactions/{id}/accept', [BankConciliationController::class, 'accept'])->whereNumber('id')->name('bank-conciliation.accept');
         Route::post('/transactions/{id}/reject', [BankConciliationController::class, 'reject'])->whereNumber('id')->name('bank-conciliation.reject');
         Route::post('/transactions/{id}/link', [BankConciliationController::class, 'link'])->whereNumber('id')->name('bank-conciliation.link');

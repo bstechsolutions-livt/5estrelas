@@ -2,6 +2,8 @@
 import { ref, watch } from 'vue'
 import { router, useForm, usePage } from '@inertiajs/vue3'
 import AppLayoutMobile from '@/Layouts/AppLayoutMobile.vue'
+import Select from 'primevue/select'
+import DatePicker from 'primevue/datepicker'
 import Tag from 'primevue/tag'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
@@ -9,58 +11,64 @@ import { useToast } from 'primevue/usetoast'
 const props = defineProps({
     imports: Object,
     isConciliador: Boolean,
+    bankAccounts: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
+    session: { type: Object, default: null },
+    summary: { type: Object, default: null },
+    periodLabel: { type: String, default: '' },
+    pendingPayables: { type: Array, default: () => [] },
 })
 
 const toast = useToast()
 const page = usePage()
 
 watch(() => page.props.flash, (flash) => {
-    if (flash?.success) {
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: flash.success, life: 4000 })
-    }
-    if (flash?.error) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: flash.error, life: 5000 })
-    }
+    if (flash?.success) toast.add({ severity: 'success', summary: 'Sucesso', detail: flash.success, life: 5000 })
+    if (flash?.error) toast.add({ severity: 'error', summary: 'Erro', detail: flash.error, life: 5000 })
 }, { deep: true })
 
-const uploadForm = useForm({ file: null })
+function parseFilterDate(value) {
+    if (!value) return new Date()
+    const [y, m, d] = String(value).slice(0, 10).split('-').map(Number)
+    return new Date(y, m - 1, d, 12, 0, 0)
+}
+
+const selectedDate = ref(parseFilterDate(props.filters.date))
+const uploadForm = useForm({ files: [], date: null })
 const fileInput = ref(null)
+
+function dateParam() {
+    const d = selectedDate.value
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function applyFilters() {
+    router.get('/financeiro/contas-pagar/conciliacao', { date: dateParam() }, { preserveState: true })
+}
 
 function triggerUpload() {
     fileInput.value?.click()
 }
 
 function handleFileChange(event) {
-    const file = event.target.files[0]
-    if (!file) return
-    uploadForm.file = file
-    uploadForm.post('/financeiro/contas-pagar/conciliacao/upload', {
+    const files = Array.from(event.target.files || [])
+    if (!files.length) return
+
+    uploadForm.files = files
+    uploadForm.date = dateParam()
+
+    uploadForm.post('/financeiro/contas-pagar/conciliacao/upload-batch', {
         forceFormData: true,
         onError: (errors) => {
-            if (errors.file) {
-                toast.add({ severity: 'error', summary: 'Erro', detail: errors.file, life: 5000 })
-            }
+            const msg = errors.files || Object.values(errors)[0]
+            if (msg) toast.add({ severity: 'error', summary: 'Erro', detail: msg, life: 5000 })
         },
     })
-    // Reset input
     event.target.value = ''
 }
 
 function goShow(id) {
     router.visit(`/financeiro/contas-pagar/conciliacao/${id}`)
-}
-
-function formatDate(d) {
-    if (!d) return '—'
-    return new Date(d).toLocaleDateString('pt-BR')
-}
-
-function statusSeverity(status) {
-    return { processing: 'warn', done: 'success', error: 'danger' }[status] || 'info'
-}
-
-function statusLabel(status) {
-    return { processing: 'Processando', done: 'Concluido', error: 'Erro' }[status] || status
 }
 </script>
 
@@ -68,51 +76,44 @@ function statusLabel(status) {
     <AppLayoutMobile>
         <Toast />
         <div class="px-4 pb-20">
-            <h1 class="text-xl font-bold text-gray-800 mb-4">Conciliacao Bancaria</h1>
+            <h1 class="text-xl font-bold text-gray-800 mb-1">Conciliação Bancária</h1>
+            <p class="text-xs text-gray-500 mb-4">Conciliação diária · {{ periodLabel }}</p>
 
-            <!-- Upload card - only for conciliador -->
+            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+                <label class="block text-xs font-medium text-gray-500 mb-1">Data</label>
+                <DatePicker v-model="selectedDate" date-format="dd/mm/yy" class="w-full" @update:model-value="applyFilters" />
+            </div>
+
             <div v-if="isConciliador" class="bg-blue-50 rounded-xl p-4 mb-4 border border-blue-100" dusk="upload-ofx" @click="triggerUpload">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
                         <i class="pi pi-upload text-white text-lg"></i>
                     </div>
                     <div>
-                        <p class="text-sm font-semibold text-blue-900">Importar extrato OFX</p>
-                        <p class="text-xs text-blue-700">Toque para selecionar arquivo</p>
+                        <p class="text-sm font-semibold text-blue-900">Importar OFX(s)</p>
+                        <p class="text-xs text-blue-700">Conta detectada automaticamente</p>
                     </div>
                 </div>
-                <input ref="fileInput" type="file" accept=".ofx" class="hidden" @change="handleFileChange" />
+                <input ref="fileInput" type="file" accept=".ofx" multiple class="hidden" @change="handleFileChange" />
             </div>
 
-            <!-- Import cards -->
-            <div v-if="imports.data.length === 0" class="text-center py-12 text-gray-500">
-                <i class="pi pi-file-import text-4xl text-gray-300 mb-3 block"></i>
-                <p>Nenhuma importacao encontrada.</p>
+            <div v-if="summary" class="grid grid-cols-2 gap-2 mb-4">
+                <div class="bg-amber-50 rounded-lg p-3 border border-amber-100">
+                    <p class="text-[10px] text-amber-700">Pagos no dia</p>
+                    <p class="text-lg font-bold text-amber-900">{{ summary.pending_payables }}</p>
+                </div>
+                <div class="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                    <p class="text-[10px] text-blue-700">Sugestões</p>
+                    <p class="text-lg font-bold text-blue-900">{{ summary.suggested_matches }}</p>
+                </div>
             </div>
 
+            <h2 class="text-sm font-semibold text-gray-700 mb-2">Extratos do dia</h2>
+            <div v-if="!imports.data?.length" class="text-center py-8 text-gray-500 text-sm">Nenhum extrato importado.</div>
             <div v-else class="space-y-3">
-                <div
-                    v-for="item in imports.data"
-                    :key="item.id"
-                    class="bg-white rounded-xl border border-gray-100 p-4 active:bg-gray-50 transition-colors"
-                    :dusk="`import-row-${item.id}`"
-                    @click="goShow(item.id)"
-                >
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <p class="text-sm font-semibold text-gray-800">{{ item.bank_name || 'Banco' }}</p>
-                            <p class="text-xs text-gray-500">Conta: {{ item.account_number }}</p>
-                        </div>
-                        <Tag :value="statusLabel(item.status)" :severity="statusSeverity(item.status)" class="text-xs" />
-                    </div>
-                    <div class="flex justify-between items-end">
-                        <div class="text-xs text-gray-500">
-                            <span>{{ formatDate(item.created_at) }}</span>
-                            <span class="mx-1">&middot;</span>
-                            <span>{{ item.transaction_count }} transacoes</span>
-                        </div>
-                        <span class="text-xs font-medium text-green-600">{{ item.matched_count }} matches</span>
-                    </div>
+                <div v-for="item in imports.data" :key="item.id" class="bg-white rounded-xl border border-gray-100 p-4" @click="goShow(item.id)">
+                    <p class="text-sm font-semibold text-gray-800">{{ item.bank_account?.name || item.bank_name }}</p>
+                    <p class="text-xs text-gray-500">{{ item.transaction_count }} transações · {{ item.matched_count }} matches</p>
                 </div>
             </div>
         </div>

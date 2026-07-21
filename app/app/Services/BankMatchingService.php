@@ -17,16 +17,19 @@ class BankMatchingService
      * Run matching for all transactions of an import.
      * @return array{matched: int, unmatched: int}
      */
-    public function run(int $importId): array
-    {
+    public function run(
+        int $importId,
+        ?Carbon $paidFrom = null,
+        ?Carbon $paidTo = null,
+        array $alreadyMatchedPayableIds = [],
+    ): array {
         $import = BankStatementImport::findOrFail($importId);
         $transactions = $import->transactions()->get();
 
         $matched = 0;
         $unmatched = 0;
 
-        // Track payable IDs already matched in this import to detect duplicates
-        $matchedPayableIds = [];
+        $matchedPayableIds = $alreadyMatchedPayableIds;
 
         foreach ($transactions as $tx) {
             // Only match DEBIT transactions (money going out = payments)
@@ -36,7 +39,7 @@ class BankMatchingService
                 continue;
             }
 
-            $candidates = $this->findCandidates($tx, $matchedPayableIds);
+            $candidates = $this->findCandidates($tx, $matchedPayableIds, $paidFrom, $paidTo);
 
             if (empty($candidates)) {
                 $tx->update(['match_status' => 'unmatched', 'match_confidence' => 'none']);
@@ -77,8 +80,12 @@ class BankMatchingService
      * Find candidate Payables for a bank transaction.
      * Returns array of candidates sorted by confidence (high > medium > low).
      */
-    public function findCandidates(BankTransaction $tx, array $alreadyMatchedPayableIds = []): array
-    {
+    public function findCandidates(
+        BankTransaction $tx,
+        array $alreadyMatchedPayableIds = [],
+        ?Carbon $paidFrom = null,
+        ?Carbon $paidTo = null,
+    ): array {
         $absAmount = abs((float) $tx->amount);
 
         // Find payables with matching amount (+-0.01) and status = pago
@@ -88,9 +95,15 @@ class BankMatchingService
             ? 'ABS(CAST(amount AS REAL) - CAST(? AS REAL)) <= CAST(? AS REAL)'
             : 'ABS(amount - ?) <= ?';
 
-        $payables = Payable::whereIn('status', ['pago', 'aguardando_conciliacao'])
-            ->whereRaw($amountExpr, [$absAmount, self::AMOUNT_TOLERANCE])
-            ->get(['id', 'amount', 'paid_at', 'title_number', 'supplier_name']);
+        $query = Payable::whereIn('status', ['pago', 'aguardando_conciliacao'])
+            ->whereRaw($amountExpr, [$absAmount, self::AMOUNT_TOLERANCE]);
+
+        if ($paidFrom !== null && $paidTo !== null) {
+            $query->whereNotNull('paid_at')
+                ->whereBetween('paid_at', [$paidFrom->toDateString(), $paidTo->toDateString()]);
+        }
+
+        $payables = $query->get(['id', 'amount', 'paid_at', 'title_number', 'supplier_name']);
 
         $candidates = [];
         foreach ($payables as $payable) {

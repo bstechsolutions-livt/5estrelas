@@ -61,7 +61,7 @@ class MenuCatalog
             ['key' => 'contas_receber', 'label' => 'Contas a Receber', 'icon' => 'pi pi-money-bill', 'href' => '/financeiro/contas-receber', 'permission' => 'financeiro.contas_receber.visualizar', 'group' => 'Financeiro'],
             ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.borderos.visualizar', 'group' => 'Financeiro'],
             ['key' => 'contas_pagar_conciliacao', 'label' => 'Conciliação Bancária', 'icon' => 'pi pi-file-import', 'href' => '/financeiro/contas-pagar/conciliacao', 'permission' => 'financeiro.conciliacao.visualizar', 'group' => 'Financeiro'],
-            ['key' => 'financeiro_sync_senior', 'label' => 'Sync Senior', 'icon' => 'pi pi-sync', 'href' => '/financeiro/sync-senior', 'permission' => 'financeiro.workflows.configurar', 'group' => 'Financeiro'],
+            ['key' => 'financeiro_bancos', 'label' => 'Bancos', 'icon' => 'pi pi-building', 'href' => '/financeiro/bancos', 'permission' => 'financeiro.bancos.visualizar', 'group' => 'Financeiro'],
             ['key' => 'financeiro_configuracao', 'label' => 'Configuração', 'icon' => 'pi pi-cog', 'href' => '/financeiro/configuracao', 'any_permissions' => FinanceiroConfigCatalog::permissionKeys(), 'group' => 'Financeiro'],
             // Tickets (portado da Biglar)
             ['key' => 'sol_nova', 'label' => 'Novo Ticket', 'icon' => 'pi pi-plus-circle', 'href' => '/solicitacoes/nova', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
