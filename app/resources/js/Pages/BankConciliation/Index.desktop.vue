@@ -1,286 +1,466 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { router, useForm, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import FileUpload from 'primevue/fileupload'
-import Select from 'primevue/select'
-import DatePicker from 'primevue/datepicker'
 import Tag from 'primevue/tag'
 import Toast from 'primevue/toast'
+import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 
 const props = defineProps({
-    imports: Object,
     isConciliador: Boolean,
     bankAccounts: { type: Array, default: () => [] },
+    days: { type: Array, default: () => [] },
+    dayReport: { type: Object, default: null },
     filters: { type: Object, default: () => ({}) },
-    session: { type: Object, default: null },
-    summary: { type: Object, default: null },
-    periodLabel: { type: String, default: '' },
-    pendingPayables: { type: Array, default: () => [] },
+    importResults: { type: Array, default: null },
 })
 
 const toast = useToast()
 const page = usePage()
 
+// ── Flash messages ────────────────────────────────────────────────────────────
 watch(() => page.props.flash, (flash) => {
-    if (flash?.success) {
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: flash.success, life: 5000 })
-    }
-    if (flash?.error) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: flash.error, life: 5000 })
-    }
+    if (flash?.success) toast.add({ severity: 'success', summary: 'Sucesso', detail: flash.success, life: 5000 })
+    if (flash?.error)   toast.add({ severity: 'error',   summary: 'Erro',    detail: flash.error,   life: 5000 })
+    if (flash?.importResults) localImportResults.value = flash.importResults
 }, { deep: true })
 
-function parseFilterDate(value) {
-    if (!value) return new Date()
-    const [y, m, d] = String(value).slice(0, 10).split('-').map(Number)
-    return new Date(y, m - 1, d, 12, 0, 0)
-}
+// ── Import results (flashed from session or from page prop on load) ───────────
+const localImportResults = ref(props.importResults ?? null)
 
-const selectedDate = ref(parseFilterDate(props.filters.date))
-const selectedBankAccountId = ref(props.filters.bank_account_id ?? null)
-
-const bankAccountOptions = computed(() => [
-    { id: null, label: 'Todas as contas' },
-    ...props.bankAccounts,
-])
-
-const uploadForm = useForm({
-    files: [],
-    date: null,
-})
-
-function dateParam() {
-    const d = selectedDate.value
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${y}-${m}-${day}`
-}
-
-function applyFilters() {
-    const params = { date: dateParam() }
-    if (selectedBankAccountId.value) {
-        params.bank_account_id = selectedBankAccountId.value
-    }
-    router.get('/financeiro/contas-pagar/conciliacao', params, { preserveState: true, preserveScroll: true })
-}
-
-function shiftDay(delta) {
-    const d = new Date(selectedDate.value)
-    d.setDate(d.getDate() + delta)
-    selectedDate.value = d
-    applyFilters()
-}
+// ── Upload batch ──────────────────────────────────────────────────────────────
+const uploadForm = useForm({ files: [] })
 
 function onBatchUpload(event) {
     uploadForm.files = event.files
-    uploadForm.date = dateParam()
-
     uploadForm.post('/financeiro/contas-pagar/conciliacao/upload-batch', {
         forceFormData: true,
         onError: (errors) => {
             const msg = errors.files || errors.file || Object.values(errors)[0]
-            if (msg) {
-                toast.add({ severity: 'error', summary: 'Erro no upload', detail: msg, life: 5000 })
-            }
+            if (msg) toast.add({ severity: 'error', summary: 'Erro no upload', detail: msg, life: 6000 })
         },
     })
 }
 
-function goShow(id) {
-    router.visit(`/financeiro/contas-pagar/conciliacao/${id}`)
+// ── Day navigation ────────────────────────────────────────────────────────────
+function openDay(date) {
+    router.get('/financeiro/contas-pagar/conciliacao', { date }, { preserveState: false })
 }
 
+// ── Day report interactions ───────────────────────────────────────────────────
+const linkTxId = ref(null)
+const linkPayableId = ref(null)
+const linkSearchQuery = ref('')
+const linkResults = ref([])
+const linkLoading = ref(false)
+
+async function searchForLink(query) {
+    if (!query || query.length < 2) { linkResults.value = []; return }
+    linkLoading.value = true
+    try {
+        const date = props.dayReport?.date ?? props.filters?.date
+        const params = new URLSearchParams({ query, ...(date ? { date } : {}) })
+        const resp = await fetch(`/financeiro/contas-pagar/conciliacao/search-payables?${params}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            credentials: 'same-origin',
+        })
+        linkResults.value = await resp.json()
+    } finally {
+        linkLoading.value = false
+    }
+}
+
+watch(linkSearchQuery, (q) => searchForLink(q))
+
+function openLink(txId) {
+    linkTxId.value = txId
+    linkPayableId.value = null
+    linkSearchQuery.value = ''
+    linkResults.value = []
+}
+
+function closeLink() {
+    linkTxId.value = null
+}
+
+const linkForm = useForm({ payable_id: null })
+
+function submitLink() {
+    if (!linkPayableId.value) return
+    linkForm.payable_id = linkPayableId.value
+    linkForm.post(`/financeiro/contas-pagar/conciliacao/transactions/${linkTxId.value}/link`, {
+        onSuccess: () => { closeLink(); router.reload() },
+    })
+}
+
+const acceptForm = useForm({})
+function acceptTx(id) {
+    acceptForm.post(`/financeiro/contas-pagar/conciliacao/transactions/${id}/accept`, {
+        onSuccess: () => router.reload(),
+        onError: (errors) => {
+            const msg = Object.values(errors)[0]
+            if (msg) toast.add({ severity: 'warn', summary: 'Atenção', detail: msg, life: 5000 })
+        },
+    })
+}
+
+const rejectForm = useForm({})
+function rejectTx(id) {
+    rejectForm.post(`/financeiro/contas-pagar/conciliacao/transactions/${id}/reject`, {
+        onSuccess: () => router.reload(),
+    })
+}
+
+const batchDayForm = useForm({ date: null })
+function batchDay() {
+    if (!props.dayReport?.date) return
+    batchDayForm.date = props.dayReport.date
+    batchDayForm.post('/financeiro/contas-pagar/conciliacao/batch-conciliate-day', {
+        onSuccess: () => router.reload(),
+    })
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDate(d) {
     if (!d) return '—'
-    const s = typeof d === 'string' ? d.slice(0, 10) : d
-    return new Date(s + 'T12:00:00').toLocaleDateString('pt-BR')
+    return new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR')
 }
-
 function formatMoney(v) {
     return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
-
-function formatPeriod(start, end) {
-    if (!start && !end) return '—'
-    return `${formatDate(start)} a ${formatDate(end)}`
+function statusTagSeverity(status) {
+    return { pending: 'info', accepted: 'success', manual: 'success', rejected: 'danger', unmatched: 'warn' }[status] ?? 'secondary'
+}
+function confidenceLabel(c) {
+    return { high: 'Alta', medium: 'Média', low: 'Baixa', none: '—' }[c] ?? c
+}
+function dayRowClass(d) {
+    return props.dayReport?.date === d.date ? 'bg-blue-50' : ''
 }
 
-function statusSeverity(status) {
-    return { processing: 'warn', done: 'success', error: 'danger' }[status] || 'info'
-}
-
-function statusLabel(status) {
-    return { processing: 'Processando', done: 'Concluído', error: 'Erro' }[status] || status
-}
+const kpis = computed(() => props.dayReport?.kpis ?? null)
+const matched  = computed(() => props.dayReport?.matched  ?? [])
+const ofxOnly  = computed(() => props.dayReport?.ofx_only  ?? [])
+const payableOnly = computed(() => props.dayReport?.payable_only ?? [])
+const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
 </script>
 
 <template>
     <AppLayout>
         <Toast />
-        <div class="max-w-7xl mx-auto">
-            <div class="mb-6">
+        <div class="max-w-7xl mx-auto space-y-6">
+
+            <!-- Header -->
+            <div>
                 <h1 class="text-2xl font-bold text-gray-800">Conciliação Bancária</h1>
-                <p class="text-sm text-gray-500 mt-1">
-                    Escolha o dia, suba os OFX (conta detectada automaticamente) e concilie os pagamentos daquele dia.
+                <p class="text-sm text-gray-500 mt-1">Suba os OFX — data e conta detectadas automaticamente.</p>
+            </div>
+
+            <!-- Upload card -->
+            <div v-if="isConciliador" class="bg-white rounded-xl border border-gray-100 p-5">
+                <h2 class="text-sm font-semibold text-gray-700 mb-1">Importar extratos OFX</h2>
+                <p class="text-xs text-gray-400 mb-3">
+                    Selecione um ou vários arquivos — data e conta são detectadas do próprio OFX.
                 </p>
-            </div>
-
-            <!-- Data + upload -->
-            <div class="bg-white rounded-xl border border-gray-100 p-5 mb-6">
-                <div class="flex flex-wrap items-end gap-3 mb-4">
-                    <button type="button" class="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 shrink-0" @click="shiftDay(-1)">
-                        <i class="pi pi-chevron-left text-sm" />
-                    </button>
-                    <div class="w-52 shrink-0">
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Data da conciliação</label>
-                        <DatePicker
-                            v-model="selectedDate"
-                            date-format="dd/mm/yy"
-                            show-icon
-                            icon-display="input"
-                            class="w-full"
-                            @update:model-value="applyFilters"
-                        />
-                    </div>
-                    <button type="button" class="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 shrink-0" @click="shiftDay(1)">
-                        <i class="pi pi-chevron-right text-sm" />
-                    </button>
-                    <div class="flex-1 min-w-[10rem] text-right">
-                        <p class="text-sm font-semibold text-gray-700">{{ periodLabel || session?.period_label }}</p>
-                        <p class="text-xs text-gray-400">Conciliação diária</p>
-                    </div>
-                </div>
-
-                <div v-if="isConciliador" class="border-t border-gray-100 pt-4" dusk="upload-ofx">
-                    <h2 class="text-sm font-semibold text-gray-700 mb-1">Importar extratos OFX</h2>
-                    <p class="text-xs text-gray-400 mb-3">
-                        Vários arquivos de uma vez — cada OFX detecta a conta no cadastro Hub.
-                    </p>
-                    <FileUpload
-                        mode="basic"
-                        accept=".ofx"
-                        multiple
-                        :auto="true"
-                        choose-label="Selecionar arquivo(s) .ofx"
-                        :custom-upload="true"
-                        @uploader="onBatchUpload"
-                        :disabled="uploadForm.processing"
-                    />
-                    <p v-if="uploadForm.processing" class="text-xs text-blue-600 mt-2">Processando arquivos...</p>
-                </div>
-            </div>
-
-            <!-- Filtro opcional por conta -->
-            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-6 max-w-md">
-                <label class="block text-xs font-medium text-gray-500 mb-1">Filtrar visualização por conta (opcional)</label>
-                <Select
-                    v-model="selectedBankAccountId"
-                    :options="bankAccountOptions"
-                    option-label="label"
-                    option-value="id"
-                    placeholder="Todas as contas"
-                    class="w-full"
-                    @change="applyFilters"
+                <FileUpload
+                    mode="basic"
+                    accept=".ofx"
+                    multiple
+                    :auto="true"
+                    choose-label="Selecionar arquivo(s) .ofx"
+                    :custom-upload="true"
+                    @uploader="onBatchUpload"
+                    :disabled="uploadForm.processing"
                 />
+                <p v-if="uploadForm.processing" class="text-xs text-blue-600 mt-2">Processando arquivos…</p>
             </div>
 
-            <!-- KPIs -->
-            <div v-if="summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-amber-50 border border-amber-100 rounded-xl p-4">
-                    <p class="text-xs text-amber-700 font-medium">Títulos pagos no dia</p>
-                    <p class="text-2xl font-bold text-amber-900">{{ summary.pending_payables }}</p>
-                </div>
-                <div class="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                    <p class="text-xs text-blue-700 font-medium">Sugestões de match</p>
-                    <p class="text-2xl font-bold text-blue-900">{{ summary.suggested_matches }}</p>
-                </div>
-                <div class="bg-green-50 border border-green-100 rounded-xl p-4">
-                    <p class="text-xs text-green-700 font-medium">Matches aceitos</p>
-                    <p class="text-2xl font-bold text-green-900">{{ summary.accepted_matches }}</p>
-                </div>
-                <div class="bg-gray-50 border border-gray-100 rounded-xl p-4">
-                    <p class="text-xs text-gray-600 font-medium">Débitos sem match</p>
-                    <p class="text-2xl font-bold text-gray-800">{{ summary.unmatched_debits }}</p>
-                </div>
-            </div>
-
-            <!-- Títulos aguardando conciliação -->
-            <div class="bg-white rounded-xl border border-gray-100 mb-6 overflow-hidden">
-                <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-                    <h2 class="text-sm font-semibold text-gray-700">Títulos pagos aguardando conciliação</h2>
-                    <span class="text-xs text-gray-400">Pagos em {{ periodLabel }}</span>
-                </div>
-                <DataTable :value="pendingPayables" striped-rows class="text-sm">
-                    <Column field="title_number" header="Título" style="width: 120px" />
-                    <Column field="supplier_name" header="Fornecedor" />
-                    <Column header="Valor" style="width: 120px">
-                        <template #body="{ data }">{{ formatMoney(data.amount) }}</template>
-                    </Column>
-                    <Column header="Pago em" style="width: 110px">
-                        <template #body="{ data }">{{ formatDate(data.paid_at) }}</template>
-                    </Column>
-                    <Column header="Status" style="width: 140px">
-                        <template #body>
-                            <Tag value="Aguardando conciliação" severity="warn" />
-                        </template>
-                    </Column>
-                    <template #empty>
-                        <div class="text-center py-8 text-gray-500">Nenhum título pago neste dia.</div>
-                    </template>
-                </DataTable>
-            </div>
-
-            <!-- Importações do dia -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                <div class="px-5 py-4 border-b border-gray-100">
-                    <h2 class="text-sm font-semibold text-gray-700">Extratos importados no dia</h2>
-                </div>
-                <DataTable
-                    :value="imports.data"
-                    striped-rows
-                    class="cursor-pointer"
-                    :lazy="true"
-                    :paginator="imports.total > imports.per_page"
-                    :rows="imports.per_page"
-                    :total-records="imports.total"
-                    :first="(imports.current_page - 1) * imports.per_page"
-                    @row-click="({ data }) => goShow(data.id)"
-                >
-                    <Column header="Data" style="width: 120px">
-                        <template #body="{ data }">
-                            <span :dusk="`import-row-${data.id}`">{{ formatDate(data.created_at) }}</span>
-                        </template>
-                    </Column>
-                    <Column header="Conta Hub" style="min-width: 160px">
-                        <template #body="{ data }">
-                            <span class="text-sm">{{ data.bank_account?.name || '—' }}</span>
-                        </template>
-                    </Column>
-                    <Column field="bank_name" header="Banco OFX" style="min-width: 140px" />
-                    <Column field="account_number" header="Conta OFX" style="width: 140px" />
-                    <Column header="Período extrato" style="min-width: 180px">
-                        <template #body="{ data }">
-                            {{ formatPeriod(data.period_start, data.period_end) }}
-                        </template>
-                    </Column>
-                    <Column field="transaction_count" header="Transações" style="width: 110px; text-align: center" />
-                    <Column field="matched_count" header="Matches" style="width: 100px; text-align: center" />
-                    <Column header="Status" style="width: 130px">
-                        <template #body="{ data }">
-                            <Tag :value="statusLabel(data.status)" :severity="statusSeverity(data.status)" />
-                        </template>
-                    </Column>
-                    <template #empty>
-                        <div class="text-center py-8 text-gray-500">
-                            Nenhum extrato importado neste dia. Suba os OFX acima.
+            <!-- Import results -->
+            <div v-if="localImportResults && localImportResults.length">
+                <h2 class="text-sm font-semibold text-gray-700 mb-2">Resultado da importação</h2>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div
+                        v-for="(card, i) in localImportResults"
+                        :key="i"
+                        :class="['rounded-xl border p-4', card.ok ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200']"
+                    >
+                        <p class="font-medium text-sm truncate" :class="card.ok ? 'text-green-800' : 'text-red-800'">
+                            {{ card.file_name }}
+                        </p>
+                        <div v-if="card.ok" class="mt-2 space-y-1 text-xs text-green-700">
+                            <p>📅 {{ formatDate(card.date) }}</p>
+                            <p>🏦 {{ card.bank_account_name ?? 'Conta não identificada' }}</p>
+                            <p>{{ card.transaction_count }} transações ({{ card.debit_count }} déb / {{ card.credit_count }} créd)</p>
+                            <button
+                                v-if="card.date"
+                                type="button"
+                                class="mt-1 text-blue-600 hover:underline"
+                                @click="openDay(card.date)"
+                            >Ver dia →</button>
                         </div>
-                    </template>
-                </DataTable>
+                        <p v-else class="mt-2 text-xs text-red-700">{{ card.error }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent days list -->
+            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h2 class="text-sm font-semibold text-gray-700">Dias com conciliação</h2>
+                </div>
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Data</th>
+                            <th class="px-4 py-2 text-right">Extratos</th>
+                            <th class="px-4 py-2 text-right">Sugeridos</th>
+                            <th class="px-4 py-2 text-right">Ambíguos</th>
+                            <th class="px-4 py-2 text-right">Só OFX</th>
+                            <th class="px-4 py-2 text-right">Só título</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="d in days"
+                            :key="d.date"
+                            :class="['cursor-pointer hover:bg-blue-50 transition', dayRowClass(d)]"
+                            @click="openDay(d.date)"
+                        >
+                            <td class="px-4 py-2 font-medium text-blue-700">{{ d.label }}</td>
+                            <td class="px-4 py-2 text-right">{{ d.imports }}</td>
+                            <td class="px-4 py-2 text-right text-green-700">{{ d.suggested }}</td>
+                            <td class="px-4 py-2 text-right text-amber-600">{{ d.ambiguous }}</td>
+                            <td class="px-4 py-2 text-right text-red-600">{{ d.unmatched }}</td>
+                            <td class="px-4 py-2 text-right text-gray-500">{{ d.pending_payables }}</td>
+                        </tr>
+                    </tbody>
+                    <tbody v-if="!days.length">
+                        <tr>
+                            <td colspan="6" class="px-4 py-8 text-center text-gray-400">Nenhum dia com conciliação ainda.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Day report -->
+            <template v-if="dayReport">
+                <div class="bg-white rounded-xl border border-gray-100 p-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-800">Relatório: {{ dayReport.label }}</h2>
+                            <p class="text-xs text-gray-400 mt-1">
+                                {{ dayReport.accounts?.map(a => a.name).join(', ') || 'Nenhuma conta' }}
+                            </p>
+                        </div>
+                        <button
+                            v-if="isConciliador && kpis && kpis.matched > 0"
+                            type="button"
+                            :disabled="batchDayForm.processing"
+                            class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+                            @click="batchDay"
+                        >
+                            Conciliar dia ({{ kpis.matched }} aceitos)
+                        </button>
+                    </div>
+
+                    <!-- KPIs -->
+                    <div v-if="kpis" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                        <div class="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                            <p class="text-xs text-blue-700">Extratos</p>
+                            <p class="text-xl font-bold text-blue-900">{{ kpis.imports }}</p>
+                        </div>
+                        <div class="bg-green-50 border border-green-100 rounded-xl p-3">
+                            <p class="text-xs text-green-700">Sugeridos</p>
+                            <p class="text-xl font-bold text-green-900">{{ kpis.matched }}</p>
+                        </div>
+                        <div class="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                            <p class="text-xs text-amber-700">Ambíguos</p>
+                            <p class="text-xl font-bold text-amber-900">{{ kpis.ambiguous }}</p>
+                        </div>
+                        <div class="bg-red-50 border border-red-100 rounded-xl p-3">
+                            <p class="text-xs text-red-700">Só OFX</p>
+                            <p class="text-xl font-bold text-red-900">{{ kpis.ofx_only }}</p>
+                        </div>
+                        <div class="bg-gray-50 border border-gray-100 rounded-xl p-3">
+                            <p class="text-xs text-gray-600">Só título</p>
+                            <p class="text-xl font-bold text-gray-800">{{ kpis.payable_only }}</p>
+                        </div>
+                    </div>
+
+                    <!-- ── Matched ───────────────────────────────────────────────────── -->
+                    <section v-if="matched.length" class="mb-6">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">✅ Sugestões de match</h3>
+                        <div class="overflow-x-auto rounded-lg border border-gray-100">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">Descrição OFX</th>
+                                        <th class="px-3 py-2 text-right">Valor</th>
+                                        <th class="px-3 py-2 text-left">Título</th>
+                                        <th class="px-3 py-2 text-left">Fornecedor</th>
+                                        <th class="px-3 py-2 text-center">Conf.</th>
+                                        <th class="px-3 py-2 text-center">Status</th>
+                                        <th v-if="isConciliador" class="px-3 py-2" />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="tx in matched" :key="tx.id" class="border-t border-gray-50 hover:bg-gray-50">
+                                        <td class="px-3 py-2 text-gray-700 truncate max-w-xs">{{ tx.description || tx.memo || '—' }}</td>
+                                        <td class="px-3 py-2 text-right font-medium">{{ formatMoney(tx.amount) }}</td>
+                                        <td class="px-3 py-2">{{ tx.payable?.title_number ?? '—' }}</td>
+                                        <td class="px-3 py-2 truncate max-w-xs">{{ tx.payable?.supplier_name ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-center">
+                                            <Tag :value="confidenceLabel(tx.match_confidence)" severity="info" class="text-xs" />
+                                        </td>
+                                        <td class="px-3 py-2 text-center">
+                                            <Tag :value="tx.match_status" :severity="statusTagSeverity(tx.match_status)" class="text-xs" />
+                                        </td>
+                                        <td v-if="isConciliador" class="px-3 py-2 text-right whitespace-nowrap space-x-2">
+                                            <button
+                                                v-if="tx.match_status === 'pending'"
+                                                type="button"
+                                                class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200"
+                                                @click="acceptTx(tx.id)"
+                                            >Aceitar</button>
+                                            <button
+                                                v-if="['pending', 'accepted', 'manual'].includes(tx.match_status)"
+                                                type="button"
+                                                class="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                                                @click="rejectTx(tx.id)"
+                                            >Rejeitar</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- ── Ambiguous ─────────────────────────────────────────────────── -->
+                    <section v-if="ambiguous.length" class="mb-6">
+                        <h3 class="text-sm font-semibold text-amber-700 mb-2">⚠️ Ambíguos — vincule manualmente</h3>
+                        <div class="overflow-x-auto rounded-lg border border-amber-100">
+                            <table class="w-full text-sm">
+                                <thead class="bg-amber-50 text-xs text-amber-600 uppercase">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">Descrição OFX</th>
+                                        <th class="px-3 py-2 text-right">Valor</th>
+                                        <th class="px-3 py-2 text-left">Candidatos</th>
+                                        <th v-if="isConciliador" class="px-3 py-2" />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="tx in ambiguous" :key="tx.id" class="border-t border-amber-50">
+                                        <td class="px-3 py-2 text-gray-700 truncate max-w-xs">{{ tx.description || tx.memo || '—' }}</td>
+                                        <td class="px-3 py-2 text-right font-medium">{{ formatMoney(tx.amount) }}</td>
+                                        <td class="px-3 py-2 text-xs text-gray-500">
+                                            {{ tx.ambiguous_candidates?.map(c => c.title_number ?? c.supplier_name).join(', ') || '—' }}
+                                        </td>
+                                        <td v-if="isConciliador" class="px-3 py-2 text-right">
+                                            <button
+                                                type="button"
+                                                class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
+                                                @click="openLink(tx.id)"
+                                            >Vincular</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- ── OFX only ──────────────────────────────────────────────────── -->
+                    <section v-if="ofxOnly.length" class="mb-6">
+                        <h3 class="text-sm font-semibold text-red-700 mb-2">🔴 Só no OFX — sem título</h3>
+                        <div class="overflow-x-auto rounded-lg border border-red-100">
+                            <table class="w-full text-sm">
+                                <thead class="bg-red-50 text-xs text-red-500 uppercase">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">Descrição</th>
+                                        <th class="px-3 py-2 text-right">Valor</th>
+                                        <th class="px-3 py-2 text-left">Data</th>
+                                        <th v-if="isConciliador" class="px-3 py-2" />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="tx in ofxOnly" :key="tx.id" class="border-t border-red-50">
+                                        <td class="px-3 py-2 text-gray-700 truncate max-w-xs">{{ tx.description || tx.memo || '—' }}</td>
+                                        <td class="px-3 py-2 text-right">{{ formatMoney(tx.amount) }}</td>
+                                        <td class="px-3 py-2">{{ formatDate(tx.date) }}</td>
+                                        <td v-if="isConciliador" class="px-3 py-2 text-right">
+                                            <button
+                                                type="button"
+                                                class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                                @click="openLink(tx.id)"
+                                            >Vincular</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- ── Payable only ──────────────────────────────────────────────── -->
+                    <section v-if="payableOnly.length">
+                        <h3 class="text-sm font-semibold text-gray-600 mb-2">🟡 Só no sistema — sem OFX</h3>
+                        <div class="overflow-x-auto rounded-lg border border-gray-100">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">Título</th>
+                                        <th class="px-3 py-2 text-left">Fornecedor</th>
+                                        <th class="px-3 py-2 text-right">Valor</th>
+                                        <th class="px-3 py-2 text-left">Pago em</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="p in payableOnly" :key="p.id" class="border-t border-gray-50">
+                                        <td class="px-3 py-2">{{ p.title_number ?? '—' }}</td>
+                                        <td class="px-3 py-2 truncate max-w-xs">{{ p.supplier_name ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-right">{{ formatMoney(p.amount) }}</td>
+                                        <td class="px-3 py-2">{{ formatDate(p.paid_at) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </template>
+        </div>
+
+        <!-- Link modal -->
+        <div v-if="linkTxId !== null" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="closeLink">
+            <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+                <h3 class="text-base font-bold text-gray-800 mb-3">Vincular título manualmente</h3>
+                <input
+                    v-model="linkSearchQuery"
+                    type="text"
+                    placeholder="Buscar por título, fornecedor…"
+                    class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+                <div v-if="linkLoading" class="text-xs text-gray-400 mb-2">Buscando…</div>
+                <div v-if="linkResults.length" class="max-h-48 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50 mb-3">
+                    <div
+                        v-for="p in linkResults"
+                        :key="p.id"
+                        :class="['px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm', linkPayableId === p.id ? 'bg-blue-100' : '']"
+                        @click="linkPayableId = p.id"
+                    >
+                        <span class="font-medium">{{ p.title_number }}</span>
+                        <span class="text-gray-500 ml-2">{{ p.supplier_name }}</span>
+                        <span class="float-right font-medium">{{ formatMoney(p.amount) }}</span>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50" @click="closeLink">Cancelar</button>
+                    <button
+                        type="button"
+                        :disabled="!linkPayableId || linkForm.processing"
+                        class="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                        @click="submitLink"
+                    >Vincular</button>
+                </div>
             </div>
         </div>
     </AppLayout>

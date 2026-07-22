@@ -217,6 +217,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/transactions/{id}/accept', [BankConciliationController::class, 'accept'])->whereNumber('id')->name('bank-conciliation.accept');
         Route::post('/transactions/{id}/reject', [BankConciliationController::class, 'reject'])->whereNumber('id')->name('bank-conciliation.reject');
         Route::post('/transactions/{id}/link', [BankConciliationController::class, 'link'])->whereNumber('id')->name('bank-conciliation.link');
+        Route::post('/batch-conciliate-day', [BankConciliationController::class, 'batchConciliateDay'])->name('bank-conciliation.batch-day');
         Route::post('/{importId}/batch-conciliate', [BankConciliationController::class, 'batchConciliate'])->whereNumber('importId')->name('bank-conciliation.batch');
         Route::delete('/{importId}', [BankConciliationController::class, 'destroy'])->whereNumber('importId')->name('bank-conciliation.destroy');
     });

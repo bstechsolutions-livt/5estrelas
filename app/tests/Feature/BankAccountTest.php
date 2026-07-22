@@ -288,7 +288,6 @@ class BankAccountTest extends TestCase
             ->post(route('bank-conciliation.upload'), [
                 'file' => $file,
                 'bank_account_id' => $account->id,
-                'date' => '2026-06-02',
             ])
             ->assertRedirect();
 

@@ -52,6 +52,7 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
                 'warning' => fn () => $request->session()->get('warning'),
+                'importResults' => fn () => $request->session()->get('importResults'),
             ],
             'is_mobile_app' => $request->header('X-Client') === '5estrelas-app'
                 || str_contains((string) $request->userAgent(), '5Estrelas'),
