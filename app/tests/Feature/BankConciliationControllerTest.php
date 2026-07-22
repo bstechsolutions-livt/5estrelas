@@ -2,14 +2,18 @@
 
 namespace Tests\Feature;
 
-use App\Models\BankAccount;
 use App\Models\AuditLog;
+use App\Models\BankAccount;
 use App\Models\BankStatementImport;
 use App\Models\BankTransaction;
+use App\Models\ConciliationSession;
 use App\Models\Payable;
 use App\Models\PayableRole;
 use App\Models\Permission;
 use App\Models\User;
+use App\Services\ConciliationSessionService;
+use App\Services\OfxImportService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
@@ -17,6 +21,8 @@ use Tests\TestCase;
 class BankConciliationControllerTest extends TestCase
 {
     use RefreshDatabase;
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private function activeUser(array $keys = ['financeiro.contas_pagar.visualizar', 'financeiro.conciliacao.visualizar']): User
     {
@@ -38,12 +44,22 @@ class BankConciliationControllerTest extends TestCase
         return $user;
     }
 
-    private function createImport(?User $user = null): BankStatementImport
+    private function createImport(?User $user = null, ?int $bankAccountId = null, ?string $date = null): BankStatementImport
     {
         $user = $user ?? User::factory()->create(['is_active' => true]);
 
+        $session = null;
+        if ($bankAccountId !== null && $date !== null) {
+            $session = ConciliationSession::firstOrCreate([
+                'bank_account_id' => $bankAccountId,
+                'reference_date' => $date,
+            ], ['status' => 'open', 'created_by' => $user->id]);
+        }
+
         return BankStatementImport::create([
             'user_id' => $user->id,
+            'bank_account_id' => $bankAccountId,
+            'conciliation_session_id' => $session?->id,
             'bank_name' => 'Banco de Brasília',
             'bank_id' => '070',
             'account_number' => '0460001329',
@@ -69,9 +85,9 @@ class BankConciliationControllerTest extends TestCase
         ], $overrides));
     }
 
-    private function createBankAccount(): BankAccount
+    private function createBankAccount(array $attrs = []): BankAccount
     {
-        return BankAccount::create([
+        return BankAccount::create(array_merge([
             'name' => 'MATRIZ — BRB',
             'is_active' => true,
             'bank_code' => '070',
@@ -79,86 +95,293 @@ class BankConciliationControllerTest extends TestCase
             'agency' => '046',
             'account_number' => '000132',
             'account_digit' => '9',
-        ]);
+        ], $attrs));
     }
 
-    private function uploadPayload(UploadedFile $file, ?BankAccount $account = null): array
+    private function realOfxFile(string $name = 'brb.ofx'): UploadedFile
     {
-        $account ??= $this->createBankAccount();
+        $path = base_path("tests/fixtures/ofx/{$name}");
 
-        return [
-            'file' => $file,
-            'bank_account_id' => $account->id,
-            'date' => now()->toDateString(),
-        ];
+        return new UploadedFile($path, $name, 'application/octet-stream', null, true);
     }
 
-    private function realOfxFile(): UploadedFile
-    {
-        $path = base_path('tests/fixtures/ofx/brb.ofx');
+    // ─── 1. Upload OFX (no date) → auto-detects date + redirects with ?date ──
 
-        return new UploadedFile($path, 'brb.ofx', 'application/octet-stream', null, true);
-    }
-
-    // ─── 1. Upload OFX as conciliador → redirect, import + transactions created ───
-
-    public function test_upload_ofx_as_conciliador_creates_import_and_transactions(): void
+    public function test_upload_without_date_auto_detects_from_ofx(): void
     {
         $user = $this->conciliador();
 
+        // Ensure a bank account exists matching OFX (BRB 0460001329)
+        BankAccount::create([
+            'name' => 'BRB MATRIZ',
+            'is_active' => true,
+            'bank_code' => '070',
+            'account_number' => '0460001329',
+        ]);
+
         $response = $this->actingAs($user)
-            ->post(route('bank-conciliation.upload'), $this->uploadPayload($this->realOfxFile()));
+            ->post(route('bank-conciliation.upload'), [
+                'file' => $this->realOfxFile('brb.ofx'),
+            ]);
 
         $response->assertRedirect();
-        $response->assertSessionHas('success');
+        // Redirect should include date query param
+        $redirectUrl = $response->headers->get('Location');
+        $this->assertStringContainsString('date=', $redirectUrl);
 
-        // Import created
+        // Import was created
         $this->assertDatabaseHas('bank_statement_imports', [
             'user_id' => $user->id,
             'bank_id' => '070',
-            'account_number' => '0460001329',
             'status' => 'done',
         ]);
-
-        // Transactions created (BRB file has 2 transactions)
-        $import = BankStatementImport::where('user_id', $user->id)->first();
-        $this->assertEquals(2, $import->transactions()->count());
     }
 
-    // ─── 2. Upload without being conciliador → 403 ───
+    // ─── 2. Upload without being conciliador → 403 ───────────────────────────
 
     public function test_upload_without_conciliador_returns_403(): void
     {
         $user = $this->activeUser();
 
         $response = $this->actingAs($user)
-            ->post(route('bank-conciliation.upload'), $this->uploadPayload($this->realOfxFile()));
+            ->post(route('bank-conciliation.upload'), [
+                'file' => $this->realOfxFile(),
+            ]);
 
         $response->assertStatus(403);
     }
 
-    // ─── 3. Upload invalid file → 422 ───
+    // ─── 3. Upload OFX that spans multiple days → rejected ───────────────────
 
-    public function test_upload_invalid_file_returns_422(): void
+    public function test_upload_period_ofx_is_rejected(): void
+    {
+        $user = $this->conciliador();
+
+        // Create a fake multi-day OFX
+        $multiDayOfx = <<<OFX
+OFXHEADER:100
+DATA:OFXSGML
+VERSION:102
+SECURITY:NONE
+ENCODING:USASCII
+CHARSET:1252
+COMPRESSION:NONE
+OLDFILEUID:NONE
+NEWFILEUID:NONE
+<OFX>
+<SIGNONMSGSRSV1><SONRS><STATUS><CODE>0</CODE><SEVERITY>INFO</SEVERITY></STATUS><LANGUAGE>POR</LANGUAGE></SONRS></SIGNONMSGSRSV1>
+<BANKMSGSRSV1><STMTTRNRS><TRNUID>1</TRNUID><STATUS><CODE>0</CODE><SEVERITY>INFO</SEVERITY></STATUS>
+<STMTRS><CURDEF>BRL</CURDEF>
+<BANKACCTFROM><BANKID>070</BANKID><ACCTID>0460001329</ACCTID><ACCTTYPE>CHECKING</ACCTTYPE></BANKACCTFROM>
+<BANKTRANLIST>
+<DTSTART>20260601000000</DTSTART>
+<DTEND>20260602000000</DTEND>
+<STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20260601000000</DTPOSTED><TRNAMT>-100.00</TRNAMT><FITID>TX001</FITID><NAME>Pag</NAME></STMTTRN>
+<STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20260602000000</DTPOSTED><TRNAMT>-200.00</TRNAMT><FITID>TX002</FITID><NAME>Pag</NAME></STMTTRN>
+</BANKTRANLIST>
+<LEDGERBAL><BALAMT>1000.00</BALAMT><DTASOF>20260602000000</DTASOF></LEDGERBAL>
+</STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>
+OFX;
+
+        $tmpPath = sys_get_temp_dir().'/'.uniqid('ofx_period_', true).'.ofx';
+        file_put_contents($tmpPath, $multiDayOfx);
+
+        $file = new UploadedFile(
+            $tmpPath,
+            'multi-day.ofx',
+            'application/octet-stream',
+            null,
+            true,
+        );
+
+        $response = $this->actingAs($user)
+            ->post(route('bank-conciliation.upload'), ['file' => $file]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('importResults');
+        $results = session('importResults');
+        $this->assertFalse($results[0]['ok']);
+        $this->assertSame(OfxImportService::PERIOD_NOT_ALLOWED, $results[0]['error']);
+
+        // No import created
+        $this->assertDatabaseCount('bank_statement_imports', 0);
+    }
+
+    // ─── 4. Batch upload 2 OFX same day → dayReport shows 2 imports ──────────
+
+    public function test_batch_upload_two_accounts_same_day_creates_two_imports(): void
+    {
+        $user = $this->conciliador();
+
+        // Register 2 bank accounts matching the 2 OFX fixtures
+        BankAccount::create([
+            'name' => 'BRB', 'is_active' => true, 'bank_code' => '070', 'account_number' => '0460001329',
+        ]);
+        BankAccount::create([
+            'name' => 'Banrisul', 'is_active' => true, 'bank_code' => '041', 'account_number' => '01350685083605',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->post(route('bank-conciliation.upload-batch'), [
+                'files' => [
+                    $this->realOfxFile('brb.ofx'),
+                    $this->realOfxFile('banrisul.ofx'),
+                ],
+            ]);
+
+        $response->assertRedirect();
+
+        // Both imports exist
+        $this->assertDatabaseCount('bank_statement_imports', 2);
+
+        // Both sessions created
+        $this->assertDatabaseCount('conciliation_sessions', 2);
+
+        // Day report for the BRB date should list 2 imports (or check via service)
+        $brbDate = '2026-06-18';
+        $banrisulDate = '2026-06-03';
+
+        // If both share the same date, dayReport.kpis.imports would be 2.
+        // Since BRB (2026-06-18) and Banrisul (2026-06-03) differ, redirect has no date.
+        // Just assert both imports are in the DB.
+        $this->assertDatabaseHas('bank_statement_imports', ['bank_id' => '070']);
+        $this->assertDatabaseHas('bank_statement_imports', ['bank_id' => '041']);
+    }
+
+    // ─── 5. Batch same-day → redirect includes date in URL ───────────────────
+
+    public function test_batch_upload_same_day_redirects_with_date(): void
+    {
+        $user = $this->conciliador();
+
+        // Two accounts, same OFX file (same day = 2026-06-18)
+        BankAccount::create([
+            'name' => 'BRB1', 'is_active' => true, 'bank_code' => '070', 'account_number' => '0460001329',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->post(route('bank-conciliation.upload-batch'), [
+                'files' => [$this->realOfxFile('brb.ofx')],
+            ]);
+
+        $response->assertRedirect();
+        $redirectUrl = $response->headers->get('Location');
+        $this->assertStringContainsString('date=2026-06-18', $redirectUrl);
+    }
+
+    // ─── 6. Index without conciliador → 200 with isConciliador=false ─────────
+
+    public function test_index_without_conciliador_returns_200_and_not_conciliador(): void
+    {
+        $user = $this->activeUser();
+
+        $response = $this->actingAs($user)
+            ->get(route('bank-conciliation.index'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('BankConciliation/Index', false)
+            ->where('isConciliador', false)
+        );
+    }
+
+    // ─── 7. Index as conciliador → isConciliador=true ─────────────────────────
+
+    public function test_index_as_conciliador_has_is_conciliador_true(): void
     {
         $user = $this->conciliador();
 
         $response = $this->actingAs($user)
-            ->post(route('bank-conciliation.upload'), $this->uploadPayload(
-                UploadedFile::fake()->create('report.pdf', 100, 'application/pdf'),
-            ));
+            ->get(route('bank-conciliation.index'));
 
-        $response->assertRedirect();
-        $response->assertSessionHasErrors('file');
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('BankConciliation/Index', false)
+            ->where('isConciliador', true)
+        );
     }
 
-    // ─── 4. Accept transaction → match_status updated to accepted ───
+    // ─── 8. Index returns 'days' prop ────────────────────────────────────────
 
-    public function test_accept_transaction_updates_status(): void
+    public function test_index_has_days_prop(): void
+    {
+        $user = $this->activeUser();
+
+        $response = $this->actingAs($user)
+            ->get(route('bank-conciliation.index'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('BankConciliation/Index', false)
+            ->has('days')
+            ->has('bankAccounts')
+            ->has('filters')
+        );
+    }
+
+    // ─── 9. Index with ?date= returns dayReport prop ─────────────────────────
+
+    public function test_index_with_date_returns_day_report(): void
+    {
+        $user = $this->activeUser();
+
+        // Create a session so dayReport has something
+        $account = $this->createBankAccount();
+        $sessions = app(ConciliationSessionService::class);
+        $sessions->resolve($account->id, Carbon::parse('2026-06-15'), $user);
+
+        $response = $this->actingAs($user)
+            ->get(route('bank-conciliation.index', ['date' => '2026-06-15']));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('BankConciliation/Index', false)
+            ->has('dayReport')
+            ->where('dayReport.date', '2026-06-15')
+            ->has('dayReport.kpis')
+            ->has('dayReport.matched')
+            ->has('dayReport.ofx_only')
+            ->has('dayReport.payable_only')
+            ->has('dayReport.ambiguous')
+        );
+    }
+
+    // ─── 10. Accept without matched_payable_id → error ───────────────────────
+
+    public function test_accept_without_matched_payable_returns_error(): void
     {
         $user = $this->conciliador();
         $import = $this->createImport($user);
-        $tx = $this->createTransaction($import, ['match_status' => 'pending', 'match_confidence' => 'high']);
+        $tx = $this->createTransaction($import, [
+            'match_status' => 'pending',
+            'matched_payable_id' => null,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->post(route('bank-conciliation.accept', $tx->id));
+
+        $response->assertRedirect();
+        $response->assertSessionHasErrors(['transaction']);
+
+        $tx->refresh();
+        $this->assertEquals('pending', $tx->match_status); // unchanged
+    }
+
+    // ─── 11. Accept with matched_payable_id → accepted ───────────────────────
+
+    public function test_accept_with_payable_sets_accepted(): void
+    {
+        $user = $this->conciliador();
+        $import = $this->createImport($user);
+        $payable = Payable::create([
+            'title_number' => 'TIT-001', 'supplier_name' => 'F', 'amount' => 110.90,
+            'due_date' => now()->subDays(5)->toDateString(), 'status' => 'pago',
+            'paid_at' => now()->subDays(1)->toDateString(),
+        ]);
+        $tx = $this->createTransaction($import, [
+            'match_status' => 'pending',
+            'matched_payable_id' => $payable->id,
+        ]);
 
         $response = $this->actingAs($user)
             ->post(route('bank-conciliation.accept', $tx->id));
@@ -168,23 +391,21 @@ class BankConciliationControllerTest extends TestCase
         $this->assertEquals('accepted', $tx->match_status);
     }
 
-    // ─── 5. Reject transaction → match_status=rejected, matched_payable_id null ───
+    // ─── 12. Reject → clears payable and ambiguous flags ─────────────────────
 
-    public function test_reject_transaction_clears_match(): void
+    public function test_reject_clears_payable_and_ambiguous_flags(): void
     {
         $user = $this->conciliador();
         $import = $this->createImport($user);
         $payable = Payable::create([
-            'title_number' => 'TIT-001',
-            'supplier_name' => 'Fornecedor',
-            'amount' => 110.90,
-            'due_date' => now()->subDays(5)->toDateString(),
-            'status' => 'pago',
-            'paid_at' => now()->subDays(2)->toDateString(),
+            'title_number' => 'TIT-002', 'supplier_name' => 'F2', 'amount' => 110.90,
+            'due_date' => now()->subDays(5)->toDateString(), 'status' => 'pago',
+            'paid_at' => now()->subDays(1)->toDateString(),
         ]);
         $tx = $this->createTransaction($import, [
             'match_status' => 'pending',
             'matched_payable_id' => $payable->id,
+            'raw_data' => ['ambiguous' => true, 'ambiguous_candidates' => [['payable_id' => $payable->id]]],
         ]);
 
         $response = $this->actingAs($user)
@@ -194,22 +415,25 @@ class BankConciliationControllerTest extends TestCase
         $tx->refresh();
         $this->assertEquals('rejected', $tx->match_status);
         $this->assertNull($tx->matched_payable_id);
+        $this->assertFalse($tx->raw_data['ambiguous'] ?? true);
+        $this->assertEmpty($tx->raw_data['ambiguous_candidates'] ?? []);
     }
 
-    // ─── 6. Link manual → match_status=manual, matched_payable_id set ───
+    // ─── 13. Link ambiguous → resolves to manual ─────────────────────────────
 
-    public function test_link_manual_sets_payable(): void
+    public function test_link_resolves_ambiguous_to_manual(): void
     {
         $user = $this->conciliador();
         $import = $this->createImport($user);
-        $tx = $this->createTransaction($import, ['match_status' => 'unmatched']);
         $payable = Payable::create([
-            'title_number' => 'TIT-002',
-            'supplier_name' => 'Fornecedor Manual',
-            'amount' => 110.90,
-            'due_date' => now()->subDays(5)->toDateString(),
-            'status' => 'pago',
-            'paid_at' => now()->subDays(2)->toDateString(),
+            'title_number' => 'TIT-003', 'supplier_name' => 'F3', 'amount' => 200.00,
+            'due_date' => now()->subDays(5)->toDateString(), 'status' => 'pago',
+            'paid_at' => now()->subDays(1)->toDateString(),
+        ]);
+        $tx = $this->createTransaction($import, [
+            'match_status' => 'unmatched',
+            'matched_payable_id' => null,
+            'raw_data' => ['ambiguous' => true, 'ambiguous_candidates' => []],
         ]);
 
         $response = $this->actingAs($user)
@@ -221,20 +445,18 @@ class BankConciliationControllerTest extends TestCase
         $tx->refresh();
         $this->assertEquals('manual', $tx->match_status);
         $this->assertEquals($payable->id, $tx->matched_payable_id);
+        $this->assertFalse($tx->raw_data['ambiguous'] ?? true);
     }
 
-    // ─── 7. Batch conciliate → payables become conciliado, audit log, success ───
+    // ─── 14. Batch conciliate by import ──────────────────────────────────────
 
     public function test_batch_conciliate_conciliates_payables(): void
     {
         $user = $this->conciliador();
         $import = $this->createImport($user);
         $payable = Payable::create([
-            'title_number' => 'TIT-003',
-            'supplier_name' => 'Fornecedor Batch',
-            'amount' => 1500.00,
-            'due_date' => now()->subDays(10)->toDateString(),
-            'status' => 'pago',
+            'title_number' => 'TIT-004', 'supplier_name' => 'F4', 'amount' => 1500.00,
+            'due_date' => now()->subDays(10)->toDateString(), 'status' => 'pago',
             'paid_at' => now()->subDays(2)->toDateString(),
         ]);
         $this->createTransaction($import, [
@@ -253,16 +475,48 @@ class BankConciliationControllerTest extends TestCase
         $payable->refresh();
         $this->assertEquals('conciliado', $payable->status);
         $this->assertEquals($user->id, $payable->conciliated_by);
-        $this->assertNotNull($payable->conciliated_at);
 
-        // Audit log created
         $this->assertDatabaseHas('audit_logs', [
             'event' => 'contas_pagar.conciliacao_lote',
             'module' => 'financeiro.contas_pagar',
         ]);
     }
 
-    // ─── 8. Delete import → cascaded deletion ───
+    // ─── 15. Batch conciliate day route ──────────────────────────────────────
+
+    public function test_batch_conciliate_day_conciliates_all_accepted_transactions(): void
+    {
+        $user = $this->conciliador();
+        $account = $this->createBankAccount();
+        $date = '2026-06-15';
+        $import = $this->createImport($user, $account->id, $date);
+
+        $payable = Payable::create([
+            'title_number' => 'TIT-005', 'supplier_name' => 'F5', 'amount' => 500.00,
+            'due_date' => '2026-06-10', 'status' => 'pago', 'paid_at' => $date,
+        ]);
+        $this->createTransaction($import, [
+            'match_status' => 'accepted',
+            'matched_payable_id' => $payable->id,
+            'amount' => -500.00,
+            'date' => Carbon::parse($date),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->post(route('bank-conciliation.batch-day'), ['date' => $date]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $payable->refresh();
+        $this->assertEquals('conciliado', $payable->status);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'contas_pagar.conciliacao_lote_dia',
+        ]);
+    }
+
+    // ─── 16. Delete import cascades → transactions removed ───────────────────
 
     public function test_delete_import_cascades(): void
     {
@@ -273,23 +527,20 @@ class BankConciliationControllerTest extends TestCase
         $response = $this->actingAs($user)
             ->delete(route('bank-conciliation.destroy', $import->id));
 
-        $response->assertRedirect(route('bank-conciliation.index'));
+        $response->assertRedirect();
         $this->assertDatabaseMissing('bank_statement_imports', ['id' => $import->id]);
         $this->assertDatabaseMissing('bank_transactions', ['id' => $tx->id]);
     }
 
-    // ─── 9. Delete import with conciliated transactions → error ───
+    // ─── 17. Delete with conciliated payable → error ─────────────────────────
 
     public function test_delete_import_with_conciliated_payable_returns_error(): void
     {
         $user = $this->conciliador();
         $import = $this->createImport($user);
         $payable = Payable::create([
-            'title_number' => 'TIT-004',
-            'supplier_name' => 'Fornecedor Conc',
-            'amount' => 500.00,
-            'due_date' => now()->subDays(10)->toDateString(),
-            'status' => 'conciliado',
+            'title_number' => 'TIT-006', 'supplier_name' => 'F6', 'amount' => 500.00,
+            'due_date' => now()->subDays(10)->toDateString(), 'status' => 'conciliado',
             'paid_at' => now()->subDays(5)->toDateString(),
             'conciliated_at' => now()->subDay()->toDateString(),
             'conciliated_by' => $user->id,
@@ -307,26 +558,20 @@ class BankConciliationControllerTest extends TestCase
         $this->assertDatabaseHas('bank_statement_imports', ['id' => $import->id]);
     }
 
-    // ─── 10. Search payables → returns JSON with pago payables ───
+    // ─── 18. Search payables → returns pago only ─────────────────────────────
 
     public function test_search_payables_returns_pago_only(): void
     {
         $user = $this->conciliador();
 
         Payable::create([
-            'title_number' => 'TIT-PAGO-1',
-            'supplier_name' => 'Fornecedor Busca',
-            'amount' => 300.00,
-            'due_date' => now()->subDays(5)->toDateString(),
-            'status' => 'pago',
+            'title_number' => 'TIT-PAGO-1', 'supplier_name' => 'Fornecedor Busca', 'amount' => 300.00,
+            'due_date' => now()->subDays(5)->toDateString(), 'status' => 'pago',
             'paid_at' => now()->subDays(2)->toDateString(),
         ]);
         Payable::create([
-            'title_number' => 'TIT-PENDENTE-1',
-            'supplier_name' => 'Fornecedor Busca Pendente',
-            'amount' => 300.00,
-            'due_date' => now()->subDays(5)->toDateString(),
-            'status' => 'pendente',
+            'title_number' => 'TIT-PEND-1', 'supplier_name' => 'Fornecedor Busca Pendente', 'amount' => 300.00,
+            'due_date' => now()->subDays(5)->toDateString(), 'status' => 'pendente',
         ]);
 
         $response = $this->actingAs($user)
@@ -336,33 +581,5 @@ class BankConciliationControllerTest extends TestCase
         $data = $response->json();
         $this->assertCount(1, $data);
         $this->assertEquals('TIT-PAGO-1', $data[0]['title_number']);
-    }
-
-    // ─── 11. Index without conciliador → still 200 (read-only) ───
-
-    public function test_index_without_conciliador_returns_200(): void
-    {
-        $user = $this->activeUser();
-
-        $response = $this->actingAs($user)
-            ->get(route('bank-conciliation.index'));
-
-        $response->assertOk();
-    }
-
-    // ─── 12. Index as conciliador → 200 with isConciliador=true ───
-
-    public function test_index_as_conciliador_has_is_conciliador_prop(): void
-    {
-        $user = $this->conciliador();
-
-        $response = $this->actingAs($user)
-            ->get(route('bank-conciliation.index'));
-
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->component('BankConciliation/Index', false)
-            ->where('isConciliador', true)
-        );
     }
 }

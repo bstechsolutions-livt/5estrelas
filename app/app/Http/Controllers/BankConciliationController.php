@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\BankAccount;
 use App\Models\BankStatementImport;
 use App\Models\BankTransaction;
-use App\Models\ConciliationSession;
 use App\Models\Payable;
 use App\Services\AuditLogger;
 use App\Services\BankAccountMatcher;
@@ -19,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,21 +26,10 @@ use Inertia\Response;
 class BankConciliationController extends Controller
 {
     /**
-     * Workspace de conciliação por dia (conta + data).
+     * OFX-first workspace: recent day list + optional day report.
      */
     public function index(Request $request, ConciliationSessionService $sessions): Response
     {
-        $referenceDate = $sessions->parseReferenceDate(
-            $request->input('date'),
-            $request->filled('year') ? (int) $request->input('year') : null,
-            $request->filled('month') ? (int) $request->input('month') : null,
-            $request->filled('day') ? (int) $request->input('day') : null,
-        );
-
-        $bankAccountId = $request->filled('bank_account_id')
-            ? (int) $request->input('bank_account_id')
-            : null;
-
         $alcada = app(PayableAlcadaService::class);
         $isConciliador = $alcada->isAssigned($request->user(), 'conciliador');
 
@@ -64,68 +53,28 @@ class BankConciliationController extends Controller
                 ];
             });
 
-        $session = null;
-        if ($bankAccountId !== null) {
-            $sessionModel = $sessions->resolve($bankAccountId, $referenceDate, $request->user());
-            $session = [
-                'id' => $sessionModel->id,
-                'bank_account_id' => $sessionModel->bank_account_id,
-                'reference_date' => $sessionModel->reference_date->toDateString(),
-                'period_label' => $sessionModel->periodLabel(),
-                'status' => $sessionModel->status,
-            ];
+        $days = $sessions->recentDaySummaries(14);
+
+        $dayReport = null;
+        if ($request->filled('date')) {
+            $referenceDate = Carbon::parse($request->input('date'))->startOfDay();
+            $dayReport = $sessions->dayReport($referenceDate);
         }
 
-        $summary = $sessions->summaryForDate($referenceDate, $bankAccountId);
-
-        $pendingPayables = $sessions->pendingPayablesQuery($referenceDate)
-            ->select(['id', 'title_number', 'supplier_name', 'amount', 'paid_at', 'due_date', 'status'])
-            ->orderByDesc('paid_at')
-            ->limit($bankAccountId === null ? 100 : 50)
-            ->get()
-            ->map(fn (Payable $p) => [
-                'id' => $p->id,
-                'title_number' => $p->title_number,
-                'supplier_name' => $p->supplier_name,
-                'amount' => (float) $p->amount,
-                'paid_at' => $p->paid_at?->toDateString(),
-                'due_date' => $p->due_date?->toDateString(),
-                'status' => $p->status,
-            ]);
-
-        $dateString = $referenceDate->toDateString();
-
-        $importsQuery = BankStatementImport::query()
-            ->with(['user:id,name', 'bankAccount:id,name,bank_code,account_number'])
-            ->whereIn('conciliation_session_id', function ($q) use ($dateString, $bankAccountId) {
-                $q->select('id')
-                    ->from('conciliation_sessions')
-                    ->whereDate('reference_date', $dateString);
-                if ($bankAccountId !== null) {
-                    $q->where('bank_account_id', $bankAccountId);
-                }
-            })
-            ->orderByDesc('created_at');
-
-        $imports = $importsQuery->paginate(15)->withQueryString();
-
         return Inertia::render('BankConciliation/Index', [
-            'imports' => $imports,
             'isConciliador' => $isConciliador,
             'bankAccounts' => $bankAccounts,
+            'days' => $days,
+            'dayReport' => $dayReport,
             'filters' => [
-                'bank_account_id' => $bankAccountId,
-                'date' => $dateString,
+                'date' => $request->input('date'),
             ],
-            'session' => $session,
-            'summary' => $summary,
-            'periodLabel' => $sessions->periodLabel($referenceDate),
-            'pendingPayables' => $pendingPayables,
+            'importResults' => session('importResults'),
         ]);
     }
 
     /**
-     * Detalhe de uma importação com transações paginadas + contadores.
+     * Detail of an import with paginated transactions + counters.
      */
     public function show(Request $request, int $importId): Response
     {
@@ -173,19 +122,17 @@ class BankConciliationController extends Controller
     }
 
     /**
-     * Upload de um arquivo OFX (mantido para compatibilidade).
+     * Upload a single OFX — date auto-detected from OFX content.
      */
     public function upload(
         Request $request,
-        OfxImportService $importer,
         ConciliationSessionService $sessions,
     ): RedirectResponse {
         $this->ensureConciliador($request);
 
         $request->validate([
             'file' => ['required', 'file', 'max:10240'],
-            'bank_account_id' => ['required', 'integer', 'exists:bank_accounts,id'],
-            'date' => ['required', 'date'],
+            'bank_account_id' => ['nullable', 'integer', 'exists:bank_accounts,id'],
         ], [
             'file.max' => 'O arquivo não pode exceder 10MB.',
         ]);
@@ -195,168 +142,84 @@ class BankConciliationController extends Controller
             return back()->withErrors(['file' => 'O arquivo deve ter extensão .ofx.']);
         }
 
-        $referenceDate = Carbon::parse($request->date)->startOfDay();
+        $bankAccountId = $request->filled('bank_account_id') ? (int) $request->input('bank_account_id') : null;
+        $card = $this->importOneOfx($file, $request->user(), $sessions, $bankAccountId);
 
-        $session = $sessions->resolve(
-            (int) $request->bank_account_id,
-            $referenceDate,
-            $request->user(),
-        );
-
-        [$paidFrom, $paidTo] = $session->periodBounds();
-
-        try {
-            $result = $importer->importFile(
-                $file,
-                $request->user(),
-                (int) $request->bank_account_id,
-                $session,
-                $sessions->existingFitIdsInSession($session),
-                $sessions->matchedPayableIdsInSession($session),
-                $paidFrom,
-                $paidTo,
-            );
-        } catch (OfxParseException $e) {
-            return back()->withErrors(['file' => $e->getMessage()]);
-        }
-
-        $import = $result['import'];
-
-        AuditLogger::log(
-            event: 'contas_pagar.ofx_importado',
-            module: 'financeiro.contas_pagar',
-            description: "Importação OFX: {$file->getClientOriginalName()} ({$import->bank_name}), {$import->transaction_count} transações",
-            auditable: $import,
-            newValues: [
-                'bank_name' => $import->bank_name,
-                'account_number' => $import->account_number,
-                'transaction_count' => $import->transaction_count,
-                'conciliation_session_id' => $session->id,
-            ],
-        );
-
-        return redirect()->route('bank-conciliation.show', $import->id)
-            ->with('success', "Extrato importado: {$import->transaction_count} transações extraídas.");
+        return redirect()->route('bank-conciliation.index', array_filter(['date' => $card['date'] ?? null]))
+            ->with('importResults', [$card]);
     }
 
     /**
-     * Upload em lote de vários arquivos OFX para a competência selecionada.
+     * Batch upload multiple OFX files — date auto-detected per file.
      */
     public function uploadBatch(
         Request $request,
-        OfxImportService $importer,
         ConciliationSessionService $sessions,
-        OfxParserService $parser,
-        BankAccountMatcher $accountMatcher,
     ): RedirectResponse {
         $this->ensureConciliador($request);
 
         $request->validate([
             'files' => ['required', 'array', 'min:1', 'max:30'],
             'files.*' => ['file', 'max:10240'],
-            'date' => ['required', 'date'],
         ], [
             'files.max' => 'Envie no máximo 30 arquivos por vez.',
             'files.*.max' => 'Cada arquivo não pode exceder 10MB.',
         ]);
 
-        $referenceDate = Carbon::parse($request->date)->startOfDay();
-
-        $imported = 0;
-        $transactions = 0;
-        $skippedDuplicates = 0;
-        $errors = [];
-        $accountsUsed = [];
+        $results = [];
 
         foreach ($request->file('files') as $file) {
             if (strtolower($file->getClientOriginalExtension()) !== 'ofx') {
-                $errors[] = "{$file->getClientOriginalName()}: extensão inválida (use .ofx).";
+                $results[] = [
+                    'ok' => false,
+                    'file_name' => $file->getClientOriginalName(),
+                    'date' => null,
+                    'bank_account_id' => null,
+                    'bank_account_name' => null,
+                    'debit_count' => 0,
+                    'credit_count' => 0,
+                    'transaction_count' => 0,
+                    'import_id' => null,
+                    'error' => 'Extensão inválida (use .ofx).',
+                ];
                 continue;
             }
 
-            try {
-                $parsed = $parser->parse(file_get_contents($file->getRealPath()));
-            } catch (OfxParseException $e) {
-                $errors[] = "{$file->getClientOriginalName()}: {$e->getMessage()}";
-                continue;
-            }
-
-            $account = $accountMatcher->suggest($parsed->meta->bankId, $parsed->meta->accountId);
-            if ($account === null) {
-                $acct = $parsed->meta->accountId ?? '?';
-                $errors[] = "{$file->getClientOriginalName()}: conta OFX {$acct} não encontrada no cadastro Hub.";
-                continue;
-            }
-
-            $session = $sessions->resolve($account->id, $referenceDate, $request->user());
-            [$paidFrom, $paidTo] = $session->periodBounds();
-
-            try {
-                $result = $importer->importFile(
-                    $file,
-                    $request->user(),
-                    $account->id,
-                    $session,
-                    $sessions->existingFitIdsInSession($session),
-                    $sessions->matchedPayableIdsInSession($session),
-                    $paidFrom,
-                    $paidTo,
-                );
-            } catch (OfxParseException $e) {
-                $errors[] = "{$file->getClientOriginalName()}: {$e->getMessage()}";
-                continue;
-            }
-
-            $import = $result['import'];
-            $imported++;
-            $transactions += $import->transaction_count;
-            $skippedDuplicates += $result['skipped_duplicates'];
-            $accountsUsed[$account->id] = $account->name;
-
-            AuditLogger::log(
-                event: 'contas_pagar.ofx_importado',
-                module: 'financeiro.contas_pagar',
-                description: "Importação OFX (lote): {$file->getClientOriginalName()} → {$account->name}, {$import->transaction_count} transações",
-                auditable: $import,
-                newValues: [
-                    'bank_account_id' => $account->id,
-                    'bank_name' => $import->bank_name,
-                    'transaction_count' => $import->transaction_count,
-                    'conciliation_session_id' => $session->id,
-                ],
-            );
+            $results[] = $this->importOneOfx($file, $request->user(), $sessions);
         }
 
-        if ($imported === 0) {
-            return back()->with('error', $errors[0] ?? 'Nenhum arquivo OFX válido foi importado.');
-        }
+        // Redirect to single date if all successful files share the same day
+        $successDates = array_values(array_unique(array_filter(
+            array_map(fn ($r) => $r['ok'] ? ($r['date'] ?? null) : null, $results)
+        )));
 
-        $msg = "{$imported} extrato(s) importado(s), {$transactions} transações.";
-        if (count($accountsUsed) > 0) {
-            $msg .= ' Contas: '.implode(', ', array_values($accountsUsed)).'.';
-        }
-        if ($skippedDuplicates > 0) {
-            $msg .= " {$skippedDuplicates} duplicata(s) ignorada(s).";
-        }
-        if (! empty($errors)) {
-            $msg .= ' Falhas: '.implode(' | ', array_slice($errors, 0, 3));
-        }
+        $redirectDate = count($successDates) === 1 ? $successDates[0] : null;
 
-        return redirect()->route('bank-conciliation.index', [
-            'date' => $referenceDate->toDateString(),
-        ])->with('success', $msg);
+        return redirect()->route('bank-conciliation.index', array_filter(['date' => $redirectDate]))
+            ->with('importResults', $results);
     }
 
+    /**
+     * Accept a match — requires matched_payable_id.
+     */
     public function accept(Request $request, int $id): RedirectResponse
     {
         $this->ensureConciliador($request);
 
         $transaction = BankTransaction::findOrFail($id);
+
+        if (! $transaction->matched_payable_id) {
+            return back()->withErrors(['transaction' => 'Esta transação não tem título vinculado. Use "Vincular" antes de aceitar.']);
+        }
+
         $transaction->update(['match_status' => 'accepted']);
 
         return back()->with('success', 'Match aceito.');
     }
 
+    /**
+     * Reject a match — clears payable link and ambiguous flags.
+     */
     public function reject(Request $request, int $id): RedirectResponse
     {
         $this->ensureConciliador($request);
@@ -365,11 +228,18 @@ class BankConciliationController extends Controller
         $transaction->update([
             'match_status' => 'rejected',
             'matched_payable_id' => null,
+            'raw_data' => array_merge($transaction->raw_data ?? [], [
+                'ambiguous' => false,
+                'ambiguous_candidates' => [],
+            ]),
         ]);
 
         return back()->with('success', 'Match rejeitado.');
     }
 
+    /**
+     * Link a transaction to a payable manually — resolves ambiguous.
+     */
     public function link(Request $request, int $id): RedirectResponse
     {
         $this->ensureConciliador($request);
@@ -387,11 +257,18 @@ class BankConciliationController extends Controller
         $transaction->update([
             'match_status' => 'manual',
             'matched_payable_id' => $payable->id,
+            'raw_data' => array_merge($transaction->raw_data ?? [], [
+                'ambiguous' => false,
+                'ambiguous_candidates' => [],
+            ]),
         ]);
 
         return back()->with('success', 'Título vinculado manualmente.');
     }
 
+    /**
+     * Batch conciliate accepted transactions for a specific import.
+     */
     public function batchConciliate(Request $request, int $importId, BatchConciliationService $batch): RedirectResponse
     {
         $result = $batch->execute($importId, $request->user());
@@ -403,6 +280,29 @@ class BankConciliationController extends Controller
         $msg = "{$result['conciliated']} título(s) conciliado(s) com sucesso.";
         if ($result['skipped'] > 0) {
             $msg .= " {$result['skipped']} ignorado(s) (status incompatível).";
+        }
+
+        return back()->with('success', $msg);
+    }
+
+    /**
+     * Batch conciliate all accepted transactions for a full day (all accounts).
+     */
+    public function batchConciliateDay(Request $request, BatchConciliationService $batch): RedirectResponse
+    {
+        $request->validate([
+            'date' => ['required', 'date'],
+        ]);
+
+        $result = $batch->executeForDate($request->input('date'), $request->user());
+
+        if (! empty($result['errors']) && $result['conciliated'] === 0) {
+            return back()->with('error', $result['errors'][0] ?? 'Erro na conciliação em lote do dia.');
+        }
+
+        $msg = "{$result['conciliated']} título(s) conciliado(s) com sucesso.";
+        if ($result['skipped'] > 0) {
+            $msg .= " {$result['skipped']} ignorado(s).";
         }
 
         return back()->with('success', $msg);
@@ -425,12 +325,9 @@ class BankConciliationController extends Controller
             return back()->with('error', 'Não é possível excluir: há transações vinculadas a títulos já conciliados.');
         }
 
-        $redirectParams = [];
+        $redirectDate = null;
         if ($import->conciliationSession) {
-            $redirectParams = [
-                'bank_account_id' => $import->conciliationSession->bank_account_id,
-                'date' => $import->conciliationSession->reference_date->toDateString(),
-            ];
+            $redirectDate = $import->conciliationSession->reference_date->toDateString();
         }
 
         AuditLogger::log(
@@ -451,7 +348,7 @@ class BankConciliationController extends Controller
 
         $import->delete();
 
-        return redirect()->route('bank-conciliation.index', $redirectParams)
+        return redirect()->route('bank-conciliation.index', array_filter(['date' => $redirectDate]))
             ->with('success', 'Importação excluída.');
     }
 
@@ -485,6 +382,114 @@ class BankConciliationController extends Controller
             ->get();
 
         return response()->json($payables);
+    }
+
+    /**
+     * Import a single OFX file, auto-detecting date and bank account from OFX content.
+     *
+     * @return array{ok: bool, file_name: string, date: ?string, bank_account_id: ?int, bank_account_name: ?string, debit_count: int, credit_count: int, transaction_count: int, import_id: ?int, error: ?string}
+     */
+    private function importOneOfx(
+        UploadedFile $file,
+        $user,
+        ConciliationSessionService $sessions,
+        ?int $bankAccountId = null,
+    ): array {
+        $fileName = $file->getClientOriginalName();
+
+        try {
+            /** @var OfxParserService $parser */
+            $parser = app(OfxParserService::class);
+            /** @var BankAccountMatcher $accountMatcher */
+            $accountMatcher = app(BankAccountMatcher::class);
+            /** @var OfxImportService $importer */
+            $importer = app(OfxImportService::class);
+
+            $content = file_get_contents($file->getRealPath());
+            $parsed = $parser->parse($content);
+
+            // Auto-detect date — will throw if OFX covers multiple days
+            $statementDate = $importer->assertSingleDay($parsed);
+
+            // Resolve bank account from OFX metadata if not passed explicitly
+            $resolvedAccountId = $bankAccountId
+                ?? $accountMatcher->suggest($parsed->meta->bankId, $parsed->meta->accountId)?->id;
+
+            $session = null;
+            $skipFitIds = [];
+
+            if ($resolvedAccountId !== null) {
+                $session = $sessions->resolve($resolvedAccountId, $statementDate, $user);
+                $skipFitIds = $sessions->existingFitIdsInSession($session);
+            }
+
+            // Already-matched payable IDs for this day across all accounts
+            $alreadyMatchedPayableIds = $sessions->matchedPayableIdsForDate($statementDate);
+
+            $result = $importer->importFile(
+                $file,
+                $user,
+                $resolvedAccountId,
+                $session,
+                $skipFitIds,
+                $alreadyMatchedPayableIds,
+            );
+
+            $import = $result['import'];
+            $bankAccount = $resolvedAccountId ? BankAccount::find($resolvedAccountId) : null;
+
+            AuditLogger::log(
+                event: 'contas_pagar.ofx_importado',
+                module: 'financeiro.contas_pagar',
+                description: "Importação OFX: {$fileName} ({$import->bank_name}), {$import->transaction_count} transações",
+                auditable: $import,
+                newValues: [
+                    'bank_name' => $import->bank_name,
+                    'account_number' => $import->account_number,
+                    'transaction_count' => $import->transaction_count,
+                    'conciliation_session_id' => $session?->id,
+                ],
+            );
+
+            return [
+                'ok' => true,
+                'file_name' => $fileName,
+                'date' => $result['statement_date'],
+                'bank_account_id' => $resolvedAccountId,
+                'bank_account_name' => $bankAccount?->name,
+                'debit_count' => $result['debit_count'],
+                'credit_count' => $result['credit_count'],
+                'transaction_count' => $import->transaction_count,
+                'import_id' => $import->id,
+                'error' => null,
+            ];
+        } catch (OfxParseException $e) {
+            return [
+                'ok' => false,
+                'file_name' => $fileName,
+                'date' => null,
+                'bank_account_id' => null,
+                'bank_account_name' => null,
+                'debit_count' => 0,
+                'credit_count' => 0,
+                'transaction_count' => 0,
+                'import_id' => null,
+                'error' => $e->getMessage(),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'ok' => false,
+                'file_name' => $fileName,
+                'date' => null,
+                'bank_account_id' => null,
+                'bank_account_name' => null,
+                'debit_count' => 0,
+                'credit_count' => 0,
+                'transaction_count' => 0,
+                'import_id' => null,
+                'error' => $e->getMessage(),
+            ];
+        }
     }
 
     private function ensureConciliador(Request $request): void
