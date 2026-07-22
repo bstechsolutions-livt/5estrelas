@@ -239,15 +239,18 @@ class BankConciliationController extends Controller
 
         $transaction = BankTransaction::findOrFail($id);
         $transaction->update([
-            'match_status' => 'rejected',
+            // Volta para "Só OFX" — pode vincular de novo sem resetar o dia
+            'match_status' => 'unmatched',
+            'match_confidence' => 'none',
             'matched_payable_id' => null,
             'raw_data' => array_merge($transaction->raw_data ?? [], [
                 'ambiguous' => false,
                 'ambiguous_candidates' => [],
+                'rejected_at' => now()->toIso8601String(),
             ]),
         ]);
 
-        return back()->with('success', 'Match rejeitado.');
+        return back()->with('success', 'Match desfeito. O débito voltou para “Só no OFX” — você pode vincular outro título.');
     }
 
     /**
@@ -344,11 +347,13 @@ class BankConciliationController extends Controller
 
         if ($result['deleted_imports'] === 0) {
             return redirect()->route('bank-conciliation.index')
-                ->with('warning', 'Nenhum extrato para resetar neste dia.');
+                ->with('warning', 'Nenhum extrato para resetar neste dia.')
+                ->with('importResults', []);
         }
 
         return redirect()->route('bank-conciliation.index')
-            ->with('success', "Dia {$date->format('d/m/Y')} resetado: {$result['deleted_imports']} extrato(s) removido(s). Pode importar de novo.");
+            ->with('success', "Dia {$date->format('d/m/Y')} resetado: {$result['deleted_imports']} extrato(s) removido(s). Pode importar de novo.")
+            ->with('importResults', []);
     }
 
     public function destroy(Request $request, int $importId): RedirectResponse

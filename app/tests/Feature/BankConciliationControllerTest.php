@@ -413,7 +413,7 @@ OFX;
 
         $response->assertRedirect();
         $tx->refresh();
-        $this->assertEquals('rejected', $tx->match_status);
+        $this->assertEquals('unmatched', $tx->match_status);
         $this->assertNull($tx->matched_payable_id);
         $this->assertFalse($tx->raw_data['ambiguous'] ?? true);
         $this->assertEmpty($tx->raw_data['ambiguous_candidates'] ?? []);
@@ -617,7 +617,8 @@ OFX;
         $this->actingAs($user)
             ->post(route('bank-conciliation.reset-day'), ['date' => '2026-06-16'])
             ->assertRedirect(route('bank-conciliation.index'))
-            ->assertSessionHas('success');
+            ->assertSessionHas('success')
+            ->assertSessionHas('importResults', []);
 
         $this->assertDatabaseMissing('bank_statement_imports', ['id' => $import->id]);
         $this->assertDatabaseMissing('conciliation_sessions', ['id' => $session->id]);
