@@ -368,6 +368,7 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                                         <th class="px-3 py-2 text-left">Descrição OFX</th>
                                         <th class="px-3 py-2 text-right">Valor</th>
                                         <th class="px-3 py-2 text-left">Título</th>
+                                        <th class="px-3 py-2 text-left">Empresa</th>
                                         <th class="px-3 py-2 text-left">Fornecedor</th>
                                         <th class="px-3 py-2 text-center">Conf.</th>
                                         <th class="px-3 py-2 text-center">Status</th>
@@ -379,6 +380,10 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                                         <td class="px-3 py-2 text-gray-700 truncate max-w-xs">{{ tx.description || tx.memo || '—' }}</td>
                                         <td class="px-3 py-2 text-right font-medium">{{ formatMoney(tx.amount) }}</td>
                                         <td class="px-3 py-2">{{ tx.payable?.title_number ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-xs text-gray-600">
+                                            {{ tx.payable?.empresa_nome || '—' }}
+                                            <span v-if="tx.payable?.filial_label" class="block text-gray-400">{{ tx.payable.filial_label }}</span>
+                                        </td>
                                         <td class="px-3 py-2 truncate max-w-xs">{{ tx.payable?.supplier_name ?? '—' }}</td>
                                         <td class="px-3 py-2 text-center">
                                             <Tag :value="confidenceLabel(tx.match_confidence)" severity="info" class="text-xs" />
@@ -424,7 +429,14 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                                         <td class="px-3 py-2 text-gray-700 truncate max-w-xs">{{ tx.description || tx.memo || '—' }}</td>
                                         <td class="px-3 py-2 text-right font-medium">{{ formatMoney(tx.amount) }}</td>
                                         <td class="px-3 py-2 text-xs text-gray-500">
-                                            {{ tx.ambiguous_candidates?.map(c => c.title_number ?? c.supplier_name).join(', ') || '—' }}
+                                            <template v-if="tx.ambiguous_candidates?.length">
+                                                <div v-for="(c, i) in tx.ambiguous_candidates" :key="i" class="mb-0.5">
+                                                    {{ c.title_number }}
+                                                    <span v-if="c.empresa_nome" class="text-gray-400"> · {{ c.empresa_nome }}</span>
+                                                    — {{ c.supplier_name }}
+                                                </div>
+                                            </template>
+                                            <template v-else>—</template>
                                         </td>
                                         <td v-if="isConciliador" class="px-3 py-2 text-right">
                                             <button
@@ -478,6 +490,7 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                                 <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
                                     <tr>
                                         <th class="px-3 py-2 text-left">Título</th>
+                                        <th class="px-3 py-2 text-left">Empresa</th>
                                         <th class="px-3 py-2 text-left">Fornecedor</th>
                                         <th class="px-3 py-2 text-right">Valor</th>
                                         <th class="px-3 py-2 text-left">Pago em</th>
@@ -486,6 +499,10 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                                 <tbody>
                                     <tr v-for="p in payableOnly" :key="p.id" class="border-t border-gray-50">
                                         <td class="px-3 py-2">{{ p.title_number ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-xs text-gray-600">
+                                            {{ p.empresa_nome || '—' }}
+                                            <span v-if="p.filial_label" class="block text-gray-400">{{ p.filial_label }}</span>
+                                        </td>
                                         <td class="px-3 py-2 truncate max-w-xs">{{ p.supplier_name ?? '—' }}</td>
                                         <td class="px-3 py-2 text-right">{{ formatMoney(p.amount) }}</td>
                                         <td class="px-3 py-2">{{ formatDate(p.paid_at) }}</td>
@@ -517,6 +534,7 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                         @click="linkPayableId = p.id"
                     >
                         <span class="font-medium">{{ p.title_number }}</span>
+                        <span v-if="p.empresa_nome" class="text-xs text-blue-700 ml-2">{{ p.empresa_nome }}</span>
                         <span class="text-gray-500 ml-2">{{ p.supplier_name }}</span>
                         <span class="float-right font-medium">{{ formatMoney(p.amount) }}</span>
                     </div>

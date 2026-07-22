@@ -267,7 +267,11 @@ function formatMoney(v) {
                             <span class="truncate text-gray-700 max-w-[60%]">{{ tx.description || '—' }}</span>
                             <span class="font-medium">{{ formatMoney(tx.amount) }}</span>
                         </div>
-                        <p class="text-xs text-gray-400 mt-1">{{ tx.payable?.supplier_name ?? '—' }}</p>
+                        <p class="text-xs text-gray-500 mt-1">
+                            {{ tx.payable?.title_number ?? '—' }}
+                            <span v-if="tx.payable?.empresa_nome"> · {{ tx.payable.empresa_nome }}</span>
+                        </p>
+                        <p class="text-xs text-gray-400">{{ tx.payable?.supplier_name ?? '—' }}</p>
                         <div v-if="isConciliador && tx.match_status === 'pending'" class="flex gap-2 mt-2">
                             <button type="button" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded" @click="acceptTx(tx.id)">Aceitar</button>
                             <button type="button" class="text-xs px-2 py-1 bg-red-100 text-red-700 rounded" @click="rejectTx(tx.id)">Rejeitar</button>
@@ -317,6 +321,7 @@ function formatMoney(v) {
                             <span>{{ p.title_number ?? '—' }}</span>
                             <span class="font-medium">{{ formatMoney(p.amount) }}</span>
                         </div>
+                        <p v-if="p.empresa_nome" class="text-xs text-blue-700 mt-0.5">{{ p.empresa_nome }}</p>
                         <p class="text-xs text-gray-400 mt-1">{{ p.supplier_name }}</p>
                     </div>
                 </section>
@@ -341,6 +346,7 @@ function formatMoney(v) {
                         @click="linkPayableId = p.id"
                     >
                         <span class="font-medium">{{ p.title_number }}</span>
+                        <span v-if="p.empresa_nome" class="text-blue-700 ml-2 text-xs">{{ p.empresa_nome }}</span>
                         <span class="text-gray-500 ml-2">{{ p.supplier_name }}</span>
                     </div>
                 </div>
