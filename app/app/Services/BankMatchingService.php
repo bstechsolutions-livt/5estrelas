@@ -109,6 +109,114 @@ class BankMatchingService
     }
 
     /**
+     * Reprocessa só débitos unmatched/rejected de um dia (não mexe em accepted/manual/pending).
+     * Regra: mesmo paid_at + valor ±0,01 → 1 candidato = pending; N = ambíguo.
+     * Ignora tarifas/aplicações/resgates (ficam na seção própria).
+     *
+     * @return array{scanned: int, matched: int, ambiguous: int, still_unmatched: int, skipped_ops: int}
+     */
+    public function rematchUnmatchedForDate(Carbon $referenceDate): array
+    {
+        $date = $referenceDate->toDateString();
+        $sessions = app(ConciliationSessionService::class);
+        $classifier = app(OfxBankOperationClassifier::class);
+
+        $importIds = \App\Models\BankStatementImport::query()
+            ->whereIn(
+                'conciliation_session_id',
+                \App\Models\ConciliationSession::query()
+                    ->whereDate('reference_date', $date)
+                    ->select('id')
+            )
+            ->pluck('id');
+
+        if ($importIds->isEmpty()) {
+            return ['scanned' => 0, 'matched' => 0, 'ambiguous' => 0, 'still_unmatched' => 0, 'skipped_ops' => 0];
+        }
+
+        $alreadyMatchedPayableIds = $sessions->matchedPayableIdsForDate($referenceDate);
+
+        $transactions = BankTransaction::query()
+            ->whereIn('import_id', $importIds)
+            ->where('type', 'debit')
+            ->whereIn('match_status', ['unmatched', 'rejected'])
+            ->orderBy('id')
+            ->get();
+
+        $matched = 0;
+        $ambiguous = 0;
+        $stillUnmatched = 0;
+        $skippedOps = 0;
+
+        foreach ($transactions as $tx) {
+            if ($classifier->classify($tx->description, $tx->memo) !== null) {
+                $skippedOps++;
+
+                continue;
+            }
+
+            $day = $tx->date?->toDateString() ?? $date;
+            $candidates = $this->findCandidatesForDay($tx, $day, $alreadyMatchedPayableIds);
+
+            if (empty($candidates)) {
+                $tx->update([
+                    'match_status' => 'unmatched',
+                    'match_confidence' => 'none',
+                    'matched_payable_id' => null,
+                    'raw_data' => array_merge($tx->raw_data ?? [], [
+                        'ambiguous' => false,
+                        'ambiguous_candidates' => [],
+                        'rematched_at' => now()->toIso8601String(),
+                    ]),
+                ]);
+                $stillUnmatched++;
+
+                continue;
+            }
+
+            if (count($candidates) > 1) {
+                $tx->update([
+                    'match_status' => 'unmatched',
+                    'match_confidence' => 'low',
+                    'matched_payable_id' => null,
+                    'raw_data' => array_merge($tx->raw_data ?? [], [
+                        'ambiguous' => true,
+                        'ambiguous_candidates' => $candidates,
+                        'rematched_at' => now()->toIso8601String(),
+                    ]),
+                ]);
+                $ambiguous++;
+                $stillUnmatched++;
+
+                continue;
+            }
+
+            $payableId = $candidates[0]['payable_id'];
+            $alreadyMatchedPayableIds[] = $payableId;
+
+            $tx->update([
+                'matched_payable_id' => $payableId,
+                'match_status' => 'pending',
+                'match_confidence' => 'high',
+                'raw_data' => array_merge($tx->raw_data ?? [], [
+                    'ambiguous' => false,
+                    'ambiguous_candidates' => [],
+                    'rematched_at' => now()->toIso8601String(),
+                ]),
+            ]);
+            $matched++;
+        }
+
+        return [
+            'scanned' => $transactions->count(),
+            'matched' => $matched,
+            'ambiguous' => $ambiguous,
+            'still_unmatched' => $stillUnmatched,
+            'skipped_ops' => $skippedOps,
+        ];
+    }
+
+    /**
      * @return list<array{payable_id: int, title_number: ?string, supplier_name: ?string, amount: float|string, paid_at: ?string}>
      */
     public function findCandidatesForDay(

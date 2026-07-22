@@ -243,6 +243,105 @@ class BankMatchingTest extends TestCase
         $this->assertEquals(1, $import->matched_count);
     }
 
+    public function test_rematch_unmatched_for_date_matches_single_candidate(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $account = \App\Models\BankAccount::create([
+            'name' => 'Teste',
+            'bank_code' => '033',
+            'bank_name' => 'Santander',
+            'agency' => '1',
+            'account_number' => '1',
+            'is_active' => true,
+        ]);
+        $session = \App\Models\ConciliationSession::create([
+            'bank_account_id' => $account->id,
+            'reference_date' => '2026-06-16',
+            'status' => 'open',
+            'created_by' => $user->id,
+        ]);
+        $import = BankStatementImport::create([
+            'user_id' => $user->id,
+            'bank_account_id' => $account->id,
+            'conciliation_session_id' => $session->id,
+            'bank_name' => 'Santander',
+            'bank_id' => '033',
+            'account_number' => '1',
+            'file_name' => 'x.ofx',
+            'file_path' => 'ofx/x.ofx',
+            'status' => 'done',
+            'transaction_count' => 1,
+            'matched_count' => 0,
+        ]);
+        $tx = $this->createTransaction($import, [
+            'date' => Carbon::parse('2026-06-16'),
+            'amount' => -231.00,
+            'match_status' => 'unmatched',
+            'description' => 'DEBITO PIX',
+        ]);
+        $payable = $this->createPayable([
+            'amount' => 231.00,
+            'paid_at' => '2026-06-16',
+            'status' => 'aguardando_conciliacao',
+        ]);
+
+        $result = $this->service->rematchUnmatchedForDate(Carbon::parse('2026-06-16'));
+
+        $this->assertEquals(1, $result['matched']);
+        $tx->refresh();
+        $this->assertEquals('pending', $tx->match_status);
+        $this->assertEquals($payable->id, $tx->matched_payable_id);
+        $this->assertEquals('high', $tx->match_confidence);
+    }
+
+    public function test_rematch_unmatched_ambiguous_when_two_same_amount(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $account = \App\Models\BankAccount::create([
+            'name' => 'Teste2',
+            'bank_code' => '033',
+            'bank_name' => 'Santander',
+            'agency' => '1',
+            'account_number' => '2',
+            'is_active' => true,
+        ]);
+        $session = \App\Models\ConciliationSession::create([
+            'bank_account_id' => $account->id,
+            'reference_date' => '2026-06-16',
+            'status' => 'open',
+            'created_by' => $user->id,
+        ]);
+        $import = BankStatementImport::create([
+            'user_id' => $user->id,
+            'bank_account_id' => $account->id,
+            'conciliation_session_id' => $session->id,
+            'bank_name' => 'Santander',
+            'bank_id' => '033',
+            'account_number' => '2',
+            'file_name' => 'y.ofx',
+            'file_path' => 'ofx/y.ofx',
+            'status' => 'done',
+            'transaction_count' => 1,
+            'matched_count' => 0,
+        ]);
+        $tx = $this->createTransaction($import, [
+            'date' => Carbon::parse('2026-06-16'),
+            'amount' => -100.00,
+            'match_status' => 'unmatched',
+            'description' => 'DEBITO PIX',
+        ]);
+        $this->createPayable(['amount' => 100.00, 'paid_at' => '2026-06-16', 'status' => 'aguardando_conciliacao']);
+        $this->createPayable(['amount' => 100.00, 'paid_at' => '2026-06-16', 'status' => 'aguardando_conciliacao']);
+
+        $result = $this->service->rematchUnmatchedForDate(Carbon::parse('2026-06-16'));
+
+        $this->assertEquals(1, $result['ambiguous']);
+        $tx->refresh();
+        $this->assertEquals('unmatched', $tx->match_status);
+        $this->assertNull($tx->matched_payable_id);
+        $this->assertTrue(($tx->raw_data['ambiguous'] ?? false) === true);
+    }
+
     // ─── calculateConfidence unit tests (kept from original) ─────────────────
 
     public function test_calculate_confidence_null_paid_at_returns_low(): void
