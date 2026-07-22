@@ -145,8 +145,13 @@ class BankConciliationController extends Controller
         $bankAccountId = $request->filled('bank_account_id') ? (int) $request->input('bank_account_id') : null;
         $card = $this->importOneOfx($file, $request->user(), $sessions, $bankAccountId);
 
-        return redirect()->route('bank-conciliation.index', array_filter(['date' => $card['date'] ?? null]))
-            ->with('importResults', [$card]);
+        $redirectDate = $card['ok'] ? ($card['date'] ?? null) : null;
+
+        return redirect()->route('bank-conciliation.index', array_filter(['date' => $redirectDate]))
+            ->with('importResults', [$card])
+            ->with($card['ok'] ? 'success' : 'error', $card['ok']
+                ? "Extrato importado: {$card['transaction_count']} transações."
+                : ($card['error'] ?? 'Falha ao importar OFX.'));
     }
 
     /**
@@ -188,15 +193,22 @@ class BankConciliationController extends Controller
             $results[] = $this->importOneOfx($file, $request->user(), $sessions);
         }
 
-        // Redirect to single date if all successful files share the same day
+        // Redirect to single date only when at least one file imported successfully
         $successDates = array_values(array_unique(array_filter(
             array_map(fn ($r) => $r['ok'] ? ($r['date'] ?? null) : null, $results)
         )));
 
+        $okCount = count(array_filter($results, fn ($r) => $r['ok']));
         $redirectDate = count($successDates) === 1 ? $successDates[0] : null;
 
+        $flashKey = $okCount > 0 ? 'success' : 'error';
+        $flashMsg = $okCount > 0
+            ? "{$okCount} extrato(s) importado(s)."
+            : (($results[0]['error'] ?? null) ?: 'Nenhum arquivo OFX válido foi importado.');
+
         return redirect()->route('bank-conciliation.index', array_filter(['date' => $redirectDate]))
-            ->with('importResults', $results);
+            ->with('importResults', $results)
+            ->with($flashKey, $flashMsg);
     }
 
     /**
@@ -415,13 +427,25 @@ class BankConciliationController extends Controller
             $resolvedAccountId = $bankAccountId
                 ?? $accountMatcher->suggest($parsed->meta->bankId, $parsed->meta->accountId)?->id;
 
-            $session = null;
-            $skipFitIds = [];
+            if ($resolvedAccountId === null) {
+                $acct = $parsed->meta->accountId ?? '?';
 
-            if ($resolvedAccountId !== null) {
-                $session = $sessions->resolve($resolvedAccountId, $statementDate, $user);
-                $skipFitIds = $sessions->existingFitIdsInSession($session);
+                return [
+                    'ok' => false,
+                    'file_name' => $fileName,
+                    'date' => $statementDate->toDateString(),
+                    'bank_account_id' => null,
+                    'bank_account_name' => null,
+                    'debit_count' => 0,
+                    'credit_count' => 0,
+                    'transaction_count' => 0,
+                    'import_id' => null,
+                    'error' => "Conta OFX {$acct} não cadastrada no Hub.",
+                ];
             }
+
+            $session = $sessions->resolve($resolvedAccountId, $statementDate, $user);
+            $skipFitIds = $sessions->existingFitIdsInSession($session);
 
             // Already-matched payable IDs for this day across all accounts
             $alreadyMatchedPayableIds = $sessions->matchedPayableIdsForDate($statementDate);
@@ -436,7 +460,7 @@ class BankConciliationController extends Controller
             );
 
             $import = $result['import'];
-            $bankAccount = $resolvedAccountId ? BankAccount::find($resolvedAccountId) : null;
+            $bankAccount = BankAccount::find($resolvedAccountId);
 
             AuditLogger::log(
                 event: 'contas_pagar.ofx_importado',
@@ -447,7 +471,7 @@ class BankConciliationController extends Controller
                     'bank_name' => $import->bank_name,
                     'account_number' => $import->account_number,
                     'transaction_count' => $import->transaction_count,
-                    'conciliation_session_id' => $session?->id,
+                    'conciliation_session_id' => $session->id,
                 ],
             );
 

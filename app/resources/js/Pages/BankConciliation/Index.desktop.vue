@@ -68,6 +68,17 @@ function openDay(date) {
     router.get('/financeiro/contas-pagar/conciliacao', { date }, { preserveState: false })
 }
 
+function clearDay() {
+    router.get('/financeiro/contas-pagar/conciliacao', {}, { preserveState: false })
+}
+
+const selectedDate = computed(() => props.filters?.date || props.dayReport?.date || null)
+
+function showOpenDayLink(card) {
+    // Só mostra se o relatório do dia ainda não está aberto nessa data
+    return card?.ok && card?.date && card.date !== selectedDate.value
+}
+
 // ── Day report interactions ───────────────────────────────────────────────────
 const linkTxId = ref(null)
 const linkPayableId = ref(null)
@@ -230,15 +241,14 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                             {{ card.file_name }}
                         </p>
                         <div v-if="card.ok" class="mt-2 space-y-1 text-xs text-green-700">
-                            <p>📅 {{ formatDate(card.date) }}</p>
-                            <p>🏦 {{ card.bank_account_name ?? 'Conta não identificada' }}</p>
+                            <p>{{ formatDate(card.date) }} · {{ card.bank_account_name ?? 'Conta não identificada' }}</p>
                             <p>{{ card.transaction_count }} transações ({{ card.debit_count }} déb / {{ card.credit_count }} créd)</p>
                             <button
-                                v-if="card.date"
+                                v-if="showOpenDayLink(card)"
                                 type="button"
                                 class="mt-1 text-blue-600 hover:underline"
                                 @click="openDay(card.date)"
-                            >Ver dia →</button>
+                            >Abrir relatório deste dia →</button>
                         </div>
                         <p v-else class="mt-2 text-xs text-red-700">{{ card.error }}</p>
                     </div>
@@ -289,20 +299,38 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                 <div class="bg-white rounded-xl border border-gray-100 p-5">
                     <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
                         <div>
+                            <div class="flex flex-wrap items-center gap-2 mb-1">
+                                <button
+                                    type="button"
+                                    class="text-sm text-blue-700 hover:underline inline-flex items-center gap-1"
+                                    @click="clearDay"
+                                >
+                                    <i class="pi pi-arrow-left text-xs" />
+                                    Voltar aos dias
+                                </button>
+                            </div>
                             <h2 class="text-lg font-bold text-gray-800">Relatório: {{ dayReport.label }}</h2>
                             <p class="text-xs text-gray-400 mt-1">
-                                {{ dayReport.accounts?.map(a => a.name).join(', ') || 'Nenhuma conta' }}
+                                {{ dayReport.accounts?.map(a => a.name).join(', ') || 'Nenhuma conta com extrato neste dia' }}
                             </p>
                         </div>
                         <button
-                            v-if="isConciliador && kpis && kpis.matched > 0"
+                            v-if="isConciliador && kpis && kpis.accepted > 0"
                             type="button"
                             :disabled="batchDayForm.processing"
                             class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
                             @click="batchDay"
                         >
-                            Conciliar dia ({{ kpis.matched }} aceitos)
+                            Conciliar aceitos do dia ({{ kpis.accepted }})
                         </button>
+                    </div>
+
+                    <div
+                        v-if="kpis && kpis.imports === 0"
+                        class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                    >
+                        Nenhum extrato OFX importado neste dia ainda.
+                        Se você acabou de enviar arquivos e eles falharam (conta não cadastrada, período etc.), veja o resultado da importação acima e corrija antes de abrir o relatório.
                     </div>
 
                     <!-- KPIs -->

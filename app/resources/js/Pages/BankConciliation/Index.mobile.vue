@@ -64,6 +64,10 @@ function openDay(date) {
     router.get('/financeiro/contas-pagar/conciliacao', { date }, { preserveState: false })
 }
 
+function clearDay() {
+    router.get('/financeiro/contas-pagar/conciliacao', {}, { preserveState: false })
+}
+
 const kpis = computed(() => props.dayReport?.kpis ?? null)
 const matched     = computed(() => props.dayReport?.matched     ?? [])
 const ofxOnly     = computed(() => props.dayReport?.ofx_only    ?? [])
@@ -188,8 +192,13 @@ function formatMoney(v) {
                         {{ formatDate(card.date) }} · {{ card.bank_account_name ?? '?' }} · {{ card.transaction_count }} transações
                     </p>
                     <p v-else class="text-xs text-red-700 mt-1">{{ card.error }}</p>
-                    <button v-if="card.ok && card.date" type="button" class="text-xs text-blue-600 mt-1" @click="openDay(card.date)">
-                        Ver dia →
+                    <button
+                        v-if="card.ok && card.date && card.date !== (filters?.date || dayReport?.date)"
+                        type="button"
+                        class="text-xs text-blue-600 mt-1"
+                        @click="openDay(card.date)"
+                    >
+                        Abrir relatório deste dia →
                     </button>
                 </div>
             </div>
@@ -213,14 +222,24 @@ function formatMoney(v) {
 
             <!-- Day report -->
             <div v-if="dayReport" class="bg-white rounded-xl border border-gray-100 p-4 space-y-4">
+                <button type="button" class="text-sm text-blue-700" @click="clearDay">
+                    ← Voltar aos dias
+                </button>
                 <div class="flex justify-between items-start">
                     <h2 class="font-bold text-gray-800">{{ dayReport.label }}</h2>
                     <button
-                        v-if="isConciliador && kpis && kpis.matched > 0"
+                        v-if="isConciliador && kpis && kpis.accepted > 0"
                         type="button"
                         class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg"
                         @click="batchDay"
-                    >Conciliar dia</button>
+                    >Conciliar</button>
+                </div>
+
+                <div
+                    v-if="kpis && kpis.imports === 0"
+                    class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                >
+                    Nenhum extrato OFX neste dia. Se o upload falhou (conta não cadastrada), corrija e envie de novo.
                 </div>
 
                 <!-- KPIs -->
