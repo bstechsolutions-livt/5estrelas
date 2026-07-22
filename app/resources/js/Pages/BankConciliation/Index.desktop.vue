@@ -227,9 +227,6 @@ function statusTagSeverity(status) {
 function confidenceLabel(c) {
     return { high: 'Alta', medium: 'Média', low: 'Baixa', none: '—' }[c] ?? c
 }
-function operationCategoryLabel(c) {
-    return { tarifa: 'Tarifa', aplicacao: 'Aplicação', resgate: 'Resgate' }[c] ?? c
-}
 function dayRowClass(d) {
     return props.dayReport?.date === d.date ? 'bg-blue-50' : ''
 }
