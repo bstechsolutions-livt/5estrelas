@@ -150,10 +150,44 @@ function rejectTx(id) {
 
 const batchDayForm = useForm({ date: null })
 function batchDay() {
-    if (!props.dayReport?.date) return
-    batchDayForm.date = props.dayReport.date
-    batchDayForm.post('/financeiro/contas-pagar/conciliacao/batch-conciliate-day', {
-        onSuccess: () => router.reload(),
+    if (!props.dayReport?.date || batchDayForm.processing) return
+
+    const blockers = props.dayReport.conciliate_blockers ?? []
+    if (blockers.length) {
+        confirm.require({
+            header: 'Dia incompleto',
+            message: blockers.join(' '),
+            icon: 'pi pi-exclamation-triangle',
+            rejectProps: { label: 'Fechar', severity: 'secondary', outlined: true },
+            acceptProps: { label: 'Entendi', severity: 'secondary' },
+            accept: () => {},
+        })
+        return
+    }
+
+    const s = props.dayReport.summary ?? {}
+    const lines = [
+        `Títulos aceitos a conciliar: ${s.accepted ?? 0}`,
+        `Tarifas: ${s.tarifas ?? 0} · Aplicações: ${s.aplicacoes ?? 0} · Resgates: ${s.resgates ?? 0}`,
+        `Arquivos OFX que serão preservados: ${s.ofx_files ?? 0}`,
+    ]
+    if ((s.payable_only ?? 0) > 0) {
+        lines.push(`Atenção: ${s.payable_only} título(s) só no sistema (sem OFX) ficam de fora.`)
+    }
+    lines.push('Confirma a conciliação completa deste dia?')
+
+    confirm.require({
+        header: `Conciliar dia ${props.dayReport.label}`,
+        message: lines.join('\n'),
+        icon: 'pi pi-check-circle',
+        rejectProps: { label: 'Cancelar', severity: 'secondary', outlined: true },
+        acceptProps: { label: 'Conciliar dia', severity: 'success' },
+        accept: () => {
+            batchDayForm.date = props.dayReport.date
+            batchDayForm.post('/financeiro/contas-pagar/conciliacao/batch-conciliate-day', {
+                onSuccess: () => router.reload(),
+            })
+        },
     })
 }
 
@@ -193,6 +227,9 @@ function statusTagSeverity(status) {
 function confidenceLabel(c) {
     return { high: 'Alta', medium: 'Média', low: 'Baixa', none: '—' }[c] ?? c
 }
+function operationCategoryLabel(c) {
+    return { tarifa: 'Tarifa', aplicacao: 'Aplicação', resgate: 'Resgate' }[c] ?? c
+}
 function dayRowClass(d) {
     return props.dayReport?.date === d.date ? 'bg-blue-50' : ''
 }
@@ -200,8 +237,11 @@ function dayRowClass(d) {
 const kpis = computed(() => props.dayReport?.kpis ?? null)
 const matched  = computed(() => props.dayReport?.matched  ?? [])
 const ofxOnly  = computed(() => props.dayReport?.ofx_only  ?? [])
+const bankOps  = computed(() => props.dayReport?.bank_ops  ?? [])
 const payableOnly = computed(() => props.dayReport?.payable_only ?? [])
 const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
+const canConciliateDay = computed(() => !!props.dayReport?.can_conciliate_day)
+const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
 </script>
 
 <template>
@@ -345,7 +385,7 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             <button
-                                v-if="isConciliador && kpis && kpis.imports > 0"
+                                v-if="isConciliador && kpis && kpis.imports > 0 && !dayConciliated"
                                 type="button"
                                 :disabled="resetDayForm.processing"
                                 class="px-3 py-2 text-sm rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
@@ -354,15 +394,31 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                                 Começar do zero
                             </button>
                             <button
-                                v-if="isConciliador && kpis && kpis.accepted > 0"
+                                v-if="isConciliador && kpis && kpis.imports > 0"
                                 type="button"
-                                :disabled="batchDayForm.processing"
+                                :disabled="batchDayForm.processing || dayConciliated"
                                 class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
                                 @click="batchDay"
                             >
-                                Conciliar aceitos do dia ({{ kpis.accepted }})
+                                {{ dayConciliated ? 'Dia já conciliado' : 'Conciliar dia' }}
                             </button>
                         </div>
+                    </div>
+
+                    <div
+                        v-if="dayConciliated"
+                        class="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900"
+                    >
+                        Dia conciliado. Tarifas/aplicações/resgates e arquivos OFX estão preservados para consulta.
+                    </div>
+                    <div
+                        v-else-if="isConciliador && (dayReport.conciliate_blockers?.length)"
+                        class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                    >
+                        <p class="font-medium mb-1">Para conciliar o dia por completo:</p>
+                        <ul class="list-disc pl-5 space-y-0.5">
+                            <li v-for="(b, i) in dayReport.conciliate_blockers" :key="i">{{ b }}</li>
+                        </ul>
                     </div>
 
                     <div
@@ -374,7 +430,7 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                     </div>
 
                     <!-- KPIs -->
-                    <div v-if="kpis" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                    <div v-if="kpis" class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
                         <div class="bg-blue-50 border border-blue-100 rounded-xl p-3">
                             <p class="text-xs text-blue-700">Extratos</p>
                             <p class="text-xl font-bold text-blue-900">{{ kpis.imports }}</p>
@@ -390,6 +446,10 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                         <div class="bg-red-50 border border-red-100 rounded-xl p-3">
                             <p class="text-xs text-red-700">Só OFX</p>
                             <p class="text-xl font-bold text-red-900">{{ kpis.ofx_only }}</p>
+                        </div>
+                        <div class="bg-violet-50 border border-violet-100 rounded-xl p-3">
+                            <p class="text-xs text-violet-700">Tarifa/Apl/Resg</p>
+                            <p class="text-xl font-bold text-violet-900">{{ kpis.bank_ops }}</p>
                         </div>
                         <div class="bg-gray-50 border border-gray-100 rounded-xl p-3">
                             <p class="text-xs text-gray-600">Só título</p>
@@ -517,6 +577,35 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </section>
+
+                    <!-- ── Bank ops (tarifa / aplicação / resgate) ───────────────────── -->
+                    <section v-if="bankOps.length" class="mb-6">
+                        <h3 class="text-sm font-semibold text-violet-800 mb-1">Tarifas, aplicações e resgates</h3>
+                        <p class="text-xs text-gray-400 mb-3">
+                            Separados do Contas a Pagar. Sem ação aqui — ao conciliar o dia, gravamos na tabela e preservamos o OFX.
+                        </p>
+                        <div class="space-y-2">
+                            <div
+                                v-for="tx in bankOps"
+                                :key="tx.id"
+                                class="rounded-lg border border-violet-100 bg-violet-50/40 px-4 py-3 flex flex-wrap items-center gap-3 justify-between"
+                            >
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                                        <Tag :value="operationCategoryLabel(tx.operation_category)" severity="secondary" class="text-xs" />
+                                        <span v-if="tx.match_status === 'non_payable'" class="text-[11px] text-green-700 font-medium">Registrado</span>
+                                    </div>
+                                    <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                                    <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                                        <span class="font-semibold text-gray-800 whitespace-nowrap">{{ formatMoney(tx.amount) }}</span>
+                                        <span>{{ formatDate(tx.date) }}</span>
+                                        <span v-if="tx.bank_account_name">{{ tx.bank_account_name }}</span>
+                                        <span v-if="tx.ofx_file_name" class="truncate max-w-[14rem]">{{ tx.ofx_file_name }}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </section>
 

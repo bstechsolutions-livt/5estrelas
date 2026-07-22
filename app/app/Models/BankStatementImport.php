@@ -13,8 +13,8 @@ class BankStatementImport extends Model
 
     protected $fillable = [
         'user_id', 'bank_account_id', 'conciliation_session_id', 'bank_name', 'bank_id', 'account_number', 'branch_number',
-        'file_name', 'file_path', 'period_start', 'period_end', 'balance',
-        'status', 'transaction_count', 'matched_count', 'error_message',
+        'file_name', 'file_path', 'retained_path', 'period_start', 'period_end', 'balance',
+        'status', 'transaction_count', 'matched_count', 'day_conciliated_at', 'error_message',
     ];
 
     protected function casts(): array
@@ -23,6 +23,7 @@ class BankStatementImport extends Model
             'period_start' => 'date',
             'period_end' => 'date',
             'balance' => 'decimal:2',
+            'day_conciliated_at' => 'datetime',
         ];
     }
 

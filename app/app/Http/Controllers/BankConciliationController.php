@@ -312,13 +312,27 @@ class BankConciliationController extends Controller
 
         $result = $batch->executeForDate($request->input('date'), $request->user());
 
-        if (! empty($result['errors']) && $result['conciliated'] === 0) {
+        if (! empty($result['errors']) && ($result['conciliated'] ?? 0) === 0 && ($result['operations_saved'] ?? 0) === 0) {
             return back()->with('error', $result['errors'][0] ?? 'Erro na conciliação em lote do dia.');
         }
 
-        $msg = "{$result['conciliated']} título(s) conciliado(s) com sucesso.";
-        if ($result['skipped'] > 0) {
-            $msg .= " {$result['skipped']} ignorado(s).";
+        $parts = [];
+        if (($result['conciliated'] ?? 0) > 0) {
+            $parts[] = "{$result['conciliated']} título(s)";
+        }
+        if (($result['operations_saved'] ?? 0) > 0) {
+            $parts[] = "{$result['operations_saved']} tarifa(s)/aplicação(ões)/resgate(s)";
+        }
+        if (($result['imports_retained'] ?? 0) > 0) {
+            $parts[] = "{$result['imports_retained']} OFX preservado(s)";
+        }
+
+        $msg = empty($parts)
+            ? 'Dia conciliado.'
+            : 'Dia conciliado: '.implode(', ', $parts).'.';
+
+        if (($result['skipped'] ?? 0) > 0) {
+            $msg .= " {$result['skipped']} título(s) ignorado(s).";
         }
 
         return back()->with('success', $msg);
