@@ -3,7 +3,9 @@ import { ref, computed, watch } from 'vue'
 import { router, useForm, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Toast from 'primevue/toast'
+import ConfirmDialog from 'primevue/confirmdialog'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 
 const props = defineProps({
     isConciliador: Boolean,
@@ -15,12 +17,15 @@ const props = defineProps({
 })
 
 const toast = useToast()
+const confirm = useConfirm()
 const page = usePage()
 
 watch(() => page.props.flash, (flash) => {
     if (flash?.success) toast.add({ severity: 'success', summary: 'Sucesso', detail: flash.success, life: 5000 })
     if (flash?.error)   toast.add({ severity: 'error',   summary: 'Erro',    detail: flash.error,   life: 5000 })
-    if (flash?.importResults) localImportResults.value = flash.importResults
+    if (flash && Object.prototype.hasOwnProperty.call(flash, 'importResults')) {
+        localImportResults.value = flash.importResults?.length ? flash.importResults : null
+    }
 }, { deep: true })
 
 const localImportResults = ref(props.importResults ?? null)
@@ -132,9 +137,20 @@ function batchDay() {
 const resetDayForm = useForm({ date: null })
 function resetDay() {
     if (!props.dayReport?.date || resetDayForm.processing) return
-    if (!confirm(`Resetar o dia ${props.dayReport.label}?\nApaga os OFX deste dia. Títulos não mudam.`)) return
-    resetDayForm.date = props.dayReport.date
-    resetDayForm.post('/financeiro/contas-pagar/conciliacao/reset-day')
+    const label = props.dayReport.label || props.dayReport.date
+    confirm.require({
+        header: 'Começar do zero',
+        message: `Apagar todos os extratos OFX de ${label} e importar de novo? Os títulos do Contas a Pagar não são alterados.`,
+        icon: 'pi pi-exclamation-triangle',
+        rejectProps: { label: 'Cancelar', severity: 'secondary', outlined: true },
+        acceptProps: { label: 'Apagar OFX do dia', severity: 'danger' },
+        accept: () => {
+            resetDayForm.date = props.dayReport.date
+            resetDayForm.post('/financeiro/contas-pagar/conciliacao/reset-day', {
+                onSuccess: () => { localImportResults.value = null },
+            })
+        },
+    })
 }
 
 function formatDate(d) {
@@ -142,13 +158,16 @@ function formatDate(d) {
     return new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR')
 }
 function formatMoney(v) {
-    return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    const n = Number(v)
+    if (Number.isNaN(n)) return '—'
+    return Math.abs(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 </script>
 
 <template>
     <AppLayout>
         <Toast />
+        <ConfirmDialog />
         <div class="px-3 pb-8 space-y-4">
             <h1 class="text-xl font-bold text-gray-800 pt-2">Conciliação Bancária</h1>
 
@@ -277,20 +296,46 @@ function formatMoney(v) {
 
                 <!-- Matched -->
                 <section v-if="matched.length">
-                    <p class="text-sm font-semibold text-gray-700 mb-2">✅ Sugestões de match</p>
-                    <div v-for="tx in matched" :key="tx.id" class="border border-gray-100 rounded-lg p-3 mb-2">
-                        <div class="flex justify-between text-sm">
-                            <span class="truncate text-gray-700 max-w-[60%]">{{ tx.description || '—' }}</span>
-                            <span class="font-medium">{{ formatMoney(tx.amount) }}</span>
+                    <p class="text-sm font-semibold text-gray-700 mb-1">Sugestões de match</p>
+                    <p class="text-xs text-gray-400 mb-2">OFX à esquerda · título à direita. Desfazer volta para “Só no OFX”.</p>
+                    <div v-for="tx in matched" :key="tx.id" class="border border-gray-200 rounded-xl overflow-hidden mb-3 bg-white">
+                        <div class="p-3 bg-slate-50 border-b border-gray-100">
+                            <p class="text-[10px] font-semibold uppercase text-slate-500 mb-1">Extrato OFX</p>
+                            <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                            <p class="text-xs text-gray-600 mt-1">
+                                <span class="font-semibold text-red-700 whitespace-nowrap">{{ formatMoney(tx.amount) }}</span>
+                                <span class="text-gray-400 mx-1">débito</span>
+                                <span>{{ formatDate(tx.date) }}</span>
+                            </p>
+                            <p v-if="tx.bank_account_name" class="text-xs text-gray-400 mt-0.5">{{ tx.bank_account_name }}</p>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">
-                            {{ tx.payable?.title_number ?? '—' }}
-                            <span v-if="tx.payable?.empresa_nome"> · {{ tx.payable.empresa_nome }}</span>
-                        </p>
-                        <p class="text-xs text-gray-400">{{ tx.payable?.supplier_name ?? '—' }}</p>
-                        <div v-if="isConciliador && tx.match_status === 'pending'" class="flex gap-2 mt-2">
-                            <button type="button" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded" @click="acceptTx(tx.id)">Aceitar</button>
-                            <button type="button" class="text-xs px-2 py-1 bg-red-100 text-red-700 rounded" @click="rejectTx(tx.id)">Rejeitar</button>
+                        <div class="p-3 bg-emerald-50/50">
+                            <p class="text-[10px] font-semibold uppercase text-emerald-700 mb-1">Título no Hub</p>
+                            <p class="text-sm font-medium text-gray-900">
+                                Nº {{ tx.payable?.title_number ?? '—' }}
+                                <span v-if="tx.payable?.nickname" class="font-normal text-gray-700"> — {{ tx.payable.nickname }}</span>
+                            </p>
+                            <p v-if="tx.payable?.description" class="text-xs text-gray-600 mt-1 leading-snug">{{ tx.payable.description }}</p>
+                            <p class="text-xs text-gray-800 mt-1.5 font-medium">{{ tx.payable?.supplier_name ?? '—' }}</p>
+                            <p class="text-xs text-gray-500 mt-1">{{ tx.payable?.empresa_nome || '—' }}</p>
+                            <p v-if="tx.payable?.filial_label" class="text-xs text-gray-400">{{ tx.payable.filial_label }}</p>
+                            <p class="text-xs text-gray-600 mt-1 whitespace-nowrap">
+                                {{ formatMoney(tx.payable?.amount) }}
+                                <span v-if="tx.payable?.paid_at" class="text-gray-400"> · pago {{ formatDate(tx.payable.paid_at) }}</span>
+                            </p>
+                        </div>
+                        <div v-if="isConciliador" class="px-3 py-2 border-t border-gray-100 flex gap-2 justify-end">
+                            <button
+                                v-if="tx.match_status === 'pending'"
+                                type="button"
+                                class="text-xs px-2.5 py-1.5 bg-green-600 text-white rounded-lg"
+                                @click="acceptTx(tx.id)"
+                            >Aceitar</button>
+                            <button
+                                type="button"
+                                class="text-xs px-2.5 py-1.5 border border-gray-200 text-gray-700 rounded-lg"
+                                @click="rejectTx(tx.id)"
+                            >{{ tx.match_status === 'pending' ? 'Rejeitar' : 'Desfazer' }}</button>
                         </div>
                     </div>
                 </section>
@@ -314,18 +359,21 @@ function formatMoney(v) {
 
                 <!-- OFX only -->
                 <section v-if="ofxOnly.length">
-                    <p class="text-sm font-semibold text-red-700 mb-2">🔴 Só no OFX</p>
-                    <div v-for="tx in ofxOnly" :key="tx.id" class="border border-red-100 rounded-lg p-3 mb-2">
-                        <div class="flex justify-between text-sm">
-                            <span class="truncate text-gray-700 max-w-[60%]">{{ tx.description || '—' }}</span>
-                            <span class="font-medium">{{ formatMoney(tx.amount) }}</span>
-                        </div>
+                    <p class="text-sm font-semibold text-red-700 mb-1">Só no OFX — sem título</p>
+                    <p class="text-xs text-gray-400 mb-2">Inclui débitos após rejeitar/desfazer. Pode vincular de novo.</p>
+                    <div v-for="tx in ofxOnly" :key="tx.id" class="border border-red-100 rounded-lg p-3 mb-2 bg-white">
+                        <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                        <p class="text-xs text-gray-600 mt-1">
+                            <span class="font-semibold">{{ formatMoney(tx.amount) }}</span>
+                            <span class="mx-1">·</span>{{ formatDate(tx.date) }}
+                        </p>
+                        <p v-if="tx.bank_account_name" class="text-xs text-gray-400 mt-0.5">{{ tx.bank_account_name }}</p>
                         <button
                             v-if="isConciliador"
                             type="button"
-                            class="mt-2 text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded"
+                            class="mt-2 text-xs px-2.5 py-1.5 bg-blue-600 text-white rounded-lg"
                             @click="linkTxId = tx.id; linkPayableId = null; linkSearchQuery = ''; linkResults = []"
-                        >Vincular</button>
+                        >Vincular título</button>
                     </div>
                 </section>
 

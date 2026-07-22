@@ -223,7 +223,11 @@ class ConciliationSessionService
             ->all();
 
         $transactions = BankTransaction::query()
-            ->with('matchedPayable:id,title_number,supplier_name,amount,paid_at,status,codemp,codfil')
+            ->with([
+                'matchedPayable:id,title_number,nickname,description,supplier_name,amount,paid_at,due_date,status,codemp,codfil',
+                'import:id,bank_account_id,bank_name,account_number,file_name',
+                'import.bankAccount:id,name,bank_code',
+            ])
             ->whereIn('import_id', $importIds)
             ->where('type', 'debit')
             ->orderByDesc('amount')
@@ -252,7 +256,8 @@ class ConciliationSessionService
                 continue;
             }
 
-            if ($tx->match_status === 'unmatched') {
+            // unmatched + rejected (legado) → só OFX, pode vincular de novo
+            if (in_array($tx->match_status, ['unmatched', 'rejected'], true)) {
                 $ofxOnly[] = $row;
             }
         }
@@ -316,6 +321,7 @@ class ConciliationSessionService
     private function mapTransactionRow(BankTransaction $tx): array
     {
         $payable = $tx->matchedPayable;
+        $import = $tx->import;
 
         return [
             'id' => $tx->id,
@@ -327,12 +333,17 @@ class ConciliationSessionService
             'match_status' => $tx->match_status,
             'match_confidence' => $tx->match_confidence,
             'matched_payable_id' => $tx->matched_payable_id,
+            'bank_account_name' => $import?->bankAccount?->name ?? $import?->bank_name,
+            'ofx_file_name' => $import?->file_name,
             'payable' => $payable ? [
                 'id' => $payable->id,
                 'title_number' => $payable->title_number,
+                'nickname' => $payable->nickname,
+                'description' => $payable->description,
                 'supplier_name' => $payable->supplier_name,
                 'amount' => (float) $payable->amount,
                 'paid_at' => $payable->paid_at?->toDateString(),
+                'due_date' => $payable->due_date?->toDateString(),
                 'status' => $payable->status,
                 'codemp' => $payable->codemp,
                 'empresa_nome' => $payable->empresa_nome,

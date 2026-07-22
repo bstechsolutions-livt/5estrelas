@@ -202,7 +202,7 @@ class BankConciliationTest extends DuskTestCase
 
         $this->assertDatabaseHas('bank_transactions', [
             'id' => $tx->id,
-            'match_status' => 'rejected',
+            'match_status' => 'unmatched',
             'matched_payable_id' => null,
         ]);
 

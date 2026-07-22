@@ -4,7 +4,9 @@ import { router, useForm, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Tag from 'primevue/tag'
 import Toast from 'primevue/toast'
+import ConfirmDialog from 'primevue/confirmdialog'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 
 const props = defineProps({
     isConciliador: Boolean,
@@ -16,13 +18,16 @@ const props = defineProps({
 })
 
 const toast = useToast()
+const confirm = useConfirm()
 const page = usePage()
 
 // ── Flash messages ────────────────────────────────────────────────────────────
 watch(() => page.props.flash, (flash) => {
     if (flash?.success) toast.add({ severity: 'success', summary: 'Sucesso', detail: flash.success, life: 5000 })
     if (flash?.error)   toast.add({ severity: 'error',   summary: 'Erro',    detail: flash.error,   life: 5000 })
-    if (flash?.importResults) localImportResults.value = flash.importResults
+    if (flash && Object.prototype.hasOwnProperty.call(flash, 'importResults')) {
+        localImportResults.value = flash.importResults?.length ? flash.importResults : null
+    }
 }, { deep: true })
 
 // ── Import results (flashed from session or from page prop on load) ───────────
@@ -156,11 +161,19 @@ const resetDayForm = useForm({ date: null })
 function resetDay() {
     if (!props.dayReport?.date || resetDayForm.processing) return
     const label = props.dayReport.label || props.dayReport.date
-    if (!confirm(`Resetar o dia ${label}?\n\nIsso apaga todos os extratos OFX deste dia para você importar de novo.\nOs títulos NÃO são alterados.`)) {
-        return
-    }
-    resetDayForm.date = props.dayReport.date
-    resetDayForm.post('/financeiro/contas-pagar/conciliacao/reset-day')
+    confirm.require({
+        header: 'Começar do zero',
+        message: `Apagar todos os extratos OFX de ${label} e importar de novo? Os títulos do Contas a Pagar não são alterados.`,
+        icon: 'pi pi-exclamation-triangle',
+        rejectProps: { label: 'Cancelar', severity: 'secondary', outlined: true },
+        acceptProps: { label: 'Apagar OFX do dia', severity: 'danger' },
+        accept: () => {
+            resetDayForm.date = props.dayReport.date
+            resetDayForm.post('/financeiro/contas-pagar/conciliacao/reset-day', {
+                onSuccess: () => { localImportResults.value = null },
+            })
+        },
+    })
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -168,8 +181,11 @@ function formatDate(d) {
     if (!d) return '—'
     return new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR')
 }
+/** Débitos OFX vêm negativos — mostra R$ sem traço quebrado na linha. */
 function formatMoney(v) {
-    return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    const n = Number(v)
+    if (Number.isNaN(n)) return '—'
+    return Math.abs(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 function statusTagSeverity(status) {
     return { pending: 'info', accepted: 'success', manual: 'success', rejected: 'danger', unmatched: 'warn' }[status] ?? 'secondary'
@@ -191,6 +207,7 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
 <template>
     <AppLayout>
         <Toast />
+        <ConfirmDialog />
         <div class="max-w-7xl mx-auto space-y-6">
 
             <!-- Header -->
@@ -380,56 +397,86 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                         </div>
                     </div>
 
-                    <!-- ── Matched ───────────────────────────────────────────────────── -->
+                    <!-- ── Matched: OFX × Título ─────────────────────────────────────── -->
                     <section v-if="matched.length" class="mb-6">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-2">✅ Sugestões de match</h3>
-                        <div class="overflow-x-auto rounded-lg border border-gray-100">
-                            <table class="w-full text-sm">
-                                <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
-                                    <tr>
-                                        <th class="px-3 py-2 text-left">Descrição OFX</th>
-                                        <th class="px-3 py-2 text-right">Valor</th>
-                                        <th class="px-3 py-2 text-left">Título</th>
-                                        <th class="px-3 py-2 text-left">Empresa</th>
-                                        <th class="px-3 py-2 text-left">Fornecedor</th>
-                                        <th class="px-3 py-2 text-center">Conf.</th>
-                                        <th class="px-3 py-2 text-center">Status</th>
-                                        <th v-if="isConciliador" class="px-3 py-2" />
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="tx in matched" :key="tx.id" class="border-t border-gray-50 hover:bg-gray-50">
-                                        <td class="px-3 py-2 text-gray-700 truncate max-w-xs">{{ tx.description || tx.memo || '—' }}</td>
-                                        <td class="px-3 py-2 text-right font-medium">{{ formatMoney(tx.amount) }}</td>
-                                        <td class="px-3 py-2">{{ tx.payable?.title_number ?? '—' }}</td>
-                                        <td class="px-3 py-2 text-xs text-gray-600">
-                                            {{ tx.payable?.empresa_nome || '—' }}
-                                            <span v-if="tx.payable?.filial_label" class="block text-gray-400">{{ tx.payable.filial_label }}</span>
-                                        </td>
-                                        <td class="px-3 py-2 truncate max-w-xs">{{ tx.payable?.supplier_name ?? '—' }}</td>
-                                        <td class="px-3 py-2 text-center">
-                                            <Tag :value="confidenceLabel(tx.match_confidence)" severity="info" class="text-xs" />
-                                        </td>
-                                        <td class="px-3 py-2 text-center">
-                                            <Tag :value="tx.match_status" :severity="statusTagSeverity(tx.match_status)" class="text-xs" />
-                                        </td>
-                                        <td v-if="isConciliador" class="px-3 py-2 text-right whitespace-nowrap space-x-2">
-                                            <button
-                                                v-if="tx.match_status === 'pending'"
-                                                type="button"
-                                                class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200"
-                                                @click="acceptTx(tx.id)"
-                                            >Aceitar</button>
-                                            <button
-                                                v-if="['pending', 'accepted', 'manual'].includes(tx.match_status)"
-                                                type="button"
-                                                class="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
-                                                @click="rejectTx(tx.id)"
-                                            >Rejeitar</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <h3 class="text-sm font-semibold text-gray-700 mb-1">Sugestões de match</h3>
+                        <p class="text-xs text-gray-400 mb-3">Esquerda = extrato bancário (OFX). Direita = título no Hub. Aceitar guarda; desfazer volta o débito para “Só no OFX”.</p>
+                        <div class="space-y-3">
+                            <div
+                                v-for="tx in matched"
+                                :key="tx.id"
+                                class="rounded-xl border border-gray-200 bg-white overflow-hidden"
+                            >
+                                <div class="grid md:grid-cols-[1fr_auto_1fr] gap-0">
+                                    <!-- OFX -->
+                                    <div class="p-4 bg-slate-50 border-b md:border-b-0 md:border-r border-gray-100">
+                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Extrato OFX</p>
+                                        <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                                        <p v-if="tx.memo && tx.description && tx.memo !== tx.description" class="text-xs text-gray-500 mt-1 leading-snug">{{ tx.memo }}</p>
+                                        <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600 items-baseline">
+                                            <span class="font-semibold text-red-700 text-sm whitespace-nowrap">{{ formatMoney(tx.amount) }}</span>
+                                            <span class="text-gray-400">débito</span>
+                                            <span>{{ formatDate(tx.date) }}</span>
+                                            <span v-if="tx.bank_account_name">{{ tx.bank_account_name }}</span>
+                                            <span v-if="tx.ofx_file_name" class="text-gray-400 truncate max-w-[12rem]">{{ tx.ofx_file_name }}</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- connector -->
+                                    <div class="hidden md:flex items-center justify-center px-2 bg-white">
+                                        <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold">↔</div>
+                                    </div>
+
+                                    <!-- Título -->
+                                    <div class="p-4 bg-emerald-50/40">
+                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 mb-2">Título no Hub</p>
+                                        <p class="text-sm font-medium text-gray-900">
+                                            Nº {{ tx.payable?.title_number ?? '—' }}
+                                            <span v-if="tx.payable?.nickname" class="font-normal text-gray-700"> — {{ tx.payable.nickname }}</span>
+                                        </p>
+                                        <p v-if="tx.payable?.description" class="text-xs text-gray-600 mt-1 leading-snug">{{ tx.payable.description }}</p>
+                                        <p class="text-xs text-gray-800 mt-2 leading-snug font-medium">{{ tx.payable?.supplier_name ?? '—' }}</p>
+                                        <div class="mt-3 space-y-1 text-xs text-gray-600">
+                                            <p>
+                                                <span class="text-gray-400">Empresa:</span>
+                                                {{ tx.payable?.empresa_nome || '—' }}
+                                            </p>
+                                            <p v-if="tx.payable?.filial_label">
+                                                <span class="text-gray-400">Filial:</span>
+                                                {{ tx.payable.filial_label }}
+                                            </p>
+                                            <p>
+                                                <span class="text-gray-400">Valor:</span>
+                                                <span class="font-semibold text-gray-900 whitespace-nowrap">{{ formatMoney(tx.payable?.amount) }}</span>
+                                                <span v-if="tx.payable?.paid_at" class="text-gray-400"> · pago {{ formatDate(tx.payable.paid_at) }}</span>
+                                                <span v-else-if="tx.payable?.due_date" class="text-gray-400"> · venc. {{ formatDate(tx.payable.due_date) }}</span>
+                                            </p>
+                                            <p class="flex flex-wrap gap-2 items-center pt-1">
+                                                <Tag :value="confidenceLabel(tx.match_confidence)" severity="info" class="text-xs" />
+                                                <Tag
+                                                    :value="tx.match_status === 'pending' ? 'Sugerido' : (tx.match_status === 'accepted' ? 'Aceito' : 'Manual')"
+                                                    :severity="statusTagSeverity(tx.match_status)"
+                                                    class="text-xs"
+                                                />
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div v-if="isConciliador" class="px-4 py-3 border-t border-gray-100 bg-white flex flex-wrap gap-2 justify-end">
+                                    <button
+                                        v-if="tx.match_status === 'pending'"
+                                        type="button"
+                                        class="text-sm px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                        @click="acceptTx(tx.id)"
+                                    >Aceitar</button>
+                                    <button
+                                        type="button"
+                                        class="text-sm px-3 py-1.5 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50"
+                                        @click="rejectTx(tx.id)"
+                                    >{{ tx.match_status === 'pending' ? 'Rejeitar sugestão' : 'Desfazer' }}</button>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
@@ -475,32 +522,31 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
 
                     <!-- ── OFX only ──────────────────────────────────────────────────── -->
                     <section v-if="ofxOnly.length" class="mb-6">
-                        <h3 class="text-sm font-semibold text-red-700 mb-2">🔴 Só no OFX — sem título</h3>
-                        <div class="overflow-x-auto rounded-lg border border-red-100">
-                            <table class="w-full text-sm">
-                                <thead class="bg-red-50 text-xs text-red-500 uppercase">
-                                    <tr>
-                                        <th class="px-3 py-2 text-left">Descrição</th>
-                                        <th class="px-3 py-2 text-right">Valor</th>
-                                        <th class="px-3 py-2 text-left">Data</th>
-                                        <th v-if="isConciliador" class="px-3 py-2" />
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="tx in ofxOnly" :key="tx.id" class="border-t border-red-50">
-                                        <td class="px-3 py-2 text-gray-700 truncate max-w-xs">{{ tx.description || tx.memo || '—' }}</td>
-                                        <td class="px-3 py-2 text-right">{{ formatMoney(tx.amount) }}</td>
-                                        <td class="px-3 py-2">{{ formatDate(tx.date) }}</td>
-                                        <td v-if="isConciliador" class="px-3 py-2 text-right">
-                                            <button
-                                                type="button"
-                                                class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                                                @click="openLink(tx.id)"
-                                            >Vincular</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <h3 class="text-sm font-semibold text-gray-700 mb-1">Só no OFX — sem título</h3>
+                        <p class="text-xs text-gray-400 mb-3">Débitos do extrato sem match (ou após desfazer uma sugestão). Dá para vincular manualmente a um título.</p>
+                        <div class="space-y-2">
+                            <div
+                                v-for="tx in ofxOnly"
+                                :key="tx.id"
+                                class="rounded-lg border border-gray-200 bg-white px-4 py-3 flex flex-wrap items-center gap-3 justify-between"
+                            >
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                                    <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                                        <span class="font-semibold text-red-700 whitespace-nowrap">{{ formatMoney(tx.amount) }}</span>
+                                        <span class="text-gray-400">débito</span>
+                                        <span>{{ formatDate(tx.date) }}</span>
+                                        <span v-if="tx.bank_account_name">{{ tx.bank_account_name }}</span>
+                                        <span v-if="tx.ofx_file_name" class="truncate max-w-[14rem]">{{ tx.ofx_file_name }}</span>
+                                    </div>
+                                </div>
+                                <button
+                                    v-if="isConciliador"
+                                    type="button"
+                                    class="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shrink-0"
+                                    @click="openLink(tx.id)"
+                                >Vincular título</button>
+                            </div>
                         </div>
                     </section>
 
