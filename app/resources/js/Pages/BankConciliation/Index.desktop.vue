@@ -425,8 +425,9 @@ watch(() => props.dayReport?.date, () => {
                             <button
                                 v-if="isConciliador && kpis && kpis.imports > 0"
                                 type="button"
-                                :disabled="batchDayForm.processing || dayConciliated"
-                                class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+                                :disabled="batchDayForm.processing || dayConciliated || !canConciliateDay"
+                                class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                :title="!canConciliateDay && !dayConciliated ? 'Resolva pendências do OFX antes de conciliar' : undefined"
                                 @click="batchDay"
                             >
                                 {{ dayConciliated ? 'Dia já conciliado' : 'Conciliar dia' }}
@@ -444,7 +445,11 @@ watch(() => props.dayReport?.date, () => {
                         v-else-if="isConciliador && (dayReport.conciliate_blockers?.length)"
                         class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
                     >
-                        <p class="font-medium mb-1">Para conciliar o dia por completo:</p>
+                        <p class="font-medium mb-1">Dia incompleto — Conciliar dia bloqueado</p>
+                        <p class="text-xs text-amber-800/80 mb-2">
+                            Todo débito do OFX precisa estar resolvido (match aceito ou tarifa/aplicação/resgate).
+                            Títulos só no sistema (sem OFX) podem sobrar e não bloqueiam.
+                        </p>
                         <ul class="list-disc pl-5 space-y-0.5">
                             <li v-for="(b, i) in dayReport.conciliate_blockers" :key="i">{{ b }}</li>
                         </ul>
@@ -742,7 +747,7 @@ watch(() => props.dayReport?.date, () => {
                             <i :class="['pi text-gray-400 text-xs', isSectionOpen('payable_only') ? 'pi-chevron-down' : 'pi-chevron-right']" />
                             <div class="min-w-0 flex-1">
                                 <p class="text-sm font-semibold text-gray-700">Só no sistema — sem OFX</p>
-                                <p class="text-xs text-gray-400">Títulos pagos sem extrato neste dia</p>
+                                <p class="text-xs text-gray-400">Pode sobrar — não bloqueia a conciliação do dia</p>
                             </div>
                             <div class="text-right shrink-0">
                                 <p class="text-sm font-bold text-gray-800">{{ payableOnly.length }}</p>
