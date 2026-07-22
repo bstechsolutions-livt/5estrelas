@@ -181,6 +181,7 @@ class BankConciliationController extends Controller
                     'date' => null,
                     'bank_account_id' => null,
                     'bank_account_name' => null,
+                    'account_created' => false,
                     'debit_count' => 0,
                     'credit_count' => 0,
                     'transaction_count' => 0,
@@ -412,8 +413,6 @@ class BankConciliationController extends Controller
         try {
             /** @var OfxParserService $parser */
             $parser = app(OfxParserService::class);
-            /** @var BankAccountMatcher $accountMatcher */
-            $accountMatcher = app(BankAccountMatcher::class);
             /** @var OfxImportService $importer */
             $importer = app(OfxImportService::class);
 
@@ -423,11 +422,32 @@ class BankConciliationController extends Controller
             // Auto-detect date — will throw if OFX covers multiple days
             $statementDate = $importer->assertSingleDay($parsed);
 
-            // Resolve bank account from OFX metadata if not passed explicitly
-            $resolvedAccountId = $bankAccountId
-                ?? $accountMatcher->suggest($parsed->meta->bankId, $parsed->meta->accountId)?->id;
+            $resolved = null;
+            if ($bankAccountId !== null) {
+                $forced = BankAccount::find($bankAccountId);
+                if ($forced === null) {
+                    return [
+                        'ok' => false,
+                        'file_name' => $fileName,
+                        'date' => $statementDate->toDateString(),
+                        'bank_account_id' => null,
+                        'bank_account_name' => null,
+                        'account_created' => false,
+                        'debit_count' => 0,
+                        'credit_count' => 0,
+                        'transaction_count' => 0,
+                        'import_id' => null,
+                        'error' => 'Conta Hub informada não encontrada.',
+                    ];
+                }
+                $resolved = ['account' => $forced, 'created' => false];
+            } else {
+                /** @var BankAccountMatcher $accountMatcher */
+                $accountMatcher = app(BankAccountMatcher::class);
+                $resolved = $accountMatcher->resolveOrCreate($parsed->meta, $user);
+            }
 
-            if ($resolvedAccountId === null) {
+            if ($resolved === null) {
                 $acct = $parsed->meta->accountId ?? '?';
 
                 return [
@@ -436,13 +456,18 @@ class BankConciliationController extends Controller
                     'date' => $statementDate->toDateString(),
                     'bank_account_id' => null,
                     'bank_account_name' => null,
+                    'account_created' => false,
                     'debit_count' => 0,
                     'credit_count' => 0,
                     'transaction_count' => 0,
                     'import_id' => null,
-                    'error' => "Conta OFX {$acct} não cadastrada no Hub.",
+                    'error' => "Não foi possível identificar a conta OFX {$acct}.",
                 ];
             }
+
+            $account = $resolved['account'];
+            $accountCreated = $resolved['created'];
+            $resolvedAccountId = $account->id;
 
             $session = $sessions->resolve($resolvedAccountId, $statementDate, $user);
             $skipFitIds = $sessions->existingFitIdsInSession($session);
@@ -460,27 +485,48 @@ class BankConciliationController extends Controller
             );
 
             $import = $result['import'];
-            $bankAccount = BankAccount::find($resolvedAccountId);
 
             AuditLogger::log(
                 event: 'contas_pagar.ofx_importado',
                 module: 'financeiro.contas_pagar',
-                description: "Importação OFX: {$fileName} ({$import->bank_name}), {$import->transaction_count} transações",
+                description: "Importação OFX: {$fileName} ({$import->bank_name}), {$import->transaction_count} transações"
+                    .($accountCreated ? ' — conta criada automaticamente' : ''),
                 auditable: $import,
                 newValues: [
                     'bank_name' => $import->bank_name,
                     'account_number' => $import->account_number,
                     'transaction_count' => $import->transaction_count,
                     'conciliation_session_id' => $session->id,
+                    'bank_account_id' => $resolvedAccountId,
+                    'account_created' => $accountCreated,
+                    'balance' => $import->balance,
+                    'statement_date' => $result['statement_date'],
                 ],
             );
+
+            if ($import->balance !== null) {
+                AuditLogger::log(
+                    event: 'financeiro.bancos.saldo_atualizado_ofx',
+                    module: 'financeiro.bancos',
+                    description: "Saldo da conta {$account->name} atualizado via OFX ({$fileName}): "
+                        .number_format((float) $import->balance, 2, ',', '.'),
+                    auditable: $account,
+                    newValues: [
+                        'balance' => $import->balance,
+                        'balance_date' => $import->period_end?->toDateString() ?? $result['statement_date'],
+                        'import_id' => $import->id,
+                        'file_name' => $fileName,
+                    ],
+                );
+            }
 
             return [
                 'ok' => true,
                 'file_name' => $fileName,
                 'date' => $result['statement_date'],
                 'bank_account_id' => $resolvedAccountId,
-                'bank_account_name' => $bankAccount?->name,
+                'bank_account_name' => $account->name,
+                'account_created' => $accountCreated,
                 'debit_count' => $result['debit_count'],
                 'credit_count' => $result['credit_count'],
                 'transaction_count' => $import->transaction_count,
@@ -494,6 +540,7 @@ class BankConciliationController extends Controller
                 'date' => null,
                 'bank_account_id' => null,
                 'bank_account_name' => null,
+                'account_created' => false,
                 'debit_count' => 0,
                 'credit_count' => 0,
                 'transaction_count' => 0,
@@ -507,6 +554,7 @@ class BankConciliationController extends Controller
                 'date' => null,
                 'bank_account_id' => null,
                 'bank_account_name' => null,
+                'account_created' => false,
                 'debit_count' => 0,
                 'credit_count' => 0,
                 'transaction_count' => 0,

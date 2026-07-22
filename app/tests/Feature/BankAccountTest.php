@@ -295,4 +295,92 @@ class BankAccountTest extends TestCase
         $this->assertNotNull($import);
         $this->assertSame($account->id, $import->bank_account_id);
     }
+
+    public function test_ofx_upload_auto_creates_account_from_catalog_and_updates_balance(): void
+    {
+        $user = $this->userWith([
+            'financeiro.contas_pagar.visualizar',
+            'financeiro.conciliacao.visualizar',
+        ]);
+        PayableRole::create(['role' => 'conciliador', 'user_id' => $user->id]);
+
+        $this->assertDatabaseCount('bank_accounts', 0);
+
+        $path = base_path('tests/fixtures/ofx/brb.ofx');
+        $file = new UploadedFile($path, 'brb.ofx', 'application/octet-stream', null, true);
+
+        $this->actingAs($user)
+            ->post(route('bank-conciliation.upload'), ['file' => $file])
+            ->assertRedirect()
+            ->assertSessionHas('importResults');
+
+        $results = session('importResults');
+        $this->assertTrue($results[0]['ok']);
+        $this->assertTrue($results[0]['account_created']);
+        $this->assertSame('FILIAL GO — BRB', $results[0]['bank_account_name']);
+
+        $account = BankAccount::first();
+        $this->assertNotNull($account);
+        $this->assertSame('070', $account->bank_code);
+        $this->assertSame('046', $account->agency);
+        $this->assertSame('000132', $account->account_number);
+        $this->assertSame('9', $account->account_digit);
+        $this->assertNotNull($account->opening_balance);
+
+        $import = BankStatementImport::first();
+        $this->assertSame($account->id, $import->bank_account_id);
+        $this->assertNotNull($import->balance);
+        $this->assertNotNull($import->conciliation_session_id);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'financeiro.bancos.conta_criada_ofx',
+            'module' => 'financeiro.bancos',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'financeiro.bancos.saldo_atualizado_ofx',
+            'module' => 'financeiro.bancos',
+        ]);
+    }
+
+    public function test_second_ofx_upload_reuses_auto_created_account(): void
+    {
+        $user = $this->userWith([
+            'financeiro.contas_pagar.visualizar',
+            'financeiro.conciliacao.visualizar',
+        ]);
+        PayableRole::create(['role' => 'conciliador', 'user_id' => $user->id]);
+
+        $fixture = base_path('tests/fixtures/ofx/brb.ofx');
+        $content = file_get_contents($fixture);
+
+        $tmp1 = sys_get_temp_dir().'/brb1_'.uniqid().'.ofx';
+        $tmp2 = sys_get_temp_dir().'/brb2_'.uniqid().'.ofx';
+        file_put_contents($tmp1, $content);
+        file_put_contents($tmp2, $content);
+
+        $this->actingAs($user)
+            ->post(route('bank-conciliation.upload'), [
+                'file' => new UploadedFile($tmp1, 'brb1.ofx', 'application/octet-stream', null, true),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseCount('bank_accounts', 1);
+
+        $second = $this->actingAs($user)
+            ->post(route('bank-conciliation.upload'), [
+                'file' => new UploadedFile($tmp2, 'brb2.ofx', 'application/octet-stream', null, true),
+            ]);
+
+        $second->assertRedirect();
+        if (! session('success')) {
+            $this->fail('Second upload failed: '.json_encode(session('importResults') ?? session('error')));
+        }
+
+        $this->assertDatabaseCount('bank_accounts', 1);
+        $results = session('importResults');
+        $this->assertTrue($results[0]['ok'], $results[0]['error'] ?? 'unknown');
+        $this->assertFalse($results[0]['account_created']);
+        $this->assertDatabaseCount('bank_statement_imports', 2);
+    }
 }

@@ -36,16 +36,28 @@ class ConciliationSessionService
     {
         $date = $referenceDate->toDateString();
 
-        return ConciliationSession::firstOrCreate(
-            [
+        $existing = ConciliationSession::query()
+            ->where('bank_account_id', $bankAccountId)
+            ->whereDate('reference_date', $date)
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        try {
+            return ConciliationSession::create([
                 'bank_account_id' => $bankAccountId,
                 'reference_date' => $date,
-            ],
-            [
                 'status' => 'open',
                 'created_by' => $user?->id,
-            ],
-        );
+            ]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+            return ConciliationSession::query()
+                ->where('bank_account_id', $bankAccountId)
+                ->whereDate('reference_date', $date)
+                ->firstOrFail();
+        }
     }
 
     public function summary(ConciliationSession $session): array

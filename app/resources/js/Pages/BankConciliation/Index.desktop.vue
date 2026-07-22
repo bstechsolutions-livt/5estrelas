@@ -242,6 +242,7 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                         </p>
                         <div v-if="card.ok" class="mt-2 space-y-1 text-xs text-green-700">
                             <p>{{ formatDate(card.date) }} · {{ card.bank_account_name ?? 'Conta não identificada' }}</p>
+                            <p v-if="card.account_created" class="text-amber-700 font-medium">Conta criada automaticamente no Hub</p>
                             <p>{{ card.transaction_count }} transações ({{ card.debit_count }} déb / {{ card.credit_count }} créd)</p>
                             <button
                                 v-if="showOpenDayLink(card)"
