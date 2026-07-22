@@ -582,4 +582,45 @@ OFX;
         $this->assertCount(1, $data);
         $this->assertEquals('TIT-PAGO-1', $data[0]['title_number']);
     }
+
+    public function test_reset_day_deletes_imports_and_sessions_without_touching_payables(): void
+    {
+        $user = $this->conciliador();
+        $account = $this->createBankAccount();
+        $sessions = app(ConciliationSessionService::class);
+        $session = $sessions->resolve($account->id, Carbon::parse('2026-06-16'), $user);
+
+        $import = BankStatementImport::create([
+            'user_id' => $user->id,
+            'bank_account_id' => $account->id,
+            'conciliation_session_id' => $session->id,
+            'bank_name' => 'BRB',
+            'bank_id' => '070',
+            'account_number' => '0460001329',
+            'file_name' => 'dia16.ofx',
+            'file_path' => 'ofx/tmp/dia16.ofx',
+            'status' => 'done',
+            'transaction_count' => 1,
+            'matched_count' => 0,
+        ]);
+        $this->createTransaction($import, ['match_status' => 'unmatched']);
+
+        $payable = Payable::create([
+            'title_number' => 'TIT-KEEP',
+            'supplier_name' => 'Keep',
+            'amount' => 100,
+            'due_date' => '2026-06-01',
+            'status' => 'pago',
+            'paid_at' => '2026-06-16',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('bank-conciliation.reset-day'), ['date' => '2026-06-16'])
+            ->assertRedirect(route('bank-conciliation.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('bank_statement_imports', ['id' => $import->id]);
+        $this->assertDatabaseMissing('conciliation_sessions', ['id' => $session->id]);
+        $this->assertDatabaseHas('payables', ['id' => $payable->id, 'status' => 'pago']);
+    }
 }

@@ -321,6 +321,36 @@ class BankConciliationController extends Controller
         return back()->with('success', $msg);
     }
 
+    /**
+     * Apaga todos os extratos/sessões do dia para reimportar do zero.
+     * Não altera títulos.
+     */
+    public function resetDay(Request $request, ConciliationSessionService $sessions): RedirectResponse
+    {
+        $this->ensureConciliador($request);
+
+        $request->validate([
+            'date' => ['required', 'date'],
+        ]);
+
+        $date = Carbon::parse($request->input('date'))->startOfDay();
+
+        try {
+            $result = $sessions->resetDay($date, $request->user());
+        } catch (\RuntimeException $e) {
+            return redirect()->route('bank-conciliation.index', ['date' => $date->toDateString()])
+                ->with('error', $e->getMessage());
+        }
+
+        if ($result['deleted_imports'] === 0) {
+            return redirect()->route('bank-conciliation.index')
+                ->with('warning', 'Nenhum extrato para resetar neste dia.');
+        }
+
+        return redirect()->route('bank-conciliation.index')
+            ->with('success', "Dia {$date->format('d/m/Y')} resetado: {$result['deleted_imports']} extrato(s) removido(s). Pode importar de novo.");
+    }
+
     public function destroy(Request $request, int $importId): RedirectResponse
     {
         $this->ensureConciliador($request);

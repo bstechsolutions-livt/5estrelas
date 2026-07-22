@@ -8,6 +8,7 @@ use App\Models\ConciliationSession;
 use App\Models\Payable;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class ConciliationSessionService
 {
@@ -385,6 +386,88 @@ class ConciliationSessionService
                 ->all();
         }
         unset($row);
+    }
+
+    /**
+     * Apaga todos os OFX/sessões do dia para recomeçar do zero.
+     * Não altera títulos (payables). Bloqueia se houver vínculo com título já conciliado.
+     *
+     * @return array{deleted_imports: int, deleted_sessions: int}
+     */
+    public function resetDay(Carbon $referenceDate, ?User $user = null): array
+    {
+        $date = $referenceDate->toDateString();
+
+        $sessions = ConciliationSession::query()
+            ->whereDate('reference_date', $date)
+            ->get();
+
+        if ($sessions->isEmpty()) {
+            return ['deleted_imports' => 0, 'deleted_sessions' => 0];
+        }
+
+        $imports = BankStatementImport::query()
+            ->whereIn('conciliation_session_id', $sessions->pluck('id'))
+            ->get();
+
+        $blocked = BankTransaction::query()
+            ->whereIn('import_id', $imports->pluck('id'))
+            ->whereIn('match_status', ['accepted', 'manual'])
+            ->whereHas('matchedPayable', fn ($q) => $q->where('status', 'conciliado'))
+            ->exists();
+
+        if ($blocked) {
+            throw new \RuntimeException(
+                'Não é possível resetar este dia: há matches vinculados a títulos já conciliados.'
+            );
+        }
+
+        $deletedImports = 0;
+        foreach ($imports as $import) {
+            AuditLogger::log(
+                event: 'contas_pagar.ofx_excluido',
+                module: 'financeiro.contas_pagar',
+                description: "Reset do dia {$date}: OFX excluído {$import->file_name} ({$import->bank_name})",
+                auditable: $import,
+                oldValues: [
+                    'bank_name' => $import->bank_name,
+                    'account_number' => $import->account_number,
+                    'transaction_count' => $import->transaction_count,
+                    'reference_date' => $date,
+                    'reset_by' => $user?->id,
+                ],
+            );
+
+            if ($import->file_path) {
+                Storage::disk('local')->delete($import->file_path);
+            }
+
+            $import->delete();
+            $deletedImports++;
+        }
+
+        $deletedSessions = 0;
+        foreach ($sessions as $session) {
+            $session->delete();
+            $deletedSessions++;
+        }
+
+        AuditLogger::log(
+            event: 'contas_pagar.conciliacao_dia_reset',
+            module: 'financeiro.contas_pagar',
+            description: "Conciliação do dia {$date} resetada: {$deletedImports} extrato(s), {$deletedSessions} sessão(ões)",
+            newValues: [
+                'date' => $date,
+                'deleted_imports' => $deletedImports,
+                'deleted_sessions' => $deletedSessions,
+                'user_id' => $user?->id,
+            ],
+        );
+
+        return [
+            'deleted_imports' => $deletedImports,
+            'deleted_sessions' => $deletedSessions,
+        ];
     }
 
     public function periodLabel(Carbon $referenceDate): string

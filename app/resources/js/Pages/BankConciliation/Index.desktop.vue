@@ -152,6 +152,17 @@ function batchDay() {
     })
 }
 
+const resetDayForm = useForm({ date: null })
+function resetDay() {
+    if (!props.dayReport?.date || resetDayForm.processing) return
+    const label = props.dayReport.label || props.dayReport.date
+    if (!confirm(`Resetar o dia ${label}?\n\nIsso apaga todos os extratos OFX deste dia para você importar de novo.\nOs títulos NÃO são alterados.`)) {
+        return
+    }
+    resetDayForm.date = props.dayReport.date
+    resetDayForm.post('/financeiro/contas-pagar/conciliacao/reset-day')
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDate(d) {
     if (!d) return '—'
@@ -315,15 +326,26 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
                                 {{ dayReport.accounts?.map(a => a.name).join(', ') || 'Nenhuma conta com extrato neste dia' }}
                             </p>
                         </div>
-                        <button
-                            v-if="isConciliador && kpis && kpis.accepted > 0"
-                            type="button"
-                            :disabled="batchDayForm.processing"
-                            class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
-                            @click="batchDay"
-                        >
-                            Conciliar aceitos do dia ({{ kpis.accepted }})
-                        </button>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button
+                                v-if="isConciliador && kpis && kpis.imports > 0"
+                                type="button"
+                                :disabled="resetDayForm.processing"
+                                class="px-3 py-2 text-sm rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                @click="resetDay"
+                            >
+                                Começar do zero
+                            </button>
+                            <button
+                                v-if="isConciliador && kpis && kpis.accepted > 0"
+                                type="button"
+                                :disabled="batchDayForm.processing"
+                                class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+                                @click="batchDay"
+                            >
+                                Conciliar aceitos do dia ({{ kpis.accepted }})
+                            </button>
+                        </div>
                     </div>
 
                     <div
