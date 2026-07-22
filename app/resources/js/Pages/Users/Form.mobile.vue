@@ -48,6 +48,7 @@ const form = useForm({
     department_id: props.user?.department_id || null,
     senior_cod_usu: props.user?.senior_cod_usu || null,
     branch_ids: props.user?.branch_ids || [],
+    extra_department_ids: props.user?.extra_department_ids || [],
     representatives: (props.representatives || []).map((r) => ({
         id: r.id || null,
         representative_id: r.representative_id,
@@ -61,6 +62,12 @@ const form = useForm({
 
 const branchOptions = computed(() =>
     (props.branches || []).map(b => ({ label: b.name, value: b.id })),
+)
+
+const extraDepartmentOptions = computed(() =>
+    (props.departments || [])
+        .filter(d => d.id !== form.department_id)
+        .map(d => ({ label: d.name, value: d.id })),
 )
 
 const departmentOptions = computed(() => [
@@ -178,6 +185,21 @@ function cancel() {
                         class="w-full"
                     />
                     <p class="text-[11px] text-gray-500 mt-1">Vazio = sem permissão para nenhuma filial.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Departamentos extras (Financeiro)</label>
+                    <MultiSelect
+                        v-model="form.extra_department_ids"
+                        :options="extraDepartmentOptions"
+                        option-label="label"
+                        option-value="value"
+                        placeholder="Além do principal"
+                        display="chip"
+                        filter
+                        class="w-full"
+                        dusk="user-extra-department-ids"
+                    />
+                    <p class="text-[11px] text-gray-500 mt-1">Libera visão no Contas a Pagar / Borderôs além do departamento principal.</p>
                 </div>
                 <div class="flex items-center gap-3 pt-1">
                     <ToggleSwitch v-model="form.is_active" inputId="active" />

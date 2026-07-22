@@ -22,7 +22,7 @@ class UserController extends Controller
         $page = (int) $request->input('page', 1);
 
         $query = User::query()
-            ->with(['department:id,name', 'branches:id,name,code'])
+            ->with(['department:id,name', 'branches:id,name,code', 'extraDepartments:id,name'])
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -69,6 +69,8 @@ class UserController extends Controller
             'senior_cod_usu' => ['nullable', 'integer', 'min:1'],
             'branch_ids' => ['nullable', 'array'],
             'branch_ids.*' => ['integer', 'exists:branches,id'],
+            'extra_department_ids' => ['nullable', 'array'],
+            'extra_department_ids.*' => ['integer', 'exists:departments,id'],
             'representatives' => ['nullable', 'array'],
             'representatives.*.id' => ['nullable', 'integer'],
             'representatives.*.representative_id' => ['required', 'integer', 'exists:users,id'],
@@ -104,6 +106,10 @@ class UserController extends Controller
             );
         }
 
+        $user->extraDepartments()->sync(
+            $this->normalizeExtraDepartmentIds($data['extra_department_ids'] ?? [], $user->department_id)
+        );
+
         app(UserRepresentativeService::class)->syncForUser($user, $data['representatives'] ?? [], $request->user());
 
         return redirect('/usuarios')->with('success', 'Usuário criado com sucesso.');
@@ -111,7 +117,7 @@ class UserController extends Controller
 
     public function edit(int $id, UserRepresentativeService $reps)
     {
-        $user = User::with('branches:id')->findOrFail($id);
+        $user = User::with(['branches:id', 'extraDepartments:id'])->findOrFail($id);
 
         return Inertia::render('Users/Form', [
             'mode' => 'edit',
@@ -123,6 +129,7 @@ class UserController extends Controller
                 'department_id' => $user->department_id,
                 'senior_cod_usu' => $user->senior_cod_usu,
                 'branch_ids' => $user->branches->pluck('id')->all(),
+                'extra_department_ids' => $user->extraDepartments->pluck('id')->all(),
             ],
             'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'branches' => $this->branchOptions(),
@@ -145,6 +152,8 @@ class UserController extends Controller
             'senior_cod_usu' => ['nullable', 'integer', 'min:1'],
             'branch_ids' => ['nullable', 'array'],
             'branch_ids.*' => ['integer', 'exists:branches,id'],
+            'extra_department_ids' => ['nullable', 'array'],
+            'extra_department_ids.*' => ['integer', 'exists:departments,id'],
             'representatives' => ['nullable', 'array'],
             'representatives.*.id' => ['nullable', 'integer'],
             'representatives.*.representative_id' => ['required', 'integer', 'exists:users,id', Rule::notIn([$user->id])],
@@ -186,6 +195,10 @@ class UserController extends Controller
             );
         }
 
+        $user->extraDepartments()->sync(
+            $this->normalizeExtraDepartmentIds($data['extra_department_ids'] ?? [], $user->department_id)
+        );
+
         app(UserRepresentativeService::class)->syncForUser($user, $data['representatives'] ?? [], $request->user());
 
         AuditLogger::log(
@@ -204,6 +217,25 @@ class UserController extends Controller
     {
         return collect($ids)
             ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Extras além do departamento principal (dedupe do home).
+     *
+     * @param  array<int, mixed>  $ids
+     * @return list<int>
+     */
+    private function normalizeExtraDepartmentIds(array $ids, ?int $homeDepartmentId): array
+    {
+        $home = $homeDepartmentId ? (int) $homeDepartmentId : null;
+
+        return collect($ids)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0 && $id !== $home)
             ->unique()
             ->sort()
             ->values()

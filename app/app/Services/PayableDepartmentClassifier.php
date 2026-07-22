@@ -59,15 +59,42 @@ class PayableDepartmentClassifier
     /** Restringe a query aos títulos do departamento (workflow + lançador Senior). Sem fallback. */
     public function applyDepartmentFilter(Builder $query, int $departmentId): void
     {
-        $department = Department::find($departmentId);
-        if (! $department) {
+        $this->applyDepartmentFilterForIds($query, [$departmentId]);
+    }
+
+    /**
+     * União de vários departamentos (workflow + lançador Senior de cada um).
+     *
+     * @param  list<int>  $departmentIds
+     */
+    public function applyDepartmentFilterForIds(Builder $query, array $departmentIds): void
+    {
+        $departmentIds = array_values(array_unique(array_filter(
+            array_map('intval', $departmentIds),
+            fn (int $id) => $id > 0,
+        )));
+
+        if ($departmentIds === []) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+
+        $activeIds = Department::query()
+            ->whereIn('id', $departmentIds)
+            ->where('is_active', true)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if ($activeIds === []) {
             $query->whereRaw('0 = 1');
 
             return;
         }
 
         $launcherCodUsus = User::query()
-            ->where('department_id', $department->id)
+            ->whereIn('department_id', $activeIds)
             ->whereNotNull('senior_cod_usu')
             ->pluck('senior_cod_usu')
             ->map(fn ($v) => (int) $v)
@@ -80,8 +107,8 @@ class PayableDepartmentClassifier
         // que também tem department_id/senior_cod_usu) tornam a referência ambígua.
         $table = $query->getModel()->getTable();
 
-        $query->where(function (Builder $q) use ($table, $department, $launcherCodUsus) {
-            $q->where("{$table}.department_id", $department->id);
+        $query->where(function (Builder $q) use ($table, $activeIds, $launcherCodUsus) {
+            $q->whereIn("{$table}.department_id", $activeIds);
 
             if ($launcherCodUsus !== []) {
                 $q->orWhere(function (Builder $inner) use ($table, $launcherCodUsus) {

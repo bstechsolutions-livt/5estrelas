@@ -12,30 +12,32 @@ class AuthorizationPanelService
 {
     public function build(User $user): array
     {
-        $departmentId = app(FinanceiroDepartmentScope::class)->resolve($user);
+        $allowedIds = app(FinanceiroDepartmentScope::class)->allowedDepartmentIds($user);
         $canBorderos = $user->hasPermission('*') || $user->hasPermission('financeiro.borderos.visualizar');
         $workflow = app(ApprovalWorkflowService::class);
 
-        $summary = $this->summaryCounts($user, $departmentId, $canBorderos);
+        $summary = $this->summaryCounts($user, $canBorderos);
         $myAction = $this->itemsAwaitingMyAction($user, $workflow, $canBorderos);
-        $inApproval = $this->itemsInApproval($user, $departmentId, $canBorderos, 30);
+        $inApproval = $this->itemsInApproval($user, $canBorderos, 30);
+
+        $lockedDepartment = ($allowedIds !== null && count($allowedIds) === 1)
+            ? Department::whereKey($allowedIds[0])->first(['id', 'name'])
+            : null;
 
         return [
             'summary' => $summary,
             'my_action' => $myAction,
             'in_approval' => $inApproval,
-            'department' => $departmentId
-                ? Department::whereKey($departmentId)->first(['id', 'name'])?->only(['id', 'name'])
-                : null,
+            'department' => $lockedDepartment?->only(['id', 'name']),
             'permissions' => ['borderos' => $canBorderos],
             'no_branch_access' => app(PayableBranchScope::class)->resolve($user)['no_branch_access'],
         ];
     }
 
-    private function payableQuery(?int $departmentId, User $user): Builder
+    private function payableQuery(User $user): Builder
     {
         $query = Payable::query();
-        app(FinanceiroDepartmentScope::class)->applyFilter($query, $departmentId);
+        app(FinanceiroDepartmentScope::class)->applyPayableFilter($query, $user);
         app(PayableBranchScope::class)->applyFilter($query, $user);
 
         return $query;
@@ -53,15 +55,15 @@ class AuthorizationPanelService
         return $query;
     }
 
-    private function summaryCounts(User $user, ?int $departmentId, bool $canBorderos): array
+    private function summaryCounts(User $user, bool $canBorderos): array
     {
-        $aguardandoPayables = (clone $this->payableQuery($departmentId, $user))
+        $aguardandoPayables = (clone $this->payableQuery($user))
             ->where('status', 'aguardando_aprovacao');
 
-        $aprovadoPayables = (clone $this->payableQuery($departmentId, $user))
+        $aprovadoPayables = (clone $this->payableQuery($user))
             ->where('status', 'aprovado');
 
-        $recusadoPayables = (clone $this->payableQuery($departmentId, $user))
+        $recusadoPayables = (clone $this->payableQuery($user))
             ->where('status', 'pendente')
             ->whereNotNull('rejection_reason')
             ->where(function (Builder $q) {
@@ -157,9 +159,9 @@ class AuthorizationPanelService
         return $items;
     }
 
-    private function itemsInApproval(User $user, ?int $departmentId, bool $canBorderos, int $limit): array
+    private function itemsInApproval(User $user, bool $canBorderos, int $limit): array
     {
-        $payables = $this->payableQuery($departmentId, $user)
+        $payables = $this->payableQuery($user)
             ->where('status', 'aguardando_aprovacao')
             ->with(['preparer:id,name'])
             ->orderByDesc('sent_for_approval_at')

@@ -123,19 +123,24 @@ class StorePayableRequest extends FormRequest
 
             $deptScope = app(FinanceiroDepartmentScope::class);
             $departmentId = $this->input('department_id');
+            $allowed = $deptScope->allowedDepartmentIds($user);
 
-            if (! $deptScope->canBypass($user)) {
-                $locked = $deptScope->resolve($user);
-                if ($locked === null) {
-                    $validator->errors()->add('department_id', 'Seu usuário não possui departamento vinculado.');
-                } elseif ($departmentId !== null && (int) $departmentId !== $locked) {
-                    $validator->errors()->add('department_id', 'Você só pode lançar títulos no seu departamento.');
+            if ($deptScope->canBypass($user)) {
+                if ($departmentId) {
+                    $active = Department::whereKey((int) $departmentId)->where('is_active', true)->exists();
+                    if (! $active) {
+                        $validator->errors()->add('department_id', 'Departamento inválido ou inativo.');
+                    }
                 }
-            } elseif ($departmentId) {
-                $active = Department::whereKey((int) $departmentId)->where('is_active', true)->exists();
-                if (! $active) {
-                    $validator->errors()->add('department_id', 'Departamento inválido ou inativo.');
-                }
+            } elseif ($allowed === null || $allowed === []) {
+                $validator->errors()->add('department_id', 'Seu usuário não possui departamento vinculado.');
+            } elseif ($departmentId !== null && ! in_array((int) $departmentId, $allowed, true)) {
+                $validator->errors()->add(
+                    'department_id',
+                    count($allowed) === 1
+                        ? 'Você só pode lançar títulos no seu departamento.'
+                        : 'Você só pode lançar títulos nos departamentos liberados.'
+                );
             }
         });
     }
@@ -180,9 +185,25 @@ class StorePayableRequest extends FormRequest
 
         $deptScope = app(FinanceiroDepartmentScope::class);
         $user = $this->user();
-        $departmentId = $deptScope->canBypass($user)
-            ? ($this->filled('department_id') ? (int) $this->input('department_id') : null)
-            : $deptScope->resolve($user);
+        if ($deptScope->canBypass($user)) {
+            $departmentId = $this->filled('department_id') ? (int) $this->input('department_id') : null;
+        } else {
+            $allowed = $deptScope->allowedDepartmentIds($user) ?? [];
+            if (count($allowed) === 1) {
+                $departmentId = $allowed[0];
+            } elseif ($allowed === []) {
+                $departmentId = null;
+            } else {
+                $requested = $this->filled('department_id') ? (int) $this->input('department_id') : null;
+                if ($requested && in_array($requested, $allowed, true)) {
+                    $departmentId = $requested;
+                } elseif ($user->department_id && in_array((int) $user->department_id, $allowed, true)) {
+                    $departmentId = (int) $user->department_id;
+                } else {
+                    $departmentId = $allowed[0];
+                }
+            }
+        }
 
         return [
             'title_number' => $titleNumber,

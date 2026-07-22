@@ -288,11 +288,12 @@ class PayableController extends Controller
             ),
             'empresas' => app(PayableBranchScope::class)->empresaOptionsForUser($user),
             'filiais' => app(PayableBranchScope::class)->filialOptionsForUser($user),
-            'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'departments' => $this->departmentsForFilter($pageData['departmentContext']),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
             'statusOptions' => Payable::STATUS_LABELS,
             'canChangeDepartmentFilter' => $pageData['departmentContext']['can_change'],
             'lockedDepartment' => $pageData['departmentContext']['locked_department'],
+            'allowedDepartments' => $pageData['departmentContext']['allowed_departments'] ?? [],
             'lockedBranches' => $branchScope['locked_branches'],
             'noBranchAccess' => $branchScope['no_branch_access'],
             'canManageClassification' => $user?->hasPermission('financeiro.contas_pagar.classificacao_gerenciar') ?? false,
@@ -312,8 +313,9 @@ class PayableController extends Controller
         $user = $request->user();
         $branchScope = app(PayableBranchScope::class)->resolve($user);
         $deptScope = app(FinanceiroDepartmentScope::class);
-        $canChangeDepartment = $deptScope->canBypass($user);
-        $lockedDepartmentId = $canChangeDepartment ? null : $deptScope->resolve($user);
+        $allowedIds = $deptScope->allowedDepartmentIds($user);
+        $canChangeDepartment = $allowedIds === null || count($allowedIds) > 1;
+        $lockedDepartmentId = ($allowedIds !== null && count($allowedIds) === 1) ? $allowedIds[0] : null;
         $lockedDepartment = $lockedDepartmentId
             ? Department::whereKey($lockedDepartmentId)->first(['id', 'name'])
             : null;
@@ -321,9 +323,13 @@ class PayableController extends Controller
         $filiais = app(PayableBranchScope::class)->filialOptionsForUser($user);
         $defaultFilial = count($filiais) === 1 ? $filiais[0]['value'] : null;
 
+        $departments = $allowedIds === null
+            ? Department::where('is_active', true)->orderBy('name')->get(['id', 'name'])
+            : Department::whereIn('id', $allowedIds)->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+
         return Inertia::render('Payables/Create', [
             'filiais' => $filiais,
-            'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'departments' => $departments,
             'canChangeDepartment' => $canChangeDepartment,
             'lockedDepartment' => $lockedDepartment ? ['id' => $lockedDepartment->id, 'name' => $lockedDepartment->name] : null,
             'defaultFilial' => $defaultFilial,
@@ -494,7 +500,7 @@ class PayableController extends Controller
             $query->whereNull('payables.bordero_id');
         }
 
-        $this->applyPayablesListFilters($query, $request, $departmentContext['department_id'], $user);
+        $this->applyPayablesListFilters($query, $request, $departmentContext, $user);
         $this->applyPayablesOrdering($query, $request->input('sort'), $request->input('dir'));
 
         $payables = $query->paginate($this->resolvePerPage($request, $defaultPerPage))->withQueryString();
@@ -520,7 +526,7 @@ class PayableController extends Controller
                     Payable::STATUS_AGUARDANDO_VINCULO_DEPARTAMENTO,
                 ])->orWhereNull('bordero_id');
             });
-        $this->applyPayablesListFilters($totalsQuery, $request, $departmentContext['department_id'], $user);
+        $this->applyPayablesListFilters($totalsQuery, $request, $departmentContext, $user);
         $totals = $totalsQuery
             ->selectRaw('status, count(*) as count, coalesce(sum(amount), 0) as total')
             ->groupBy('status')
@@ -542,7 +548,7 @@ class PayableController extends Controller
     private function applyPayablesListFilters(
         \Illuminate\Database\Eloquent\Builder $query,
         Request $request,
-        ?int $departmentId,
+        array $departmentContext,
         ?User $user,
     ): void {
         if ($request->filled('search')) {
@@ -593,7 +599,7 @@ class PayableController extends Controller
                 $query->where('payment_priority', $request->payment_priority);
             }
         }
-        app(FinanceiroDepartmentScope::class)->applyFilter($query, $departmentId);
+        app(FinanceiroDepartmentScope::class)->applyFromContext($query, $departmentContext);
         app(PayableBranchScope::class)->applyFilter($query, $user);
     }
 
@@ -607,6 +613,22 @@ class PayableController extends Controller
     private function applyDepartmentScope(\Illuminate\Database\Eloquent\Builder $query, ?int $departmentId): void
     {
         app(FinanceiroDepartmentScope::class)->applyFilter($query, $departmentId);
+    }
+
+    /**
+     * Opções do filtro de departamento: liberados do usuário, ou todos se bypass/sem restrição.
+     *
+     * @param  array{allowed_departments?: list<array{id:int,name:string}>}  $context
+     * @return \Illuminate\Support\Collection<int, array{id:int,name:string}>|\Illuminate\Database\Eloquent\Collection<int, Department>
+     */
+    private function departmentsForFilter(array $context)
+    {
+        $allowed = $context['allowed_departments'] ?? [];
+        if ($allowed !== []) {
+            return collect($allowed);
+        }
+
+        return Department::where('is_active', true)->orderBy('name')->get(['id', 'name']);
     }
 
     private function applyPayablesOrdering(\Illuminate\Database\Eloquent\Builder $query, ?string $sort, ?string $dir): void

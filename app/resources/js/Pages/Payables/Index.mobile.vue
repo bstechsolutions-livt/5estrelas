@@ -32,6 +32,7 @@ const props = defineProps({
     statusOptions: Object,
     canChangeDepartmentFilter: { type: Boolean, default: true },
     lockedDepartment: { type: Object, default: null },
+    allowedDepartments: { type: Array, default: () => [] },
     lockedBranches: { type: Array, default: () => [] },
     noBranchAccess: { type: Boolean, default: false },
     canManageClassification: { type: Boolean, default: false },
@@ -177,7 +178,10 @@ const filialList = computed(() => [
 ])
 
 const departmentList = computed(() => [
-    { label: 'Todos os departamentos', value: null },
+    {
+        label: (props.allowedDepartments || []).length > 0 ? 'Todos liberados' : 'Todos os departamentos',
+        value: null,
+    },
     ...(props.departments || []).map(d => ({ label: d.name, value: d.id })),
 ])
 

@@ -61,6 +61,12 @@ class User extends Authenticatable
         return $this->belongsToMany(Branch::class, 'branch_user');
     }
 
+    /** Departamentos extras liberados no Financeiro (além do department_id principal). */
+    public function extraDepartments(): BelongsToMany
+    {
+        return $this->belongsToMany(Department::class, 'department_user');
+    }
+
     /** Quem este usuário cadastrou como representante (age em nome dele). */
     public function representatives(): \Illuminate\Database\Eloquent\Relations\HasMany
     {

@@ -26,21 +26,21 @@ class FinanceiroDashboardService
 
     public function build(User $user): array
     {
-        $departmentId = app(FinanceiroDepartmentScope::class)->resolve($user);
+        $allowedIds = app(FinanceiroDepartmentScope::class)->allowedDepartmentIds($user);
         $branchScope = app(PayableBranchScope::class)->resolve($user);
-        $lockedDepartment = $departmentId
-            ? Department::whereKey($departmentId)->first(['id', 'name'])
+        $lockedDepartment = ($allowedIds !== null && count($allowedIds) === 1)
+            ? Department::whereKey($allowedIds[0])->first(['id', 'name'])
             : null;
 
         $canBorderos = $user->hasPermission('*') || $user->hasPermission('financeiro.borderos.visualizar');
         $canConciliacao = $user->hasPermission('*') || $user->hasPermission('financeiro.conciliacao.visualizar');
 
         return [
-            'kpis' => $this->kpis($user, $departmentId, $canBorderos),
-            'payables_by_status' => $this->payablesByStatus($departmentId, $user),
+            'kpis' => $this->kpis($user, $canBorderos),
+            'payables_by_status' => $this->payablesByStatus($user),
             'borderos_by_status' => $canBorderos ? $this->borderosByStatus($user) : null,
-            'vencimentos_semanas' => $this->vencimentosPorSemana($departmentId, $user),
-            'proximos_vencimentos' => $this->proximosVencimentos($departmentId, $user),
+            'vencimentos_semanas' => $this->vencimentosPorSemana($user),
+            'proximos_vencimentos' => $this->proximosVencimentos($user),
             'minhas_aprovacoes' => $this->minhasAprovacoes($user),
             'conciliacao' => $canConciliacao ? $this->conciliacaoResumo() : null,
             'department' => $lockedDepartment ? ['id' => $lockedDepartment->id, 'name' => $lockedDepartment->name] : null,
@@ -53,22 +53,22 @@ class FinanceiroDashboardService
         ];
     }
 
-    private function payableQuery(?int $departmentId, User $user): Builder
+    private function payableQuery(User $user): Builder
     {
         $query = Payable::query();
-        app(FinanceiroDepartmentScope::class)->applyFilter($query, $departmentId);
+        app(FinanceiroDepartmentScope::class)->applyPayableFilter($query, $user);
         app(PayableBranchScope::class)->applyFilter($query, $user);
 
         return $query;
     }
 
-    private function kpis(User $user, ?int $departmentId, bool $canBorderos): array
+    private function kpis(User $user, bool $canBorderos): array
     {
         $today = now()->toDateString();
         $in7 = now()->addDays(7)->toDateString();
         $monthStart = now()->startOfMonth()->toDateString();
 
-        $emAbertoQuery = $this->payableQuery($departmentId, $user)
+        $emAbertoQuery = $this->payableQuery($user)
             ->where(function (Builder $q) {
                 $q->where('status', 'em_preparacao')
                     ->orWhere(function (Builder $q2) {
@@ -76,18 +76,18 @@ class FinanceiroDashboardService
                     });
             });
 
-        $aguardandoQuery = $this->payableQuery($departmentId, $user)->where('status', 'aguardando_aprovacao');
-        $aprovadoQuery = $this->payableQuery($departmentId, $user)->where('status', 'aprovado');
+        $aguardandoQuery = $this->payableQuery($user)->where('status', 'aguardando_aprovacao');
+        $aprovadoQuery = $this->payableQuery($user)->where('status', 'aprovado');
 
-        $vencidosQuery = $this->payableQuery($departmentId, $user)
+        $vencidosQuery = $this->payableQuery($user)
             ->whereIn('status', self::OPEN_STATUSES)
             ->where('due_date', '<', $today);
 
-        $vencendo7Query = $this->payableQuery($departmentId, $user)
+        $vencendo7Query = $this->payableQuery($user)
             ->whereIn('status', self::OPEN_STATUSES)
             ->whereBetween('due_date', [$today, $in7]);
 
-        $pagosMesQuery = $this->payableQuery($departmentId, $user)
+        $pagosMesQuery = $this->payableQuery($user)
             ->whereIn('status', ['pago', 'aguardando_conciliacao'])
             ->where('paid_at', '>=', $monthStart);
 
@@ -108,11 +108,11 @@ class FinanceiroDashboardService
                 ->first();
         }
 
-        $urgentesQuery = $this->payableQuery($departmentId, $user)
+        $urgentesQuery = $this->payableQuery($user)
             ->where('payment_priority', 'urgente')
             ->whereIn('status', self::OPEN_STATUSES);
 
-        $slaEstouradoQuery = $this->payableQuery($departmentId, $user)
+        $slaEstouradoQuery = $this->payableQuery($user)
             ->whereNotNull('payment_sla_date')
             ->where('payment_sla_date', '<', $today)
             ->whereIn('status', self::OPEN_STATUSES);
@@ -158,9 +158,9 @@ class FinanceiroDashboardService
         ];
     }
 
-    private function payablesByStatus(?int $departmentId, User $user): array
+    private function payablesByStatus(User $user): array
     {
-        $rows = $this->payableQuery($departmentId, $user)
+        $rows = $this->payableQuery($user)
             ->where(function (Builder $q) {
                 $q->where('status', '!=', 'pendente')
                     ->orWhereNull('bordero_id');
@@ -213,7 +213,7 @@ class FinanceiroDashboardService
         return $result;
     }
 
-    private function vencimentosPorSemana(?int $departmentId, User $user): array
+    private function vencimentosPorSemana(User $user): array
     {
         $today = Carbon::today();
         $weeks = [];
@@ -222,7 +222,7 @@ class FinanceiroDashboardService
             $start = $today->copy()->addDays($w * 7);
             $end = $today->copy()->addDays(($w + 1) * 7 - 1);
 
-            $query = $this->payableQuery($departmentId, $user)
+            $query = $this->payableQuery($user)
                 ->whereIn('status', self::OPEN_STATUSES)
                 ->whereBetween('due_date', [$start->toDateString(), $end->toDateString()]);
 
@@ -238,11 +238,11 @@ class FinanceiroDashboardService
         return $weeks;
     }
 
-    private function proximosVencimentos(?int $departmentId, User $user): array
+    private function proximosVencimentos(User $user): array
     {
         $today = now()->toDateString();
 
-        $items = $this->payableQuery($departmentId, $user)
+        $items = $this->payableQuery($user)
             ->whereIn('status', self::OPEN_STATUSES)
             ->where('due_date', '>=', $today)
             ->orderBy('due_date')
