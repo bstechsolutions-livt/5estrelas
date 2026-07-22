@@ -2,10 +2,8 @@
 import { ref, computed, watch } from 'vue'
 import { router, useForm, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import FileUpload from 'primevue/fileupload'
 import Tag from 'primevue/tag'
 import Toast from 'primevue/toast'
-import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 
 const props = defineProps({
@@ -30,11 +28,21 @@ watch(() => page.props.flash, (flash) => {
 // ── Import results (flashed from session or from page prop on load) ───────────
 const localImportResults = ref(props.importResults ?? null)
 
-// ── Upload batch ──────────────────────────────────────────────────────────────
+// ── Upload batch (arrastar/soltar + clique) ───────────────────────────────────
 const uploadForm = useForm({ files: [] })
+const fileInput = ref(null)
+const dragOver = ref(false)
 
-function onBatchUpload(event) {
-    uploadForm.files = event.files
+function ofxFilesFromList(fileList) {
+    return Array.from(fileList || []).filter((f) => /\.ofx$/i.test(f.name))
+}
+
+function submitOfxFiles(files) {
+    if (!files.length) {
+        toast.add({ severity: 'warn', summary: 'Nenhum OFX', detail: 'Solte ou selecione arquivos .ofx.', life: 4000 })
+        return
+    }
+    uploadForm.files = files
     uploadForm.post('/financeiro/contas-pagar/conciliacao/upload-batch', {
         forceFormData: true,
         onError: (errors) => {
@@ -42,6 +50,17 @@ function onBatchUpload(event) {
             if (msg) toast.add({ severity: 'error', summary: 'Erro no upload', detail: msg, life: 6000 })
         },
     })
+}
+
+function onFileInputChange(event) {
+    submitOfxFiles(ofxFilesFromList(event.target.files))
+    event.target.value = ''
+}
+
+function onDrop(event) {
+    dragOver.value = false
+    if (uploadForm.processing) return
+    submitOfxFiles(ofxFilesFromList(event.dataTransfer?.files))
 }
 
 // ── Day navigation ────────────────────────────────────────────────────────────
@@ -162,18 +181,39 @@ const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
             <div v-if="isConciliador" class="bg-white rounded-xl border border-gray-100 p-5">
                 <h2 class="text-sm font-semibold text-gray-700 mb-1">Importar extratos OFX</h2>
                 <p class="text-xs text-gray-400 mb-3">
-                    Selecione um ou vários arquivos — data e conta são detectadas do próprio OFX.
+                    Arraste um ou vários .ofx — data e conta são detectadas do próprio arquivo.
                 </p>
-                <FileUpload
-                    mode="basic"
-                    accept=".ofx"
+                <input
+                    ref="fileInput"
+                    type="file"
+                    accept=".ofx,application/x-ofx,application/ofx"
                     multiple
-                    :auto="true"
-                    choose-label="Selecionar arquivo(s) .ofx"
-                    :custom-upload="true"
-                    @uploader="onBatchUpload"
+                    class="hidden"
                     :disabled="uploadForm.processing"
+                    @change="onFileInputChange"
                 />
+                <div
+                    role="button"
+                    tabindex="0"
+                    class="rounded-xl border-2 border-dashed px-4 py-10 text-center transition cursor-pointer select-none"
+                    :class="dragOver
+                        ? 'border-blue-500 bg-blue-50'
+                        : uploadForm.processing
+                            ? 'border-gray-200 bg-gray-50 opacity-60 cursor-wait'
+                            : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/40'"
+                    @click="!uploadForm.processing && fileInput?.click()"
+                    @keydown.enter.prevent="!uploadForm.processing && fileInput?.click()"
+                    @dragenter.prevent="dragOver = true"
+                    @dragover.prevent="dragOver = true"
+                    @dragleave.prevent="dragOver = false"
+                    @drop.prevent="onDrop"
+                >
+                    <i class="pi pi-cloud-upload text-3xl text-gray-400 mb-2 block" />
+                    <p class="text-sm font-medium text-gray-700">
+                        {{ dragOver ? 'Solte os arquivos aqui' : 'Arraste os .ofx aqui' }}
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">ou clique para selecionar</p>
+                </div>
                 <p v-if="uploadForm.processing" class="text-xs text-blue-600 mt-2">Processando arquivos…</p>
             </div>
 

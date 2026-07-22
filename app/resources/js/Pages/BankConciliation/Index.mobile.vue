@@ -2,7 +2,6 @@
 import { ref, computed, watch } from 'vue'
 import { router, useForm, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import FileUpload from 'primevue/fileupload'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 
@@ -26,10 +25,21 @@ watch(() => page.props.flash, (flash) => {
 
 const localImportResults = ref(props.importResults ?? null)
 
-// Upload
+// Upload — arrastar/soltar + toque
 const uploadForm = useForm({ files: [] })
-function onBatchUpload(event) {
-    uploadForm.files = event.files
+const fileInput = ref(null)
+const dragOver = ref(false)
+
+function ofxFilesFromList(fileList) {
+    return Array.from(fileList || []).filter((f) => /\.ofx$/i.test(f.name))
+}
+
+function submitOfxFiles(files) {
+    if (!files.length) {
+        toast.add({ severity: 'warn', summary: 'Nenhum OFX', detail: 'Use arquivos .ofx.', life: 4000 })
+        return
+    }
+    uploadForm.files = files
     uploadForm.post('/financeiro/contas-pagar/conciliacao/upload-batch', {
         forceFormData: true,
         onError: (errors) => {
@@ -37,6 +47,17 @@ function onBatchUpload(event) {
             if (msg) toast.add({ severity: 'error', summary: 'Erro', detail: msg, life: 5000 })
         },
     })
+}
+
+function onFileInputChange(event) {
+    submitOfxFiles(ofxFilesFromList(event.target.files))
+    event.target.value = ''
+}
+
+function onDrop(event) {
+    dragOver.value = false
+    if (uploadForm.processing) return
+    submitOfxFiles(ofxFilesFromList(event.dataTransfer?.files))
 }
 
 function openDay(date) {
@@ -122,16 +143,36 @@ function formatMoney(v) {
             <!-- Upload -->
             <div v-if="isConciliador" class="bg-white rounded-xl border border-gray-100 p-4">
                 <p class="text-sm font-semibold text-gray-700 mb-2">Importar OFX</p>
-                <FileUpload
-                    mode="basic"
-                    accept=".ofx"
+                <input
+                    ref="fileInput"
+                    type="file"
+                    accept=".ofx,application/x-ofx,application/ofx"
                     multiple
-                    :auto="true"
-                    choose-label="Selecionar .ofx"
-                    :custom-upload="true"
-                    @uploader="onBatchUpload"
+                    class="hidden"
                     :disabled="uploadForm.processing"
+                    @change="onFileInputChange"
                 />
+                <div
+                    role="button"
+                    tabindex="0"
+                    class="rounded-xl border-2 border-dashed px-3 py-8 text-center transition"
+                    :class="dragOver
+                        ? 'border-blue-500 bg-blue-50'
+                        : uploadForm.processing
+                            ? 'border-gray-200 bg-gray-50 opacity-60'
+                            : 'border-gray-300'"
+                    @click="!uploadForm.processing && fileInput?.click()"
+                    @dragenter.prevent="dragOver = true"
+                    @dragover.prevent="dragOver = true"
+                    @dragleave.prevent="dragOver = false"
+                    @drop.prevent="onDrop"
+                >
+                    <i class="pi pi-cloud-upload text-2xl text-gray-400 mb-1 block" />
+                    <p class="text-sm font-medium text-gray-700">
+                        {{ dragOver ? 'Solte aqui' : 'Arraste os .ofx' }}
+                    </p>
+                    <p class="text-xs text-gray-500 mt-0.5">ou toque para selecionar</p>
+                </div>
                 <p v-if="uploadForm.processing" class="text-xs text-blue-600 mt-2">Processando…</p>
             </div>
 
