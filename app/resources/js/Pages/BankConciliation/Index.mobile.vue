@@ -83,6 +83,7 @@ const resgates = computed(() => bankOps.value.filter((t) => t.operation_category
 const payableOnly = computed(() => props.dayReport?.payable_only ?? [])
 const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
 const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
+const canConciliateDay = computed(() => !!props.dayReport?.can_conciliate_day)
 
 const openSection = ref(null)
 function toggleSection(id) {
@@ -319,8 +320,8 @@ function formatMoney(v) {
                         <button
                             v-if="isConciliador && kpis && kpis.imports > 0"
                             type="button"
-                            :disabled="dayConciliated"
-                            class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg disabled:opacity-50"
+                            :disabled="dayConciliated || !canConciliateDay"
+                            class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                             @click="batchDay"
                         >{{ dayConciliated ? 'Já conciliado' : 'Conciliar dia' }}</button>
                     </div>
@@ -363,7 +364,8 @@ function formatMoney(v) {
                     v-else-if="isConciliador && (dayReport.conciliate_blockers?.length)"
                     class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
                 >
-                    <p class="font-medium mb-1">Para conciliar o dia:</p>
+                    <p class="font-medium mb-1">Dia incompleto — Conciliar dia bloqueado</p>
+                    <p class="text-amber-800/80 mb-1">OFX precisa estar 100% resolvido. Títulos só no sistema podem sobrar.</p>
                     <ul class="list-disc pl-4 space-y-0.5">
                         <li v-for="(b, i) in dayReport.conciliate_blockers" :key="i">{{ b }}</li>
                     </ul>

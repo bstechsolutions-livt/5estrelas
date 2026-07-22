@@ -339,7 +339,8 @@ class ConciliationSessionService
             $blockers[] = 'Há matches ambíguos — vincule ou resolva antes.';
         }
         if (count($ofxOnly) > 0) {
-            $blockers[] = 'Há débitos só no OFX (sem título) que não são tarifa/aplicação/resgate — vincule ou trate antes.';
+            $n = count($ofxOnly);
+            $blockers[] = "Há {$n} débito(s) só no OFX sem título — todo débito do extrato precisa de título no Hub (exceto tarifa/aplicação/resgate).";
         }
 
         return [

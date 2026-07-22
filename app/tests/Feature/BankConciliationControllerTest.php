@@ -731,4 +731,53 @@ OFX;
 
         $this->assertDatabaseHas('bank_statement_imports', ['id' => $import->id]);
     }
+
+    public function test_can_conciliate_day_blocked_by_ofx_only_but_not_by_payable_only(): void
+    {
+        $user = $this->conciliador();
+        $account = $this->createBankAccount();
+        $date = '2026-06-16';
+        $import = $this->createImport($user, $account->id, $date);
+
+        $payableAccepted = Payable::create([
+            'title_number' => 'TIT-OK', 'supplier_name' => 'Ok', 'amount' => 50.00,
+            'due_date' => '2026-06-10', 'status' => 'pago', 'paid_at' => $date,
+        ]);
+        $this->createTransaction($import, [
+            'match_status' => 'accepted',
+            'matched_payable_id' => $payableAccepted->id,
+            'amount' => -50.00,
+            'date' => Carbon::parse($date),
+            'description' => 'PIX FORNECEDOR',
+        ]);
+        $this->createTransaction($import, [
+            'match_status' => 'unmatched',
+            'description' => 'TARIFA AVULSA ENVIO PIX',
+            'amount' => -1.75,
+            'date' => Carbon::parse($date),
+        ]);
+
+        // Título só no sistema — não bloqueia
+        Payable::create([
+            'title_number' => 'TIT-SO-SISTEMA', 'supplier_name' => 'Sem OFX', 'amount' => 999.00,
+            'due_date' => '2026-06-10', 'status' => 'pago', 'paid_at' => $date,
+        ]);
+
+        $report = app(ConciliationSessionService::class)->dayReport(Carbon::parse($date));
+        $this->assertTrue($report['can_conciliate_day']);
+        $this->assertGreaterThan(0, $report['kpis']['payable_only']);
+        $this->assertEmpty($report['ofx_only']);
+
+        $this->createTransaction($import, [
+            'match_status' => 'unmatched',
+            'description' => 'DEBITO PIX SEM TITULO',
+            'amount' => -200.00,
+            'date' => Carbon::parse($date),
+        ]);
+
+        $reportBlocked = app(ConciliationSessionService::class)->dayReport(Carbon::parse($date));
+        $this->assertFalse($reportBlocked['can_conciliate_day']);
+        $this->assertCount(1, $reportBlocked['ofx_only']);
+        $this->assertNotEmpty($reportBlocked['conciliate_blockers']);
+    }
 }
