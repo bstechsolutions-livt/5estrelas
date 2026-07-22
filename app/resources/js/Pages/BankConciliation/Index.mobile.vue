@@ -77,13 +77,38 @@ const kpis = computed(() => props.dayReport?.kpis ?? null)
 const matched     = computed(() => props.dayReport?.matched     ?? [])
 const ofxOnly     = computed(() => props.dayReport?.ofx_only    ?? [])
 const bankOps     = computed(() => props.dayReport?.bank_ops    ?? [])
+const tarifas = computed(() => bankOps.value.filter((t) => t.operation_category === 'tarifa'))
+const aplicacoes = computed(() => bankOps.value.filter((t) => t.operation_category === 'aplicacao'))
+const resgates = computed(() => bankOps.value.filter((t) => t.operation_category === 'resgate'))
 const payableOnly = computed(() => props.dayReport?.payable_only ?? [])
 const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
 const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
 
-function operationCategoryLabel(c) {
-    return { tarifa: 'Tarifa', aplicacao: 'Aplicação', resgate: 'Resgate' }[c] ?? c
+const openSection = ref(null)
+function toggleSection(id) {
+    openSection.value = openSection.value === id ? null : id
 }
+function isSectionOpen(id) {
+    return openSection.value === id
+}
+function sumAbs(items) {
+    return items.reduce((s, t) => s + Math.abs(Number(t.amount ?? 0)), 0)
+}
+function defaultOpenSection() {
+    if (matched.value.some((t) => t.match_status === 'pending')) return 'matched'
+    if (ambiguous.value.length) return 'ambiguous'
+    if (ofxOnly.value.length) return 'ofx_only'
+    if (matched.value.length) return 'matched'
+    if (tarifas.value.length) return 'tarifas'
+    if (aplicacoes.value.length) return 'aplicacoes'
+    if (resgates.value.length) return 'resgates'
+    if (payableOnly.value.length) return 'payable_only'
+    return null
+}
+watch(() => props.dayReport?.date, () => {
+    openSection.value = defaultOpenSection()
+}, { immediate: true })
+
 // Link
 const linkTxId = ref(null)
 const linkPayableId = ref(null)
@@ -344,115 +369,186 @@ function formatMoney(v) {
                     </ul>
                 </div>
 
+                <div class="space-y-2">
                 <!-- Matched -->
-                <section v-if="matched.length">
-                    <p class="text-sm font-semibold text-gray-700 mb-1">Sugestões de match</p>
-                    <p class="text-xs text-gray-400 mb-2">OFX à esquerda · título à direita. Desfazer volta para “Só no OFX”.</p>
-                    <div v-for="tx in matched" :key="tx.id" class="border border-gray-200 rounded-xl overflow-hidden mb-3 bg-white">
-                        <div class="p-3 bg-slate-50 border-b border-gray-100">
-                            <p class="text-[10px] font-semibold uppercase text-slate-500 mb-1">Extrato OFX</p>
-                            <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
-                            <p class="text-xs text-gray-600 mt-1">
-                                <span class="font-semibold text-red-700 whitespace-nowrap">{{ formatMoney(tx.amount) }}</span>
-                                <span class="text-gray-400 mx-1">débito</span>
-                                <span>{{ formatDate(tx.date) }}</span>
-                            </p>
-                            <p v-if="tx.bank_account_name" class="text-xs text-gray-400 mt-0.5">{{ tx.bank_account_name }}</p>
+                <section v-if="matched.length" class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                    <button type="button" class="w-full px-3 py-2.5 flex items-center gap-2 text-left" @click="toggleSection('matched')">
+                        <i :class="['pi text-gray-400 text-[10px]', isSectionOpen('matched') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-gray-800">Sugestões de match</p>
                         </div>
-                        <div class="p-3 bg-emerald-50/50">
-                            <p class="text-[10px] font-semibold uppercase text-emerald-700 mb-1">Título no Hub</p>
-                            <p class="text-sm font-medium text-gray-900">
-                                Nº {{ tx.payable?.title_number ?? '—' }}
-                                <span v-if="tx.payable?.nickname" class="font-normal text-gray-700"> — {{ tx.payable.nickname }}</span>
-                            </p>
-                            <p v-if="tx.payable?.description" class="text-xs text-gray-600 mt-1 leading-snug">{{ tx.payable.description }}</p>
-                            <p class="text-xs text-gray-800 mt-1.5 font-medium">{{ tx.payable?.supplier_name ?? '—' }}</p>
-                            <p class="text-xs text-gray-500 mt-1">{{ tx.payable?.empresa_nome || '—' }}</p>
-                            <p v-if="tx.payable?.filial_label" class="text-xs text-gray-400">{{ tx.payable.filial_label }}</p>
-                            <p class="text-xs text-gray-600 mt-1 whitespace-nowrap">
-                                {{ formatMoney(tx.payable?.amount) }}
-                                <span v-if="tx.payable?.paid_at" class="text-gray-400"> · pago {{ formatDate(tx.payable.paid_at) }}</span>
-                            </p>
+                        <div class="text-right shrink-0 text-xs">
+                            <p class="font-bold">{{ matched.length }}</p>
+                            <p class="text-gray-500">{{ formatMoney(sumAbs(matched)) }}</p>
                         </div>
-                        <div v-if="isConciliador" class="px-3 py-2 border-t border-gray-100 flex gap-2 justify-end">
-                            <button
-                                v-if="tx.match_status === 'pending'"
-                                type="button"
-                                class="text-xs px-2.5 py-1.5 bg-green-600 text-white rounded-lg"
-                                @click="acceptTx(tx.id)"
-                            >Aceitar</button>
-                            <button
-                                type="button"
-                                class="text-xs px-2.5 py-1.5 border border-gray-200 text-gray-700 rounded-lg"
-                                @click="rejectTx(tx.id)"
-                            >{{ tx.match_status === 'pending' ? 'Rejeitar' : 'Desfazer' }}</button>
+                    </button>
+                    <div v-if="isSectionOpen('matched')" class="border-t border-gray-100 px-3 py-2 space-y-2">
+                        <div v-for="tx in matched" :key="tx.id" class="border border-gray-200 rounded-xl overflow-hidden bg-white">
+                            <div class="p-3 bg-slate-50 border-b border-gray-100">
+                                <p class="text-[10px] font-semibold uppercase text-slate-500 mb-1">Extrato OFX</p>
+                                <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                                <p class="text-xs text-gray-600 mt-1">
+                                    <span class="font-semibold text-red-700 whitespace-nowrap">{{ formatMoney(tx.amount) }}</span>
+                                    <span class="text-gray-400 mx-1">débito</span>
+                                    <span>{{ formatDate(tx.date) }}</span>
+                                </p>
+                            </div>
+                            <div class="p-3 bg-emerald-50/50">
+                                <p class="text-[10px] font-semibold uppercase text-emerald-700 mb-1">Título no Hub</p>
+                                <p class="text-sm font-medium text-gray-900">
+                                    Nº {{ tx.payable?.title_number ?? '—' }}
+                                    <span v-if="tx.payable?.nickname" class="font-normal text-gray-700"> — {{ tx.payable.nickname }}</span>
+                                </p>
+                                <p class="text-xs text-gray-800 mt-1 font-medium">{{ tx.payable?.supplier_name ?? '—' }}</p>
+                                <p class="text-xs text-gray-500 mt-1">{{ tx.payable?.empresa_nome || '—' }}</p>
+                                <p class="text-xs text-gray-600 mt-1">{{ formatMoney(tx.payable?.amount) }}</p>
+                            </div>
+                            <div v-if="isConciliador" class="px-3 py-2 border-t border-gray-100 flex gap-2 justify-end">
+                                <button v-if="tx.match_status === 'pending'" type="button" class="text-xs px-2.5 py-1.5 bg-green-600 text-white rounded-lg" @click="acceptTx(tx.id)">Aceitar</button>
+                                <button type="button" class="text-xs px-2.5 py-1.5 border border-gray-200 text-gray-700 rounded-lg" @click="rejectTx(tx.id)">{{ tx.match_status === 'pending' ? 'Rejeitar' : 'Desfazer' }}</button>
+                            </div>
                         </div>
                     </div>
                 </section>
 
                 <!-- Ambiguous -->
-                <section v-if="ambiguous.length">
-                    <p class="text-sm font-semibold text-amber-700 mb-2">⚠️ Ambíguos</p>
-                    <div v-for="tx in ambiguous" :key="tx.id" class="border border-amber-100 rounded-lg p-3 mb-2">
-                        <div class="flex justify-between text-sm">
-                            <span class="truncate text-gray-700 max-w-[60%]">{{ tx.description || '—' }}</span>
-                            <span class="font-medium">{{ formatMoney(tx.amount) }}</span>
+                <section v-if="ambiguous.length" class="rounded-xl border border-amber-200 bg-white overflow-hidden">
+                    <button type="button" class="w-full px-3 py-2.5 flex items-center gap-2 text-left" @click="toggleSection('ambiguous')">
+                        <i :class="['pi text-amber-500 text-[10px]', isSectionOpen('ambiguous') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                        <div class="min-w-0 flex-1"><p class="text-sm font-semibold text-amber-800">Ambíguos</p></div>
+                        <div class="text-right shrink-0 text-xs">
+                            <p class="font-bold text-amber-900">{{ ambiguous.length }}</p>
+                            <p class="text-amber-700">{{ formatMoney(sumAbs(ambiguous)) }}</p>
                         </div>
-                        <button
-                            v-if="isConciliador"
-                            type="button"
-                            class="mt-2 text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded"
-                            @click="linkTxId = tx.id; linkPayableId = null; linkSearchQuery = ''; linkResults = []"
-                        >Vincular</button>
+                    </button>
+                    <div v-if="isSectionOpen('ambiguous')" class="border-t border-amber-100 px-3 py-2 space-y-2">
+                        <div v-for="tx in ambiguous" :key="tx.id" class="border border-amber-100 rounded-lg p-3">
+                            <div class="flex justify-between text-sm">
+                                <span class="truncate text-gray-700 max-w-[60%]">{{ tx.description || '—' }}</span>
+                                <span class="font-medium">{{ formatMoney(tx.amount) }}</span>
+                            </div>
+                            <button
+                                v-if="isConciliador"
+                                type="button"
+                                class="mt-2 text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded"
+                                @click="linkTxId = tx.id; linkPayableId = null; linkSearchQuery = ''; linkResults = []"
+                            >Vincular</button>
+                        </div>
                     </div>
                 </section>
 
-                <!-- Bank ops -->
-                <section v-if="bankOps.length">
-                    <p class="text-sm font-semibold text-violet-800 mb-1">Tarifas / aplicações / resgates</p>
-                    <p class="text-xs text-gray-400 mb-2">Sem ação — gravados ao conciliar o dia.</p>
-                    <div v-for="tx in bankOps" :key="tx.id" class="border border-violet-100 rounded-lg p-3 mb-2 bg-violet-50/40">
-                        <p class="text-[10px] font-semibold uppercase text-violet-700">{{ operationCategoryLabel(tx.operation_category) }}</p>
-                        <p class="text-sm font-medium text-gray-900 leading-snug mt-0.5">{{ tx.description || tx.memo || '—' }}</p>
-                        <p class="text-xs text-gray-600 mt-1">
-                            <span class="font-semibold">{{ formatMoney(tx.amount) }}</span>
-                            <span class="mx-1">·</span>{{ formatDate(tx.date) }}
-                        </p>
+                <!-- Tarifas -->
+                <section v-if="tarifas.length" class="rounded-xl border border-violet-200 bg-white overflow-hidden">
+                    <button type="button" class="w-full px-3 py-2.5 flex items-center gap-2 text-left" @click="toggleSection('tarifas')">
+                        <i :class="['pi text-violet-500 text-[10px]', isSectionOpen('tarifas') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                        <div class="min-w-0 flex-1"><p class="text-sm font-semibold text-violet-900">Tarifas</p></div>
+                        <div class="text-right shrink-0 text-xs">
+                            <p class="font-bold text-violet-900">{{ tarifas.length }}</p>
+                            <p class="text-violet-700">{{ formatMoney(sumAbs(tarifas)) }}</p>
+                        </div>
+                    </button>
+                    <div v-if="isSectionOpen('tarifas')" class="border-t border-violet-100 px-3 py-2 space-y-2">
+                        <div v-for="tx in tarifas" :key="tx.id" class="border border-violet-100 rounded-lg p-3 bg-violet-50/40">
+                            <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                            <p class="text-xs text-gray-600 mt-1">
+                                <span class="font-semibold">{{ formatMoney(tx.amount) }}</span>
+                                <span class="mx-1">·</span>{{ formatDate(tx.date) }}
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Aplicações -->
+                <section v-if="aplicacoes.length" class="rounded-xl border border-indigo-200 bg-white overflow-hidden">
+                    <button type="button" class="w-full px-3 py-2.5 flex items-center gap-2 text-left" @click="toggleSection('aplicacoes')">
+                        <i :class="['pi text-indigo-500 text-[10px]', isSectionOpen('aplicacoes') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                        <div class="min-w-0 flex-1"><p class="text-sm font-semibold text-indigo-900">Aplicações</p></div>
+                        <div class="text-right shrink-0 text-xs">
+                            <p class="font-bold text-indigo-900">{{ aplicacoes.length }}</p>
+                            <p class="text-indigo-700">{{ formatMoney(sumAbs(aplicacoes)) }}</p>
+                        </div>
+                    </button>
+                    <div v-if="isSectionOpen('aplicacoes')" class="border-t border-indigo-100 px-3 py-2 space-y-2">
+                        <div v-for="tx in aplicacoes" :key="tx.id" class="border border-indigo-100 rounded-lg p-3 bg-indigo-50/40">
+                            <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                            <p class="text-xs text-gray-600 mt-1">
+                                <span class="font-semibold">{{ formatMoney(tx.amount) }}</span>
+                                <span class="mx-1">·</span>{{ formatDate(tx.date) }}
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Resgates -->
+                <section v-if="resgates.length" class="rounded-xl border border-sky-200 bg-white overflow-hidden">
+                    <button type="button" class="w-full px-3 py-2.5 flex items-center gap-2 text-left" @click="toggleSection('resgates')">
+                        <i :class="['pi text-sky-500 text-[10px]', isSectionOpen('resgates') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                        <div class="min-w-0 flex-1"><p class="text-sm font-semibold text-sky-900">Resgates</p></div>
+                        <div class="text-right shrink-0 text-xs">
+                            <p class="font-bold text-sky-900">{{ resgates.length }}</p>
+                            <p class="text-sky-700">{{ formatMoney(sumAbs(resgates)) }}</p>
+                        </div>
+                    </button>
+                    <div v-if="isSectionOpen('resgates')" class="border-t border-sky-100 px-3 py-2 space-y-2">
+                        <div v-for="tx in resgates" :key="tx.id" class="border border-sky-100 rounded-lg p-3 bg-sky-50/40">
+                            <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                            <p class="text-xs text-gray-600 mt-1">
+                                <span class="font-semibold">{{ formatMoney(tx.amount) }}</span>
+                                <span class="mx-1">·</span>{{ formatDate(tx.date) }}
+                            </p>
+                        </div>
                     </div>
                 </section>
 
                 <!-- OFX only -->
-                <section v-if="ofxOnly.length">
-                    <p class="text-sm font-semibold text-red-700 mb-1">Só no OFX — sem título</p>
-                    <p class="text-xs text-gray-400 mb-2">Inclui débitos após rejeitar/desfazer. Pode vincular de novo.</p>
-                    <div v-for="tx in ofxOnly" :key="tx.id" class="border border-red-100 rounded-lg p-3 mb-2 bg-white">
-                        <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
-                        <p class="text-xs text-gray-600 mt-1">
-                            <span class="font-semibold">{{ formatMoney(tx.amount) }}</span>
-                            <span class="mx-1">·</span>{{ formatDate(tx.date) }}
-                        </p>
-                        <p v-if="tx.bank_account_name" class="text-xs text-gray-400 mt-0.5">{{ tx.bank_account_name }}</p>
-                        <button
-                            v-if="isConciliador"
-                            type="button"
-                            class="mt-2 text-xs px-2.5 py-1.5 bg-blue-600 text-white rounded-lg"
-                            @click="linkTxId = tx.id; linkPayableId = null; linkSearchQuery = ''; linkResults = []"
-                        >Vincular título</button>
+                <section v-if="ofxOnly.length" class="rounded-xl border border-red-200 bg-white overflow-hidden">
+                    <button type="button" class="w-full px-3 py-2.5 flex items-center gap-2 text-left" @click="toggleSection('ofx_only')">
+                        <i :class="['pi text-red-500 text-[10px]', isSectionOpen('ofx_only') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                        <div class="min-w-0 flex-1"><p class="text-sm font-semibold text-red-800">Só no OFX</p></div>
+                        <div class="text-right shrink-0 text-xs">
+                            <p class="font-bold text-red-900">{{ ofxOnly.length }}</p>
+                            <p class="text-red-700">{{ formatMoney(sumAbs(ofxOnly)) }}</p>
+                        </div>
+                    </button>
+                    <div v-if="isSectionOpen('ofx_only')" class="border-t border-red-100 px-3 py-2 space-y-2">
+                        <div v-for="tx in ofxOnly" :key="tx.id" class="border border-red-100 rounded-lg p-3 bg-white">
+                            <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                            <p class="text-xs text-gray-600 mt-1">
+                                <span class="font-semibold">{{ formatMoney(tx.amount) }}</span>
+                                <span class="mx-1">·</span>{{ formatDate(tx.date) }}
+                            </p>
+                            <button
+                                v-if="isConciliador"
+                                type="button"
+                                class="mt-2 text-xs px-2.5 py-1.5 bg-blue-600 text-white rounded-lg"
+                                @click="linkTxId = tx.id; linkPayableId = null; linkSearchQuery = ''; linkResults = []"
+                            >Vincular título</button>
+                        </div>
                     </div>
                 </section>
 
                 <!-- Payable only -->
-                <section v-if="payableOnly.length">
-                    <p class="text-sm font-semibold text-gray-600 mb-2">🟡 Só no sistema</p>
-                    <div v-for="p in payableOnly" :key="p.id" class="border border-gray-100 rounded-lg p-3 mb-2 text-sm">
-                        <div class="flex justify-between">
-                            <span>{{ p.title_number ?? '—' }}</span>
-                            <span class="font-medium">{{ formatMoney(p.amount) }}</span>
+                <section v-if="payableOnly.length" class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                    <button type="button" class="w-full px-3 py-2.5 flex items-center gap-2 text-left" @click="toggleSection('payable_only')">
+                        <i :class="['pi text-gray-400 text-[10px]', isSectionOpen('payable_only') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                        <div class="min-w-0 flex-1"><p class="text-sm font-semibold text-gray-700">Só no sistema</p></div>
+                        <div class="text-right shrink-0 text-xs">
+                            <p class="font-bold">{{ payableOnly.length }}</p>
+                            <p class="text-gray-500">{{ formatMoney(sumAbs(payableOnly)) }}</p>
                         </div>
-                        <p v-if="p.empresa_nome" class="text-xs text-blue-700 mt-0.5">{{ p.empresa_nome }}</p>
-                        <p class="text-xs text-gray-400 mt-1">{{ p.supplier_name }}</p>
+                    </button>
+                    <div v-if="isSectionOpen('payable_only')" class="border-t border-gray-100 px-3 py-2 space-y-2">
+                        <div v-for="p in payableOnly" :key="p.id" class="border border-gray-100 rounded-lg p-3 text-sm">
+                            <div class="flex justify-between">
+                                <span>{{ p.title_number ?? '—' }}</span>
+                                <span class="font-medium">{{ formatMoney(p.amount) }}</span>
+                            </div>
+                            <p v-if="p.empresa_nome" class="text-xs text-blue-700 mt-0.5">{{ p.empresa_nome }}</p>
+                            <p class="text-xs text-gray-400 mt-1">{{ p.supplier_name }}</p>
+                        </div>
                     </div>
                 </section>
+                </div>
             </div>
         </div>
 

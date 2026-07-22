@@ -238,10 +238,39 @@ const kpis = computed(() => props.dayReport?.kpis ?? null)
 const matched  = computed(() => props.dayReport?.matched  ?? [])
 const ofxOnly  = computed(() => props.dayReport?.ofx_only  ?? [])
 const bankOps  = computed(() => props.dayReport?.bank_ops  ?? [])
+const tarifas = computed(() => bankOps.value.filter((t) => t.operation_category === 'tarifa'))
+const aplicacoes = computed(() => bankOps.value.filter((t) => t.operation_category === 'aplicacao'))
+const resgates = computed(() => bankOps.value.filter((t) => t.operation_category === 'resgate'))
 const payableOnly = computed(() => props.dayReport?.payable_only ?? [])
 const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
 const canConciliateDay = computed(() => !!props.dayReport?.can_conciliate_day)
 const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
+
+/** Accordion: uma seção aberta por vez */
+const openSection = ref(null)
+function toggleSection(id) {
+    openSection.value = openSection.value === id ? null : id
+}
+function isSectionOpen(id) {
+    return openSection.value === id
+}
+function sumAbs(items) {
+    return items.reduce((s, t) => s + Math.abs(Number(t.amount ?? 0)), 0)
+}
+function defaultOpenSection() {
+    if (matched.value.some((t) => t.match_status === 'pending')) return 'matched'
+    if (ambiguous.value.length) return 'ambiguous'
+    if (ofxOnly.value.length) return 'ofx_only'
+    if (matched.value.length) return 'matched'
+    if (tarifas.value.length) return 'tarifas'
+    if (aplicacoes.value.length) return 'aplicacoes'
+    if (resgates.value.length) return 'resgates'
+    if (payableOnly.value.length) return 'payable_only'
+    return null
+}
+watch(() => props.dayReport?.date, () => {
+    openSection.value = defaultOpenSection()
+}, { immediate: true })
 </script>
 
 <template>
@@ -457,18 +486,33 @@ const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
                         </div>
                     </div>
 
-                    <!-- ── Matched: OFX × Título ─────────────────────────────────────── -->
-                    <section v-if="matched.length" class="mb-6">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-1">Sugestões de match</h3>
-                        <p class="text-xs text-gray-400 mb-3">Esquerda = extrato bancário (OFX). Direita = título no Hub. Aceitar guarda; desfazer volta o débito para “Só no OFX”.</p>
-                        <div class="space-y-3">
+                    <!-- Seções em accordion (uma aberta por vez) -->
+                    <div class="space-y-2 mb-2">
+
+                    <!-- Matches -->
+                    <section v-if="matched.length" class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                        <button
+                            type="button"
+                            class="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50"
+                            @click="toggleSection('matched')"
+                        >
+                            <i :class="['pi text-gray-400 text-xs', isSectionOpen('matched') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-gray-800">Sugestões de match</p>
+                                <p class="text-xs text-gray-400">OFX × título · aceite ou rejeite</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-sm font-bold text-gray-900">{{ matched.length }}</p>
+                                <p class="text-xs text-gray-500 whitespace-nowrap">{{ formatMoney(sumAbs(matched)) }}</p>
+                            </div>
+                        </button>
+                        <div v-if="isSectionOpen('matched')" class="border-t border-gray-100 px-4 py-3 space-y-3">
                             <div
                                 v-for="tx in matched"
                                 :key="tx.id"
                                 class="rounded-xl border border-gray-200 bg-white overflow-hidden"
                             >
                                 <div class="grid md:grid-cols-[1fr_auto_1fr] gap-0">
-                                    <!-- OFX -->
                                     <div class="p-4 bg-slate-50 border-b md:border-b-0 md:border-r border-gray-100">
                                         <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Extrato OFX</p>
                                         <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
@@ -481,13 +525,9 @@ const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
                                             <span v-if="tx.ofx_file_name" class="text-gray-400 truncate max-w-[12rem]">{{ tx.ofx_file_name }}</span>
                                         </div>
                                     </div>
-
-                                    <!-- connector -->
                                     <div class="hidden md:flex items-center justify-center px-2 bg-white">
                                         <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold">↔</div>
                                     </div>
-
-                                    <!-- Título -->
                                     <div class="p-4 bg-emerald-50/40">
                                         <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 mb-2">Título no Hub</p>
                                         <p class="text-sm font-medium text-gray-900">
@@ -497,19 +537,12 @@ const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
                                         <p v-if="tx.payable?.description" class="text-xs text-gray-600 mt-1 leading-snug">{{ tx.payable.description }}</p>
                                         <p class="text-xs text-gray-800 mt-2 leading-snug font-medium">{{ tx.payable?.supplier_name ?? '—' }}</p>
                                         <div class="mt-3 space-y-1 text-xs text-gray-600">
-                                            <p>
-                                                <span class="text-gray-400">Empresa:</span>
-                                                {{ tx.payable?.empresa_nome || '—' }}
-                                            </p>
-                                            <p v-if="tx.payable?.filial_label">
-                                                <span class="text-gray-400">Filial:</span>
-                                                {{ tx.payable.filial_label }}
-                                            </p>
+                                            <p><span class="text-gray-400">Empresa:</span> {{ tx.payable?.empresa_nome || '—' }}</p>
+                                            <p v-if="tx.payable?.filial_label"><span class="text-gray-400">Filial:</span> {{ tx.payable.filial_label }}</p>
                                             <p>
                                                 <span class="text-gray-400">Valor:</span>
                                                 <span class="font-semibold text-gray-900 whitespace-nowrap">{{ formatMoney(tx.payable?.amount) }}</span>
                                                 <span v-if="tx.payable?.paid_at" class="text-gray-400"> · pago {{ formatDate(tx.payable.paid_at) }}</span>
-                                                <span v-else-if="tx.payable?.due_date" class="text-gray-400"> · venc. {{ formatDate(tx.payable.due_date) }}</span>
                                             </p>
                                             <p class="flex flex-wrap gap-2 items-center pt-1">
                                                 <Tag :value="confidenceLabel(tx.match_confidence)" severity="info" class="text-xs" />
@@ -522,7 +555,6 @@ const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
                                         </div>
                                     </div>
                                 </div>
-
                                 <div v-if="isConciliador" class="px-4 py-3 border-t border-gray-100 bg-white flex flex-wrap gap-2 justify-end">
                                     <button
                                         v-if="tx.match_status === 'pending'"
@@ -540,10 +572,20 @@ const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
                         </div>
                     </section>
 
-                    <!-- ── Ambiguous ─────────────────────────────────────────────────── -->
-                    <section v-if="ambiguous.length" class="mb-6">
-                        <h3 class="text-sm font-semibold text-amber-700 mb-2">⚠️ Ambíguos — vincule manualmente</h3>
-                        <div class="overflow-x-auto rounded-lg border border-amber-100">
+                    <!-- Ambíguos -->
+                    <section v-if="ambiguous.length" class="rounded-xl border border-amber-200 bg-white overflow-hidden">
+                        <button type="button" class="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-amber-50/50" @click="toggleSection('ambiguous')">
+                            <i :class="['pi text-amber-500 text-xs', isSectionOpen('ambiguous') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-amber-800">Ambíguos</p>
+                                <p class="text-xs text-amber-600/80">Vincule manualmente</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-sm font-bold text-amber-900">{{ ambiguous.length }}</p>
+                                <p class="text-xs text-amber-700 whitespace-nowrap">{{ formatMoney(sumAbs(ambiguous)) }}</p>
+                            </div>
+                        </button>
+                        <div v-if="isSectionOpen('ambiguous')" class="border-t border-amber-100 px-4 py-3 overflow-x-auto">
                             <table class="w-full text-sm">
                                 <thead class="bg-amber-50 text-xs text-amber-600 uppercase">
                                     <tr>
@@ -568,11 +610,7 @@ const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
                                             <template v-else>—</template>
                                         </td>
                                         <td v-if="isConciliador" class="px-3 py-2 text-right">
-                                            <button
-                                                type="button"
-                                                class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
-                                                @click="openLink(tx.id)"
-                                            >Vincular</button>
+                                            <button type="button" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200" @click="openLink(tx.id)">Vincular</button>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -580,40 +618,99 @@ const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
                         </div>
                     </section>
 
-                    <!-- ── Bank ops (tarifa / aplicação / resgate) ───────────────────── -->
-                    <section v-if="bankOps.length" class="mb-6">
-                        <h3 class="text-sm font-semibold text-violet-800 mb-1">Tarifas, aplicações e resgates</h3>
-                        <p class="text-xs text-gray-400 mb-3">
-                            Separados do Contas a Pagar. Sem ação aqui — ao conciliar o dia, gravamos na tabela e preservamos o OFX.
-                        </p>
-                        <div class="space-y-2">
-                            <div
-                                v-for="tx in bankOps"
-                                :key="tx.id"
-                                class="rounded-lg border border-violet-100 bg-violet-50/40 px-4 py-3 flex flex-wrap items-center gap-3 justify-between"
-                            >
-                                <div class="min-w-0 flex-1">
-                                    <div class="flex flex-wrap items-center gap-2 mb-1">
-                                        <Tag :value="operationCategoryLabel(tx.operation_category)" severity="secondary" class="text-xs" />
-                                        <span v-if="tx.match_status === 'non_payable'" class="text-[11px] text-green-700 font-medium">Registrado</span>
-                                    </div>
-                                    <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
-                                    <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
-                                        <span class="font-semibold text-gray-800 whitespace-nowrap">{{ formatMoney(tx.amount) }}</span>
-                                        <span>{{ formatDate(tx.date) }}</span>
-                                        <span v-if="tx.bank_account_name">{{ tx.bank_account_name }}</span>
-                                        <span v-if="tx.ofx_file_name" class="truncate max-w-[14rem]">{{ tx.ofx_file_name }}</span>
-                                    </div>
+                    <!-- Tarifas -->
+                    <section v-if="tarifas.length" class="rounded-xl border border-violet-200 bg-white overflow-hidden">
+                        <button type="button" class="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-violet-50/40" @click="toggleSection('tarifas')">
+                            <i :class="['pi text-violet-500 text-xs', isSectionOpen('tarifas') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-violet-900">Tarifas</p>
+                                <p class="text-xs text-violet-600/70">Sem ação — gravadas ao conciliar o dia</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-sm font-bold text-violet-900">{{ tarifas.length }}</p>
+                                <p class="text-xs text-violet-700 whitespace-nowrap">{{ formatMoney(sumAbs(tarifas)) }}</p>
+                            </div>
+                        </button>
+                        <div v-if="isSectionOpen('tarifas')" class="border-t border-violet-100 px-4 py-3 space-y-2">
+                            <div v-for="tx in tarifas" :key="tx.id" class="rounded-lg border border-violet-100 bg-violet-50/40 px-4 py-3">
+                                <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                                <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                                    <span class="font-semibold text-gray-800 whitespace-nowrap">{{ formatMoney(tx.amount) }}</span>
+                                    <span>{{ formatDate(tx.date) }}</span>
+                                    <span v-if="tx.bank_account_name">{{ tx.bank_account_name }}</span>
+                                    <span v-if="tx.ofx_file_name" class="truncate max-w-[14rem]">{{ tx.ofx_file_name }}</span>
+                                    <span v-if="tx.match_status === 'non_payable'" class="text-green-700 font-medium">Registrado</span>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    <!-- ── OFX only ──────────────────────────────────────────────────── -->
-                    <section v-if="ofxOnly.length" class="mb-6">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-1">Só no OFX — sem título</h3>
-                        <p class="text-xs text-gray-400 mb-3">Débitos do extrato sem match (ou após desfazer uma sugestão). Dá para vincular manualmente a um título.</p>
-                        <div class="space-y-2">
+                    <!-- Aplicações -->
+                    <section v-if="aplicacoes.length" class="rounded-xl border border-indigo-200 bg-white overflow-hidden">
+                        <button type="button" class="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-indigo-50/40" @click="toggleSection('aplicacoes')">
+                            <i :class="['pi text-indigo-500 text-xs', isSectionOpen('aplicacoes') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-indigo-900">Aplicações</p>
+                                <p class="text-xs text-indigo-600/70">Sem ação — gravadas ao conciliar o dia</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-sm font-bold text-indigo-900">{{ aplicacoes.length }}</p>
+                                <p class="text-xs text-indigo-700 whitespace-nowrap">{{ formatMoney(sumAbs(aplicacoes)) }}</p>
+                            </div>
+                        </button>
+                        <div v-if="isSectionOpen('aplicacoes')" class="border-t border-indigo-100 px-4 py-3 space-y-2">
+                            <div v-for="tx in aplicacoes" :key="tx.id" class="rounded-lg border border-indigo-100 bg-indigo-50/40 px-4 py-3">
+                                <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                                <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                                    <span class="font-semibold text-gray-800 whitespace-nowrap">{{ formatMoney(tx.amount) }}</span>
+                                    <span>{{ formatDate(tx.date) }}</span>
+                                    <span v-if="tx.bank_account_name">{{ tx.bank_account_name }}</span>
+                                    <span v-if="tx.ofx_file_name" class="truncate max-w-[14rem]">{{ tx.ofx_file_name }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Resgates -->
+                    <section v-if="resgates.length" class="rounded-xl border border-sky-200 bg-white overflow-hidden">
+                        <button type="button" class="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-sky-50/40" @click="toggleSection('resgates')">
+                            <i :class="['pi text-sky-500 text-xs', isSectionOpen('resgates') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-sky-900">Resgates</p>
+                                <p class="text-xs text-sky-600/70">Sem ação — gravados ao conciliar o dia</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-sm font-bold text-sky-900">{{ resgates.length }}</p>
+                                <p class="text-xs text-sky-700 whitespace-nowrap">{{ formatMoney(sumAbs(resgates)) }}</p>
+                            </div>
+                        </button>
+                        <div v-if="isSectionOpen('resgates')" class="border-t border-sky-100 px-4 py-3 space-y-2">
+                            <div v-for="tx in resgates" :key="tx.id" class="rounded-lg border border-sky-100 bg-sky-50/40 px-4 py-3">
+                                <p class="text-sm font-medium text-gray-900 leading-snug">{{ tx.description || tx.memo || '—' }}</p>
+                                <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                                    <span class="font-semibold text-gray-800 whitespace-nowrap">{{ formatMoney(tx.amount) }}</span>
+                                    <span>{{ formatDate(tx.date) }}</span>
+                                    <span v-if="tx.bank_account_name">{{ tx.bank_account_name }}</span>
+                                    <span v-if="tx.ofx_file_name" class="truncate max-w-[14rem]">{{ tx.ofx_file_name }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Só OFX -->
+                    <section v-if="ofxOnly.length" class="rounded-xl border border-red-200 bg-white overflow-hidden">
+                        <button type="button" class="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-red-50/40" @click="toggleSection('ofx_only')">
+                            <i :class="['pi text-red-500 text-xs', isSectionOpen('ofx_only') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-red-800">Só no OFX — sem título</p>
+                                <p class="text-xs text-red-600/70">Vincule a um título antes de conciliar o dia</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-sm font-bold text-red-900">{{ ofxOnly.length }}</p>
+                                <p class="text-xs text-red-700 whitespace-nowrap">{{ formatMoney(sumAbs(ofxOnly)) }}</p>
+                            </div>
+                        </button>
+                        <div v-if="isSectionOpen('ofx_only')" class="border-t border-red-100 px-4 py-3 space-y-2">
                             <div
                                 v-for="tx in ofxOnly"
                                 :key="tx.id"
@@ -639,10 +736,20 @@ const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
                         </div>
                     </section>
 
-                    <!-- ── Payable only ──────────────────────────────────────────────── -->
-                    <section v-if="payableOnly.length">
-                        <h3 class="text-sm font-semibold text-gray-600 mb-2">🟡 Só no sistema — sem OFX</h3>
-                        <div class="overflow-x-auto rounded-lg border border-gray-100">
+                    <!-- Só título -->
+                    <section v-if="payableOnly.length" class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                        <button type="button" class="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50" @click="toggleSection('payable_only')">
+                            <i :class="['pi text-gray-400 text-xs', isSectionOpen('payable_only') ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-gray-700">Só no sistema — sem OFX</p>
+                                <p class="text-xs text-gray-400">Títulos pagos sem extrato neste dia</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-sm font-bold text-gray-800">{{ payableOnly.length }}</p>
+                                <p class="text-xs text-gray-500 whitespace-nowrap">{{ formatMoney(sumAbs(payableOnly)) }}</p>
+                            </div>
+                        </button>
+                        <div v-if="isSectionOpen('payable_only')" class="border-t border-gray-100 px-4 py-3 overflow-x-auto">
                             <table class="w-full text-sm">
                                 <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
                                     <tr>
@@ -668,6 +775,8 @@ const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
                             </table>
                         </div>
                     </section>
+
+                    </div>
                 </div>
             </template>
         </div>
