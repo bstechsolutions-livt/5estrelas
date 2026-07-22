@@ -222,11 +222,15 @@ class ConciliationSessionService
             ->all();
 
         $transactions = BankTransaction::query()
-            ->with('matchedPayable:id,title_number,supplier_name,amount,paid_at,status')
+            ->with('matchedPayable:id,title_number,supplier_name,amount,paid_at,status,codemp,codfil')
             ->whereIn('import_id', $importIds)
             ->where('type', 'debit')
             ->orderByDesc('amount')
             ->get();
+
+        $matchedPayables = $transactions->pluck('matchedPayable')->filter();
+        Payable::attachEmpresaNome($matchedPayables);
+        Payable::attachFilialNome($matchedPayables);
 
         $matched = [];
         $ofxOnly = [];
@@ -252,6 +256,8 @@ class ConciliationSessionService
             }
         }
 
+        $this->enrichAmbiguousCandidates($ambiguous);
+
         $matchedPayableIds = $transactions
             ->whereNotNull('matched_payable_id')
             ->whereIn('match_status', ['pending', 'accepted', 'manual'])
@@ -259,10 +265,15 @@ class ConciliationSessionService
             ->unique()
             ->all();
 
-        $payableOnly = $this->pendingPayablesQuery($referenceDate)
+        $payableOnlyModels = $this->pendingPayablesQuery($referenceDate)
             ->when(! empty($matchedPayableIds), fn ($q) => $q->whereNotIn('id', $matchedPayableIds))
             ->orderByDesc('amount')
-            ->get(['id', 'title_number', 'supplier_name', 'amount', 'paid_at', 'status'])
+            ->get(['id', 'title_number', 'supplier_name', 'amount', 'paid_at', 'status', 'codemp', 'codfil']);
+
+        Payable::attachEmpresaNome($payableOnlyModels);
+        Payable::attachFilialNome($payableOnlyModels);
+
+        $payableOnly = $payableOnlyModels
             ->map(fn (Payable $p) => [
                 'id' => $p->id,
                 'title_number' => $p->title_number,
@@ -270,6 +281,10 @@ class ConciliationSessionService
                 'amount' => (float) $p->amount,
                 'paid_at' => $p->paid_at?->toDateString(),
                 'status' => $p->status,
+                'codemp' => $p->codemp,
+                'empresa_nome' => $p->empresa_nome,
+                'filial_nome' => $p->filial_nome,
+                'filial_label' => $p->filial_label,
             ])
             ->values()
             ->all();
@@ -318,9 +333,58 @@ class ConciliationSessionService
                 'amount' => (float) $payable->amount,
                 'paid_at' => $payable->paid_at?->toDateString(),
                 'status' => $payable->status,
+                'codemp' => $payable->codemp,
+                'empresa_nome' => $payable->empresa_nome,
+                'filial_nome' => $payable->filial_nome,
+                'filial_label' => $payable->filial_label,
             ] : null,
             'ambiguous_candidates' => $tx->raw_data['ambiguous_candidates'] ?? [],
         ];
+    }
+
+    /** Enriquece candidatos ambíguos com empresa/filial. */
+    private function enrichAmbiguousCandidates(array &$ambiguousRows): void
+    {
+        $ids = collect($ambiguousRows)
+            ->flatMap(fn ($row) => collect($row['ambiguous_candidates'] ?? [])->pluck('payable_id'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        $payables = Payable::query()
+            ->whereIn('id', $ids)
+            ->get(['id', 'title_number', 'supplier_name', 'amount', 'paid_at', 'codemp', 'codfil']);
+
+        Payable::attachEmpresaNome($payables);
+        Payable::attachFilialNome($payables);
+
+        $byId = $payables->keyBy('id');
+
+        foreach ($ambiguousRows as &$row) {
+            $row['ambiguous_candidates'] = collect($row['ambiguous_candidates'] ?? [])
+                ->map(function ($c) use ($byId) {
+                    $p = $byId->get($c['payable_id'] ?? null);
+                    if (! $p) {
+                        return $c;
+                    }
+
+                    return array_merge($c, [
+                        'title_number' => $p->title_number,
+                        'supplier_name' => $p->supplier_name,
+                        'empresa_nome' => $p->empresa_nome,
+                        'filial_nome' => $p->filial_nome,
+                        'filial_label' => $p->filial_label,
+                        'codemp' => $p->codemp,
+                    ]);
+                })
+                ->values()
+                ->all();
+        }
+        unset($row);
     }
 
     public function periodLabel(Carbon $referenceDate): string

@@ -389,12 +389,24 @@ class BankConciliationController extends Controller
         }
 
         $payables = $query
-            ->select(['id', 'title_number', 'supplier_name', 'amount', 'paid_at', 'due_date'])
+            ->select(['id', 'title_number', 'supplier_name', 'amount', 'paid_at', 'due_date', 'codemp', 'codfil'])
             ->orderByDesc('paid_at')
             ->limit(20)
             ->get();
 
-        return response()->json($payables);
+        Payable::attachEmpresaNome($payables);
+        Payable::attachFilialNome($payables);
+
+        return response()->json($payables->map(fn (Payable $p) => [
+            'id' => $p->id,
+            'title_number' => $p->title_number,
+            'supplier_name' => $p->supplier_name,
+            'amount' => $p->amount,
+            'paid_at' => $p->paid_at?->toDateString(),
+            'due_date' => $p->due_date?->toDateString(),
+            'empresa_nome' => $p->empresa_nome,
+            'filial_label' => $p->filial_label,
+        ]));
     }
 
     /**
