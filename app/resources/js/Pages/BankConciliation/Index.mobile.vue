@@ -129,6 +129,14 @@ function batchDay() {
     })
 }
 
+const resetDayForm = useForm({ date: null })
+function resetDay() {
+    if (!props.dayReport?.date || resetDayForm.processing) return
+    if (!confirm(`Resetar o dia ${props.dayReport.label}?\nApaga os OFX deste dia. Títulos não mudam.`)) return
+    resetDayForm.date = props.dayReport.date
+    resetDayForm.post('/financeiro/contas-pagar/conciliacao/reset-day')
+}
+
 function formatDate(d) {
     if (!d) return '—'
     return new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR')
@@ -226,14 +234,22 @@ function formatMoney(v) {
                 <button type="button" class="text-sm text-blue-700" @click="clearDay">
                     ← Voltar aos dias
                 </button>
-                <div class="flex justify-between items-start">
+                <div class="flex justify-between items-start gap-2">
                     <h2 class="font-bold text-gray-800">{{ dayReport.label }}</h2>
-                    <button
-                        v-if="isConciliador && kpis && kpis.accepted > 0"
-                        type="button"
-                        class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg"
-                        @click="batchDay"
-                    >Conciliar</button>
+                    <div class="flex flex-col gap-1 items-end">
+                        <button
+                            v-if="isConciliador && kpis && kpis.imports > 0"
+                            type="button"
+                            class="text-xs px-3 py-1.5 border border-red-200 text-red-700 rounded-lg"
+                            @click="resetDay"
+                        >Começar do zero</button>
+                        <button
+                            v-if="isConciliador && kpis && kpis.accepted > 0"
+                            type="button"
+                            class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg"
+                            @click="batchDay"
+                        >Conciliar</button>
+                    </div>
                 </div>
 
                 <div
