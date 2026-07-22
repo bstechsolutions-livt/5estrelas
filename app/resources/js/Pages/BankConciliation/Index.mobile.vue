@@ -191,6 +191,7 @@ function formatMoney(v) {
                     <p v-if="card.ok" class="text-xs text-green-700 mt-1">
                         {{ formatDate(card.date) }} · {{ card.bank_account_name ?? '?' }} · {{ card.transaction_count }} transações
                     </p>
+                    <p v-if="card.ok && card.account_created" class="text-xs text-amber-700 mt-0.5">Conta criada automaticamente</p>
                     <p v-else class="text-xs text-red-700 mt-1">{{ card.error }}</p>
                     <button
                         v-if="card.ok && card.date && card.date !== (filters?.date || dayReport?.date)"

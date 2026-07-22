@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class BankAccount extends Model
 {
+    use Auditable;
+
+    public string $auditableModule = 'financeiro.bancos';
+
+    public string $auditableEventPrefix = 'conta';
+
     protected $fillable = [
         'name',
         'is_active',
@@ -121,5 +128,15 @@ class BankAccount extends Model
             'imported_from_senior_at' => $this->imported_from_senior_at?->toIso8601String(),
             'from_senior' => $this->isFromSenior(),
         ];
+    }
+
+    public function auditDescription(string $action): string
+    {
+        return match ($action) {
+            'created' => "Conta bancária criada: {$this->name}",
+            'updated' => "Conta bancária atualizada: {$this->name}",
+            'deleted' => "Conta bancária excluída: {$this->name}",
+            default => "Conta bancária ({$action}): {$this->name}",
+        };
     }
 }
