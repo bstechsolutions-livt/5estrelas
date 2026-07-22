@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\BankDayOperation;
 use App\Models\BankStatementImport;
 use App\Models\BankTransaction;
 use App\Models\ConciliationSession;
@@ -205,6 +206,7 @@ class ConciliationSessionService
                 'bank_account_name' => $i->bankAccount?->name,
                 'transaction_count' => $i->transaction_count,
                 'matched_count' => $i->matched_count,
+                'day_conciliated_at' => $i->day_conciliated_at?->toIso8601String(),
                 'created_at' => $i->created_at?->toIso8601String(),
             ])
             ->values()
@@ -240,6 +242,8 @@ class ConciliationSessionService
         $matched = [];
         $ofxOnly = [];
         $ambiguous = [];
+        $bankOps = [];
+        $classifier = app(OfxBankOperationClassifier::class);
 
         foreach ($transactions as $tx) {
             $row = $this->mapTransactionRow($tx);
@@ -256,9 +260,27 @@ class ConciliationSessionService
                 continue;
             }
 
-            // unmatched + rejected (legado) → só OFX, pode vincular de novo
+            // Já gravado como tarifa/aplicação/resgate no conciliar dia
+            if ($tx->match_status === 'non_payable') {
+                $category = $tx->raw_data['bank_operation_category']
+                    ?? $classifier->classify($tx->description, $tx->memo);
+                if ($category) {
+                    $row['operation_category'] = $category;
+                    $bankOps[] = $row;
+                }
+
+                continue;
+            }
+
+            // unmatched + rejected (legado) → só OFX ou operação bancária
             if (in_array($tx->match_status, ['unmatched', 'rejected'], true)) {
-                $ofxOnly[] = $row;
+                $category = $classifier->classify($tx->description, $tx->memo);
+                if ($category) {
+                    $row['operation_category'] = $category;
+                    $bankOps[] = $row;
+                } else {
+                    $ofxOnly[] = $row;
+                }
             }
         }
 
@@ -296,23 +318,60 @@ class ConciliationSessionService
             ->all();
 
         $accepted = $transactions->whereIn('match_status', ['accepted', 'manual'])->count();
+        $pendingMatches = collect($matched)->where('match_status', 'pending')->count();
+        $dayAlreadyConciliated = collect($imports)->contains(fn ($i) => ! empty($i['day_conciliated_at'] ?? null))
+            || BankDayOperation::query()->whereDate('reference_date', $date)->exists();
+
+        $opsByCategory = [
+            'tarifa' => collect($bankOps)->where('operation_category', 'tarifa')->count(),
+            'aplicacao' => collect($bankOps)->where('operation_category', 'aplicacao')->count(),
+            'resgate' => collect($bankOps)->where('operation_category', 'resgate')->count(),
+        ];
+
+        $blockers = [];
+        if ($dayAlreadyConciliated) {
+            $blockers[] = 'Este dia já foi conciliado.';
+        }
+        if ($pendingMatches > 0) {
+            $blockers[] = "Há {$pendingMatches} sugestão(ões) pendente(s) — aceite ou rejeite todas.";
+        }
+        if (count($ambiguous) > 0) {
+            $blockers[] = 'Há matches ambíguos — vincule ou resolva antes.';
+        }
+        if (count($ofxOnly) > 0) {
+            $blockers[] = 'Há débitos só no OFX (sem título) que não são tarifa/aplicação/resgate — vincule ou trate antes.';
+        }
 
         return [
             'date' => $date,
             'label' => $this->periodLabel($referenceDate),
             'imports' => $imports,
             'accounts' => $accounts,
+            'day_conciliated' => $dayAlreadyConciliated,
+            'can_conciliate_day' => empty($blockers) && count($imports) > 0,
+            'conciliate_blockers' => $blockers,
+            'summary' => [
+                'accepted' => $accepted,
+                'bank_ops' => count($bankOps),
+                'tarifas' => $opsByCategory['tarifa'],
+                'aplicacoes' => $opsByCategory['aplicacao'],
+                'resgates' => $opsByCategory['resgate'],
+                'ofx_files' => count($imports),
+                'payable_only' => count($payableOnly),
+            ],
             'kpis' => [
                 'imports' => count($imports),
                 'accounts' => count($accounts),
                 'matched' => count($matched),
                 'ofx_only' => count($ofxOnly),
+                'bank_ops' => count($bankOps),
                 'payable_only' => count($payableOnly),
                 'ambiguous' => count($ambiguous),
                 'accepted' => $accepted,
             ],
             'matched' => $matched,
             'ofx_only' => $ofxOnly,
+            'bank_ops' => $bankOps,
             'payable_only' => $payableOnly,
             'ambiguous' => $ambiguous,
         ];
@@ -417,9 +476,21 @@ class ConciliationSessionService
             return ['deleted_imports' => 0, 'deleted_sessions' => 0];
         }
 
+        if (BankDayOperation::query()->whereDate('reference_date', $date)->exists()) {
+            throw new \RuntimeException(
+                'Não é possível resetar este dia: já foi conciliado (tarifas/aplicações/resgates e OFX preservados).'
+            );
+        }
+
         $imports = BankStatementImport::query()
             ->whereIn('conciliation_session_id', $sessions->pluck('id'))
             ->get();
+
+        if ($imports->contains(fn (BankStatementImport $i) => $i->day_conciliated_at !== null)) {
+            throw new \RuntimeException(
+                'Não é possível resetar este dia: há extratos OFX já arquivados na conciliação do dia.'
+            );
+        }
 
         $blocked = BankTransaction::query()
             ->whereIn('import_id', $imports->pluck('id'))

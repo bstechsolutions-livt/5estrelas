@@ -76,9 +76,14 @@ function clearDay() {
 const kpis = computed(() => props.dayReport?.kpis ?? null)
 const matched     = computed(() => props.dayReport?.matched     ?? [])
 const ofxOnly     = computed(() => props.dayReport?.ofx_only    ?? [])
+const bankOps     = computed(() => props.dayReport?.bank_ops    ?? [])
 const payableOnly = computed(() => props.dayReport?.payable_only ?? [])
 const ambiguous   = computed(() => props.dayReport?.ambiguous   ?? [])
+const dayConciliated = computed(() => !!props.dayReport?.day_conciliated)
 
+function operationCategoryLabel(c) {
+    return { tarifa: 'Tarifa', aplicacao: 'Aplicação', resgate: 'Resgate' }[c] ?? c
+}
 // Link
 const linkTxId = ref(null)
 const linkPayableId = ref(null)
@@ -127,10 +132,34 @@ function rejectTx(id) {
 
 const batchDayForm = useForm({ date: null })
 function batchDay() {
-    if (!props.dayReport?.date) return
-    batchDayForm.date = props.dayReport.date
-    batchDayForm.post('/financeiro/contas-pagar/conciliacao/batch-conciliate-day', {
-        onSuccess: () => router.reload(),
+    if (!props.dayReport?.date || batchDayForm.processing) return
+
+    const blockers = props.dayReport.conciliate_blockers ?? []
+    if (blockers.length) {
+        confirm.require({
+            header: 'Dia incompleto',
+            message: blockers.join(' '),
+            icon: 'pi pi-exclamation-triangle',
+            rejectProps: { label: 'Fechar', severity: 'secondary', outlined: true },
+            acceptProps: { label: 'Entendi', severity: 'secondary' },
+            accept: () => {},
+        })
+        return
+    }
+
+    const s = props.dayReport.summary ?? {}
+    confirm.require({
+        header: `Conciliar dia ${props.dayReport.label}`,
+        message: `Títulos: ${s.accepted ?? 0} · Tarifas: ${s.tarifas ?? 0} · Aplicações: ${s.aplicacoes ?? 0} · Resgates: ${s.resgates ?? 0} · OFX: ${s.ofx_files ?? 0}. Confirma?`,
+        icon: 'pi pi-check-circle',
+        rejectProps: { label: 'Cancelar', severity: 'secondary', outlined: true },
+        acceptProps: { label: 'Conciliar dia', severity: 'success' },
+        accept: () => {
+            batchDayForm.date = props.dayReport.date
+            batchDayForm.post('/financeiro/contas-pagar/conciliacao/batch-conciliate-day', {
+                onSuccess: () => router.reload(),
+            })
+        },
     })
 }
 
@@ -257,17 +286,18 @@ function formatMoney(v) {
                     <h2 class="font-bold text-gray-800">{{ dayReport.label }}</h2>
                     <div class="flex flex-col gap-1 items-end">
                         <button
-                            v-if="isConciliador && kpis && kpis.imports > 0"
+                            v-if="isConciliador && kpis && kpis.imports > 0 && !dayConciliated"
                             type="button"
                             class="text-xs px-3 py-1.5 border border-red-200 text-red-700 rounded-lg"
                             @click="resetDay"
                         >Começar do zero</button>
                         <button
-                            v-if="isConciliador && kpis && kpis.accepted > 0"
+                            v-if="isConciliador && kpis && kpis.imports > 0"
                             type="button"
-                            class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg"
+                            :disabled="dayConciliated"
+                            class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg disabled:opacity-50"
                             @click="batchDay"
-                        >Conciliar</button>
+                        >{{ dayConciliated ? 'Já conciliado' : 'Conciliar dia' }}</button>
                     </div>
                 </div>
 
@@ -279,7 +309,7 @@ function formatMoney(v) {
                 </div>
 
                 <!-- KPIs -->
-                <div v-if="kpis" class="grid grid-cols-3 gap-2 text-center text-xs">
+                <div v-if="kpis" class="grid grid-cols-2 gap-2 text-center text-xs">
                     <div class="bg-green-50 rounded-lg p-2">
                         <p class="text-green-700">Sugeridos</p>
                         <p class="font-bold text-green-900 text-lg">{{ kpis.matched }}</p>
@@ -292,6 +322,26 @@ function formatMoney(v) {
                         <p class="text-red-700">Só OFX</p>
                         <p class="font-bold text-red-900 text-lg">{{ kpis.ofx_only }}</p>
                     </div>
+                    <div class="bg-violet-50 rounded-lg p-2">
+                        <p class="text-violet-700">Tarifa/Apl/Resg</p>
+                        <p class="font-bold text-violet-900 text-lg">{{ kpis.bank_ops }}</p>
+                    </div>
+                </div>
+
+                <div
+                    v-if="dayConciliated"
+                    class="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-900"
+                >
+                    Dia conciliado. OFX e tarifas/aplicações/resgates preservados.
+                </div>
+                <div
+                    v-else-if="isConciliador && (dayReport.conciliate_blockers?.length)"
+                    class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                >
+                    <p class="font-medium mb-1">Para conciliar o dia:</p>
+                    <ul class="list-disc pl-4 space-y-0.5">
+                        <li v-for="(b, i) in dayReport.conciliate_blockers" :key="i">{{ b }}</li>
+                    </ul>
                 </div>
 
                 <!-- Matched -->
@@ -354,6 +404,20 @@ function formatMoney(v) {
                             class="mt-2 text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded"
                             @click="linkTxId = tx.id; linkPayableId = null; linkSearchQuery = ''; linkResults = []"
                         >Vincular</button>
+                    </div>
+                </section>
+
+                <!-- Bank ops -->
+                <section v-if="bankOps.length">
+                    <p class="text-sm font-semibold text-violet-800 mb-1">Tarifas / aplicações / resgates</p>
+                    <p class="text-xs text-gray-400 mb-2">Sem ação — gravados ao conciliar o dia.</p>
+                    <div v-for="tx in bankOps" :key="tx.id" class="border border-violet-100 rounded-lg p-3 mb-2 bg-violet-50/40">
+                        <p class="text-[10px] font-semibold uppercase text-violet-700">{{ operationCategoryLabel(tx.operation_category) }}</p>
+                        <p class="text-sm font-medium text-gray-900 leading-snug mt-0.5">{{ tx.description || tx.memo || '—' }}</p>
+                        <p class="text-xs text-gray-600 mt-1">
+                            <span class="font-semibold">{{ formatMoney(tx.amount) }}</span>
+                            <span class="mx-1">·</span>{{ formatDate(tx.date) }}
+                        </p>
                     </div>
                 </section>
 

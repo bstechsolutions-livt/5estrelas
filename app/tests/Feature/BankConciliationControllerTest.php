@@ -624,4 +624,111 @@ OFX;
         $this->assertDatabaseMissing('conciliation_sessions', ['id' => $session->id]);
         $this->assertDatabaseHas('payables', ['id' => $payable->id, 'status' => 'pago']);
     }
+
+    public function test_day_report_separates_tarifas_from_ofx_only(): void
+    {
+        $user = $this->conciliador();
+        $account = $this->createBankAccount();
+        $date = '2026-06-16';
+        $import = $this->createImport($user, $account->id, $date);
+
+        $this->createTransaction($import, [
+            'match_status' => 'unmatched',
+            'description' => 'TARIFA AVULSA ENVIO PIX',
+            'amount' => -1.75,
+            'date' => Carbon::parse($date),
+        ]);
+        $this->createTransaction($import, [
+            'match_status' => 'unmatched',
+            'description' => 'DEBITO PIX',
+            'amount' => -100.00,
+            'date' => Carbon::parse($date),
+        ]);
+
+        $report = app(ConciliationSessionService::class)->dayReport(Carbon::parse($date));
+
+        $this->assertCount(1, $report['bank_ops']);
+        $this->assertEquals('tarifa', $report['bank_ops'][0]['operation_category']);
+        $this->assertCount(1, $report['ofx_only']);
+        $this->assertFalse($report['can_conciliate_day']);
+    }
+
+    public function test_batch_conciliate_day_saves_tarifas_and_retains_ofx(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+
+        $user = $this->conciliador();
+        $account = $this->createBankAccount();
+        $date = '2026-06-16';
+        $import = $this->createImport($user, $account->id, $date);
+
+        \Illuminate\Support\Facades\Storage::disk('local')->put($import->file_path, 'OFXDATA');
+
+        $payable = Payable::create([
+            'title_number' => 'TIT-OPS', 'supplier_name' => 'FOps', 'amount' => 50.00,
+            'due_date' => '2026-06-10', 'status' => 'pago', 'paid_at' => $date,
+        ]);
+        $this->createTransaction($import, [
+            'match_status' => 'accepted',
+            'matched_payable_id' => $payable->id,
+            'amount' => -50.00,
+            'date' => Carbon::parse($date),
+            'description' => 'PIX FORNECEDOR',
+        ]);
+        $tarifa = $this->createTransaction($import, [
+            'match_status' => 'unmatched',
+            'description' => 'TARIFA AVULSA ENVIO PIX',
+            'amount' => -1.75,
+            'date' => Carbon::parse($date),
+        ]);
+        $this->createTransaction($import, [
+            'match_status' => 'unmatched',
+            'description' => 'APLICACAO CONTAMAX',
+            'amount' => -1000.00,
+            'date' => Carbon::parse($date),
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('bank-conciliation.batch-day'), ['date' => $date])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $payable->refresh();
+        $this->assertEquals('conciliado', $payable->status);
+
+        $this->assertDatabaseHas('bank_day_operations', [
+            'bank_transaction_id' => $tarifa->id,
+            'category' => 'tarifa',
+        ]);
+        $this->assertTrue(
+            \App\Models\BankDayOperation::query()
+                ->where('bank_transaction_id', $tarifa->id)
+                ->whereDate('reference_date', $date)
+                ->exists()
+        );
+        $this->assertDatabaseHas('bank_day_operations', [
+            'category' => 'aplicacao',
+        ]);
+        $this->assertTrue(
+            \App\Models\BankDayOperation::query()
+                ->where('category', 'aplicacao')
+                ->whereDate('reference_date', $date)
+                ->exists()
+        );
+
+        $tarifa->refresh();
+        $this->assertEquals('non_payable', $tarifa->match_status);
+
+        $import->refresh();
+        $this->assertNotNull($import->day_conciliated_at);
+        $this->assertNotNull($import->retained_path);
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists($import->retained_path);
+
+        $this->actingAs($user)
+            ->post(route('bank-conciliation.reset-day'), ['date' => $date])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('bank_statement_imports', ['id' => $import->id]);
+    }
 }
