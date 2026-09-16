@@ -20,10 +20,13 @@ Os pacotes de sistema abaixo já fazem parte da imagem base do ambiente
 
 | Script | Papel no ambiente | O que faz |
 |--------|-------------------|-----------|
-| `services.sh` | `start` (todo boot) | Sobe PostgreSQL e Redis e garante o papel/bancos `estrelas` e `estrelas_test`. |
 | `install.sh` | `install` (bootstrap) | `composer install`, `.env` + `APP_KEY`, cria diretórios de runtime, `npm ci`, `npm run build`, `php artisan migrate --force` e seed inicial (só quando o banco está vazio). |
+| `start.sh` | `start` (todo boot) | Chama `services.sh` e sobe os serviços de dev de longa duração em background (idempotente via pidfile), esperando o web responder. |
+| `services.sh` | infraestrutura | Sobe PostgreSQL e Redis e garante o papel/bancos `estrelas` e `estrelas_test`. Usado por `install.sh` e `start.sh`. |
 
-## Serviços de longa duração (`terminals`)
+## Serviços de longa duração (subidos pelo `start.sh`)
+
+Rodam em background, com logs/pids em `app/storage/logs/cloud-agent/`:
 
 - `web` — `php artisan serve --host=0.0.0.0 --port=8090`
 - `vite` — `npm run dev` (HMR na porta 5173)
