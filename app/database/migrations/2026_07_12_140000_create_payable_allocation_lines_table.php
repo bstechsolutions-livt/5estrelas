@@ -24,8 +24,11 @@ return new class extends Migration
             $table->decimal('quantity', 10, 2)->nullable();
             $table->decimal('unit_amount', 15, 2)->nullable();
             $table->decimal('amount', 15, 2);
-            $table->foreignId('matched_bank_transaction_id')->nullable()
-                ->constrained('bank_transactions')->nullOnDelete();
+            // FK para bank_transactions é adicionada numa migration posterior
+            // (2026_08_10_100002_*), pois a tabela bank_transactions só é criada
+            // em 2026_08_10. Manter aqui apenas a coluna preserva a ordem correta
+            // em bancos novos (PostgreSQL valida a tabela referenciada na criação).
+            $table->foreignId('matched_bank_transaction_id')->nullable();
             $table->timestamps();
 
             $table->index(['payable_id', 'line_order']);
