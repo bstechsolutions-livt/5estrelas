@@ -6,6 +6,7 @@ use App\Models\BankStatementImport;
 use App\Models\Payable;
 use App\Models\Permission;
 use App\Models\User;
+use App\Support\FinanceiroConfigCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -22,6 +23,7 @@ class FinanceiroRoutesSmokeTest extends TestCase
         $user->permissions()->attach(
             Permission::firstOrCreate(['key' => '*'], ['label' => '*', 'module' => 'system'])->id
         );
+
         return $user;
     }
 
@@ -120,7 +122,7 @@ class FinanceiroRoutesSmokeTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Financeiro/Configuracao/Index', false)
-                ->has('items', 5)); // alcada, fluxos, borderos_auto, plano_contas, sync_senior
+                ->has('items', count(FinanceiroConfigCatalog::all())));
     }
 
     public function test_sync_senior_monitor(): void
@@ -130,6 +132,15 @@ class FinanceiroRoutesSmokeTest extends TestCase
             Permission::firstOrCreate(['key' => 'financeiro.workflows.configurar'], ['label' => 'x', 'module' => 'financeiro'])->id
         );
         $this->actingAs($user)->get('/financeiro/sync-senior')->assertOk();
+    }
+
+    public function test_open_finance_status(): void
+    {
+        $user = $this->admin();
+        $user->permissions()->attach(
+            Permission::firstOrCreate(['key' => 'open_finance.visualizar'], ['label' => 'x', 'module' => 'open_finance'])->id
+        );
+        $this->actingAs($user)->get('/open-finance')->assertOk();
     }
 
     public function test_configuracao_hub_forbidden_without_permissions(): void

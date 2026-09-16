@@ -62,6 +62,7 @@ class MenuCatalog
             ['key' => 'borderos', 'label' => 'Borderôs', 'icon' => 'pi pi-list-check', 'href' => '/financeiro/borderos', 'permission' => 'financeiro.borderos.visualizar', 'group' => 'Financeiro'],
             ['key' => 'contas_pagar_conciliacao', 'label' => 'Conciliação Bancária', 'icon' => 'pi pi-file-import', 'href' => '/financeiro/contas-pagar/conciliacao', 'permission' => 'financeiro.conciliacao.visualizar', 'group' => 'Financeiro'],
             ['key' => 'financeiro_bancos', 'label' => 'Bancos', 'icon' => 'pi pi-building', 'href' => '/financeiro/bancos', 'permission' => 'financeiro.bancos.visualizar', 'group' => 'Financeiro'],
+            ['key' => 'open_finance', 'label' => 'Open Finance', 'icon' => 'pi pi-link', 'href' => '/open-finance', 'permission' => 'open_finance.visualizar', 'group' => 'Financeiro'],
             ['key' => 'financeiro_configuracao', 'label' => 'Configuração', 'icon' => 'pi pi-cog', 'href' => '/financeiro/configuracao', 'any_permissions' => FinanceiroConfigCatalog::permissionKeys(), 'group' => 'Financeiro'],
             // Tickets (portado da Biglar)
             ['key' => 'sol_nova', 'label' => 'Novo Ticket', 'icon' => 'pi pi-plus-circle', 'href' => '/solicitacoes/nova', 'permission' => 'solicitacoes.visualizar', 'group' => 'Tickets'],
