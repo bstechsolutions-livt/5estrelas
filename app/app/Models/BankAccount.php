@@ -57,6 +57,11 @@ class BankAccount extends Model
         return $this->hasMany(BankStatementImport::class);
     }
 
+    public function openFinanceConnections(): HasMany
+    {
+        return $this->hasMany(OpenFinanceAccountConnection::class);
+    }
+
     public function latestStatementImport(): HasOne
     {
         return $this->hasOne(BankStatementImport::class)

@@ -11,6 +11,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(
+            \App\Services\OpenFinance\TecnoSpeedClient::class,
+            fn () => \App\Services\OpenFinance\TecnoSpeedClient::fromConfig(),
+        );
+
         if ($this->app->environment('local')) {
             if (class_exists(\Laravel\Telescope\TelescopeServiceProvider::class)) {
                 $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);

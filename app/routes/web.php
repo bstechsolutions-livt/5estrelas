@@ -11,6 +11,8 @@ use App\Http\Controllers\BranchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankConciliationController;
+use App\Http\Controllers\OpenFinance\AccountConnectionController;
+use App\Http\Controllers\OpenFinance\ConnectionStatusController;
 use App\Http\Controllers\PayableController;
 use App\Http\Controllers\PayableAlcadaController;
 use App\Http\Controllers\PayableDepartmentRulesController;
@@ -186,6 +188,22 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [PayableDepartmentRulesController::class, 'index'])->name('payables.department-rules.index');
         Route::post('/', [PayableDepartmentRulesController::class, 'update'])->name('payables.department-rules.update');
     });
+
+    Route::get('open-finance', [ConnectionStatusController::class, 'index'])
+        ->middleware('permission:open_finance.visualizar')
+        ->name('open-finance.index');
+    Route::get('open-finance/accounts/{bankAccount}/preview', [AccountConnectionController::class, 'preview'])
+        ->middleware('permission:open_finance.gerenciar')
+        ->name('open-finance.accounts.preview');
+    Route::post('open-finance/connections', [AccountConnectionController::class, 'store'])
+        ->middleware('permission:open_finance.gerenciar')
+        ->name('open-finance.connections.store');
+    Route::get('open-finance/connections/{connection}/authorization-link', [AccountConnectionController::class, 'authorizationLink'])
+        ->middleware('permission:open_finance.gerenciar')
+        ->name('open-finance.connections.authorization-link');
+    Route::post('open-finance/connections/{connection}/verify', [AccountConnectionController::class, 'verify'])
+        ->middleware('permission:open_finance.gerenciar')
+        ->name('open-finance.connections.verify');
 
     // Financeiro - Contas bancárias (cadastro Hub; import one-shot Senior)
     Route::prefix('financeiro/bancos')->middleware('permission:financeiro.bancos.visualizar')->group(function () {

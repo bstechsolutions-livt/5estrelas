@@ -16,6 +16,12 @@ class FinanceiroRoutesSmokeTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutVite();
+    }
+
     private function admin(): User
     {
         $user = User::factory()->create(['is_active' => true]);
@@ -120,7 +126,7 @@ class FinanceiroRoutesSmokeTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Financeiro/Configuracao/Index', false)
-                ->has('items', 5)); // alcada, fluxos, borderos_auto, plano_contas, sync_senior
+                ->has('items', 7)); // alcada, fluxos, borderos_auto, plano_contas, sync_senior, bancos, open_finance
     }
 
     public function test_sync_senior_monitor(): void
@@ -130,6 +136,11 @@ class FinanceiroRoutesSmokeTest extends TestCase
             Permission::firstOrCreate(['key' => 'financeiro.workflows.configurar'], ['label' => 'x', 'module' => 'financeiro'])->id
         );
         $this->actingAs($user)->get('/financeiro/sync-senior')->assertOk();
+    }
+
+    public function test_open_finance_status(): void
+    {
+        $this->actingAs($this->admin())->get('/open-finance')->assertOk();
     }
 
     public function test_configuracao_hub_forbidden_without_permissions(): void

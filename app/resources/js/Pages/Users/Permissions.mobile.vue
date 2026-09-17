@@ -24,6 +24,7 @@ const moduleLabels = {
     aparencia: 'Aparência',
     auditoria: 'Auditoria',
     noticias: 'Notícias',
+    open_finance: 'Open Finance',
 }
 
 function moduleLabel(key) {
