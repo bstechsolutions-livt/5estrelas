@@ -34,5 +34,10 @@
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="SENIOR_POST_SYNC_LAUNCHER_LOOKUPS" value="0"/>
         <env name="SENIOR_POST_SYNC_SUPPLIER_LOOKUPS" value="0"/>
+        <env name="APP_KEY" value="base64:2fl+Ktvkfl+Fuz4Qp/Ej30Vy4YfK/q6Ifn3C8gqBH/g="/>
+        <env name="OPEN_FINANCE_ENABLED" value="false"/>
+        <env name="TECNOSPEED_ENV" value="staging"/>
+        <env name="TECNOSPEED_CNPJ_SH" value=""/>
+        <env name="TECNOSPEED_TOKEN_SH" value=""/>
     </php>
 </phpunit>

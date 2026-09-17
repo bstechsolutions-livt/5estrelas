@@ -60,6 +60,14 @@ class FinanceiroConfigCatalog
                 'href' => '/financeiro/bancos',
                 'permission' => 'financeiro.bancos.visualizar',
             ],
+            [
+                'key' => 'open_finance',
+                'label' => 'Open Finance (TecnoSpeed)',
+                'description' => 'Conexão técnica, pagador, conta e consentimento Open Finance.',
+                'icon' => 'pi pi-link',
+                'href' => '/open-finance',
+                'permission' => 'open_finance.visualizar',
+            ],
         ];
     }
 

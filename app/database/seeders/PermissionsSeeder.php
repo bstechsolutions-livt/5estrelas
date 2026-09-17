@@ -56,6 +56,8 @@ class PermissionsSeeder extends Seeder
             ['key' => 'financeiro.conciliacao.visualizar', 'label' => 'Ver conciliação bancária', 'module' => 'financeiro', 'description' => 'Acessar módulo de conciliação com extratos OFX.'],
             ['key' => 'financeiro.bancos.visualizar', 'label' => 'Ver contas bancárias', 'module' => 'financeiro', 'description' => 'Listar contas bancárias cadastradas para conciliação.'],
             ['key' => 'financeiro.bancos.gerenciar', 'label' => 'Gerenciar contas bancárias', 'module' => 'financeiro', 'description' => 'Cadastrar, editar e ativar/desativar contas bancárias.'],
+            ['key' => 'open_finance.visualizar', 'label' => 'Ver status Open Finance', 'module' => 'open_finance', 'description' => 'Consultar a conexão técnica TecnoSpeed e o status das contas Open Finance.'],
+            ['key' => 'open_finance.gerenciar', 'label' => 'Gerenciar Open Finance', 'module' => 'open_finance', 'description' => 'Configurar pagador, vincular conta, gerar link de autorização e confirmar o conector.'],
             ['key' => 'financeiro.workflows.configurar', 'label' => 'Configurar fluxos de aprovação', 'module' => 'financeiro', 'description' => 'Editar trilhas de aprovação por área/departamento.'],
 
             ['key' => 'backups.gerenciar', 'label' => 'Gerenciar backups', 'module' => 'backups', 'description' => 'Executar e restaurar backups do sistema.'],
