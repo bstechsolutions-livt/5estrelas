@@ -210,8 +210,10 @@ function formatCheckedAt(iso) {
 
                         <p class="text-sm text-slate-600 dark:text-slate-300 m-0">
                             {{ payer.last_status_label }}
-                            <span class="text-slate-400">·</span>
-                            {{ formatCheckedAt(payer.last_checked_at) }}
+                            <template v-if="payer.last_checked_at">
+                                <span class="text-slate-400"> · </span>
+                                {{ formatCheckedAt(payer.last_checked_at) }}
+                            </template>
                         </p>
 
                         <p
