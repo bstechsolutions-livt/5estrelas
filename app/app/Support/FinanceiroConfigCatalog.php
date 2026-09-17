@@ -53,6 +53,14 @@ class FinanceiroConfigCatalog
                 'permission' => 'financeiro.workflows.configurar',
             ],
             [
+                'key' => 'open_finance',
+                'label' => 'Open Finance (TecnoSpeed)',
+                'description' => 'Verifique a conexão e cadastre/ative os pagadores (CNPJs) para Extrato Open Finance.',
+                'icon' => 'pi pi-link',
+                'href' => '/open-finance',
+                'permission' => 'open_finance.visualizar',
+            ],
+            [
                 'key' => 'bancos',
                 'label' => 'Contas bancárias',
                 'description' => 'Cadastro de contas para conciliação OFX (importação inicial da Senior, gestão na intranet).',

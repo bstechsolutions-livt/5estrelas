@@ -58,6 +58,9 @@ class PermissionsSeeder extends Seeder
             ['key' => 'financeiro.bancos.gerenciar', 'label' => 'Gerenciar contas bancárias', 'module' => 'financeiro', 'description' => 'Cadastrar, editar e ativar/desativar contas bancárias.'],
             ['key' => 'financeiro.workflows.configurar', 'label' => 'Configurar fluxos de aprovação', 'module' => 'financeiro', 'description' => 'Editar trilhas de aprovação por área/departamento.'],
 
+            ['key' => 'open_finance.visualizar', 'label' => 'Ver status Open Finance', 'module' => 'open_finance', 'description' => 'Consultar a conexão TecnoSpeed e o estado dos pagadores (CNPJs) no Open Finance.'],
+            ['key' => 'open_finance.gerenciar', 'label' => 'Cadastrar/ativar pagadores Open Finance', 'module' => 'open_finance', 'description' => 'Cadastrar pagador na TecnoSpeed e ativar Extrato/Open Finance (statementActived).'],
+
             ['key' => 'backups.gerenciar', 'label' => 'Gerenciar backups', 'module' => 'backups', 'description' => 'Executar e restaurar backups do sistema.'],
 
             ['key' => 'contratos.visualizar', 'label' => 'Ver gestão de contratos', 'module' => 'contratos', 'description' => 'Acessar painel e indicadores de contratos.'],

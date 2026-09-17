@@ -27,6 +27,7 @@ const moduleLabels = {
     sistema: 'Sistema',
     usuarios: 'Usuários',
     aparencia: 'Aparência',
+    open_finance: 'Open Finance',
 }
 
 function moduleLabel(key) {

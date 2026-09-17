@@ -1,44 +1,58 @@
 <?php
 
+use App\Http\Controllers\ApprovalFlowConfigController;
+use App\Http\Controllers\ApprovalPendingController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\ForcePasswordChangeController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
-use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\AuthorizationPanelController;
 use App\Http\Controllers\BackupController;
-use App\Http\Controllers\BorderoController;
-use App\Http\Controllers\BranchController;
-use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankConciliationController;
-use App\Http\Controllers\PayableController;
-use App\Http\Controllers\PayableAlcadaController;
-use App\Http\Controllers\PayableDepartmentRulesController;
+use App\Http\Controllers\BorderoAutoRuleController;
+use App\Http\Controllers\BorderoController;
+use App\Http\Controllers\BranchController;
+use App\Http\Controllers\ChartOfAccountController;
+use App\Http\Controllers\Comercial\ComercialClienteController;
+use App\Http\Controllers\Comercial\ComercialConfigController;
+use App\Http\Controllers\Comercial\ComercialContratoController;
+use App\Http\Controllers\Comercial\ComercialCotacaoController;
+use App\Http\Controllers\Comercial\ComercialDashboardController;
+use App\Http\Controllers\Comercial\ComercialFaturamentoController;
+use App\Http\Controllers\Comercial\ComercialPropostaController;
+use App\Http\Controllers\Comercial\ComercialReajusteController;
+use App\Http\Controllers\Comercial\ComercialSaudeController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
-use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\DeviceTokenController;
+use App\Http\Controllers\FinanceiroConfiguracaoController;
+use App\Http\Controllers\FinanceiroDashboardController;
+use App\Http\Controllers\HealthController;
+use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OpenFinance\ConnectionStatusController;
+use App\Http\Controllers\OpenFinance\PayerController;
+use App\Http\Controllers\PayableAlcadaController;
+use App\Http\Controllers\PayableController;
+use App\Http\Controllers\PayableDepartmentRulesController;
+use App\Http\Controllers\PayableSyncMonitorController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\PostInteractionController;
+use App\Http\Controllers\PresidencyDeskController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReceivableController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SolicitacoesController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Http\Controllers\UserShortcutController;
 use App\Http\Controllers\v2\GestaoContratosController;
 use App\Http\Controllers\v2\GestaoEquipamentosController;
-use App\Http\Controllers\SolicitacoesController;
-use App\Http\Controllers\Comercial\ComercialClienteController;
-use App\Http\Controllers\Comercial\ComercialConfigController;
-use App\Http\Controllers\Comercial\ComercialCotacaoController;
-use App\Http\Controllers\Comercial\ComercialFaturamentoController;
-use App\Http\Controllers\Comercial\ComercialPropostaController;
-use App\Http\Controllers\Comercial\ComercialReajusteController;
-use App\Http\Controllers\Comercial\ComercialSaudeController;
-use App\Http\Controllers\Comercial\ComercialContratoController;
-use App\Http\Controllers\Comercial\ComercialDashboardController;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 // Guest routes
 Route::middleware('guest')->group(function () {
@@ -159,24 +173,34 @@ Route::middleware('auth')->group(function () {
     });
 
     // Financeiro - Contas a Pagar - Alçada (gestão de quem paga/concilia/assina)
-    Route::get('financeiro/dashboard', [\App\Http\Controllers\FinanceiroDashboardController::class, 'index'])
+    Route::get('financeiro/dashboard', [FinanceiroDashboardController::class, 'index'])
         ->middleware('permission:financeiro.contas_pagar.visualizar')
         ->name('financeiro.dashboard.index');
- // Minhas Pendências de Aprovação (Financeiro)
- Route::get("financeiro/pendencias", [\App\Http\Controllers\ApprovalPendingController::class, "index"])->name("approval-pending.index");
- Route::get('financeiro/presidencia', [\App\Http\Controllers\PresidencyDeskController::class, 'index'])
-     ->middleware('permission:financeiro.presidencia.painel')
-     ->name('presidency-desk.index');
- Route::get('financeiro/autorizacoes', [\App\Http\Controllers\AuthorizationPanelController::class, 'index'])
-     ->middleware('permission:financeiro.contas_pagar.visualizar')
-     ->name('authorization-panel.index');
- Route::get('financeiro/configuracao', [\App\Http\Controllers\FinanceiroConfiguracaoController::class, 'index'])
-     ->name('financeiro.configuracao.index');
-    Route::get('financeiro/sync-senior', [\App\Http\Controllers\PayableSyncMonitorController::class, 'index'])
+    // Minhas Pendências de Aprovação (Financeiro)
+    Route::get('financeiro/pendencias', [ApprovalPendingController::class, 'index'])->name('approval-pending.index');
+    Route::get('financeiro/presidencia', [PresidencyDeskController::class, 'index'])
+        ->middleware('permission:financeiro.presidencia.painel')
+        ->name('presidency-desk.index');
+    Route::get('financeiro/autorizacoes', [AuthorizationPanelController::class, 'index'])
+        ->middleware('permission:financeiro.contas_pagar.visualizar')
+        ->name('authorization-panel.index');
+    Route::get('financeiro/configuracao', [FinanceiroConfiguracaoController::class, 'index'])
+        ->name('financeiro.configuracao.index');
+
+    Route::get('open-finance', [ConnectionStatusController::class, 'index'])
+        ->middleware('permission:open_finance.visualizar')
+        ->name('open-finance.index');
+    Route::post('open-finance/payers/verify', [PayerController::class, 'verify'])
+        ->middleware('permission:open_finance.visualizar')
+        ->name('open-finance.payers.verify');
+    Route::post('open-finance/payers/ensure', [PayerController::class, 'ensure'])
+        ->middleware('permission:open_finance.gerenciar')
+        ->name('open-finance.payers.ensure');
+    Route::get('financeiro/sync-senior', [PayableSyncMonitorController::class, 'index'])
         ->middleware('permission:financeiro.workflows.configurar')
         ->name('financeiro.sync-senior.index');
- Route::get("financeiro/fluxos-aprovacao", [\App\Http\Controllers\ApprovalFlowConfigController::class, "index"])->middleware("permission:financeiro.workflows.configurar")->name("approval-flow-config.index");
- Route::post("financeiro/fluxos-aprovacao", [\App\Http\Controllers\ApprovalFlowConfigController::class, "update"])->middleware("permission:financeiro.workflows.configurar")->name("approval-flow-config.update");
+    Route::get('financeiro/fluxos-aprovacao', [ApprovalFlowConfigController::class, 'index'])->middleware('permission:financeiro.workflows.configurar')->name('approval-flow-config.index');
+    Route::post('financeiro/fluxos-aprovacao', [ApprovalFlowConfigController::class, 'update'])->middleware('permission:financeiro.workflows.configurar')->name('approval-flow-config.update');
     Route::prefix('financeiro/contas-pagar/alcada')->middleware('permission:financeiro.contas_pagar.alcada_gerenciar')->group(function () {
         Route::get('/', [PayableAlcadaController::class, 'index'])->name('payables.alcada.index');
         Route::post('/', [PayableAlcadaController::class, 'store'])->name('payables.alcada.store');
@@ -225,11 +249,11 @@ Route::middleware('auth')->group(function () {
 
     // Financeiro - Contas a Receber (read-only Senior)
     Route::prefix('financeiro/contas-receber')->middleware('permission:financeiro.contas_receber.visualizar')->group(function () {
-        Route::get('/', [\App\Http\Controllers\ReceivableController::class, 'index'])->name('receivables.index');
-        Route::get('/{id}', [\App\Http\Controllers\ReceivableController::class, 'show'])->whereNumber('id')->name('receivables.show');
+        Route::get('/', [ReceivableController::class, 'index'])->name('receivables.index');
+        Route::get('/{id}', [ReceivableController::class, 'show'])->whereNumber('id')->name('receivables.show');
     });
 
-    Route::get('financeiro/plano-de-contas', [\App\Http\Controllers\ChartOfAccountController::class, 'index'])
+    Route::get('financeiro/plano-de-contas', [ChartOfAccountController::class, 'index'])
         ->middleware('permission:financeiro.plano_contas.visualizar')
         ->name('chart-of-accounts.index');
 
@@ -277,34 +301,34 @@ Route::middleware('auth')->group(function () {
 
     // Financeiro - Borderôs
     Route::prefix('financeiro/borderos')->middleware('permission:financeiro.borderos.visualizar')->group(function () {
-        Route::get('/automatico', [\App\Http\Controllers\BorderoAutoRuleController::class, 'index'])
+        Route::get('/automatico', [BorderoAutoRuleController::class, 'index'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.index');
-        Route::get('/automatico/criar', [\App\Http\Controllers\BorderoAutoRuleController::class, 'create'])
+        Route::get('/automatico/criar', [BorderoAutoRuleController::class, 'create'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.create');
-        Route::post('/automatico', [\App\Http\Controllers\BorderoAutoRuleController::class, 'store'])
+        Route::post('/automatico', [BorderoAutoRuleController::class, 'store'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.store');
-        Route::post('/automatico/simular', [\App\Http\Controllers\BorderoAutoRuleController::class, 'simulate'])
+        Route::post('/automatico/simular', [BorderoAutoRuleController::class, 'simulate'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.simulate');
-        Route::get('/automatico/opcoes-filtro', [\App\Http\Controllers\BorderoAutoRuleController::class, 'filterOptions'])
+        Route::get('/automatico/opcoes-filtro', [BorderoAutoRuleController::class, 'filterOptions'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.filter-options');
-        Route::post('/automatico/agendamento/toggle', [\App\Http\Controllers\BorderoAutoRuleController::class, 'toggleScheduler'])
+        Route::post('/automatico/agendamento/toggle', [BorderoAutoRuleController::class, 'toggleScheduler'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.toggle-scheduler');
-        Route::get('/automatico/{rule}/editar', [\App\Http\Controllers\BorderoAutoRuleController::class, 'edit'])
+        Route::get('/automatico/{rule}/editar', [BorderoAutoRuleController::class, 'edit'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.edit');
-        Route::put('/automatico/{rule}', [\App\Http\Controllers\BorderoAutoRuleController::class, 'update'])
+        Route::put('/automatico/{rule}', [BorderoAutoRuleController::class, 'update'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.update');
-        Route::delete('/automatico/{rule}', [\App\Http\Controllers\BorderoAutoRuleController::class, 'destroy'])
+        Route::delete('/automatico/{rule}', [BorderoAutoRuleController::class, 'destroy'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.destroy');
-        Route::post('/automatico/{rule}/toggle', [\App\Http\Controllers\BorderoAutoRuleController::class, 'toggle'])
+        Route::post('/automatico/{rule}/toggle', [BorderoAutoRuleController::class, 'toggle'])
             ->middleware('permission:financeiro.borderos.automatico_gerenciar')
             ->name('borderos.auto-rules.toggle');
         Route::get('/', [BorderoController::class, 'index'])->name('borderos.index');
@@ -341,7 +365,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Busca global
-    Route::get('/search', \App\Http\Controllers\SearchController::class)->name('search');
+    Route::get('/search', SearchController::class)->name('search');
 
     // ═══════════════════════════════════════════════════════════════
     //   GESTÃO DE CONTRATOS (portado da intranet Biglar)
@@ -662,4 +686,4 @@ Route::get('/', function () {
 });
 
 // Health check público (pra monitoramento externo / load balancer)
-Route::get('/health', \App\Http\Controllers\HealthController::class)->name('health');
+Route::get('/health', HealthController::class)->name('health');
