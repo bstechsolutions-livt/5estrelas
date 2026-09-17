@@ -375,11 +375,12 @@ function bankLine(account) {
 
                         <div v-if="can_manage" class="flex flex-col sm:flex-row gap-2">
                             <Button
+                                v-if="account.status !== 'conectada'"
                                 :label="actionLabel(account)"
                                 :icon="account.actions.includes('authorize') ? 'pi pi-external-link' : 'pi pi-link'"
                                 size="small"
                                 :loading="isBusy(account.id)"
-                                :disabled="isBusy(account.id) || (p2_blocked && account.status !== 'conectada')"
+                                :disabled="isBusy(account.id) || p2_blocked"
                                 dusk="open-finance-account-primary"
                                 @click="primaryAction(account)"
                             />
@@ -387,8 +388,8 @@ function bankLine(account) {
                                 v-if="account.actions.includes('verify')"
                                 label="Verificar conexão"
                                 icon="pi pi-search"
-                                severity="secondary"
-                                outlined
+                                :severity="account.status === 'conectada' ? 'success' : 'secondary'"
+                                :outlined="account.status !== 'conectada'"
                                 size="small"
                                 :loading="isBusy(account.id)"
                                 :disabled="isBusy(account.id) || p2_blocked"
